@@ -5,20 +5,6 @@ const path = require('path');
 const prisma = new PrismaClient();
 
 async function main() {
-  // 1. Tạo User mặc định (Nếu chưa có)
-  const user = await prisma.user.upsert({
-    where: { email: 'student@gmail.com' },
-    update: {},
-    create: {
-      email: 'student@gmail.com',
-      password: '123',
-      name: 'Student One',
-      // Nếu schema User của bạn có password hay trường khác thì điền vào đây
-    },
-  });
-
-  console.log('Created/Found User with ID:', user.id);
-
   console.log('🌱 Đang khởi tạo dữ liệu...');
 
   // 1. Xóa dữ liệu cũ

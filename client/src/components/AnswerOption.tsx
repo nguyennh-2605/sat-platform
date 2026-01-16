@@ -37,7 +37,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
         w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold border transition-colors
         ${isSelected && !isEliminated ? 'bg-indigo-600 text-white border-indigo-600'
           : 'bg-white text-gray-500 border-gray-500 group-hover:border-indigo-400 group-hover:text-indigo-500'}
-        ${isEliminated ? 'text-gray-500 border-gray-500' : ''}
+        ${isEliminated ? 'text-gray-500 border-gray-300' : ''}
       `}>
         {label}
       </div>
