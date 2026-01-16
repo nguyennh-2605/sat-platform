@@ -43,7 +43,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
       </div>
 
       {/* 2. NỘI DUNG ĐÁP ÁN */}
-      <span className="font-serif text-[1.05rem] font-normal tracking-[-0.005em]">
+      <span className="font-sans text-[1.05rem] font-normal tracking-[-0.005em]">
         {content}
       </span>
 

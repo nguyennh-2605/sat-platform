@@ -55,36 +55,61 @@
           "blocks": [
             {
               "type": "text",
-              "content": "The spacecraft OSIRIS-REx briefly made contact with the asteroid 101955 Bennu in 2020. NASA scientist Daniella DellaGiustina reports that despite facing the unexpected obstacle of a surface mostly covered in boulders, OSIRIS-REx successfully _______ a sample of the surface, gathering pieces of it to bring back to Earth."
+              "content": "Documented Publications of Langston Hughes, Gwendolyn Brooks, Dorothy West, and Edna Ferber"
+            },
+            {
+              "type": "table",
+              "headers": ["Individual", "Years active", "Number of credited works published"],
+              "rows": [
+                ["Langston Hughes", "1921-1967", "8 poetry collections, 50 short stories, 5 plays"],
+                ["Gwendolyn Brooks", "1945-1987", "4 poetry collections, 3 novels"],
+                ["Dorothy West", "1926-1995", "2 novels, 50-100 editorial pieces"],
+                ["Edna Ferber", "1911-1958", "12 novels, 80-150 short stories, 20 plays"]
+              ]
+            },
+            {
+              "type": "text",
+              "content":"Some scholars examining twentieth-century American literary figures have focused on authors who were active during the early- to mid-1900s, when writers such as Langston Hughes, Gwendolyn Brooks, Dorothy West, and Edna Ferber were associated in one way or another with many different publications. Unfortunately, incomplete documentation from this period suggests that the numbers of these four authors' contributions to the literary record should not be viewed as exhaustive; it's entirely possible, for instance, that _______"
             }
           ],
-          "questionText": "Which choice completes the text with the most logical and precise word or phrase?",
+          "questionText": "Which choice most effectively uses the data from the table to complete the example?",
           "correctAnswer": "B",
           "choices": [
-            { "id": "A", "text": "attached" },
-            { "id": "B", "text": "collected" },
-            { "id": "C", "text": "followed" },
-            { "id": "D", "text": "replaced" }
+            { "id": "A", "text": "Langston Hughes published exactly 50 short stories and eight poetry collections." },
+            { "id": "B", "text": "Gwendolyn Brooks published considerably fewer novels than Edna Ferber, who is credited with 12." },
+            { "id": "C", "text": "Dorothy West's two credited novels include some that were written after 1995." },
+            { "id": "D", "text": "Edna Ferber wrote more than 20 plays and Dorothy West produced more than 100 editorial pieces." }
           ]
         },
         {
           "blocks": [
             {
-              "type": "image",
-              "src": ""
-            },
-            {
               "type": "text",
-              "content": "A nonprofit organization tracks the percentage of women elected to serve in state legislatures across the United States in order to report on the gap between the number of men and women serving in government. Among the states with the highest proportions of female legislators are Nevada, Colorado, Oregon (which only has data reported for its state house), Washington, and Arizona. In some cases, the percentage of women serving in these legislatures was found to be especially notable; for instance, _______"
+              "content": "The following text is adapted from Countee Cullen's 1926 poem “Thoughts in a Zoo.” "
+            },
+            { 
+              "type": "poem",
+              "lines": [
+                "They in their cruel traps, and we in ours,",
+                "Survey each other's rage, and pass the hours",
+                "Commiserating each the other's woe,",
+                "To mitigate his own pain's fiery glow.",
+                "Man could but little proffer in exchange",
+                "Save that his cages have a larger range.",
+                "That lion with his lordly, untamed heart",
+                "Has in some man his human counterpart,",
+                "Some lofty soul in dreams and visions wrapped,",
+                "But in the stifling flesh securely trapped."
+              ]
             }
           ],
-          "questionText": "Which choice most effectively uses data from the graph to complete the example?",
-          "correctAnswer": "B",
+          "questionText": "Based on the text, what challenge do humans sometimes experience?",
+          "correctAnswer": "D",
           "choices": [
-            { "id": "A", "text": "attached" },
-            { "id": "B", "text": "collected" },
-            { "id": "C", "text": "followed" },
-            { "id": "D", "text": "replaced" }
+            { "id": "A", "text": "They cannot effectively tame certain wild animals because of a lack of compassion." },
+            { "id": "B", "text": "They cannot focus on setting attainable goals because of a lack of motivation." },
+            { "id": "C", "text": "They quickly become frustrated when faced with difficult tasks because of a lack of self-control." },
+            { "id": "D", "text": "They have aspirations that cannot be fulfilled because of certain limitations." }
           ]
         }
       ]

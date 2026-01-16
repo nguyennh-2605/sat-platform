@@ -14,9 +14,23 @@ export interface ImageBlock {
   caption?: string; // Chú thích ảnh (optional)
 }
 
+export interface TableBlock {
+  type: 'table';
+  title?: string;
+  headers: string[];
+  rows: string[][];
+  note?: string;
+}
+
+export interface PoemBlock {
+  type: 'poem';
+  title?: string;        // Tên bài thơ
+  author?: string;       // Tác giả
+  lines: string[];       // Mảng chứa từng dòng thơ (để xuống dòng cho chuẩn)
+}
+
 // 3. Gom tất cả các loại khối lại thành một kiểu chung
-// (Sau này có thêm Table hay Poem thì thêm vào đây: | TableBlock | PoemBlock)
-export type ContentBlock = TextBlock | ImageBlock;
+export type ContentBlock = TextBlock | ImageBlock | TableBlock | PoemBlock;
 
 // 4. Định nghĩa khuôn mẫu cho một CÂU HỎI hoàn chỉnh
 export interface QuestionData {

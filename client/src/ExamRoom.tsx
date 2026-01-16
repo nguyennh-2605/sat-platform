@@ -634,7 +634,7 @@ function ExamRoom() {
           <div className="flex-1 flex overflow-hidden">
           {/* 👈 CỘT TRÁI: CHỈ HIỆN BLOCKS (Bài đọc, Graph...) */}
             <div className="w-1/2 p-8 border-r border-gray-200 overflow-y-auto bg-white custom-scrollbar">
-              <div   className=" font-['Georgia','Times_New_Roman',serif] text-[1.05rem] font-normal text-slate-800 leading-[1.45] tracking-[-0.01em] whitespace-pre-line">
+              <div   className=" font-['Georgia','Times_New_Roman', serif] text-[1.05rem] font-normal text-slate-800 leading-[1.45] tracking-[-0.01em] whitespace-pre-line">
                 {/* Nếu không có block nào (ví dụ câu hỏi ngắn) thì ẩn hoặc hiện placeholder */}
                 {currentQ.blocks && currentQ.blocks.length > 0 ? (
                     <BlockRenderer blocks={currentQ.blocks} />
@@ -663,7 +663,7 @@ function ExamRoom() {
 
                 <h3
                   className="
-                    font-serif text-[1.125rem] font-normal text-slate-800 leading-[1.5]
+                    font-sans text-[1.125rem] font-normal text-slate-800 leading-[1.5]
                     tracking-[-0.01em]
                     mb-8
                   "
