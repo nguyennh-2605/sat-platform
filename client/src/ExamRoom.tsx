@@ -309,7 +309,7 @@ function ExamRoom() {
       if (document.hidden) {
         setViolationCount(prev => {
           const newCount = prev + 1;
-          if (newCount > 50) finishTest("Vi phạm quy chế (rời màn hình) quá 3 lần.");
+          if (newCount > 3) finishTest("Vi phạm quy chế (rời màn hình) quá 3 lần.");
           else alert(`⚠️ CẢNH BÁO (${newCount}/3): Đừng rời khỏi màn hình!`);
           return newCount;
         });
@@ -334,14 +334,43 @@ function ExamRoom() {
 
     const handleContextMenu = (e: Event) => e.preventDefault();
 
+    // 2. Chặn Copy, Cut, Paste
+    const handleCopyCutPaste = (e: ClipboardEvent) => e.preventDefault();
+
+    // 3. Chặn phím tắt (Ctrl+C, Ctrl+V, Ctrl+A, F12, Ctrl+Shift+I)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Chặn F12 (DevTools)
+      if (e.key === 'F12') {
+        e.preventDefault();
+        return;
+      }
+      // Chặn các tổ hợp phím Ctrl/Command
+      if (e.ctrlKey || e.metaKey) {
+        const key = e.key.toLowerCase();
+        // c=copy, v=paste, x=cut, a=select all, u=view source, i=inspect
+        if (['c', 'v', 'x', 'a', 'u', 'i'].includes(key)) {
+          e.preventDefault();
+        }
+      }
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener('copy', handleCopyCutPaste);
+    document.addEventListener('cut', handleCopyCutPaste);
+    document.addEventListener('paste', handleCopyCutPaste);
+    document.addEventListener('keydown', handleKeyDown);
+
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("contextmenu", handleContextMenu);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      document.addEventListener("fullscreenchange", handleFullscreenChange);
+      document.addEventListener("contextmenu", handleContextMenu);
+      document.addEventListener('copy', handleCopyCutPaste);
+      document.addEventListener('cut', handleCopyCutPaste);
+      document.addEventListener('paste', handleCopyCutPaste);
+      document.addEventListener('keydown', handleKeyDown);
     };
   }, [isTimerRunning, finishTest, isSubmitted]);
 
@@ -580,13 +609,13 @@ function ExamRoom() {
                   onClick={() => setPhase('MODULE_1')} 
                   className="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition"
                 >
-                  ⬅ Quay lại sửa bài
+                  Quay lại sửa bài
                 </button>
                 <button 
                   onClick={startModule2} 
                   className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg transition transform hover:scale-105"
                 >
-                  Bắt đầu Module 2 ➡
+                  Bắt đầu Module 2
                 </button>
               </div>
           </div>
