@@ -1,0 +1,93 @@
+{
+  "title": "Digital SAT Practice Test #1",
+  "description": "Reading and Writing - Full Test",
+  "duration": 64,
+  "sections": [
+    {
+      "name": "Reading and Writing - Module 1",
+      "order": 1,
+      "duration": 32,
+      "questions": [
+        {
+          "blocks": [
+            {
+              "type": "text",
+              "content": "The spacecraft OSIRIS-REx briefly made contact with the asteroid 101955 Bennu in 2020. NASA scientist Daniella DellaGiustina reports that despite facing the unexpected obstacle of a surface mostly covered in boulders, OSIRIS-REx successfully _______ a sample of the surface, gathering pieces of it to bring back to Earth."
+            }
+          ],
+          "questionText": "Which choice completes the text with the most logical and precise word or phrase?",
+          "correctAnswer": "B",
+          "choices": [
+            { "id": "A", "text": "attached" },
+            { "id": "B", "text": "collected" },
+            { "id": "C", "text": "followed" },
+            { "id": "D", "text": "replaced" }
+          ]
+        },
+        {
+          "blocks": [
+            {
+              "type": "image",
+              "src": "/images/_car sales.jpg" 
+            },
+            {
+              "type": "text",
+              "content": "A nonprofit organization tracks the percentage of women elected to serve in state legislatures across the United States in order to report on the gap between the number of men and women serving in government. Among the states with the highest proportions of female legislators are Nevada, Colorado, Oregon (which only has data reported for its state house), Washington, and Arizona. In some cases, the percentage of women serving in these legislatures was found to be especially notable; for instance, _______"
+            }
+          ],
+          "questionText": "Which choice most effectively uses data from the graph to complete the example?",
+          "correctAnswer": "B",
+          "choices": [
+            { "id": "A", "text": "attached" },
+            { "id": "B", "text": "collected" },
+            { "id": "C", "text": "followed" },
+            { "id": "D", "text": "replaced" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reading and Writing - Module 2",
+      "order": 2,
+      "duration": 32,
+      "questions": [
+        {
+          "blocks": [
+            {
+              "type": "text",
+              "content": "The spacecraft OSIRIS-REx briefly made contact with the asteroid 101955 Bennu in 2020. NASA scientist Daniella DellaGiustina reports that despite facing the unexpected obstacle of a surface mostly covered in boulders, OSIRIS-REx successfully _______ a sample of the surface, gathering pieces of it to bring back to Earth."
+            }
+          ],
+          "questionText": "Which choice completes the text with the most logical and precise word or phrase?",
+          "correctAnswer": "B",
+          "choices": [
+            { "id": "A", "text": "attached" },
+            { "id": "B", "text": "collected" },
+            { "id": "C", "text": "followed" },
+            { "id": "D", "text": "replaced" }
+          ]
+        },
+        {
+          "blocks": [
+            {
+              "type": "image",
+              "src": ""
+            },
+            {
+              "type": "text",
+              "content": "A nonprofit organization tracks the percentage of women elected to serve in state legislatures across the United States in order to report on the gap between the number of men and women serving in government. Among the states with the highest proportions of female legislators are Nevada, Colorado, Oregon (which only has data reported for its state house), Washington, and Arizona. In some cases, the percentage of women serving in these legislatures was found to be especially notable; for instance, _______"
+            }
+          ],
+          "questionText": "Which choice most effectively uses data from the graph to complete the example?",
+          "correctAnswer": "B",
+          "choices": [
+            { "id": "A", "text": "attached" },
+            { "id": "B", "text": "collected" },
+            { "id": "C", "text": "followed" },
+            { "id": "D", "text": "replaced" }
+          ]
+        }
+      ]
+    }
+  ]
+}

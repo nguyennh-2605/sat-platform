@@ -1,0 +1,107 @@
+// server/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Enum cho phân quyền
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+// 2. Bảng người dùng
+model User {
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  password    String
+  name        String?      // Tên hiển thị
+  role        Role         @default(STUDENT) // Dùng Enum Role ở đây
+  createdAt   DateTime     @default(now())
+  
+  submissions Submission[]
+}
+
+// 3. Bảng Đề thi (Ví dụ: SAT Practice Test #1)
+model Test {
+  id          Int          @id @default(autoincrement())
+  title       String
+  description String?
+  duration    Int          @default(1920) // Tổng thời gian (để hiển thị)
+  
+  sections    Section[]    // 1 Bài thi có nhiều phần (Module 1, Module 2)
+  submissions Submission[]
+}
+
+// 4. Bảng Phần thi (Ví dụ: Reading Module 1, Math Module 2)
+model Section {
+  id        Int        @id @default(autoincrement())
+  name      String     // VD: "Reading & Writing - Module 1"
+  order     Int        // Thứ tự: 1, 2, 3...
+  duration  Int        // Thời gian riêng cho section này (giây)
+  
+  testId    Int
+  test      Test       @relation(fields: [testId], references: [id])
+  
+  questions Question[] // 1 Section có nhiều câu hỏi
+}
+
+// 5. Bảng Câu hỏi
+model Question {
+  id            Int      @id @default(autoincrement())
+  blocks        Json     // Cột trái chứa passage, table, graph, ...
+  questionText  String   @db.Text
+  
+  // Lưu danh sách đáp án dưới dạng JSON
+  // Cấu trúc: [{"id": "A", "text": "Answer 1"}, {"id": "B", "text": "Answer 2"}]
+  choices       Json     
+  
+  correctAnswer String   // "A", "B", "C", hoặc "D"
+  
+  sectionId     Int
+  section       Section  @relation(fields: [sectionId], references: [id])
+
+  // Quan hệ ngược để biết câu này đã được trả lời thế nào trong các bài nộp
+  answers       Answer[] 
+}
+
+// 6. Bảng Nộp bài (Lịch sử thi)
+model Submission {
+  id             Int       @id @default(autoincrement())
+  startTime      DateTime  @default(now())
+  endTime        DateTime?
+  score          Int?      // Điểm số
+  startedAt      DateTime  @default(now())
+  status         String    @default("DOING")
+  
+  // Các field chống gian lận
+  violationCount Int       @default(0)
+  terminated     Boolean   @default(false)
+  submitReason   String?   // Lý do nộp: "Hết giờ", "Nộp bài", "Vi phạm"
+
+  userId         Int
+  user           User      @relation(fields: [userId], references: [id])
+  
+  testId         Int
+  test           Test      @relation(fields: [testId], references: [id])
+
+  answers        Answer[]
+}
+
+// 7. Bảng Chi tiết câu trả lời của User
+model Answer {
+  id             Int        @id @default(autoincrement())
+  selectedChoice String?    // User chọn "A", "B"... (Nếu null là bỏ qua)
+  isCorrect      Boolean    @default(false)
+  
+  submissionId   Int
+  submission     Submission @relation(fields: [submissionId], references: [id])
+  
+  questionId     Int
+  question       Question   @relation(fields: [questionId], references: [id])
+}

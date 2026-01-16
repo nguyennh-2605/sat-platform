@@ -1,0 +1,196 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+function Dashboard() {
+  const navigate = useNavigate();
+  // State tab
+  const [activeTab, setActiveTab] = useState('practice');
+
+  // --- STATE MỚI ĐỂ LƯU DỮ LIỆU TỪ API ---
+  const [tests, setTests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // --- GỌI API KHI COMPONENT LOAD ---
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+
+    // Tạo URL: Nếu có userId thì kẹp thêm vào đuôi
+    const url = userId ? `http://localhost:5000/api/tests?userId=${userId}` : 'http://localhost:5000/api/tests'
+
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        setTests(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Lỗi tải danh sách bài thi:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    navigate('/');
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-50 font-sans">
+      
+      {/* --- SIDEBAR BÊN TRÁI (GIỮ NGUYÊN) --- */}
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        {/* Logo khu vực Dashboard */}
+        <div className="p-6 border-b border-gray-100 flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">S</div>
+          <span className="text-xl font-bold text-slate-800">SAT Master</span>
+        </div>
+
+        {/* Menu Items */}
+        <nav className="flex-1 p-4 space-y-2">
+          
+          {/* Mục 1: Practice Test */}
+          <button
+            onClick={() => setActiveTab('practice')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeTab === 'practice' 
+                ? 'bg-blue-50 text-blue-700 font-semibold' 
+                : 'text-slate-600 hover:bg-gray-100'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+            Practice Test
+          </button>
+
+          {/* Mục 2: Vocabulary */}
+          <button
+            onClick={() => setActiveTab('vocab')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeTab === 'vocab' 
+                ? 'bg-blue-50 text-blue-700 font-semibold' 
+                : 'text-slate-600 hover:bg-gray-100'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            Vocabulary
+          </button>
+
+          {/* Mục 3: Homework */}
+          <button
+            onClick={() => setActiveTab('homework')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeTab === 'homework' 
+                ? 'bg-blue-50 text-blue-700 font-semibold' 
+                : 'text-slate-600 hover:bg-gray-100'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Homework
+          </button>
+        </nav>
+
+        {/* User Profile & Logout */}
+        <div className="p-4 border-t border-gray-200">
+           <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
+                {localStorage.getItem('userName')?.charAt(0) || 'U'}
+              </div>
+              <div className="text-sm">
+                <p className="font-semibold text-slate-800">{localStorage.getItem('userName') || 'Học viên'}</p>
+                <p className="text-slate-500 text-xs">Free Plan</p>
+              </div>
+           </div>
+           <button 
+             onClick={handleLogout}
+             className="w-full text-center text-sm text-red-600 hover:bg-red-50 py-2 rounded-md transition"
+           >
+             Đăng xuất
+           </button>
+        </div>
+      </aside>
+
+
+      {/* --- NỘI DUNG BÊN PHẢI (MAIN CONTENT) --- */}
+      <main className="flex-1 overflow-y-auto p-8">
+        
+        {/* NỘI DUNG TAB: PRACTICE TEST */}
+        {activeTab === 'practice' && (
+          <div className="space-y-6">
+            <h2 className="text-3xl font-bold text-slate-800">Thư viện đề thi</h2>
+            <p className="text-slate-600">Chọn một bài thi để bắt đầu luyện tập.</p>
+            
+            {/* Hiển thị Loading hoặc Grid danh sách */}
+            {loading ? (
+              <div className="text-center py-10 text-slate-500">⏳ Đang tải danh sách đề thi...</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                
+                {/* --- RENDER LIST TỪ API --- */}
+                {tests.map((test, index) => (
+                  <div key={test.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
+                    <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 mb-4">
+                      <span className="font-bold text-xl">{index + 1}</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">{test.title}</h3>
+                    <div className="flex gap-2 text-sm text-slate-500 mb-4">
+                      <span>⏱ {Math.floor(test.duration)} phút</span>
+                      <span>•</span>
+                      <span>{test.description || "Reading & Math"}</span>
+                    </div>
+                    <button 
+                      onClick={() => navigate(`/test/${test.id}`)} 
+                      className={`w-full py-2 text-white rounded-lg font-medium transition ${
+                        test.isDoing
+                          ? "bg-yellow-500 hover:bg-yellow-600"
+                          : "bg-blue-600 hover:bg-blue-700"   
+                      }`}
+                    >
+                      {/* Kiểm tra: Nếu backend trả về isDoing = true thì hiện chữ khác */}
+                      {test.isDoing ? "Tiếp tục làm bài" : "Làm bài ngay"}
+                    </button>
+                  </div>
+                ))}
+
+                {/* Nếu không có bài thi nào */}
+                {tests.length === 0 && (
+                  <div className="col-span-3 text-center py-10 text-gray-400 italic">
+                    Chưa có bài thi nào trong hệ thống.
+                  </div>
+                )}
+                
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* NỘI DUNG TAB: VOCABULARY (GIỮ NGUYÊN) */}
+        {activeTab === 'vocab' && (
+          <div className="space-y-6">
+            <h2 className="text-3xl font-bold text-slate-800">Từ vựng (Vocabulary)</h2>
+            <div className="p-10 text-center bg-white rounded-xl border border-dashed border-gray-300">
+               <p className="text-slate-500">Tính năng đang được phát triển...</p>
+            </div>
+          </div>
+        )}
+
+        {/* NỘI DUNG TAB: HOMEWORK (GIỮ NGUYÊN) */}
+        {activeTab === 'homework' && (
+          <div className="space-y-6">
+             <h2 className="text-3xl font-bold text-slate-800">Bài tập về nhà (Homework)</h2>
+             <div className="p-10 text-center bg-white rounded-xl border border-dashed border-gray-300">
+               <p className="text-slate-500">Chưa có bài tập nào được giao.</p>
+            </div>
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}
+
+export default Dashboard;

@@ -1,0 +1,22 @@
+# Bỏ qua các thư viện nặng (Git không cần lưu cái này, tải lại được bằng npm install)
+node_modules/
+*/node_modules/
+
+# Bỏ qua file môi trường chứa mật khẩu DB (BẢO MẬT)
+.env
+
+# Bỏ qua file build của frontend
+dist/
+build/
+
+# Bỏ qua file database SQLite (nếu bạn dùng sqlite cục bộ)
+*.db
+*.db-journal
+
+# Các file rác hệ thống
+.DS_Store
+Thumbs.db
+
+# Log lỗi
+npm-debug.log*
+yarn-debug.log*
