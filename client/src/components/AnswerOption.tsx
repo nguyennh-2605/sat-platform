@@ -1,5 +1,6 @@
 // FILE: src/components/AnswerOption.tsx
 import React from 'react';
+import InteractiveText from './InteractiveText';
 
 interface AnswerProps {
   label: string;         // Ví dụ: "A", "B", "C"
@@ -24,7 +25,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
       // Nếu bị gạch thì disable click, ngược lại thì cho chọn
       onClick={!isEliminated ? onSelect : undefined} 
       className={`
-        relative flex-1 flex items-center gap-3 p-4 border-2 rounded-2xl select-none bg-white
+        relative flex-1 flex items-center gap-3 p-4 border-2 rounded-2xl bg-white
         transition-all duration-200 ease-in-out overflow-hidden
         ${isEliminated ? 'cursor-default border-gray-200 bg-white' : 'cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-300 hover:shadow-md'}
         ${isSelected && !isEliminated ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-200 ring-offset-1' : 'border-gray-400'}
@@ -44,7 +45,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
 
       {/* 2. NỘI DUNG ĐÁP ÁN */}
       <span className="font-sans text-[1.05rem] font-normal tracking-[-0.005em]">
-        {content}
+        <InteractiveText content={content} />
       </span>
 
       <div className={`

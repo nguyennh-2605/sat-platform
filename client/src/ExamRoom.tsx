@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import QuestionHeader from './components/QuestionHeader';
 import AnswerOption from './components/AnswerOption';
 import BlockRenderer from './components/BlockRenderer';
+import ToolsHeader from './components/ToolsHeader';
+import InteractiveText from './components/InteractiveText';
 
 // 2. Import Type
 import type { QuestionData } from './types/quiz';
@@ -105,6 +107,27 @@ function ExamRoom() {
           });
 
           setQuestions(allQuestions);
+        }
+
+        if (data.session) {
+          const currentSubmissionId = data.session.submissionId;
+          // Lấy ID của lượt làm bài lần trước đã lưu (nếu có)
+          const savedSubmissionId = localStorage.getItem(`lastSubmissionId_${userId}_${id}`);
+          if (savedSubmissionId && savedSubmissionId !== currentSubmissionId.toString()) {
+            console.log("Phát hiện lượt làm bài mới! Đang dọn dẹp dữ liệu cũ...");
+            // XÓA SẠCH DỮ LIỆU CŨ CỦA BÀI THI NÀY
+            localStorage.removeItem(`mod2Start_${userId}_${id}`);
+            localStorage.removeItem(`answers_${userId}_${id}`);
+            localStorage.removeItem(`violations_${userId}_${id}`);
+            // Cập nhật lại ID mới để lần sau so sánh
+            localStorage.setItem(`lastSubmissionId_${userId}_${id}`, currentSubmissionId);
+          }
+          else {
+            // Nếu chưa có, lưu lại để dùng cho lần sau
+            if (!savedSubmissionId) {
+                localStorage.setItem(`lastSubmissionId_${userId}_${id}`, currentSubmissionId);
+            }
+          }
         }
 
         let durationMod1 = 0;
@@ -262,12 +285,12 @@ function ExamRoom() {
         setTimeLeft(secondsRemaining);
 
         if (secondsRemaining <= 0) {
+          clearInterval(timer);
           if (phase === 'MODULE_2') {
             finishTest("Hết thời gian làm bài");
-            clearInterval(timer);
           }
           else {
-            setPhase('MODULE_2');
+            startModule2();
           }
         }
       }, 1000);
@@ -276,7 +299,7 @@ function ExamRoom() {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isTimerRunning, endTime, finishTest]);
+  }, [isTimerRunning, endTime, phase, finishTest]);
 
   // --- LOGIC ANTICHEAT ---
   useEffect(() => {    
@@ -371,7 +394,7 @@ function ExamRoom() {
   };
 
   const startModule2 = () => {
-    if (phase !== 'REVIEW_1') return;
+    if (phase !== 'REVIEW_1' && phase !== 'MODULE_1') return;
     // BẬT MÀN HÌNH LOADING NGAY LẬP TỨC
     setIsTransitioning(true);
     const now  = Date.now();
@@ -477,7 +500,7 @@ function ExamRoom() {
   // --- RENDER PHÒNG THI ---
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 font-sans select-none relative overflow-hidden">
+    <div className="flex flex-col h-screen bg-gray-50 font-sans relative overflow-hidden">
       {/* 👇 COMPONENT LOADING 👇 */}
       {isTransitioning && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
@@ -492,7 +515,9 @@ function ExamRoom() {
       {/* HEADER */}
       <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shadow-sm z-20 relative">
         <div className="flex items-center gap-4">
-          <span className="font-bold text-lg text-slate-800">Exam Online</span>
+          <span className="font-bold text-lg text-slate-800">
+            Section 1, {phase === 'MODULE_2' ? "Module 2" : "Module 1"}: Reading and Writing
+          </span>
           {violationCount > 0 && (
              <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
                ⚠️ {violationCount}/3
@@ -501,6 +526,8 @@ function ExamRoom() {
         </div>
 
         <div className="flex items-center gap-6">
+          {/* Nút bật tắt Highlight & Notes */}
+          <ToolsHeader />
           <div className={`font-mono text-xl font-bold ${timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-slate-700'}`}>
             {formatTime(timeLeft)}
           </div>
@@ -668,7 +695,7 @@ function ExamRoom() {
                     mb-8
                   "
                 >
-                  {currentQ.questionText}
+                  <InteractiveText content={currentQ.questionText} />
                 </h3>
                 
                 <div className="space-y-3">
@@ -803,7 +830,7 @@ function ExamRoom() {
           </div>
         </div>
       )}  
-    </div>
+      </div>
   );
 }
 

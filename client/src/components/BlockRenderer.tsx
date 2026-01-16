@@ -1,7 +1,7 @@
 // src/components/BlockRenderer.tsx
 import React from 'react';
-import parse from 'html-react-parser';
 import type { ContentBlock, TableBlock, PoemBlock } from '../types/quiz';
+import InteractiveText from './InteractiveText';
 
 // --- 1. Component hiển thị Bảng (Table) ---
 const TableRenderer = ({ block }: { block: TableBlock }) => (
@@ -65,7 +65,7 @@ const PoemRenderer = ({ block }: { block: PoemBlock }) => (
       {block.lines.map((line, idx) => (
         // Thêm padding-left cho các dòng chẵn để tạo hiệu ứng thụt đầu dòng thơ
         <div key={idx} className={idx % 2 !== 0 ? "pl-4" : ""}>
-          {line}
+          <InteractiveText content={line} />
         </div>
       ))}
     </div>
@@ -94,7 +94,7 @@ const BlockRenderer: React.FC<Props> = ({ blocks }) => {
           case 'text':
             return (
               <div key={index} className="leading-relaxed">
-                {parse(block.content)}
+                <InteractiveText content={block.content} />
               </div>
             );
           
