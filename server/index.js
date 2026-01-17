@@ -234,6 +234,8 @@ app.post('/api/test/:id/submit', async (req, res) => {
     
     // Mảng chứa các câu trả lời để lưu vào bảng Answer
     const answersToSave = [];
+    // Dùng cho frontend hiển thị
+    const responseDetails = [];
 
     test.sections.forEach(section => {
       section.questions.forEach(question => {
@@ -254,6 +256,12 @@ app.post('/api/test/:id/submit', async (req, res) => {
           questionId: question.id,
           selectedChoice: userChoiceId || null, // Nếu không chọn thì null
           isCorrect: isCorrect
+        });
+        responseDetails.push({
+          questionId: question.id,
+          isCorrect: isCorrect,
+          userSelected: userChoiceId || null,
+          correctOption: correctChoiceId
         });
       });
     });
@@ -283,6 +291,7 @@ app.post('/api/test/:id/submit', async (req, res) => {
       score: correctCount,
       total: totalQuestions,
       submission: UpdateSubmission, // Trả về ID bài nộp để sau này tra cứu
+      details: responseDetails,
       message: "Nộp bài và lưu kết quả thành công"
     });
 

@@ -32,7 +32,6 @@ function ExamRoom() {
 
   // State kết quả
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [scoreData, setScoreData] = useState<{ score: number, total: number } | null>(null);
 
   // Timer & Anticheat
   const [timeLeft, setTimeLeft] = useState(32 * 60);
@@ -73,6 +72,20 @@ function ExamRoom() {
     description: '',
     duration: 0
   }) 
+
+  // Dữ liệu Backend trả về sau khi nộp bài
+  interface BackendResult {
+    score: number;
+    totalQuestions: number;
+    details: {
+      questionId: number | string;
+      isCorrect: boolean;
+      correctOption: string; // Backend nói câu này đáp án là gì
+      userSelected: string | null; // Backend xác nhận user đã chọn gì
+    }[];
+  }
+
+  const [apiResult, setApiResult] = useState<BackendResult | null>(null);
 
   // --- 1. GỌI API LẤY ĐỀ THI ---
   useEffect(() => {
@@ -123,7 +136,7 @@ function ExamRoom() {
                   id: q.id,
                   blocks: q.blocks,
                   questionText: q.questionText,
-                  choices: formattedChoices,
+                  options: formattedChoices,
                 } as QuestionData; 
               });
               allQuestions = [...allQuestions, ...qs];
@@ -143,6 +156,7 @@ function ExamRoom() {
             localStorage.removeItem(`mod2Start_${userId}_${id}`);
             localStorage.removeItem(`answers_${userId}_${id}`);
             localStorage.removeItem(`violations_${userId}_${id}`);
+            localStorage.removeItem(`mod1TimeUsed_${userId}_${id}`);
             // Cập nhật lại ID mới để lần sau so sánh
             localStorage.setItem(`lastSubmissionId_${userId}_${id}`, currentSubmissionId);
           }
@@ -286,7 +300,8 @@ function ExamRoom() {
           localStorage.removeItem(`mod2Start_${userId}_${id}`);
           localStorage.removeItem(`answers_${userId}_${id}`);
           localStorage.removeItem(`violations_${userId}_${id}`);
-          setScoreData({ score: data.score, total: data.total });
+          localStorage.removeItem(`mod1TimeUsed_${userId}_${id}`);
+          setApiResult(data);
           setIsSubmitted(true);
         } else {
             alert("Lỗi khi nộp bài: " + (data.error || data.message));
@@ -456,7 +471,6 @@ function ExamRoom() {
     const now  = Date.now();
     const userId = localStorage.getItem('userId');
     localStorage.setItem(`mod1TimeUsed_${userId}_${id}`, mod1UsedSecond.toString());
-    console.log("Da luu thoi gian su dung cua mod 1", mod1UsedSecond);
     localStorage.setItem(`mod2Start_${userId}_${id}`, now.toString());
     // Tính toán lại endTime mới
     const durationMs = examConfig.mod2Duration * 60 * 1000;
@@ -508,17 +522,27 @@ function ExamRoom() {
   };
 
   const getResults = (): QuestionResult[] => {
+    if (!apiResult) return [];
     // Mapping dữ liệu sang dạng của Score Report
     return questions.map((q, index) => {
       const moduleName = index < splitIndex ? "Module 1" : "Module 2";
       const questionNumber = moduleName === 'Module 1' ? index + 1 : index - splitIndex + 1;
+      // Backend tra ve mang detail => Ta tim theo id
+      const gradedInfo = apiResult.details.find(d => d.questionId === q.id);
       return  {
         id: q.id,
         module: moduleName,
         questionNumber: questionNumber,
-        correctAnswer: q.correctAnswer,
-        userAnswer: answers[q.id] || null,
-        isCorrect: answers[q.id] === q.correctAnswer
+        blocks: q.blocks,
+        questionText: q.questionText,
+        options: q.options.map((c, i) => ({
+          id: c.id,
+          text: c.text,
+          label: String.fromCharCode(65 + i)
+        })),
+        correctAnswer: gradedInfo?.correctOption || "",
+        userAnswer: gradedInfo?.userSelected || null,
+        isCorrect: gradedInfo?.isCorrect || false
       };
     });
   };
@@ -541,7 +565,7 @@ function ExamRoom() {
   }
 
   // --- RENDER KẾT QUẢ ---
-  if (isSubmitted && scoreData) {
+  if (isSubmitted && apiResult) {
     const formatDuration = (totalSeconds: number) => {
       const h = Math.floor(totalSeconds / 3600);
       const m = Math.floor((totalSeconds % 3600) / 60);
@@ -565,10 +589,6 @@ function ExamRoom() {
         date={new Date().toLocaleString()}
         duration={formatDuration(secondsUsed <= 0 ? TestInfo.duration * 60 : secondsUsed)} // Thời gian làm bài thực tế
         questions={getResults()}
-        onReview={(id) => {
-           console.log("Review câu hỏi:", id);
-           // Logic quay lại xem câu hỏi đó
-        }}
         onBackToHome={() => {
           localStorage.removeItem('current_exam_info');
           window.location.href = '/dashboard';
@@ -591,7 +611,7 @@ function ExamRoom() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans relative overflow-hidden">
-      {/* 👇 COMPONENT LOADING 👇 */}
+      {/* COMPONENT LOADING */}
       {isTransitioning && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
           {/* Icon Spinner xoay xoay */}
@@ -709,7 +729,7 @@ function ExamRoom() {
                   const isMarked = markedQuestions.includes(realIndex);
                   const isCurrent = currentQuestionIndex === realIndex;
                   
-                  // 👇 LOGIC MÀU SẮC CHUẨN: Ưu tiên Marked -> Answered -> Default
+                  // LOGIC MÀU SẮC CHUẨN: Ưu tiên Marked -> Answered -> Default
                   let btnClass = "bg-white text-gray-700 border-gray-200 hover:bg-gray-100";
                   
                   if (isMarked) {
@@ -789,7 +809,7 @@ function ExamRoom() {
                 </h3>
                 
                 <div className="space-y-3">
-                  {currentQ.choices.map((opt: any, index: number) => {
+                  {currentQ.options.map((opt: any, index: number) => {
                       const isEliminated = eliminatedMap[currentQuestionIndex]?.includes(index);
                       const charLabel = String.fromCharCode(65 + index); // 0->A, 1->B
 

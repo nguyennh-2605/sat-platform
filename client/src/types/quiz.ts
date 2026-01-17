@@ -36,13 +36,13 @@ export type ContentBlock = TextBlock | ImageBlock | TableBlock | PoemBlock;
 export interface QuestionData {
   id: number;
   
-  // 👇 QUAN TRỌNG NHẤT: Bắt buộc blocks phải là mảng các ContentBlock
+  // QUAN TRỌNG NHẤT: Bắt buộc blocks phải là mảng các ContentBlock
   blocks: ContentBlock[]; 
   // Các trường khác khớp với Database của bạn
   questionText: string;
   correctAnswer: string;
   // Định nghĩa cho choices (vì choices trong DB cũng là JSON)
-  choices: {
+  options: {
     id: string;
     text: string;
   }[];
