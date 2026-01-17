@@ -15,7 +15,7 @@ function AuthPage() {
     // Nếu đang mode Đăng nhập thì gọi API login (mình sẽ làm sau), 
     // Nếu đang mode Đăng ký thì gọi API register
     const endpoint = isLoginMode ? '/api/login' : '/api/register'; 
-    const apiUrl = `http://localhost:5000${endpoint}`;
+    const apiUrl = `${import.meta.env.VITE_API_URL}${endpoint}`
 
     try {
       // --- 2. GỬI DỮ LIỆU XUỐNG SERVER (BACKEND) ---

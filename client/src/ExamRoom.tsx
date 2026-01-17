@@ -115,7 +115,7 @@ function ExamRoom() {
     }
 
     // Gửi kèm thêm cả userId để tìm bài làm dở
-    fetch(`http://localhost:5000/api/test/${id}?userId=${userId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/test/${id}?userId=${userId}`)
       .then(res => res.json())
       .then(data => {
         if (data && data.sections) {
@@ -282,7 +282,7 @@ function ExamRoom() {
              return;
         }
 
-        const res = await fetch(`http://localhost:5000/api/test/${id}/submit`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/test/${id}/submit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 

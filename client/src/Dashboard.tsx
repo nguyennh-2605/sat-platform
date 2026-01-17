@@ -15,7 +15,7 @@ function Dashboard() {
     const userId = localStorage.getItem('userId');
 
     // Tạo URL: Nếu có userId thì kẹp thêm vào đuôi
-    const url = userId ? `http://localhost:5000/api/tests?userId=${userId}` : 'http://localhost:5000/api/tests'
+    const url = userId ? `${import.meta.env.VITE_API_URL}/api/tests?userId=${userId}` : `${import.meta.env.VITE_API_URL}/api/tests`
 
     fetch(url)
       .then(res => res.json())

@@ -1,11 +1,11 @@
 const express = require('express');
 const cors = require('cors');
-const { PrismaClient } = require('@prisma/client'); // 👈 Import Prisma
+const { PrismaClient } = require('@prisma/client'); 
 const { register, login } = require('./src/controllers/authController');
 
 const app = express();
 const prisma = new PrismaClient(); // 👈 Khởi tạo kết nối DB
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 // --- MIDDLEWARE ---
 app.use(cors());
@@ -36,7 +36,7 @@ app.get('/api/tests', async (req, res) => {
       return res.json(testsDefaults);
     }
 
-    // 3. 👇 TỐI ƯU: Tìm tất cả bài ĐANG LÀM của user này 1 lần duy nhất
+    // 3. TỐI ƯU: Tìm tất cả bài ĐANG LÀM của user này 1 lần duy nhất
     // (Thay vì lặp từng bài thi để query -> Rất chậm)
     const activeSubmission = await prisma.submission.findMany({
       where: {
@@ -182,7 +182,7 @@ app.get('/api/test/:id', async (req, res) => {
 // ... (Các phần import và setup giữ nguyên)
 
 app.post('/api/test/:id/submit', async (req, res) => {
-  // 👉 Nhận thêm userId từ Frontend gửi lên
+  // Nhận thêm userId từ Frontend gửi lên
   const { submissionId, answers, userId, violationCount } = req.body; 
   const testId = parseInt(req.params.id);
 
@@ -195,7 +195,7 @@ app.post('/api/test/:id/submit', async (req, res) => {
   try {
     const userExists = await prisma.user.findUnique({ where: { id: Number(userId) } });
     if (!userExists) {
-      console.log(`❌ Lỗi: User ID ${userId} không tồn tại trong Database!`);
+      console.log(`Lỗi: User ID ${userId} không tồn tại trong Database!`);
       // Gợi ý fix: Nếu đang test, hãy tạo nhanh 1 user
       return res.status(400).json({ 
         error: `User ID ${userId} không tồn tại. Hãy đăng ký tài khoản mới hoặc sửa userId trong code.` 
@@ -266,7 +266,7 @@ app.post('/api/test/:id/submit', async (req, res) => {
       });
     });
 
-    console.log(`✅ Kết quả: ${correctCount}/${totalQuestions}`);
+    console.log(`Kết quả: ${correctCount}/${totalQuestions}`);
 
     // 3. LƯU VÀO DATABASE (QUAN TRỌNG)
     // Chúng ta dùng Prisma để tạo Submission và các Answer cùng lúc
