@@ -159,7 +159,8 @@ function ExamRoom() {
         }
 
         if (data.session) {
-          setSubmissionId(data.session.submissionId);
+          const currentSubmissionId = data.session.submissionId;
+          setSubmissionId(currentSubmissionId);
           let startMs = 0;
           let durationMs = 0;
           if (currentPhase === 'MODULE_2' && mod2StartVal != null) {
@@ -171,25 +172,23 @@ function ExamRoom() {
           }
           const endMs = startMs + durationMs;
           setEndTime(endMs);
-          // So giay con lai tai thoi diem load trang
+
           const now = Date.now();
           const remaining = Math.max(0, Math.floor((endMs - now) / 1000));
-
           setTimeLeft(remaining);
 
           if (remaining <= 0) {
-            if (currentPhase === 'MODULE_1') {
-             setPhase('REVIEW_1'); // Hoặc logic chuyển tiếp
-             alert("Hết giờ Module 1, chuyển sang phần tiếp theo.");
-            } else {
-              alert("Phiên làm bài này đã hết hạn.");
-              navigate('/dashboard');
+            if (currentPhase === 'MODULE_2') {
+              finishTest("Hết thời gian làm bài phiên này", currentSubmissionId);
+            }
+            else {
+              setPhase('MODULE_2'); // Hoặc logic chuyển tiếp
+              alert("Hết giờ Module 1, chuyển sang module tiếp theo.");
             }
           }
           else {
             setIsTimerRunning(true);
           }
-
         }
 
         // KHÔI PHỤC ĐÁP ÁN TỪ LOCAL STORAGE (Nếu user refresh trang)
@@ -205,9 +204,6 @@ function ExamRoom() {
           setViolationCount(parseInt(savedViolations, 10));
           console.log("Đã khôi phục số lỗi vi phạm:", savedViolations);
         }
-
-        console.log("Câu hiện tại", currentQuestionIndex + 1);
-        
         setIsLoading(false);
       })
       .catch(err => {
@@ -225,7 +221,7 @@ function ExamRoom() {
   };
 
   // --- 2. LOGIC NỘP BÀI ---
-  const finishTest = useCallback(async (reason: string) => {
+  const finishTest = useCallback(async (reason: string, passedSubmissionId?: number) => {
     setIsTimerRunning(false);
     setIsReviewOpen(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -241,11 +237,18 @@ function ExamRoom() {
             return;
         }
 
+        const idToSubmit = passedSubmissionId || submissionId; 
+
+        if (!idToSubmit) {
+             console.error("Lỗi: Không có submissionId để nộp");
+             return;
+        }
+
         const res = await fetch(`http://localhost:5000/api/test/${id}/submit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              submissionId: submissionId, // Gửi cái này để backend biết update bài nào
+              submissionId: idToSubmit, // Gửi cái này để backend biết update bài nào
               answers,
               userId: userId,
               violationCount: violationCount,

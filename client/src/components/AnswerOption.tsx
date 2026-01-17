@@ -30,6 +30,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
         ${isEliminated ? 'cursor-default border-gray-200 bg-white' : 'cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-300 hover:shadow-md'}
         ${isSelected && !isEliminated ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-200 ring-offset-1' : 'border-gray-400'}
         active:scale-[0.99]
+        ${isEliminated ? 'opacity-50 grayscale' : ''}
       `}
     >
       
