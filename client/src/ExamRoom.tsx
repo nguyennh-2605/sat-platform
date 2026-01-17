@@ -8,6 +8,8 @@ import InteractiveText from './components/InteractiveText';
 
 // 2. Import Type
 import type { QuestionData } from './types/quiz';
+import type { QuestionResult } from './ScoreReport';
+import ScoreReport from './ScoreReport';
 
 function ExamRoom() {
   const { id } = useParams();
@@ -21,7 +23,7 @@ function ExamRoom() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
   
-  // 👇 State cho tính năng Đánh dấu (Mark for Review)
+  // State cho tính năng Đánh dấu (Mark for Review)
   const [markedQuestions, setMarkedQuestions] = useState<number[]>([]);
 
   // State Modal & Sidebar
@@ -31,7 +33,6 @@ function ExamRoom() {
   // State kết quả
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [scoreData, setScoreData] = useState<{ score: number, total: number } | null>(null);
-  const [submitReason, setSubmitReason] = useState("");
 
   // Timer & Anticheat
   const [timeLeft, setTimeLeft] = useState(32 * 60);
@@ -59,12 +60,19 @@ function ExamRoom() {
 
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // 👇 1. STATE BẬT/TẮT CHẾ ĐỘ GẠCH
+  // STATE BẬT/TẮT CHẾ ĐỘ GẠCH
   const [isStrikeMode, setIsStrikeMode] = useState(false);
 
-  // 👇 2. STATE LƯU NHỮNG CÂU BỊ GẠCH
+  // STATE LƯU NHỮNG CÂU BỊ GẠCH
   // Cấu trúc: { 0: [0, 2], 1: [1] } -> Câu 0 gạch đáp án A, C; Câu 1 gạch đáp án B
   const [eliminatedMap, setEliminatedMap] = useState<Record<number, number[]>>({});
+
+  // State lưu thông tin bài thi từ Dashboard gửi qua
+  const [TestInfo, setTestInfo] = useState({
+    title: '',
+    description: '',
+    duration: 0
+  }) 
 
   // --- 1. GỌI API LẤY ĐỀ THI ---
   useEffect(() => {
@@ -75,6 +83,22 @@ function ExamRoom() {
       alert("Bạn chưa đăng nhập!");
       navigate('/login');
       return;
+    }
+
+    const savedData = localStorage.getItem('current_exam_info');
+    if (savedData) {
+      const parsedData = JSON.parse(savedData);
+      if (parsedData.id.toString() === id) {
+        setTestInfo({
+          title: parsedData.title,
+          description: parsedData.description,
+          duration: parsedData.duration
+        });
+      }
+      else {
+        console.log("ID không khớp!");
+        // Nếu user bấm test này nhưng mà đổi url sang test khác thì sẽ gọi API?
+      }
     }
 
     // Gửi kèm thêm cả userId để tìm bài làm dở
@@ -179,7 +203,7 @@ function ExamRoom() {
 
           if (remaining <= 0) {
             if (currentPhase === 'MODULE_2') {
-              finishTest("Hết thời gian làm bài phiên này", currentSubmissionId);
+              finishTest(currentSubmissionId);
             }
             else {
               setPhase('MODULE_2'); // Hoặc logic chuyển tiếp
@@ -221,7 +245,7 @@ function ExamRoom() {
   };
 
   // --- 2. LOGIC NỘP BÀI ---
-  const finishTest = useCallback(async (reason: string, passedSubmissionId?: number) => {
+  const finishTest = useCallback(async (passedSubmissionId?: number) => {
     setIsTimerRunning(false);
     setIsReviewOpen(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -263,7 +287,6 @@ function ExamRoom() {
           localStorage.removeItem(`answers_${userId}_${id}`);
           localStorage.removeItem(`violations_${userId}_${id}`);
           setScoreData({ score: data.score, total: data.total });
-          setSubmitReason(reason);
           setIsSubmitted(true);
         } else {
             alert("Lỗi khi nộp bài: " + (data.error || data.message));
@@ -290,7 +313,7 @@ function ExamRoom() {
         if (secondsRemaining <= 0) {
           clearInterval(timer);
           if (phase === 'MODULE_2') {
-            finishTest("Hết thời gian làm bài");
+            finishTest();
           }
           else {
             startModule2();
@@ -312,7 +335,7 @@ function ExamRoom() {
       if (document.hidden) {
         setViolationCount(prev => {
           const newCount = prev + 1;
-          if (newCount > 3) finishTest("Vi phạm quy chế (rời màn hình) quá 3 lần.");
+          if (newCount > 3) finishTest();
           else alert(`⚠️ CẢNH BÁO (${newCount}/3): Đừng rời khỏi màn hình!`);
           return newCount;
         });
@@ -324,7 +347,7 @@ function ExamRoom() {
         setViolationCount(prev => {
           const newCount = prev + 1;
           if (newCount > 3) {
-            finishTest("Vi phạm quy chế (thoát fullscreen) quá 3 lần.");
+            finishTest();
             return newCount;
           } else {
             alert(`⚠️ CẢNH BÁO (${newCount}/3): Quay lại fullscreen ngay!`);
@@ -367,13 +390,13 @@ function ExamRoom() {
 
 
     return () => {
-      document.addEventListener("visibilitychange", handleVisibilityChange);
-      document.addEventListener("fullscreenchange", handleFullscreenChange);
-      document.addEventListener("contextmenu", handleContextMenu);
-      document.addEventListener('copy', handleCopyCutPaste);
-      document.addEventListener('cut', handleCopyCutPaste);
-      document.addEventListener('paste', handleCopyCutPaste);
-      document.addEventListener('keydown', handleKeyDown);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener('copy', handleCopyCutPaste);
+      document.removeEventListener('cut', handleCopyCutPaste);
+      document.removeEventListener('paste', handleCopyCutPaste);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isTimerRunning, finishTest, isSubmitted]);
 
@@ -429,11 +452,12 @@ function ExamRoom() {
     if (phase !== 'REVIEW_1' && phase !== 'MODULE_1') return;
     // BẬT MÀN HÌNH LOADING NGAY LẬP TỨC
     setIsTransitioning(true);
+    const mod1UsedSecond = Math.max(0, examConfig.mod1Duration * 60 - timeLeft);
     const now  = Date.now();
     const userId = localStorage.getItem('userId');
+    localStorage.setItem(`mod1TimeUsed_${userId}_${id}`, mod1UsedSecond.toString());
+    console.log("Da luu thoi gian su dung cua mod 1", mod1UsedSecond);
     localStorage.setItem(`mod2Start_${userId}_${id}`, now.toString());
-    // Xóa LocalStorage answer mod 1
-    localStorage.removeItem(`answers_${userId}_${id}`);
     // Tính toán lại endTime mới
     const durationMs = examConfig.mod2Duration * 60 * 1000;
     const newEndTime = now + durationMs;
@@ -483,6 +507,22 @@ function ExamRoom() {
     });
   };
 
+  const getResults = (): QuestionResult[] => {
+    // Mapping dữ liệu sang dạng của Score Report
+    return questions.map((q, index) => {
+      const moduleName = index < splitIndex ? "Module 1" : "Module 2";
+      const questionNumber = moduleName === 'Module 1' ? index + 1 : index - splitIndex + 1;
+      return  {
+        id: q.id,
+        module: moduleName,
+        questionNumber: questionNumber,
+        correctAnswer: q.correctAnswer,
+        userAnswer: answers[q.id] || null,
+        isCorrect: answers[q.id] === q.correctAnswer
+      };
+    });
+  };
+
   // --- RENDER LOADING ---
   if (isLoading) {
     return (
@@ -502,20 +542,38 @@ function ExamRoom() {
 
   // --- RENDER KẾT QUẢ ---
   if (isSubmitted && scoreData) {
+    const formatDuration = (totalSeconds: number) => {
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      // Nếu có giờ thì hiện H:MM:SS, không thì hiện MM:SS
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const userId = localStorage.getItem('userId');
+    const savedMod1TimeUsed = localStorage.getItem(`mod1TimeUsed_${userId}_${id}`);
+    const mod1TimeUsed = parseInt(savedMod1TimeUsed || "0", 10);
+    const secondsUsed = mod1TimeUsed + Math.max(0, examConfig.mod2Duration * 60 - timeLeft);
+    console.log("Thoi gian su dung o mod 1", mod1TimeUsed);
+    console.log("Thoi gian su dung o mod 2", Math.max(0, examConfig.mod2Duration * 60 - timeLeft));
+    console.log("Thoi gian da su dung o ca 2 mod", secondsUsed);
+
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full text-center">
-          <h2 className="text-3xl font-bold text-slate-800 mb-2">Kết quả bài thi</h2>
-          <p className="text-slate-600 mb-6">{submitReason}</p>
-          <div className="flex justify-center items-end gap-2 mb-8">
-             <span className="text-6xl font-bold text-blue-600">{scoreData.score}</span>
-             <span className="text-2xl text-gray-400 font-medium mb-2">/ {scoreData.total}</span>
-          </div>
-          <button onClick={() => navigate('/dashboard')} className="bg-slate-800 text-white px-6 py-3 rounded-lg hover:bg-slate-700 transition">
-            Về Dashboard
-          </button>
-        </div>
-      </div>
+      <ScoreReport 
+        examTitle={TestInfo.title}
+        subject={TestInfo.description}
+        date={new Date().toLocaleString()}
+        duration={formatDuration(secondsUsed <= 0 ? TestInfo.duration * 60 : secondsUsed)} // Thời gian làm bài thực tế
+        questions={getResults()}
+        onReview={(id) => {
+           console.log("Review câu hỏi:", id);
+           // Logic quay lại xem câu hỏi đó
+        }}
+        onBackToHome={() => {
+          localStorage.removeItem('current_exam_info');
+          window.location.href = '/dashboard';
+        }}
+      />
     );
   }
 
@@ -548,7 +606,7 @@ function ExamRoom() {
       <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shadow-sm z-20 relative">
         <div className="flex items-center gap-4">
           <span className="font-bold text-lg text-slate-800">
-            Section 1, {phase === 'MODULE_2' ? "Module 2" : "Module 1"}: Reading and Writing
+            Section 1, {phase === 'MODULE_2' ? "Module 2" : "Module 1"}: {TestInfo.description}
           </span>
           {violationCount > 0 && (
              <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
@@ -832,7 +890,7 @@ function ExamRoom() {
                 <button 
                   onClick={() => {
                     setShowSubmitModal(false); // Tắt modal
-                    finishTest("Nộp bài thành công"); // Gọi hàm nộp thật
+                    finishTest(); // Gọi hàm nộp thật
                   }}
                   className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition shadow-lg shadow-red-500/30"
                 >

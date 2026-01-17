@@ -34,6 +34,18 @@ function Dashboard() {
     navigate('/');
   };
 
+  const handleStartExam = (exam: any) => {
+    const examInfo = {
+      id: exam.id,
+      title: exam.title,
+      description: exam.description,
+      duration: exam.duration
+    };
+
+    localStorage.setItem('current_exam_info', JSON.stringify(examInfo));
+    navigate(`/test/${exam.id}`);
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 font-sans">
       
@@ -143,7 +155,7 @@ function Dashboard() {
                       <span>{test.description || "Reading & Math"}</span>
                     </div>
                     <button 
-                      onClick={() => navigate(`/test/${test.id}`)} 
+                      onClick={() => handleStartExam(test)} 
                       className={`w-full py-2 text-white rounded-lg font-medium transition ${
                         test.isDoing
                           ? "bg-yellow-500 hover:bg-yellow-600"

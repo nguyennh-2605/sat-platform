@@ -10,7 +10,9 @@ const QuizToolContext = createContext<QuizToolContextType | undefined>(undefined
 export const QuizToolProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isHighlightMode, setIsHighlightMode] = useState(false);
 
-  // 👇 SỬ DỤNG USEMEMO ĐỂ NGĂN CHẶN RENDER THỪA
+  console.log("Highlight Mode khởi tạo là:", isHighlightMode);
+
+  // SỬ DỤNG USEMEMO ĐỂ NGĂN CHẶN RENDER THỪA
   const value = useMemo(() => {
     return {
       isHighlightMode,

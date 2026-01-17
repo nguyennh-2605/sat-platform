@@ -206,8 +206,12 @@ app.post('/api/test/:id/submit', async (req, res) => {
       where: { id: submissionId }
     });
 
-    if (!submission || submission.status == 'COMPLETED') {
-      return res.status(400).json({ error: "Bài thi này đã nộp hoặc không tồn tại!" });
+    if (submission.status == 'COMPLETED') {
+      return res.status(400).json({ error: "Bài thi này đã nộp!" });
+    }
+
+    if (!submission) {
+      return res.status(400).json({ error: "Bài thi này không tồn tại! "});
     }
 
     // 1. Lấy đề thi từ DB để so sánh đáp án
