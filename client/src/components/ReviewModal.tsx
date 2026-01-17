@@ -10,7 +10,6 @@ interface ReviewModalProps {
 }
 
 const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle }) => {
-  
   // Logic tô màu đáp án (Giữ nguyên logic chuẩn)
   const getOptionStyle = (optText: string, optId: string) => {
     // Backend trả về correctOption là ID hoặc Text, cần so sánh linh hoạt
@@ -86,7 +85,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle }) =
                   
                   return (
                     // Thêm shadow-sm, bo góc lớn hơn (rounded-xl) và hiệu ứng hover
-                    <div key={index} className={`relative flex items-center p-4 border rounded-xl transition-all bg-white shadow-sm ${styleClass}`}>
+                    <div key={index} className={`relative flex items-center p-4 border rounded-xl transition-all shadow-sm 
+                      ${isCorrect ? 'bg-green-50 border-green-500'
+                                  : 'bg-white border-gray-300 hover:border-gray-400'}
+                      ${styleClass}`}>
                       
                       {/* Nhãn A/B/C/D */}
                       <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full border-[1.5px] text-sm font-bold mr-4 transition-colors
