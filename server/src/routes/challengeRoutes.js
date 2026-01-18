@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { getRandomPassage, verifyRecall } = require("../controllers/challengeController");
+const { getSATQuestion, evaluateSATResponse } = require("../controllers/challengeController");
 
-router.get("/random", getRandomPassage);
-router.post("/verify", verifyRecall);
+router.post("/generate", getSATQuestion);
+router.post("/evaluate", evaluateSATResponse);
 
 module.exports = router;

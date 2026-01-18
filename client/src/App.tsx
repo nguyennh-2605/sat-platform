@@ -5,7 +5,7 @@ import HomePage from './HomePage';
 import AuthPage from './AuthPage';
 import Dashboard from './Dashboard';
 import ExamRoom from './pages/ExamRoom';
-import RecallChallenge from './pages/RecallChallenge';
+import RecallChallenge from './pages/LogicLab';
 import { QuizToolProvider } from './context/QuizToolContext';
 
 function App() {
