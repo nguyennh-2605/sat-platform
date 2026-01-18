@@ -57,7 +57,7 @@ function HomePage() {
               Log in
             </button>
             <button 
-              onClick={() => navigate('/auth')} 
+              onClick={() => navigate('/auth?mode=register')} 
               className="bg-white text-blue-600 font-semibold px-5 py-2 rounded-full shadow-sm border border-blue-100 hover:shadow-md transition-all"
             >
               Register
@@ -78,7 +78,7 @@ function HomePage() {
         </h1>
 
         <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-          Nền tảng thi thử sát với thực tế nhất. Giúp bạn làm quen với áp lực thời gian và cấu trúc đề thi mới.
+          A powerful practice platform that helps you adapt to time pressure, master the latest exam format, and improve your overall performance.
         </p>
 
         <div className="pt-8">
@@ -86,7 +86,7 @@ function HomePage() {
             onClick={handleStartTest}
             className="group relative inline-flex h-14 items-center justify-center overflow-hidden rounded-full bg-blue-600 px-10 font-medium text-white transition-all duration-300 hover:bg-blue-700 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
           >
-            <span className="mr-2 text-lg">Bắt đầu làm bài</span>
+            <span className="mr-2 text-lg">Get Started</span>
             <svg className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>

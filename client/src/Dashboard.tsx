@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { User, LogOut } from 'lucide-react';
 
 function Dashboard() {
   const navigate = useNavigate();
   // State tab
   const [activeTab, setActiveTab] = useState('practice');
+  const [user, setUser] = useState({ name: '', avatar: '' });
 
   // --- STATE MỚI ĐỂ LƯU DỮ LIỆU TỪ API ---
   const [tests, setTests] = useState<any[]>([]);
@@ -16,6 +18,9 @@ function Dashboard() {
 
     // Tạo URL: Nếu có userId thì kẹp thêm vào đuôi
     const url = userId ? `${import.meta.env.VITE_API_URL}/api/tests?userId=${userId}` : `${import.meta.env.VITE_API_URL}/api/tests`
+    const name = localStorage.getItem('userName') || 'Student';
+    const avatar = localStorage.getItem('userAvatar');
+    setUser({ name: name, avatar: avatar || '' });
 
     fetch(url)
       .then(res => res.json())
@@ -30,7 +35,7 @@ function Dashboard() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn');
+    localStorage.clear();
     navigate('/');
   };
 
@@ -107,22 +112,47 @@ function Dashboard() {
         </nav>
 
         {/* User Profile & Logout */}
-        <div className="p-4 border-t border-gray-200">
-           <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
-                {localStorage.getItem('userName')?.charAt(0) || 'U'}
+        <div className="p-4 border-t border-gray-200 flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              {/* 1. Thông tin Tên & Vai trò (Đẩy sang trái) */}
+              <div className="hidden md:block text-left">
+                <p className="text-sm font-bold text-gray-900 whitespace-nowrap truncate max-w-[150px]">
+                  {user.name}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Học viên
+                </p>
               </div>
-              <div className="text-sm">
-                <p className="font-semibold text-slate-800">{localStorage.getItem('userName') || 'Học viên'}</p>
-                <p className="text-slate-500 text-xs">Free Plan</p>
+
+              {/* 2. Avatar & Nút Logout (Gom lại 1 cụm bên phải) */}
+              <div className="flex items-center gap-2 pl-0 pr-0 bg-gray-50 rounded-full border border-gray-100">
+                {/* Avatar hình tròn */}
+                <div className="relative h-9 w-9 rounded-full overflow-hidden border-2 border-white shadow-sm">
+                  {user.avatar ? (
+                    <img 
+                      src={user.avatar} 
+                      alt="Avatar" 
+                      className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-blue-100 flex items-center justify-center text-blue-600">
+                      <User size={18} />
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Nút Icon Đăng xuất */}
+                <button 
+                  onClick={handleLogout}
+                  className="group p-1 rounded-full hover:bg-red-50 transition-colors mr-1"
+                  title="Đăng xuất" // Hiện chữ khi di chuột vào
+                >
+                  {/* Icon LogOut màu xám, hover vào chuyển màu đỏ */}
+                  <LogOut size={18} className="text-gray-400 group-hover:text-red-600 transition-colors" />
+                </button>
               </div>
-           </div>
-           <button 
-             onClick={handleLogout}
-             className="w-full text-center text-sm text-red-600 hover:bg-red-50 py-2 rounded-md transition"
-           >
-             Đăng xuất
-           </button>
+            </div>
         </div>
       </aside>
 

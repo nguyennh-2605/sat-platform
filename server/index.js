@@ -1,14 +1,20 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client'); 
-const { register, login } = require('./src/controllers/authController');
+
+// Login
+const { register, login, googleLogin } = require('./src/controllers/authController');
 
 const app = express();
-const prisma = new PrismaClient(); // 👈 Khởi tạo kết nối DB
+const prisma = new PrismaClient(); // Khởi tạo kết nối DB
 const PORT = process.env.PORT || 5000;
 
 // --- MIDDLEWARE ---
-app.use(cors());
+app.use(cors({
+  origin: ["https://sat-platform-two.vercel.app", "http://localhost:5173"],
+  credentials: true
+}));
 app.use(express.json());
 
 // --- ROUTES (Đường dẫn) ---
@@ -16,6 +22,8 @@ app.use(express.json());
 // 1. AUTHENTICATION
 app.post('/api/register', register);
 app.post('/api/login', login);
+// route xử lý đăng nhập Google
+app.post('/api/auth/google-login', googleLogin);
 
 // 2. API LẤY DANH SÁCH BÀI THI (Cho Dashboard)
 app.get('/api/tests', async (req, res) => {
