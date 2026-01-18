@@ -106,3 +106,12 @@ model Answer {
   questionId     Int
   question       Question   @relation(fields: [questionId], references: [id])
 }
+
+model Passage {
+  id             String   @id @default(uuid())
+  title          String?  // Tiêu đề (VD: The Great Gatsby)
+  content        String   // Nội dung đoạn văn cần đọc
+  difficulty     String  @default("Medium") // Easy, Medium, Hard
+  createdAt      DateTime @default(now())
+}
+

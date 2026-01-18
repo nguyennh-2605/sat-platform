@@ -4,7 +4,8 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import HomePage from './HomePage';
 import AuthPage from './AuthPage';
 import Dashboard from './Dashboard';
-import ExamRoom from './ExamRoom';
+import ExamRoom from './pages/ExamRoom';
+import RecallChallenge from './pages/RecallChallenge';
 import { QuizToolProvider } from './context/QuizToolContext';
 
 function App() {
@@ -17,12 +18,12 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/auth" element={<AuthPage />} />
-            
             {/* Đường dẫn mới cho Dashboard */}
             <Route path="/dashboard" element={<Dashboard />} /> 
             
             {/* Đường dẫn vào thi (vẫn giữ nguyên để từ Dashboard nhảy sang) */}
             <Route path="/test/:id" element={<ExamRoom />} /> 
+            <Route path="/recall" element={<RecallChallenge />} />
           </Routes>
         </Router>
       </GoogleOAuthProvider>

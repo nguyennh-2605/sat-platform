@@ -25,6 +25,8 @@ app.post('/api/login', login);
 // route xử lý đăng nhập Google
 app.post('/api/auth/google-login', googleLogin);
 
+app.use("/api/challenge", require("./src/routes/challengeRoutes"));
+
 // 2. API LẤY DANH SÁCH BÀI THI (Cho Dashboard)
 app.get('/api/tests', async (req, res) => {
   try {

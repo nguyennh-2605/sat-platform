@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import QuestionHeader from './components/QuestionHeader';
-import AnswerOption from './components/AnswerOption';
-import BlockRenderer from './components/BlockRenderer';
-import ToolsHeader from './components/ToolsHeader';
-import InteractiveText from './components/InteractiveText';
+import QuestionHeader from '../components/QuestionHeader';
+import AnswerOption from '../components/AnswerOption';
+import BlockRenderer from '../components/BlockRenderer';
+import ToolsHeader from '../components/ToolsHeader';
+import InteractiveText from '../components/InteractiveText';
 
 // 2. Import Type
-import type { QuestionData } from './types/quiz';
-import type { QuestionResult } from './ScoreReport';
-import ScoreReport from './ScoreReport';
+import type { QuestionData } from '../types/quiz';
+import type { QuestionResult } from '../ScoreReport';
+import ScoreReport from '../ScoreReport';
 
 function ExamRoom() {
   const { id } = useParams();

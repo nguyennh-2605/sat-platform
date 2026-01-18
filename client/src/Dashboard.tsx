@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, LogOut } from 'lucide-react';
+import RecallChallenge from './pages/RecallChallenge';
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -108,6 +109,21 @@ function Dashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
             Homework
+          </button>
+          {/* Mục 4: Active Recall (Mới) */}
+          <button
+            onClick={() => setActiveTab('recall')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              activeTab === 'recall' 
+                ? 'bg-blue-50 text-blue-700 font-semibold' 
+                : 'text-slate-600 hover:bg-gray-100'
+            }`}
+          >
+            {/* Icon: Trí tuệ / Bóng đèn sáng */}
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3M3.343 15.657l.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            Active Recall
           </button>
         </nav>
 
@@ -227,6 +243,14 @@ function Dashboard() {
              <div className="p-10 text-center bg-white rounded-xl border border-dashed border-gray-300">
                <p className="text-slate-500">Chưa có bài tập nào được giao.</p>
             </div>
+          </div>
+        )}
+
+        {/* NỘI DUNG TAB: ACTIVE RECALL */}
+        {activeTab === 'recall' && (
+          <div className="h-full">
+            {/* Vì RecallChallenge đã có giao diện hoàn chỉnh, ta chỉ cần gọi nó ra */}
+            <RecallChallenge />
           </div>
         )}
 
