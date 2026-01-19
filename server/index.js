@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 5000;
 // --- MIDDLEWARE ---
 app.use(cors({
   origin: ["https://sat-platform-two.vercel.app", "http://localhost:5173"],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 app.use(express.json());
@@ -26,6 +27,7 @@ app.post('/api/login', login);
 app.post('/api/auth/google-login', googleLogin);
 
 app.use("/api/challenge", require("./src/routes/challengeRoutes"));
+app.use("/api/classes", require("./src/routes/classRoute"));
 
 // 2. API LẤY DANH SÁCH BÀI THI (Cho Dashboard)
 app.get('/api/tests', async (req, res) => {

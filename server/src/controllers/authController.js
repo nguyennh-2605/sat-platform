@@ -7,11 +7,12 @@ const prisma = new PrismaClient();
 
 // Khởi tạo Client Google với ID lấy từ biến môi trường
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const JWT_SECRET = process.env.JWT_SECRET || 'secret123'; 
 
 // --- ĐĂNG KÝ (Cũ) ---
 const register = async (req, res) => {
 	try {
-		const { email, password, name } = req.body;
+		const { email, password, name, role } = req.body;
 
 		const existingUser = await prisma.user.findUnique({
 			where: { email: email },
@@ -28,11 +29,12 @@ const register = async (req, res) => {
 				email,
 				password: hashedPassword,
 				name, // Sửa lại: database của bạn là 'name' hay 'username'? Hãy check schema nhé.
+				role: role || 'STUDENT'
 			},
 		});
 
 		// Tạo Token ngay khi đăng ký để user tự đăng nhập luôn (Optional)
-		const token = jwt.sign({ userId: newUser.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+		const token = jwt.sign({ userId: newUser.id, role: newUser.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
 		res.status(201).json({ 
 			message: "Đăng ký thành công!", 
@@ -46,7 +48,7 @@ const register = async (req, res) => {
 	}
 };
 
-// --- ĐĂNG NHẬP THƯỜNG --- 
+// --- ĐĂNG NHẬP THƯỜNG ---
 const login = async (req, res) => {
 	try {
 			const { email, password } = req.body;
@@ -72,8 +74,8 @@ const login = async (req, res) => {
 
 			// [QUAN TRỌNG] Tạo JWT Token
 			const token = jwt.sign(
-				{ userId: user.id, email: user.email },
-				process.env.JWT_SECRET,
+				{ userId: user.id, email: user.email, role: user.role },
+				JWT_SECRET,
 				{ expiresIn: '7d' }
 			);
 
@@ -122,7 +124,7 @@ const googleLogin = async (req, res) => {
 
 		// 4. Tạo JWT Token của web bạn
 		const jwtToken = jwt.sign(
-			{ userId: user.id, email: user.email },
+			{ userId: user.id, email: user.email, role: user.role },
 			process.env.JWT_SECRET,
 			{ expiresIn: '7d' }
 		);

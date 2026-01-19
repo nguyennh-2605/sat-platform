@@ -11,7 +11,7 @@ datasource db {
 
 // 1. Enum cho phân quyền
 enum Role {
-  ADMIN
+  TEACHER
   STUDENT
 }
 
@@ -26,6 +26,65 @@ model User {
   avatar      String? 
   
   submissions Submission[]
+
+  // Nếu là Teacher
+  taughtClasses   Class[]      @relation("TeacherClasses")
+  // Nếu là Student
+  studyingClasses Class[]      @relation("StudentClasses")
+  // 3. Các bài tập về nhà đã nộp
+  homeworkSubmissions HomeworkSubmission[]
+}
+
+model Class {
+  id          String   @id @default(uuid()) // Dùng ID chuỗi cho bảo mật hơn (VD: cl_123abc)
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Giáo viên chủ nhiệm (1 Lớp thuộc về 1 Giáo viên)
+  teacherId   Int
+  teacher     User     @relation("TeacherClasses", fields: [teacherId], references: [id])
+
+  // Danh sách học sinh (1 Lớp có nhiều HS, 1 HS học nhiều lớp) -> Quan hệ N-N
+  students    User[]   @relation("StudentClasses")
+
+  // Danh sách bài tập trong lớp này
+  assignments Assignment[]
+}
+
+model Assignment {
+  id          String   @id @default(uuid())
+  title       String
+  content     String?  // Nội dung đề bài text
+  fileUrl     String?  // File đề bài đính kèm (PDF/DOC)
+  deadline    DateTime?
+  createdAt   DateTime @default(now())
+
+  // Thuộc về lớp nào
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  // Danh sách bài nộp của học sinh
+  submissions HomeworkSubmission[]
+}
+
+// Bảng Nộp bài tập về nhà (Bài làm)
+model HomeworkSubmission {
+  id          String   @id @default(uuid())
+  fileUrl     String?  // File bài làm học sinh up lên
+  textResponse String? // Hoặc trả lời trực tiếp dạng text
+  score       Float?   // Điểm số giáo viên chấm
+  feedback    String?  // Lời phê của giáo viên
+  submittedAt DateTime @default(now())
+  status      String   @default("SUBMITTED") // SUBMITTED, LATE, GRADED
+
+  // Ai nộp?
+  studentId   Int
+  student     User     @relation(fields: [studentId], references: [id])
+
+  // Nộp cho bài tập nào?
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 }
 
 // 3. Bảng Đề thi (Ví dụ: SAT Practice Test #1)
@@ -33,7 +92,7 @@ model Test {
   id          Int          @id @default(autoincrement())
   title       String
   description String?
-  duration    Int          @default(1920) // Tổng thời gian (để hiển thị)
+  duration    Int          @default(64) // Tổng thời gian (để hiển thị)
   
   sections    Section[]    // 1 Bài thi có nhiều phần (Module 1, Module 2)
   submissions Submission[]

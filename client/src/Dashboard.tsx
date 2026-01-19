@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, LogOut } from 'lucide-react';
 import RecallChallenge from './pages/LogicLab';
+import HomeworkModule from './pages/HomeworkModule';
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -238,11 +239,9 @@ function Dashboard() {
 
         {/* NỘI DUNG TAB: HOMEWORK (GIỮ NGUYÊN) */}
         {activeTab === 'homework' && (
-          <div className="space-y-6">
-             <h2 className="text-3xl font-bold text-slate-800">Bài tập về nhà (Homework)</h2>
-             <div className="p-10 text-center bg-white rounded-xl border border-dashed border-gray-300">
-               <p className="text-slate-500">Chưa có bài tập nào được giao.</p>
-            </div>
+          <div className="w-full h-full">
+            {/* Gọi module Homework ra đây */}
+            <HomeworkModule />
           </div>
         )}
 

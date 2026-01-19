@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react'; // Import icon
+import { Mail, Lock, Eye, EyeOff, User, GraduationCap } from 'lucide-react'; // Đã thêm icon GraduationCap
 
 function AuthPage() {
   const [searchParams] = useSearchParams()
@@ -11,10 +11,13 @@ function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // [MỚI] Để ẩn/hiện mật khẩu
+  
+  // [MỚI 1] State cho Role, mặc định là STUDENT
+  const [role, setRole] = useState('STUDENT'); 
+  
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
-  // --- Logic cũ giữ nguyên ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const endpoint = isLoginMode ? '/api/login' : '/api/register';
@@ -24,18 +27,30 @@ function AuthPage() {
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
+        // [MỚI 2] Gửi kèm role lên server khi đăng ký
+        body: JSON.stringify({ 
+            email, 
+            password, 
+            name, 
+            role: isLoginMode ? undefined : role // Chỉ gửi role khi đăng ký
+        }),
       });
       const data = await response.json();
 
       if (response.ok) {
         if (data.token) localStorage.setItem('token', data.token);
         localStorage.setItem('isLoggedIn', 'true');
+        
         if (data.user) {
           localStorage.setItem('userId', data.user.id);
           localStorage.setItem('userName', data.user.name || 'Học viên');
           localStorage.setItem('userAvatar', data.user.avatar || '');
+          
+          // [MỚI 3] Lưu Role vào LocalStorage
+          // Ưu tiên lấy từ server trả về (data.user.role), nếu không có thì lấy từ state
+          localStorage.setItem('userRole', data.user.role || role);
         }
+        
         alert(data.message || (isLoginMode ? "Đăng nhập thành công!" : "Đăng ký thành công!"));
         navigate('/dashboard');
       } else {
@@ -61,6 +76,8 @@ function AuthPage() {
         localStorage.setItem('userId', data.user.id);
         localStorage.setItem('userName', data.user.name);
         localStorage.setItem('userAvatar', data.user.avatar || '');
+        localStorage.setItem('userRole', data.user.role || 'STUDENT');
+
         alert('Đăng nhập Google thành công!');
         navigate('/dashboard');
       } else {
@@ -76,7 +93,6 @@ function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 font-sans">
       <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
         
-        {/* Header: Tiêu đề */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             {isLoginMode ? 'Sign in' : 'Sign up'}
@@ -97,27 +113,59 @@ function AuthPage() {
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           
-          {/* Input Tên (Chỉ hiện khi Đăng ký) */}
           {!isLoginMode && (
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700 block">Full Name</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
+            <>
+                <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700 block">Full Name</label>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                    type="text"
+                    required
+                    className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    placeholder="Enter your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    />
                 </div>
-                <input
-                  type="text"
-                  required
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="Enter your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-            </div>
+                </div>
+
+                {/* [MỚI 5] Phần chọn Role (Chỉ hiện khi Đăng ký) */}
+                <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700 block">I am a</label>
+                    <div className="flex gap-4 mt-2">
+                        <label className={`flex-1 flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all ${role === 'STUDENT' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50'}`}>
+                            <input
+                                type="radio"
+                                name="role"
+                                value="STUDENT"
+                                checked={role === 'STUDENT'}
+                                onChange={(e) => setRole(e.target.value)}
+                                className="hidden"
+                            />
+                            <User className="h-4 w-4 mr-2" />
+                            <span className="font-medium text-sm">Student</span>
+                        </label>
+
+                        <label className={`flex-1 flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all ${role === 'TEACHER' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50'}`}>
+                            <input
+                                type="radio"
+                                name="role"
+                                value="TEACHER"
+                                checked={role === 'TEACHER'}
+                                onChange={(e) => setRole(e.target.value)}
+                                className="hidden"
+                            />
+                            <GraduationCap className="h-4 w-4 mr-2" />
+                            <span className="font-medium text-sm">Teacher</span>
+                        </label>
+                    </div>
+                </div>
+            </>
           )}
 
-          {/* Input Email */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700 block">Email</label>
             <div className="relative">
@@ -135,7 +183,6 @@ function AuthPage() {
             </div>
           </div>
 
-          {/* Input Password */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700 block">Password</label>
             <div className="relative">
@@ -150,7 +197,6 @@ function AuthPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              {/* Nút ẩn hiện pass */}
               <button
                 type="button"
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
@@ -165,7 +211,6 @@ function AuthPage() {
             </div>
           </div>
 
-          {/* Remember Me & Forgot Password */}
           {isLoginMode && (
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center">
@@ -187,7 +232,6 @@ function AuthPage() {
             </div>
           )}
 
-          {/* Nút Submit */}
           <button
             type="submit"
             className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
@@ -196,7 +240,6 @@ function AuthPage() {
           </button>
         </form>
 
-        {/* Divider "OR" */}
         <div className="mt-8 relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-200"></div>
@@ -206,18 +249,16 @@ function AuthPage() {
           </div>
         </div>
 
-        {/* Nút Google */}
         <div className="mt-6 flex justify-center w-full">
-           {/* Wrapper này để căn chỉnh nút Google cho đẹp */}
            <div className="w-full flex justify-center"> 
               <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => alert("Đăng nhập Google thất bại.")}
                   theme="outline"    
-                  size="large"        // Kích thước lớn
-                  width="100%"        // Cố gắng full width (tùy thư viện hỗ trợ)
-                  text="continue_with" // Text "Continue with Google"
-                  shape="rectangular" // Hình chữ nhật bo góc
+                  size="large"        
+                  width="100%"        
+                  text="continue_with" 
+                  shape="rectangular" 
               />
            </div>
         </div>
