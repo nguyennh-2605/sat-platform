@@ -101,7 +101,10 @@ exports.getClassDetail = async (req, res) => {
           select: { id: true, name: true, email: true, avatar: true }
         },
         assignments: {
-          orderBy: { createdAt: 'desc' } // Lấy bài tập mới nhất lên đầu
+          orderBy: { createdAt: 'desc' }, // Lấy bài tập mới nhất lên đầu
+          include: {
+            submissions: true
+          }
         }
       }
     });
@@ -191,5 +194,50 @@ exports.createAssignment = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Lỗi tạo bài tập" });
+  }
+};
+
+exports.createSubmission = async (req, res) => {
+  try {
+    // 1. Lấy dữ liệu từ Frontend gửi lên
+    const { assignmentId, textResponse, fileUrl } = req.body;
+    const studentId = req.user?.id || req.user?.userId; // Lấy ID học sinh từ Token
+
+    if (!assignmentId) {
+      return res.status(400).json({ error: "Thiếu thông tin bài tập (assignmentId)" });
+    }
+
+    // 2. Kiểm tra xem đã nộp chưa (Nếu muốn cho nộp lại thì dùng upsert, ở đây dùng create cho đơn giản)
+    // Lưu ý: assignmentId có thể cần ép kiểu về Int nếu DB để Int
+    const submission = await prisma.homeworkSubmission.upsert({
+      where: {
+        // Tìm xem học sinh này đã nộp bài này chưa
+        studentId_assignmentId: {
+          studentId: parseInt(studentId),
+          assignmentId: assignmentId
+        }
+      },
+      update: {
+        // Nếu nộp rồi thì cập nhật lại nội dung mới
+        textResponse: textResponse || null,
+        fileUrl: fileUrl || null,
+        submittedAt: new Date(), // Cập nhật lại thời gian nộp
+        status: 'SUBMITTED' // Reset lại trạng thái nếu trước đó bị chấm LATE/FAIL
+      },
+      create: {
+        // Nếu chưa nộp thì tạo mới
+        studentId: parseInt(studentId),
+        assignmentId: assignmentId,
+        textResponse: textResponse || null,
+        fileUrl: fileUrl || null,
+      }
+    });
+
+    console.log("Học sinh đã nộp bài:", submission);
+    res.status(201).json({ message: "Nộp bài thành công!", data: submission });
+
+  } catch (error) {
+    console.error("❌ Lỗi nộp bài:", error);
+    res.status(500).json({ error: "Lỗi server khi nộp bài" });
   }
 };

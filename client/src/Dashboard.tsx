@@ -8,7 +8,7 @@ function Dashboard() {
   const navigate = useNavigate();
   // State tab
   const [activeTab, setActiveTab] = useState('practice');
-  const [user, setUser] = useState({ name: '', avatar: '' });
+  const [user, setUser] = useState({ name: '', avatar: '', role: '' });
 
   // --- STATE MỚI ĐỂ LƯU DỮ LIỆU TỪ API ---
   const [tests, setTests] = useState<any[]>([]);
@@ -22,7 +22,8 @@ function Dashboard() {
     const url = userId ? `${import.meta.env.VITE_API_URL}/api/tests?userId=${userId}` : `${import.meta.env.VITE_API_URL}/api/tests`
     const name = localStorage.getItem('userName') || 'Student';
     const avatar = localStorage.getItem('userAvatar');
-    setUser({ name: name, avatar: avatar || '' });
+    const role = localStorage.getItem('userRole');
+    setUser({ name: name, avatar: avatar || '',  role: role || 'STUDENT'});
 
     fetch(url)
       .then(res => res.json())
@@ -137,7 +138,7 @@ function Dashboard() {
                   {user.name}
                 </p>
                 <p className="text-xs text-gray-500">
-                  Học viên
+                  {user.role === 'STUDENT' ? "Học viên" : "Giáo viên"}
                 </p>
               </div>
 

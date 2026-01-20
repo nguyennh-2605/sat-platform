@@ -46,7 +46,6 @@ function AuthPage() {
           localStorage.setItem('userName', data.user.name || 'Học viên');
           localStorage.setItem('userAvatar', data.user.avatar || '');
           
-          // [MỚI 3] Lưu Role vào LocalStorage
           // Ưu tiên lấy từ server trả về (data.user.role), nếu không có thì lấy từ state
           localStorage.setItem('userRole', data.user.role || role);
         }

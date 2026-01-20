@@ -12,5 +12,6 @@ router.get('/:id', authenticateToken, classController.getClassDetail);
 // API thêm học sinh vào lớp
 router.post('/:classId/students', authenticateToken, classController.addStudentToClass);
 router.post('/assignments', authenticateToken, classController.createAssignment);
+router.post('/submissions', authenticateToken, classController.createSubmission);
 
 module.exports = router;

@@ -29,7 +29,7 @@ const register = async (req, res) => {
 				email,
 				password: hashedPassword,
 				name, // Sửa lại: database của bạn là 'name' hay 'username'? Hãy check schema nhé.
-				role: role || 'STUDENT'
+				role: role || 'STUDENT'	
 			},
 		});
 
@@ -38,7 +38,7 @@ const register = async (req, res) => {
 
 		res.status(201).json({ 
 			message: "Đăng ký thành công!", 
-			user: { id: newUser.id, email: newUser.email, name: newUser.name },
+			user: { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role },
 			token // Trả về token
 		});
 
@@ -81,7 +81,7 @@ const login = async (req, res) => {
 
 			res.status(200).json({
 				message: "Đăng nhập thành công!",
-				user: { id: user.id, email: user.email, name: user.name },
+				user: { id: user.id, email: user.email, name: user.name, role: user.role },
 				token // Trả về token cho Frontend lưu
 			});
 
@@ -132,7 +132,7 @@ const googleLogin = async (req, res) => {
 		res.status(200).json({ 
 			message: 'Google login successful', 
 			token: jwtToken, 
-			user: { id: user.id, email: user.email, name: user.name, avatar: user.avatar } 
+			user: { id: user.id, email: user.email, name: user.name, avatar: user.avatar, role: user.role } 
 		});
 
 	} catch (error) {

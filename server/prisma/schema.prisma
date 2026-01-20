@@ -85,6 +85,7 @@ model HomeworkSubmission {
   // Nộp cho bài tập nào?
   assignmentId String
   assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  @@unique([studentId, assignmentId])
 }
 
 // 3. Bảng Đề thi (Ví dụ: SAT Practice Test #1)

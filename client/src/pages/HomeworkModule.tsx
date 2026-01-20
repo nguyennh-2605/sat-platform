@@ -3,7 +3,7 @@ import axios from 'axios';
 import { 
   BookOpen, Upload, FileText, CheckCircle, 
   Users, Plus, Clock, ChevronRight, Paperclip,
-  X, LayoutDashboard
+  X, LayoutDashboard, ArrowLeft
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -117,7 +117,7 @@ const HomeworkModule = () => {
 
   const handleSubmitAssignment = async (assignmentId: string, content: string, type: 'FILE' | 'TEXT') => {
     try {
-      await axios.post(`${API_URL}/api/submissions`, {
+      await axios.post(`${API_URL}/api/classes/submissions`, {
         assignmentId,
         textResponse: type === 'TEXT' ? content : undefined,
         fileUrl: type === 'FILE' ? content : undefined,
@@ -430,6 +430,7 @@ const TeacherDashboard = ({
 const AssignmentTracker = ({ assignment, classStudents }: any) => {
    const submissions = assignment.submissions || [];
    const submittedCount = submissions.length;
+   const [previewText, setPreviewText] = useState<any> (null)
    
    return (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden transition hover:shadow-md">
@@ -489,10 +490,28 @@ const AssignmentTracker = ({ assignment, classStudents }: any) => {
                            </td>
                            <td className="px-6 py-3 text-gray-500">
                               {sub ? (
-                                 <a href={sub.fileUrl || '#'} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-indigo-600 hover:underline">
+                                sub.fileUrl ? (
+                                  <a 
+                                    href={sub.fileUrl} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="flex items-center gap-1 text-indigo-600 hover:underline font-medium"
+                                  >
                                     <Paperclip size={14} /> 
-                                    {sub.fileUrl ? "Xem File" : "Xem Text"}
-                                 </a>
+                                    Xem File
+                                  </a>
+                                ) : (
+                                  <button 
+                                    onClick={() => setPreviewText({
+                                        name: student.name,
+                                        content: sub.textResponse
+                                    })}
+                                    className="flex items-center gap-1 text-purple-600 hover:underline font-medium hover:bg-purple-50 px-2 py-1 rounded transition"
+                                  >
+                                    <FileText size={14} /> 
+                                    Xem Bài Làm
+                                  </button>
+                                )
                               ) : '-'}
                            </td>
                            <td className="px-6 py-3 text-gray-400 text-xs font-mono">
@@ -504,6 +523,41 @@ const AssignmentTracker = ({ assignment, classStudents }: any) => {
                </tbody>
             </table>
          </div>
+         {previewText && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+              
+              {/* Header Modal */}
+              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 className="font-bold text-gray-800">Bài làm của {previewText.name}</h3>
+                <button 
+                  onClick={() => setPreviewText(null)}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 p-1 rounded-full transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Nội dung bài làm */}
+              <div className="p-6 max-h-[60vh] overflow-y-auto">
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-700 whitespace-pre-wrap font-sans text-sm">
+                  {previewText.content || "Học sinh không nhập nội dung text."}
+                </div>
+              </div>
+
+              {/* Footer Modal */}
+              <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+                <button 
+                  onClick={() => setPreviewText(null)}
+                  className="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 transition font-medium text-sm"
+                >
+                  Đóng
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
       </div>
    );
 };
@@ -513,11 +567,19 @@ const AssignmentTracker = ({ assignment, classStudents }: any) => {
 // ==========================================
 const StudentDashboard = ({ classes, selectedClassId, setSelectedClassId, classDetail, currentUser, onSubmit }: any) => {
    
-   if (!classes || classes.length === 0) return <div className="text-center p-10 text-gray-500">Bạn chưa được thêm vào lớp học nào.</div>;
+  // 1. Thêm State để quản lý việc đang xem bài nào
+  const [viewingAssignment, setViewingAssignment] = useState<any>(null);
+
+  // Khi người dùng chuyển sang lớp khác -> Reset về xem danh sách
+  useEffect(() => {
+    setViewingAssignment(null);
+  }, [selectedClassId]);
+
+  if (!classes || classes.length === 0) return <div className="text-center p-10 text-gray-500">Bạn chưa được thêm vào lớp học nào.</div>;
 
    return (
       <div className="max-w-4xl mx-auto">
-         {/* Chọn lớp học (Horizontal Scroll) */}
+         {/* --- 1. PHẦN CHỌN LỚP (GIỮ NGUYÊN) --- */}
          <div className="flex overflow-x-auto gap-3 mb-8 pb-2 scrollbar-hide">
             {classes.map((c: any) => (
                <button 
@@ -536,37 +598,95 @@ const StudentDashboard = ({ classes, selectedClassId, setSelectedClassId, classD
 
          {classDetail ? (
              <>
-                {/* Banner Gradient */}
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-xl shadow-indigo-200 mb-8 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-10 opacity-10 transform translate-x-10 -translate-y-10">
-                        <BookOpen size={150} color="white" />
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2 relative z-10">Thông tin lớp học</h2>
-                    <p className="opacity-90 relative z-10">Lớp đang chọn: <span className="font-bold bg-white/20 px-2 py-0.5 rounded">{classDetail.name}</span></p>
-                    <div className="mt-6 flex gap-4 relative z-10">
-                        <div className="bg-white/20 backdrop-blur-md px-5 py-3 rounded-xl border border-white/10">
-                           <span className="block text-3xl font-bold">{classDetail.assignments?.length || 0}</span>
-                           <span className="text-xs opacity-80 uppercase tracking-wider">Tổng bài tập</span>
+                {/* --- 2. BANNER LỚP HỌC (GIỮ NGUYÊN) --- */}
+                {/* Chỉ hiện Banner khi đang ở màn hình danh sách để đỡ rối mắt khi vào chi tiết (hoặc giữ lại tùy bạn) */}
+                {!viewingAssignment && (
+                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-xl shadow-indigo-200 mb-8 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-10 opacity-10 transform translate-x-10 -translate-y-10">
+                            <BookOpen size={150} color="white" />
+                        </div>
+                        <h2 className="text-2xl font-bold mb-2 relative z-10">Thông tin lớp học</h2>
+                        <p className="opacity-90 relative z-10">Lớp đang chọn: <span className="font-bold bg-white/20 px-2 py-0.5 rounded">{classDetail.name}</span></p>
+                        <div className="mt-6 flex gap-4 relative z-10">
+                            <div className="bg-white/20 backdrop-blur-md px-5 py-3 rounded-xl border border-white/10">
+                               <span className="block text-3xl font-bold">{classDetail.assignments?.length || 0}</span>
+                               <span className="text-xs opacity-80 uppercase tracking-wider">Bài tập</span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
-                <h3 className="font-bold text-gray-700 mb-4 text-lg flex items-center gap-2"><LayoutDashboard size={18}/> Danh sách bài tập</h3>
-                <div className="space-y-6">
-                   {classDetail.assignments && classDetail.assignments.map((assignment: any) => (
-                      <StudentAssignmentCard 
-                         key={assignment.id} 
-                         assignment={assignment} 
-                         studentId={currentUser.id} 
-                         onSubmit={onSubmit}
-                      />
-                   ))}
-                   {(!classDetail.assignments || classDetail.assignments.length === 0) && (
-                      <div className="text-center py-10 bg-white rounded-xl border border-dashed text-gray-400 italic">
-                          Lớp này hiện chưa có bài tập nào.
-                      </div>
-                   )}
-                </div>
+                {/* --- 3. LOGIC HIỂN THỊ CHÍNH --- */}
+                
+                {viewingAssignment ? (
+                    // === TRƯỜNG HỢP A: ĐANG XEM CHI TIẾT BÀI TẬP (FORM NỘP) ===
+                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                        <button 
+                            onClick={() => setViewingAssignment(null)}
+                            className="flex items-center gap-2 text-gray-500 hover:text-indigo-600 font-bold mb-6 transition group"
+                        >
+                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-indigo-100 transition">
+                                <ArrowLeft size={18} />
+                            </div>
+                            Quay lại danh sách
+                        </button>
+
+                        {/* Gọi component hiển thị chi tiết bài tập ở đây */}
+                        {/* Lưu ý: Đây là nơi bạn đặt cái component StudentAssignmentCard cũ (hoặc code nộp bài) */}
+                        <StudentAssignmentCard 
+                             assignment={viewingAssignment} 
+                             studentId={currentUser.id} 
+                             onSubmit={onSubmit}
+                             isDetailView={true} // Báo cho component con biết là đang hiển thị chế độ full
+                        />
+                    </div>
+
+                ) : (
+                    // === TRƯỜNG HỢP B: DANH SÁCH BÀI TẬP (STYLE GOOGLE CLASSROOM) ===
+                    <div className="space-y-4">
+                        {/* Tiêu đề list */}
+                        <h3 className="font-bold text-gray-700 mb-4 text-lg flex items-center gap-2">
+                             <LayoutDashboard size={18}/> Bảng tin lớp học
+                        </h3>
+
+                        {classDetail.assignments && classDetail.assignments.length > 0 ? (
+                           classDetail.assignments.map((assignment: any) => (
+                              <div 
+                                 key={assignment.id} 
+                                 onClick={() => setViewingAssignment(assignment)}
+                                 className="group bg-white p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all flex items-center gap-4"
+                              >
+                                 {/* Icon tròn xanh đặc trưng */}
+                                 <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                     <FileText size={24} />
+                                 </div>
+
+                                 {/* Thông tin bài tập */}
+                                 <div className="flex-1">
+                                     <h4 className="font-medium text-gray-800 text-base mb-1 group-hover:text-indigo-700 transition">
+                                         Giáo viên đã đăng một bài tập mới: <span className="font-bold">{assignment.title}</span>
+                                     </h4>
+                                     <div className="text-xs text-gray-400 font-medium">
+                                         {assignment.createdAt 
+                                            ? format(new Date(assignment.createdAt), 'dd/MM/yyyy') 
+                                            : format(new Date(), 'dd/MM/yyyy')}
+                                     </div>
+                                 </div>
+
+                                 {/* Nút 3 chấm hoặc mũi tên (để trang trí) */}
+                                 <div className="text-gray-300 group-hover:text-indigo-500 px-2">
+                                     <ChevronRight size={20} />
+                                 </div>
+                              </div>
+                           ))
+                        ) : (
+                           <div className="text-center py-16 bg-white rounded-xl border border-dashed text-gray-400 italic">
+                               <BookOpen size={40} className="mx-auto mb-2 opacity-20"/>
+                               Lớp này hiện chưa có bài tập nào.
+                           </div>
+                        )}
+                    </div>
+                )}
              </>
          ) : (
              <div className="text-center py-20 bg-white rounded-2xl border border-dashed flex flex-col items-center gap-2">
