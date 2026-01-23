@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Play, Save, ArrowLeft,  } from 'lucide-react';
+import { useState, memo } from 'react';
+import { Play, Save, ArrowLeft, X, FileText } from 'lucide-react';
 import { parseSATInput, type SATQuestion } from '../utlis/satParser';
 import { createPortal } from "react-dom";
 import InputGuideModal from './InputGuideModal';
@@ -160,21 +160,46 @@ const CreateTestWizard = ({ onClose }: any) => {
     );
   };
 
+  // Component con: Stepper (Thanh tiến trình)
+  const Stepper = memo(({ currentStep }: { currentStep: number }) => (
+    <div className="flex items-center gap-2 text-sm select-none"> {/* Thêm select-none để ko bị bôi đen nhầm */}
+      <div className={`flex items-center gap-2 transition-colors duration-300 ${currentStep === 1 ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
+        <span className={`w-6 h-6 rounded-full flex items-center justify-center border text-xs ${currentStep === 1 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>1</span>
+        Thông tin
+      </div>
+      
+      {/* Dùng border-t thay vì div rỗng để render nhẹ hơn */}
+      <div className="w-8 border-t border-gray-300"></div>
+      
+      <div className={`flex items-center gap-2 transition-colors duration-300 ${currentStep === 2 ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
+        <span className={`w-6 h-6 rounded-full flex items-center justify-center border text-xs ${currentStep === 2 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>2</span>
+        Nội dung
+      </div>
+    </div>
+  ));
+
   return createPortal(
-    <div className="fixed inset-0 bg-black/50 z-[50] flex items-center justify-center">
-      <div className="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 p-4">
+    <div className="fixed inset-0 bg-slate-900/60 z-[50] flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         {/* HEADER MODAL */}
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">
-                {step === 1 ? "Bước 1: Thông tin đề thi" : "Bước 2: Nhập nội dung câu hỏi"}
-            </h2>
-            <p className="text-xs text-gray-500">
-                {step === 1 ? "Thiết lập các thông số cơ bản" : `Đang nhập liệu cho: ${testInfo.title} (${testInfo.type})`}
-            </p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
+        <div className="flex items-center gap-4">
+           {/* Nút đóng giả lập icon app */}
+           <div className="bg-indigo-600 p-2 rounded-lg text-white shadow-lg shadow-indigo-200">
+              <FileText size={20} />
+           </div>
+           <div>
+              <h2 className="text-lg font-bold text-gray-800">Tạo đề thi mới</h2>
+              <Stepper currentStep={step} />
+           </div>
         </div>
+        <button 
+          onClick={onClose} 
+          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+        >
+          <X size={24} />
+        </button>
+      </div>
 
         {/* BODY MODAL */}
         <div className="flex-1 overflow-hidden">
