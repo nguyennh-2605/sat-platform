@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 // --- TYPES ---
 interface SATQuestion {
@@ -51,18 +52,18 @@ const SATChallenge = () => {
       setQuestionData(res.data);
       setStep('DOING');
     } catch (error) {
-      alert("Lỗi server: " + error);
+      toast.error("Lỗi server: " + error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (!userChoice) return alert("Bạn chưa chọn đáp án!");
+    if (!userChoice) return toast("Bạn chưa chọn đáp án!");
     
     // Kiểm tra xem đã điền đủ 4 ô chưa
     const emptyExpl = Object.values(userExplanations).some(val => val.trim().length < 5);
-    if (emptyExpl) return alert("Hãy giải thích ngắn gọn cho CẢ 4 đáp án (tại sao đúng/sai)!");
+    if (emptyExpl) return toast("Hãy giải thích ngắn gọn cho CẢ 4 đáp án (tại sao đúng/sai)!");
 
     setIsLoading(true);
     try {
@@ -74,7 +75,7 @@ const SATChallenge = () => {
       setResult(res.data);
       setStep('RESULT');
     } catch (error) {
-      alert("Lỗi chấm bài: " + error);
+      toast.error("Lỗi chấm bài: " + error);
     } finally {
       setIsLoading(false);
     }

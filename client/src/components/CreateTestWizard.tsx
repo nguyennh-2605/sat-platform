@@ -1,5 +1,5 @@
-import { useState, memo } from 'react';
-import { Play, Save, ArrowLeft, X, FileText } from 'lucide-react';
+import { useState, memo, useRef } from 'react';
+import { Play, Save, ArrowLeft, X, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { parseSATInput, type SATQuestion } from '../utlis/satParser';
 import { createPortal } from "react-dom";
 import InputGuideModal from './InputGuideModal';
@@ -44,6 +44,10 @@ const CreateTestWizard = ({ onClose }: any) => {
   const [showGuide, setShowGuide] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [isUploading, setIsUploading] = useState(false); // Trạng thái đang upload
+  const fileInputRef = useRef<HTMLInputElement>(null);   // Để kích hoạt input file
+  const textareaRef = useRef<HTMLTextAreaElement>(null); // Để thao tác con trỏ trong textarea
+
   // --- XỬ LÝ BƯỚC 1 ---
   const handleInfoSubmit = (e: any) => {
     e.preventDefault();
@@ -53,7 +57,9 @@ const CreateTestWizard = ({ onClose }: any) => {
 
   // --- XỬ LÝ BƯỚC 2 ---
   const handleParse = () => {
+    console.log("DEBUG RAW TEXT:", JSON.stringify(rawText));
     const data = parseSATInput(rawText);
+    console.log("DEBUG PARSED RESULT:", data);
     
     // Validate số lượng module
     const modulesFound = new Set(data.map((q: any) => q.module)).size;
@@ -158,6 +164,81 @@ const CreateTestWizard = ({ onClose }: any) => {
         })}
       </div>
     );
+  };
+
+  // === 2. HÀM CHÈN TEXT VÀO VỊ TRÍ CON TRỎ ===
+  const insertAtCursor = (textToInsert: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const originalText = textarea.value;
+    
+    // Chèn text vào giữa
+    const newText = originalText.substring(0, start) + textToInsert + originalText.substring(end);
+    setRawText(newText);
+    
+    // Focus lại và đưa con trỏ ra sau đoạn vừa chèn
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
+    }, 0);
+  };
+
+  // === 3. HÀM UPLOAD LÊN CLOUDINARY ===
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) { // Giới hạn 5MB
+      toast.error("File quá lớn! Vui lòng chọn ảnh dưới 5MB");
+      return;
+    }
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // --- CẤU HÌNH CLOUDINARY ---
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME; 
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_PRESET;
+    // ------------------------------------
+
+    if (!cloudName || !uploadPreset) {
+        toast.error("Thiếu cấu hình Cloudinary trong .env");
+        setIsUploading(false);
+        return;
+    }
+
+    formData.append('upload_preset', uploadPreset);
+
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const data = await res.json();
+
+      if (data.secure_url) {
+        // Tạo cú pháp Markdown ảnh
+        const markdown = `![Image](${data.secure_url})\n`;
+        insertAtCursor(markdown);
+      } else {
+        toast.error("Lỗi upload ảnh (Sai cấu hình Cloudinary?)");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Có lỗi xảy ra khi upload");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
+    }
   };
 
   // Component con: Stepper (Thanh tiến trình)
@@ -282,42 +363,71 @@ const CreateTestWizard = ({ onClose }: any) => {
             <div className="flex h-full">
               {/* CỘT TRÁI: EDITOR (Giữ nguyên logic của bạn) */}
               <div className="w-1/2 p-4 flex flex-col border-r bg-white h-full">
-                <button
-                  type="button"
-                  onClick={() => setShowGuide(true)}
-                  className="w-full text-left flex items-center justify-between bg-indigo-50 border border-indigo-200 p-4 rounded-lg mb-4 hover:bg-indigo-100 transition focus:outline-none"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="bg-indigo-100 p-2 rounded-full text-indigo-600">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-bold text-indigo-900"> Chưa biết cách nhập? </p>
-                      <p className="text-sm text-indigo-700"> Xem hướng dẫn cú pháp dấu gạch đầu dòng, bảng biểu, hình ảnh. </p>
-                    </div>
-                  </div>
-                  <div className="text-indigo-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </button>
+                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-300 border-b-0 rounded-t-lg select-none">
+                  
+                  {/* Nhóm bên trái: Các công cụ nhập liệu */}
+                  <div className="flex items-center gap-2">
+                    {/* Input file ẩn */}
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                    />
 
+                    {/* Nút Upload Ảnh */}
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className={`p-2 rounded-md transition-all flex items-center gap-2 text-sm font-medium
+                        ${isUploading 
+                          ? 'bg-gray-100 text-gray-400 cursor-wait' 
+                          : 'text-gray-600 hover:text-indigo-600 hover:bg-white hover:shadow-sm active:scale-95'
+                        }`}
+                      title="Tải ảnh lên (Max 5MB)"
+                    >
+                      {isUploading ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <ImageIcon size={18} />
+                      )}
+                      <span className="hidden xl:inline">Chèn ảnh</span>
+                    </button>
+
+                    {/* Dấu gạch ngăn cách */}
+                    <div className="w-[1px] h-5 bg-gray-300 mx-1"></div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowGuide(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-700 transition-colors border border-indigo-100"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Hướng dẫn & Cú pháp
+                  </button>
+                </div>
+
+                {/* 2. KHUNG SOẠN THẢO (TEXTAREA) */}
+                {/* Lưu ý: rounded-t-none để dính liền với toolbar bên trên */}
                 <textarea
-                  className="flex-1 w-full p-4 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none bg-gray-50"
-                  placeholder={`Paste nội dung đề thi vào đây...`}
+                  ref={textareaRef}
+                  className="flex-1 w-full p-4 border border-gray-300 rounded-b-lg rounded-t-none font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none bg-white leading-relaxed"
+                  placeholder={`Nhập nội dung đề thi vào đây...\n\n- Bấm nút "Chèn ảnh" ở trên để upload hình.\n- Bấm nút "Hướng dẫn" để xem cách nhập bảng biểu, đoạn văn.`}
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
                 />
 
+                {/* 3. CÁC NÚT ĐIỀU HƯỚNG DƯỚI CÙNG */}
                 <div className="mt-4 flex gap-3">
-                  <button onClick={() => setStep(1)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg flex items-center gap-2 transition">
-                    <ArrowLeft size={16} /> Quay lại
+                  <button onClick={() => setStep(1)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg flex items-center gap-2 transition font-medium">
+                    <ArrowLeft size={18} /> Quay lại
                   </button>
-                  <button onClick={handleParse} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 shadow-lg flex items-center justify-center gap-2 transition">
-                    <Play size={16} /> Phân tích & Xem trước
+                  
+                  <button onClick={handleParse} className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-bold hover:bg-indigo-700 shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                    <Play size={18} /> Phân tích & Xem trước
                   </button>
                 </div>
               </div>
@@ -406,12 +516,20 @@ const CreateTestWizard = ({ onClose }: any) => {
 
                             {/* 4. IMAGE BLOCK */}
                             {block.type === 'image' && (
-                              <div className="h-40 bg-gray-50 rounded-lg flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-300 select-none">
-                                <svg className="w-8 h-8 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span className="text-xs font-medium text-gray-500">Khu vực hiển thị ảnh</span>
-                                <span className="text-[10px] text-gray-400 mt-1 font-mono bg-gray-100 px-1 rounded">{block.src || "SRC_NOT_FOUND"}</span>
+                              <div className="my-4 flex justify-center">
+                                {block.src ? (
+                                  <img 
+                                    src={block.src} 
+                                    alt="Question Image" 
+                                    className="max-h-64 rounded-lg border border-gray-200 shadow-sm object-contain"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  // Fallback nếu không parse được src
+                                  <div className="h-20 bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                                    [Ảnh lỗi: Không tìm thấy link]
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
