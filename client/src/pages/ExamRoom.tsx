@@ -10,6 +10,7 @@ import InteractiveText from '../components/InteractiveText';
 import type { QuestionData } from '../types/quiz';
 import type { QuestionResult } from '../ScoreReport';
 import ScoreReport from '../ScoreReport';
+import toast from 'react-hot-toast';
 
 function ExamRoom() {
   const { id } = useParams();
@@ -54,7 +55,8 @@ function ExamRoom() {
   // State lưu cấu hình thời gian (tính bằng PHÚT để dễ hiển thị)
   const [examConfig, setExamConfig] = useState({
     mod1Duration: 0,
-    mod2Duration: 0
+    mod2Duration: 0,
+    totalModules: 1
   })
 
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -72,6 +74,9 @@ function ExamRoom() {
     description: '',
     duration: 0
   }) 
+
+  // State lưu độ dài module 1
+  const [firstModuleLength, setFirstModuleLength] = useState(0);
 
   // Dữ liệu Backend trả về sau khi nộp bài
   interface BackendResult {
@@ -93,7 +98,7 @@ function ExamRoom() {
 
     const userId = localStorage.getItem('userId');
     if (!userId) {
-      alert("Bạn chưa đăng nhập!");
+      toast.error("Bạn chưa đăng nhập!");
       navigate('/login');
       return;
     }
@@ -136,7 +141,8 @@ function ExamRoom() {
                   id: q.id,
                   blocks: q.blocks,
                   questionText: q.questionText,
-                  options: formattedChoices,
+                  choices: formattedChoices,
+                  moduleIndex: section.order
                 } as QuestionData; 
               });
               allQuestions = [...allQuestions, ...qs];
@@ -168,32 +174,32 @@ function ExamRoom() {
           }
         }
 
-        let durationMod1 = 0;
-        let durationMod2 = 0;
-
-        if (data.sections && data.sections.length > 1) {
-          durationMod1 = data.sections[0].duration;
-          durationMod2 = data.sections[1].duration;
-
-          console.log('thời gian cho mod 1 là ', durationMod1)
-          console.log('thời gian cho mod 2 là ', durationMod2)
-
-          setExamConfig({
-            mod1Duration: durationMod1,
-            mod2Duration: durationMod2
-          });
+        if (data.sections && data.sections.length > 0) {
+          setFirstModuleLength(data.sections[0].questions.length);
         }
+
+        let durationMod1 = data.sections[0]?.duration || 0;
+        let durationMod2 = (data.sections.length > 1 ? data.sections[1].duration : 0);
+
+        setExamConfig({
+          mod1Duration: durationMod1,
+          mod2Duration: durationMod2,
+          totalModules: data.sections.length
+        });
 
         const savedMod2Start = localStorage.getItem(`mod2Start_${userId}_${id}`);
         console.log("Thời gian mod 2 bắt đầu", savedMod2Start);
         let currentPhase = 'MODULE_1'; // Mặc định
         let mod2StartVal = null;
 
-        if (savedMod2Start) {
+        if (savedMod2Start && data.sections.length > 1) {
           currentPhase = 'MODULE_2';
           mod2StartVal = parseInt(savedMod2Start, 10);
           setPhase('MODULE_2'); // Cập nhật state phase
           setCurrentQuestionIndex(data.sections[0].questions.length);
+        }
+        else {
+          setPhase('MODULE_1')
         }
 
         if (data.session) {
@@ -220,8 +226,13 @@ function ExamRoom() {
               finishTest(currentSubmissionId);
             }
             else {
-              setPhase('MODULE_2'); // Hoặc logic chuyển tiếp
-              alert("Hết giờ Module 1, chuyển sang module tiếp theo.");
+              if (data.sections.length < 2) {
+                finishTest(currentSubmissionId);
+              }
+              else {
+                startModule2();
+                toast("Hết giờ Module 1, chuyển sang module tiếp theo.");
+              }
             }
           }
           else {
@@ -271,7 +282,7 @@ function ExamRoom() {
         const userId = storedUserId ? parseInt(storedUserId) : null;
 
         if (!userId) {
-            alert("Lỗi: Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại!");
+            toast.error("Lỗi: Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại!");
             return;
         }
 
@@ -304,11 +315,11 @@ function ExamRoom() {
           setApiResult(data);
           setIsSubmitted(true);
         } else {
-            alert("Lỗi khi nộp bài: " + (data.error || data.message));
+            toast.error("Lỗi khi nộp bài: " + (data.error || data.message));
         }
     } catch (error) {
         console.error("Lỗi mạng:", error);
-        alert("Không thể kết nối đến server để nộp bài!");
+        toast.error("Không thể kết nối đến server để nộp bài!");
     } finally {
         setIsSubmitting(false);
     }
@@ -351,7 +362,7 @@ function ExamRoom() {
         setViolationCount(prev => {
           const newCount = prev + 1;
           if (newCount > 3) finishTest();
-          else alert(`⚠️ CẢNH BÁO (${newCount}/3): Đừng rời khỏi màn hình!`);
+          else toast(`⚠️ CẢNH BÁO (${newCount}/3): Đừng rời khỏi màn hình!`);
           return newCount;
         });
       }
@@ -365,7 +376,7 @@ function ExamRoom() {
             finishTest();
             return newCount;
           } else {
-            alert(`⚠️ CẢNH BÁO (${newCount}/3): Quay lại fullscreen ngay!`);
+            toast(`⚠️ CẢNH BÁO (${newCount}/3): Quay lại fullscreen ngay!`);
             enterFullscreen(); 
             return newCount;
           }
@@ -454,8 +465,11 @@ function ExamRoom() {
 
   const splitIndex = useMemo(() => {
     if (questions.length === 0) return 0;
-    return Math.floor(questions.length / 2); // Cắt đôi: Ví dụ 20 câu -> split tại 10
-  }, [questions.length]);
+    if (examConfig.totalModules == 1) {
+      return questions.length;
+    }
+    return firstModuleLength // Cắt đôi: Ví dụ 20 câu -> split tại 10
+  }, [questions.length, examConfig.totalModules, firstModuleLength]);
 
 
   const jumpToQuestion = (index: number) => {
@@ -535,7 +549,7 @@ function ExamRoom() {
         questionNumber: questionNumber,
         blocks: q.blocks,
         questionText: q.questionText,
-        options: q.options.map((c, i) => ({
+        choices: q.choices.map((c, i) => ({
           id: c.id,
           text: c.text,
           label: String.fromCharCode(65 + i)
@@ -557,7 +571,7 @@ function ExamRoom() {
   }
 
   if (isSubmitting) {
-    return <div className="h-screen flex items-center justify-center text-blue-600 font-bold">🚀 Đang chấm điểm...</div>;
+    return <div className="h-screen flex items-center justify-center text-blue-600 font-bold"> Đang chấm điểm...</div>;
   }
 
   if (questions.length === 0) {
@@ -650,10 +664,6 @@ function ExamRoom() {
             </svg>
             Review 
           </button>
-
-          {/* <button onClick={() => finishTest("Nộp bài tự nguyện")} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-md hover:bg-blue-700 transition">
-            Nộp bài
-          </button> */}
         </div>
       </header>
       
@@ -769,7 +779,7 @@ function ExamRoom() {
 
           {/* --- NỘI DUNG CHÍNH (BODY) --- */}
           <div className="flex-1 flex overflow-hidden">
-          {/* 👈 CỘT TRÁI: CHỈ HIỆN BLOCKS (Bài đọc, Graph...) */}
+          {/*  CỘT TRÁI: CHỈ HIỆN BLOCKS (Bài đọc, Graph...) */}
             <div className="w-1/2 p-8 border-r border-gray-200 overflow-y-auto bg-white custom-scrollbar">
               <div   className=" font-['Georgia','Times_New_Roman', serif] text-[1.05rem] font-normal text-slate-800 leading-[1.45] tracking-[-0.01em] whitespace-pre-line">
                 {/* Nếu không có block nào (ví dụ câu hỏi ngắn) thì ẩn hoặc hiện placeholder */}
@@ -809,7 +819,7 @@ function ExamRoom() {
                 </h3>
                 
                 <div className="space-y-3">
-                  {currentQ.options.map((opt: any, index: number) => {
+                  {currentQ.choices.map((opt: any, index: number) => {
                       const isEliminated = eliminatedMap[currentQuestionIndex]?.includes(index);
                       const charLabel = String.fromCharCode(65 + index); // 0->A, 1->B
 
@@ -857,7 +867,12 @@ function ExamRoom() {
                     }
                     else {
                       if (phase === 'MODULE_1' && currentQuestionIndex == splitIndex - 1) {
-                        setPhase('REVIEW_1');
+                        if (examConfig.totalModules == 1){
+                          setShowSubmitModal(true);
+                        }
+                        else {
+                          setPhase('REVIEW_1');
+                        }
                       }
                       else {
                         setCurrentQuestionIndex(p => Math.min(questions.length - 1, p + 1))
@@ -874,11 +889,17 @@ function ExamRoom() {
                   `}
                 >
                   {/* Logic đổi tên nút bấm */}
-                  {phase === 'MODULE_1' && currentQuestionIndex === splitIndex - 1 
-                      ? "Review Module 1" 
-                      : phase === 'MODULE_2' && currentQuestionIndex === questions.length - 1 
+                  {
+                    // Nếu là câu cuối cùng của toàn bộ bài thi (Mod 2 HOẶC Mod 1 nếu chỉ có 1 mod)
+                    (phase === 'MODULE_2' && currentQuestionIndex === questions.length - 1) || 
+                    (phase === 'MODULE_1' && currentQuestionIndex === splitIndex - 1 && examConfig.totalModules === 1)
                       ? "Submit" 
-                      : "Next"}
+                      // Nếu là câu cuối Mod 1 (nhưng còn Mod 2)
+                      : (phase === 'MODULE_1' && currentQuestionIndex === splitIndex - 1)
+                        ? "Review Module 1"
+                        // Còn lại
+                        : "Next"
+                    }
                 </button>
             </div>
           </footer>

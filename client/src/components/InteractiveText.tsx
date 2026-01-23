@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import parse from 'html-react-parser';
 import { useQuizTool } from '../context/QuizToolContext';
+import toast from 'react-hot-toast';
 
 interface Props {
   content: string;
@@ -111,7 +112,7 @@ const InteractiveText: React.FC<Props> = ({ content }) => {
             }
         }
         if (hasBlock) {
-             alert("Vui lòng không highlight qua nhiều đoạn văn (xuống dòng).");
+             toast.error("Vui lòng không highlight qua nhiều đoạn văn (xuống dòng).");
              setToolbar(null);
              return;
         }
@@ -150,7 +151,7 @@ const InteractiveText: React.FC<Props> = ({ content }) => {
 
     } catch (e) {
       console.error("Highlight Error:", e);
-      alert("Không thể highlight vùng này do cấu trúc HTML quá phức tạp.");
+      toast.error("Không thể highlight vùng này do cấu trúc HTML quá phức tạp.");
       setToolbar(null);
     }
   };
@@ -203,7 +204,7 @@ const InteractiveText: React.FC<Props> = ({ content }) => {
         setToolbar(null);
         syncDomToState(); // Quan trọng: Sync để React vẽ lại
     } else {
-        alert("Vùng chọn không chứa Highlight nào để xóa.");
+        toast.error("Vùng chọn không chứa Highlight nào để xóa.");
         setToolbar(null);
     }
   };

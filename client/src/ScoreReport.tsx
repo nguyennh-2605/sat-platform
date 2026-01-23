@@ -9,7 +9,7 @@ export interface QuestionResult {
   questionNumber: number;   // VD: 5 (Số thứ tự trong module đó)
   blocks: ContentBlock[];
   questionText: string;
-  options: {
+  choices: {
     id: string;
     text: string;
     label?: string

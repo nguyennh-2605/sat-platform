@@ -1,24 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, LogOut } from 'lucide-react';
+import { 
+  User, LogOut, Plus, BookOpen, 
+  BrainCircuit, Layout, GraduationCap, 
+  Clock, ChevronRight, Search 
+} from 'lucide-react';
 import RecallChallenge from './pages/LogicLab';
 import HomeworkModule from './pages/HomeworkModule';
+import CreateTestWizard from './components/CreateTestWizard';
 
 function Dashboard() {
   const navigate = useNavigate();
-  // State tab
   const [activeTab, setActiveTab] = useState('practice');
   const [user, setUser] = useState({ name: '', avatar: '', role: '' });
-
-  // --- STATE MỚI ĐỂ LƯU DỮ LIỆU TỪ API ---
   const [tests, setTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // --- GỌI API KHI COMPONENT LOAD ---
+  // --- LOGIC GIỮ NGUYÊN ---
   useEffect(() => {
     const userId = localStorage.getItem('userId');
-
-    // Tạo URL: Nếu có userId thì kẹp thêm vào đuôi
     const url = userId ? `${import.meta.env.VITE_API_URL}/api/tests?userId=${userId}` : `${import.meta.env.VITE_API_URL}/api/tests`
     const name = localStorage.getItem('userName') || 'Student';
     const avatar = localStorage.getItem('userAvatar');
@@ -49,211 +50,235 @@ function Dashboard() {
       description: exam.description,
       duration: exam.duration
     };
-
     localStorage.setItem('current_exam_info', JSON.stringify(examInfo));
     navigate(`/test/${exam.id}`);
   };
 
+  // Component Menu Item nhỏ gọn để tái sử dụng
+  const MenuItem = ({ id, label, icon: Icon }: any) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`group w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 font-medium ${
+        activeTab === id 
+          ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
+          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+      }`}
+    >
+      <Icon size={20} className={activeTab === id ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'} />
+      <span>{label}</span>
+      {activeTab === id && <ChevronRight size={16} className="ml-auto opacity-50" />}
+    </button>
+  );
+
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
+    <div className="flex h-screen bg-[#F8FAFC] font-sans overflow-hidden">
       
-      {/* --- SIDEBAR BÊN TRÁI (GIỮ NGUYÊN) --- */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        {/* Logo khu vực Dashboard */}
-        <div className="p-6 border-b border-gray-100 flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">S</div>
-          <span className="text-xl font-bold text-slate-800">SAT Master</span>
+      {/* --- SIDEBAR HIỆN ĐẠI --- */}
+      <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shadow-sm z-10">
+        {/* Logo */}
+        <div className="p-8 pb-4">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md">
+              <BookOpen size={20} strokeWidth={3} />
+            </div>
+            <div>
+              <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">SAT Master</h1>
+              <p className="text-xs text-slate-400 font-medium">Luyện thi thông minh</p>
+            </div>
+          </div>
         </div>
 
-        {/* Menu Items */}
-        <nav className="flex-1 p-4 space-y-2">
-          
-          {/* Mục 1: Practice Test */}
-          <button
-            onClick={() => setActiveTab('practice')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeTab === 'practice' 
-                ? 'bg-blue-50 text-blue-700 font-semibold' 
-                : 'text-slate-600 hover:bg-gray-100'
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-            </svg>
-            Practice Test
-          </button>
-
-          {/* Mục 2: Vocabulary */}
-          <button
-            onClick={() => setActiveTab('vocab')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeTab === 'vocab' 
-                ? 'bg-blue-50 text-blue-700 font-semibold' 
-                : 'text-slate-600 hover:bg-gray-100'
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-            Vocabulary
-          </button>
-
-          {/* Mục 3: Homework */}
-          <button
-            onClick={() => setActiveTab('homework')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeTab === 'homework' 
-                ? 'bg-blue-50 text-blue-700 font-semibold' 
-                : 'text-slate-600 hover:bg-gray-100'
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Homework
-          </button>
-          {/* Mục 4: Active Recall (Mới) */}
-          <button
-            onClick={() => setActiveTab('recall')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              activeTab === 'recall' 
-                ? 'bg-blue-50 text-blue-700 font-semibold' 
-                : 'text-slate-600 hover:bg-gray-100'
-            }`}
-          >
-            {/* Icon: Trí tuệ / Bóng đèn sáng */}
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3M3.343 15.657l.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            Logic Lab
-          </button>
+        {/* Menu Navigation */}
+        <nav className="flex-1 px-4 py-6 space-y-2">
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 px-4">Menu</div>
+          <MenuItem id="practice" label="Practice Test" icon={Layout} />
+          <MenuItem id="homework" label="Homework" icon={GraduationCap} />
+          <MenuItem id="vocab" label="Vocabulary" icon={BookOpen} />
+          <MenuItem id="recall" label="Logic Lab" icon={BrainCircuit} />
         </nav>
 
-        {/* User Profile & Logout */}
-        <div className="p-4 border-t border-gray-200 flex items-center justify-center">
-            <div className="flex items-center gap-4">
-              {/* 1. Thông tin Tên & Vai trò (Đẩy sang trái) */}
-              <div className="hidden md:block text-left">
-                <p className="text-sm font-bold text-gray-900 whitespace-nowrap truncate max-w-[150px]">
-                  {user.name}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {user.role === 'STUDENT' ? "Học viên" : "Giáo viên"}
-                </p>
-              </div>
-
-              {/* 2. Avatar & Nút Logout (Gom lại 1 cụm bên phải) */}
-              <div className="flex items-center gap-2 pl-0 pr-0 bg-gray-50 rounded-full border border-gray-100">
-                {/* Avatar hình tròn */}
-                <div className="relative h-9 w-9 rounded-full overflow-hidden border-2 border-white shadow-sm">
-                  {user.avatar ? (
-                    <img 
-                      src={user.avatar} 
-                      alt="Avatar" 
-                      className="h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="h-full w-full bg-blue-100 flex items-center justify-center text-blue-600">
-                      <User size={18} />
-                    </div>
-                  )}
+        {/* User Profile Card */}
+        <div className="p-4 border-t border-slate-100">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <div className="relative h-10 w-10 min-w-[2.5rem] rounded-full overflow-hidden border border-white shadow-sm">
+              {user.avatar ? (
+                <img src={user.avatar} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                <div className="h-full w-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                  <User size={20} />
                 </div>
-
-                {/* 3. Nút Icon Đăng xuất */}
-                <button 
-                  onClick={handleLogout}
-                  className="group p-1 rounded-full hover:bg-red-50 transition-colors mr-1"
-                  title="Đăng xuất" // Hiện chữ khi di chuột vào
-                >
-                  {/* Icon LogOut màu xám, hover vào chuyển màu đỏ */}
-                  <LogOut size={18} className="text-gray-400 group-hover:text-red-600 transition-colors" />
-                </button>
-              </div>
+              )}
             </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-sm font-bold text-slate-800 truncate">{user.name}</p>
+              <p className="text-xs text-slate-500 truncate">{user.role === 'STUDENT' ? "Học viên" : "Giáo viên"}</p>
+            </div>
+            <button 
+              onClick={handleLogout}
+              className="p-2 rounded-lg hover:bg-white hover:text-red-500 hover:shadow-sm text-slate-400 transition-all"
+              title="Đăng xuất"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
       </aside>
 
+      {/* --- MAIN CONTENT --- */}
+      <main className="flex-1 overflow-y-auto relative scroll-smooth">
+        {/* Header Background Decoration */}
+        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
 
-      {/* --- NỘI DUNG BÊN PHẢI (MAIN CONTENT) --- */}
-      <main className="flex-1 overflow-y-auto p-8">
-        
-        {/* NỘI DUNG TAB: PRACTICE TEST */}
-        {activeTab === 'practice' && (
-          <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-slate-800">Thư viện đề thi</h2>
-            <p className="text-slate-600">Chọn một bài thi để bắt đầu luyện tập.</p>
-            
-            {/* Hiển thị Loading hoặc Grid danh sách */}
-            {loading ? (
-              <div className="text-center py-10 text-slate-500">⏳ Đang tải danh sách đề thi...</div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+        <div className="max-w-7xl mx-auto p-8 relative">
+          
+          {/* TAB: PRACTICE TEST */}
+          {activeTab === 'practice' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              
+              {/* Header Section */}
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-3xl font-extrabold text-slate-800 mb-2">
+                    Xin chào, {user.name.split(' ').pop()}! 👋
+                  </h2>
+                  <p className="text-slate-500 text-lg">Hôm nay bạn muốn luyện tập kỹ năng nào?</p>
+                </div>
                 
-                {/* --- RENDER LIST TỪ API --- */}
-                {tests.map((test, index) => (
-                  <div key={test.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
-                    <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 mb-4">
-                      <span className="font-bold text-xl">{index + 1}</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">{test.title}</h3>
-                    <div className="flex gap-2 text-sm text-slate-500 mb-4">
-                      <span>⏱ {Math.floor(test.duration)} phút</span>
-                      <span>•</span>
-                      <span>{test.description || "Reading & Math"}</span>
-                    </div>
-                    <button 
-                      onClick={() => handleStartExam(test)} 
-                      className={`w-full py-2 text-white rounded-lg font-medium transition ${
-                        test.isDoing
-                          ? "bg-yellow-500 hover:bg-yellow-600"
-                          : "bg-blue-600 hover:bg-blue-700"   
-                      }`}
-                    >
-                      {/* Kiểm tra: Nếu backend trả về isDoing = true thì hiện chữ khác */}
-                      {test.isDoing ? "Tiếp tục làm bài" : "Làm bài ngay"}
-                    </button>
-                  </div>
-                ))}
-
-                {/* Nếu không có bài thi nào */}
-                {tests.length === 0 && (
-                  <div className="col-span-3 text-center py-10 text-gray-400 italic">
-                    Chưa có bài thi nào trong hệ thống.
-                  </div>
+                {user.role === 'TEACHER' && (
+                  <button 
+                    onClick={() => setShowCreateModal(true)}
+                    className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-xl font-semibold hover:bg-slate-800 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                  >
+                    <Plus size={20} /> 
+                    <span>Tạo đề thi mới</span>
+                  </button>
                 )}
-                
               </div>
-            )}
-          </div>
-        )}
 
-        {/* NỘI DUNG TAB: VOCABULARY (GIỮ NGUYÊN) */}
-        {activeTab === 'vocab' && (
-          <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-slate-800">Từ vựng (Vocabulary)</h2>
-            <div className="p-10 text-center bg-white rounded-xl border border-dashed border-gray-300">
-               <p className="text-slate-500">Tính năng đang được phát triển...</p>
+              {/* Search / Filter Bar (Mockup UI) */}
+              <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-2 max-w-md">
+                <div className="p-2 text-slate-400">
+                  <Search size={20} />
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Tìm kiếm bài thi..." 
+                  className="w-full outline-none text-slate-700 placeholder-slate-400 bg-transparent"
+                />
+              </div>
+
+              {/* List Cards */}
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 opacity-60">
+                  <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                  <p className="text-slate-500 font-medium">Đang tải dữ liệu...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+                  {tests.map((test, index) => (
+                    <div 
+                      key={test.id} 
+                      className="group bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-[0_8px_30px_-6px_rgba(6,81,237,0.15)] hover:border-blue-100 transition-all duration-300 flex flex-col"
+                    >
+                      {/* Card Header */}
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold text-lg group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                          {String(index + 1).padStart(2, '0')}
+                        </div>
+                        {/* 2. Góc phải: Thời gian + Explanation */}
+                        <div className="flex flex-col items-end gap-1.5">
+                          {/* Thời gian */}
+                          <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                            <Clock size={12} className="text-slate-400"/>
+                            <span>{Math.floor(test.duration)} phút</span>
+                          </div>
+                          
+                          {/* Bạn có thể thay true bằng test.hasExplanation nếu backend có trả về */}
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                            <span>Explanations included</span>
+                          </div>
+                        </div>
+                      </div>
+
+
+                      {/* Card Content */}
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                          {test.title}
+                        </h3>
+                        <p className="text-slate-500 text-sm mb-4 line-clamp-2">
+                          {test.description || "Bài kiểm tra tổng hợp Reading & Math chuẩn SAT."}
+                        </p>
+                      </div>
+
+                      {/* Action Button */}
+                      <button 
+                        onClick={() => handleStartExam(test)} 
+                        className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all transform active:scale-95 ${
+                          test.isDoing
+                            ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                            : "bg-slate-900 text-white hover:bg-blue-600 shadow-lg shadow-slate-200 hover:shadow-blue-200"
+                        }`}
+                      >
+                        {test.isDoing ? "Tiếp tục bài thi" : "Bắt đầu làm bài"}
+                        {!test.isDoing && <ChevronRight size={18} />}
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Empty State */}
+                  {tests.length === 0 && (
+                    <div className="col-span-full py-20 flex flex-col items-center justify-center text-center bg-white rounded-3xl border border-dashed border-slate-300">
+                      <div className="bg-slate-50 p-4 rounded-full mb-4">
+                        <BookOpen size={32} className="text-slate-300" />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-700">Chưa có đề thi nào</h3>
+                      <p className="text-slate-500 max-w-xs mx-auto mt-2">Hiện tại hệ thống chưa có đề thi nào khả dụng. Vui lòng quay lại sau.</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* NỘI DUNG TAB: HOMEWORK (GIỮ NGUYÊN) */}
-        {activeTab === 'homework' && (
-          <div className="w-full h-full">
-            {/* Gọi module Homework ra đây */}
-            <HomeworkModule />
-          </div>
-        )}
+          {/* CÁC TAB KHÁC GIỮ NGUYÊN WRAPPER ĐỂ ĐỒNG BỘ STYLE */}
+          {activeTab === 'vocab' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <h2 className="text-3xl font-extrabold text-slate-800 mb-6">Kho Từ Vựng</h2>
+               <div className="bg-white rounded-3xl p-12 text-center shadow-sm border border-slate-200">
+                  <div className="inline-flex bg-indigo-50 p-6 rounded-full mb-6">
+                    <BookOpen size={48} className="text-indigo-500" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800">Tính năng đang phát triển</h3>
+                  <p className="text-slate-500 mt-2">Chúng tôi đang xây dựng bộ từ vựng SAT 3000 từ phổ biến nhất.</p>
+               </div>
+            </div>
+          )}
 
-        {/* NỘI DUNG TAB: ACTIVE RECALL */}
-        {activeTab === 'recall' && (
-          <div className="h-full">
-            {/* Vì RecallChallenge đã có giao diện hoàn chỉnh, ta chỉ cần gọi nó ra */}
-            <RecallChallenge />
-          </div>
-        )}
+          {activeTab === 'homework' && (
+             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full">
+               <HomeworkModule />
+             </div>
+          )}
 
+          {activeTab === 'recall' && (
+             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full">
+               <RecallChallenge />
+             </div>
+          )}
+
+          {/* WIZARD MODAL */}
+          {showCreateModal && (
+            <CreateTestWizard 
+              onClose={() => setShowCreateModal(false)}
+              onUploadSuccess={() => {
+                  window.location.reload(); // Reload đơn giản để cập nhật data
+              }}
+            />
+          )}
+
+        </div>
       </main>
     </div>
   );

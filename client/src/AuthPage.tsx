@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { Mail, Lock, Eye, EyeOff, User, GraduationCap } from 'lucide-react'; // Đã thêm icon GraduationCap
+import toast from 'react-hot-toast';
 
 function AuthPage() {
   const [searchParams] = useSearchParams()
@@ -50,14 +51,14 @@ function AuthPage() {
           localStorage.setItem('userRole', data.user.role || role);
         }
         
-        alert(data.message || (isLoginMode ? "Đăng nhập thành công!" : "Đăng ký thành công!"));
+        toast.success(data.message || (isLoginMode ? "Đăng nhập thành công!" : "Đăng ký thành công!"));
         navigate('/dashboard');
       } else {
-        alert(`Lỗi: ${data.message}`);
+        toast.error(`Lỗi: ${data.message}`);
       }
     } catch (error) {
       console.error("Lỗi kết nối:", error);
-      alert("Không thể kết nối đến Server.");
+      toast.error("Không thể kết nối đến Server.");
     }
   };
 
@@ -77,14 +78,14 @@ function AuthPage() {
         localStorage.setItem('userAvatar', data.user.avatar || '');
         localStorage.setItem('userRole', data.user.role || 'STUDENT');
 
-        alert('Đăng nhập Google thành công!');
+        toast.success('Đăng nhập Google thành công!');
         navigate('/dashboard');
       } else {
-        alert(`Lỗi Google Login: ${data.message}`);
+        toast.error(`Lỗi Google Login: ${data.message}`);
       }
     } catch (error) {
       console.log("Lỗi kết nối Google Login:", error);
-      alert("Lỗi khi kết nối tới server.");
+      toast.error("Lỗi khi kết nối tới server.");
     }
   };
 
@@ -252,7 +253,7 @@ function AuthPage() {
            <div className="w-full flex justify-center"> 
               <GoogleLogin
                   onSuccess={handleGoogleSuccess}
-                  onError={() => alert("Đăng nhập Google thất bại.")}
+                  onError={() => toast.error("Đăng nhập Google thất bại.")}
                   theme="outline"    
                   size="large"        
                   width="100%"        

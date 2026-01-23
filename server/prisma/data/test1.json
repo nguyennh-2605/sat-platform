@@ -6,112 +6,454 @@
     {
       "name": "Reading and Writing - Module 1",
       "order": 1,
-      "duration": 1,
+      "duration": 27,
       "questions": [
         {
           "blocks": [
             {
               "type": "text",
-              "content": "The spacecraft OSIRIS-REx briefly made contact with the asteroid 101955 Bennu in 2020. NASA scientist Daniella DellaGiustina reports that despite facing the unexpected obstacle of a surface mostly covered in boulders, OSIRIS-REx successfully _______ a sample of the surface, gathering pieces of it to bring back to Earth."
+              "content": "During his career, Cuban composer and pianist Ernesto Lecuona produced hundreds of compositions. Especially impressive is how ______ his body of work is: Lecuona showcased a diverse range of musical talents in different areas, from orchestral pieces and operas to popular film scores."
             }
           ],
           "questionText": "Which choice completes the text with the most logical and precise word or phrase?",
-          "correctAnswer": "B",
+          "correctAnswer": "D",
           "choices": [
-            { "id": "A", "text": "attached" },
-            { "id": "B", "text": "collected" },
-            { "id": "C", "text": "followed" },
-            { "id": "D", "text": "replaced" }
+            { "id": "A", "text": "outdated" },
+            { "id": "B", "text": "lonely" },
+            { "id": "C", "text": "forgotten" },
+            { "id": "D", "text": "varied" }
           ]
         },
         {
           "blocks": [
             {
-              "type": "image",
-              "src": "/images/_car sales.jpg" 
-            },
-            {
               "type": "text",
-              "content": "A nonprofit organization tracks the percentage of women elected to serve in state legislatures across the United States in order to report on the gap between the number of men and women serving in government. Among the states with the highest proportions of female legislators are Nevada, Colorado, Oregon (which only has data reported for its state house), Washington, and Arizona. In some cases, the percentage of women serving in these legislatures was found to be especially notable; for instance, _______"
+              "content": "The following text is from Amy Tan's 1989 novel The Joy Luck Club. The narrator describes practicing the piano when she was a child.\n\nFor the talent show, I was to play a piece called \"Pleading Child\" from Schumann's Scenes From Childhood. It was a simple, moody piece that sounded more difficult than it was. I was supposed to memorize the whole thing, playing the repeat parts twice to make the piece sound longer. But I dawdled over it, playing a few bars and then cheating, looking up to see what notes followed. I never really listened to what I was playing. I daydreamed about being somewhere else, about being someone else."
             }
           ],
-          "questionText": "Which choice most effectively uses data from the graph to complete the example?",
-          "correctAnswer": "B",
+          "questionText": "Based on the text, when the narrator describes herself as \"cheating,\" what does she most likely mean?",
+          "correctAnswer": "A",
           "choices": [
-            { "id": "A", "text": "attached" },
-            { "id": "B", "text": "collected" },
-            { "id": "C", "text": "followed" },
-            { "id": "D", "text": "replaced" }
+            { "id": "A", "text": "She was violating an expectation about how to perform the piece." },
+            { "id": "B", "text": "She was deceiving her piano teacher." },
+            { "id": "C", "text": "She was gaining an unfair advantage over other contestants in the talent show." },
+            { "id": "D", "text": "She was lying to herself about her musical ability." }
           ]
+        },
+        {
+          "blocks": [
+            {
+              "type": "text",
+              "content": "As with other river deltas, the Indus River delta is ______ : it is a constantly evolving network of channels and strips of land that change in size and shape as the river deposits new sedimentary particles where the river meets the waters of the Arabian Sea."
+            }
+          ],
+          "questionText": "Which choice completes the text with the most logical and precise word or phrase?",
+          "correctAnswer": "A",
+          "choices": [
+            { "id": "A", "text": "dynamic" },
+            { "id": "B", "text": "sustainable" },
+            { "id": "C", "text": "immutable" },
+            { "id": "D", "text": "unrivaled" }
+          ]
+        },
+
+        {
+          "blocks": [
+            {
+              "type": "text",
+              "content": "The following text is from Bram Stoker's 1911 novel The Lair of the White Worm. Adam is meeting his great-uncle Richard at a port.\n\nThe meeting so auspiciously begun proceeded well. Adam, seeing that the old man was interested in the novelty of the ship, suggested that he should stay the night on board, and that he would himself be ready to start at any hour and go anywhere that the other suggested. This affectionate willingness to fall in with his own plans quite won the old man's heart. He warmly accepted the invitation, and at once they became not only on terms of affectionate relationship, but almost like old friends."
+            }
+          ],
+          "questionText": "Which choice best states the main purpose of the text?",
+          "correctAnswer": "A",
+          "choices": [
+            { "id": "A", "text": "It showcases how Adam's flexibility and consideration strengthen his relationship with his great-uncle Richard." },
+            { "id": "B", "text": "It states the reasons why Adam and his great-uncle Richard decide to sleep on the ship rather than finding lodging on land." },
+            { "id": "C", "text": "It describes why Adam and his great-uncle Richard are excited for their upcoming journey on the ship." },
+            { "id": "D", "text": "It contrasts great-uncle Richard's wary first impressions of Adam with his ultimate affection toward him." }
+          ]
+        },
+
+        {
+          "blocks": [
+            {
+              "type": "text",
+              "content": "Vertical gene transfer involves the transmission of genetic material from a parent to offspring: horizontal gene transfer, on the other hand, involves the exchange of genetic material between organisms not in a parent-offspring relationship..."
+            }
+          ],
+          "questionText": "Which choice best states the function of the underlined sentence in the text as a whole?",
+          "correctAnswer": "D",
+          "choices": [
+            { "id": "A", "text": "It argues that a particular direction of research concerning horizontal gene transfer is likely to be fruitless." },
+            { "id": "B", "text": "It indicates a distinction between horizontal gene transfer and vertical gene transfer." },
+            { "id": "C", "text": "It implies that a common perception of horizontal gene transfer may be inaccurate." },
+            { "id": "D", "text": "It compares the frequencies with which horizontal gene transfer has been detected in two categories of organisms." }
+          ]
+        },
+            {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "Though John Crowley, author of Endless Things, is perhaps not as well known as the most widely read American writers of the past fifty years, influential figures have championed his work, including the poet James Merrill and the literary critic Harold Bloom. In his afterword to Crowley's book Little, Big, Bloom praises the novel's adroit blend of what playwright Friedrich Schiller termed the naive and sentimental modes — while Schiller thought works could be classified as either naive (seeking to describe reality) or sentimental (seeking to develop ideas), Little, Big demonstrates that a work can be both."
         }
+      ],
+      "questionText": "Which choice best states the main purpose of the text?",
+      "correctAnswer": "B",
+      "choices": [
+        { "id": "A", "text": "To explain what inspired an author to write a particular work" },
+        { "id": "B", "text": "To present a reason why a literary critic is impressed by a certain novel" },
+        { "id": "C", "text": "To compare the work of a writer with the work of a poet who admired him" },
+        { "id": "D", "text": "To argue that all writing must be classified as belonging to one of two categories" }
       ]
     },
     {
-      "name": "Reading and Writing - Module 2",
-      "order": 2,
-      "duration": 1,
-      "questions": [
+      "blocks": [
         {
-          "blocks": [
-            {
-              "type": "text",
-              "content": "Documented Publications of Langston Hughes, Gwendolyn Brooks, Dorothy West, and Edna Ferber"
-            },
-            {
-              "type": "table",
-              "headers": ["Individual", "Years active", "Number of credited works published"],
-              "rows": [
-                ["Langston Hughes", "1921-1967", "8 poetry collections, 50 short stories, 5 plays"],
-                ["Gwendolyn Brooks", "1945-1987", "4 poetry collections, 3 novels"],
-                ["Dorothy West", "1926-1995", "2 novels, 50-100 editorial pieces"],
-                ["Edna Ferber", "1911-1958", "12 novels, 80-150 short stories, 20 plays"]
-              ]
-            },
-            {
-              "type": "text",
-              "content":"Some scholars examining twentieth-century American literary figures have focused on authors who were active during the early- to mid-1900s, when writers such as Langston Hughes, Gwendolyn Brooks, Dorothy West, and Edna Ferber were associated in one way or another with many different publications. Unfortunately, incomplete documentation from this period suggests that the numbers of these four authors' contributions to the literary record should not be viewed as exhaustive; it's entirely possible, for instance, that _______"
-            }
-          ],
-          "questionText": "Which choice most effectively uses the data from the table to complete the example?",
-          "correctAnswer": "B",
-          "choices": [
-            { "id": "A", "text": "Langston Hughes published exactly 50 short stories and eight poetry collections." },
-            { "id": "B", "text": "Gwendolyn Brooks published considerably fewer novels than Edna Ferber, who is credited with 12." },
-            { "id": "C", "text": "Dorothy West's two credited novels include some that were written after 1995." },
-            { "id": "D", "text": "Edna Ferber wrote more than 20 plays and Dorothy West produced more than 100 editorial pieces." }
-          ]
+          "type": "text",
+          "content": "The following text is from a translation of María Dueñas’s 2009 novel The Time in Between. The narrator has just rented an apartment and is entering it for the first time.\n\nOver the years there have been many times when my destiny has delivered me unexpected moments, unforeseen twists and turns that I've had to handle on the fly as they appeared. Occasionally I was ready for them: very often I wasn't. Never, however, was I so aware of entering a new stage as I was that afternoon in October when I finally dared to cross the threshold and my steps sounded hollowly in the unfurnished apartment. Behind me was a complicated past, and in front of me, like an omen, I could see a space opening out, a great empty space that time would take care of filling up."
+        }
+      ],
+      "questionText": "Which choice best states the main idea of the text?",
+      "correctAnswer": "C",
+      "choices": [
+        { "id": "A", "text": "The narrator feels optimistic about the future success of a new business." },
+        { "id": "B", "text": "The narrator has always had a plan for how to handle big moments in her life." },
+        { "id": "C", "text": "The narrator recognizes that a particular moment marks a major shift in her life." },
+        { "id": "D", "text": "The narrator wants to express her gratitude for the people who have helped her." }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "The soil on Mars can make missions to explore the planet challenging, as the sand and dust are known to clog filters and lock moving parts on robotic rovers and other exploration devices. Using simulants, which are materials designed to simulate different planetary surfaces, scientists are able to study the characteristics of Mars’s surface. Simulants like the Mars Mojave simulant — which was developed using lava deposits from California’s Mojave Desert — help scientists evaluate how well their devices will handle the surface when operated on Mars."
+        }
+      ],
+      "questionText": "Based on the text, what is one reason why simulants are valuable for scientists?",
+      "correctAnswer": "D",
+      "choices": [
+        { "id": "A", "text": "Scientists use simulants to track how the chemical properties of planetary soils have changed over time." },
+        { "id": "B", "text": "Scientists use simulants to compare the physical properties of Mars's surface to those of Earth's surface." },
+        { "id": "C", "text": "Simulants can be mixed with soil from Earth to explore how research equipment will handle extreme terrains on Earth." },
+        { "id": "D", "text": "Simulants allow scientists to test the ability of research equipment to withstand some of the conditions it will encounter during a mission." }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "The Wonderful Wizard of Oz is a 1900 novel by L. Frank Baum. In the novel, the narrator describes a character's house as having become very faded in appearance over time: ______"
+        }
+      ],
+      "questionText": "Which quotation from The Wonderful Wizard of Oz most effectively illustrates the claim?",
+      "correctAnswer": "C",
+      "choices": [
+        { "id": "A", "text": "Once more [Dorothy and her companions] could see fences built beside the road; but these were painted green, and when they came to a small house, in which a farmer evidently lived, that also was painted green." },
+        { "id": "B", "text": "Then [Dorothy] went back to the house, and having helped herself and Toto to a good drink of the cool, clear water, she set about making ready for the journey to the city of Emeralds." },
+        { "id": "C", "text": "Once the house had been painted, but the sun blistered the paint and the rains washed it away, and now the house was as dull and gray as everything else." },
+        { "id": "D", "text": "When Dorothy stood in the doorway and looked around, she could see nothing but the great gray prairie on every side." }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "As the second-most populous continent in the world, Africa was home to an estimated 1.186 billion people in 2015. In a paper for a social studies class, a student nonetheless notes that countries with very large populations may be less densely populated than are countries with much smaller populations, as can be seen by comparing ______"
+        }
+      ],
+      "questionText": "Which choice most effectively uses data from the table to complete the example?",
+      "correctAnswer": "B",
+      "choices": [
+        { "id": "A", "text": "the geographic size of Angola (1,246,700 square kilometers) with its relatively high population of 25,022,000 inhabitants." },
+        { "id": "B", "text": "Angola, which has a high population of 25,022,000 inhabitants and a relatively low density of 20.1 inhabitants per square kilometer, with Sao Tomé and Príncipe, which has a much lower population and a higher density." },
+        { "id": "C", "text": "Mauritania, which has a low density, with Ethiopia, which has a similar density despite both countries having different geographic sizes." },
+        { "id": "D", "text": "the populations of both Sao Tomé and Príncipe and Ethiopia in 2015 with their populations in 2010." }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "image",
+          "src": ""
         },
         {
-          "blocks": [
-            {
-              "type": "text",
-              "content": "The following text is adapted from Countee Cullen's 1926 poem “Thoughts in a Zoo.” "
-            },
-            { 
-              "type": "poem",
-              "lines": [
-                "They in their cruel traps, and we in ours,",
-                "Survey each other's rage, and pass the hours",
-                "Commiserating each the other's woe,",
-                "To mitigate his own pain's fiery glow.",
-                "Man could but little proffer in exchange",
-                "Save that his cages have a larger range.",
-                "That lion with his lordly, untamed heart",
-                "Has in some man his human counterpart,",
-                "Some lofty soul in dreams and visions wrapped,",
-                "But in the stifling flesh securely trapped."
-              ]
-            }
-          ],
-          "questionText": "Based on the text, what challenge do humans sometimes experience?",
-          "correctAnswer": "D",
-          "choices": [
-            { "id": "A", "text": "They cannot effectively tame certain wild animals because of a lack of compassion." },
-            { "id": "B", "text": "They cannot focus on setting attainable goals because of a lack of motivation." },
-            { "id": "C", "text": "They quickly become frustrated when faced with difficult tasks because of a lack of self-control." },
-            { "id": "D", "text": "They have aspirations that cannot be fulfilled because of certain limitations." }
-          ]
+          "type": "text",
+          "content": "To measure whether countries in free trade agreements (FTAs) experience changes in total agricultural exports, economist Kayode Ajewole and colleagues calculated average export growth rates for several countries over the five years before and the five years after entering an FTA with the United States. The graph shows the results for three countries in the study. Consulting the graph, a student claims that joining an FTA increases the rate of growth of a country's total agricultural exports."
         }
+      ],
+      "questionText": "Which choice best describes data from the graph that weaken the student's claim?",
+      "correctAnswer": "B",
+      "choices": [
+        { "id": "A", "text": "All the countries shown had positive growth in agricultural exports over the five years after joining their respective FTAs, but their rates of export growth varied." },
+        { "id": "B", "text": "Although agricultural exports from Nicaragua grew over the five years after Nicaragua joined CAFTA-DR, their growth rate was even higher in the five years before CAFTA-DR." },
+        { "id": "C", "text": "Although agricultural exports from Mexico decreased over the five years before NAFTA, a reversal in this trend was observed over the five years after Mexico joined NAFTA." },
+        { "id": "D", "text": "Over the five years after El Salvador joined CAFTA-DR, agricultural exports from El Salvador grew at a rate of about 21.8 percent, which is higher than the rate over the five years before El Salvador joined the agreement." }
+      ]
+    },
+      {
+        "blocks": [
+          {
+            "type": "image",
+            "src": ""
+          },
+          {
+            "type": "text",
+            "content": "If a planet orbits in close proximity to a star and lacks an atmosphere, the planet can become so hot that magma oceans form on its surface. For three planets that could plausibly harbor magma oceans, the table shows mass, density, and surface temperature according to a model that assumes the absence of atmosphere."
+          }
+        ],
+        "questionText": "Which choice best describes how data in the table for HD 80606 b would likely differ if it had an atmosphere?",
+        "correctAnswer": "D",
+        "choices": [
+          { "id": "A", "text": "It would have a mass below 5.6 Earth masses." },
+          { "id": "B", "text": "Its surface temperature would be around 1,400 kelvins." },
+          { "id": "C", "text": "It would have a mass above 5.6 Earth masses." },
+          { "id": "D", "text": "Its surface temperature would be below 2,300 kelvins." }
+        ]
+      },
+      {
+        "blocks": [
+          {
+            "type": "image",
+            "src": ""
+          },
+          {
+            "type": "text",
+            "content": "Michelle Pereira et al. hypothesized that introducing health improvements into workplaces would increase productivity by reducing absenteeism and presenteeism. Pereira's team enrolled groups of Australian workers in two programs and calculated productivity loss at 12 weeks and 12 months after the programs began."
+          }
+        ],
+        "questionText": "Which choice best describes data from the table that most effectively strengthen Pereira and colleagues' conclusion?",
+        "correctAnswer": "D",
+        "choices": [
+          { "id": "A", "text": "Productivity loss for the EET group barely decreased between 12 weeks and 12 months after the program began, while productivity loss for the EHP group significantly increased." },
+          { "id": "B", "text": "Productivity loss was largely due to absenteeism for the EHP group at 12 months, while productivity loss was largely due to presenteeism for the EET group." },
+          { "id": "C", "text": "Productivity loss was consistently higher for the EHP group than for the EET group over twelve months." },
+          { "id": "D", "text": "Productivity loss was fairly similar for the EET and EHP groups at 12 weeks, but at 12 months it had decreased for the EET group and increased for the EHP group." }
+        ]
+      },
+      {
+        "blocks": [
+          {
+            "type": "text",
+            "content": "Ningyo joruri is a form of theater that was popular in eighteenth-century Japan and that unites puppetry with playing of the shamisen. Over the ensuing centuries, audience interest began to decline and sannin zukai became prohibitively expensive to mount."
+          }
+        ],
+        "questionText": "Which statement, if true, would most strongly support the claim in the underlined sentence?",
+        "correctAnswer": "D",
+        "choices": [
+          { "id": "A", "text": "The kurum ningyo puppeteering method is not easy and requires complex manipulation." },
+          { "id": "B", "text": "The costs of building sannin zukai puppets were very high until machine-based production methods lowered them." },
+          { "id": "C", "text": "In 1872, Nishikawa Koryu developed a technique called kuruma ningyo." },
+          { "id": "D", "text": "The few remaining companies with sannin zukai performers today are mostly amateur troupes whose members have other primary employment." }
+        ]
+      },
+      {
+        "blocks": [
+          {
+            "type": "text",
+            "content": "Both Pontianak, Indonesia, and Manta, Ecuador, are located at less than one degree latitude. In other words, ______ cities basically sit right on the equator!"
+          }
+        ],
+        "questionText": "Which choice completes the text so that it conforms to the conventions of standard English?",
+        "correctAnswer": "A",
+        "choices": [
+          { "id": "A", "text": "these" },
+          { "id": "B", "text": "each" },
+          { "id": "C", "text": "that" },
+          { "id": "D", "text": "this" }
+        ]
+      },
+          {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "An upcoming exhibition will showcase Vincent van Gogh's drawing Sale of Building Serap, which van Gogh _____ in the city of Nuenen nearly 150 years ago."
+        }
+      ],
+      "questionText": "Which choice completes the text so that it conforms to the conventions of standard English?",
+      "correctAnswer": "D",
+      "choices": [
+        { "id": "A", "text": "has been completing" },
+        { "id": "B", "text": "is completing" },
+        { "id": "C", "text": "will complete" },
+        { "id": "D", "text": "completed" }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "The rough frog is a species of amphibian native to Australia. Currently, the frog's range ______ parts of northern New South Wales and southeastern Queensland."
+        }
+      ],
+      "questionText": "Which choice completes the text so that it conforms to the conventions of standard English?",
+      "correctAnswer": "C",
+      "choices": [
+        { "id": "A", "text": "had included" },
+        { "id": "B", "text": "will have included" },
+        { "id": "C", "text": "includes" },
+        { "id": "D", "text": "included" }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "When attempting to determine a fault's seismic history, geophysicists rely on data about the fault's physical dimensions and geological features. For the Lone Valley fault in Nevada, the US Geological Survey compiles such data in several ______ exchanging information with state geological surveys, by linking maps of the fault with sources that offer detailed descriptions of it, and by maintaining a database of quantitative data."
+        }
+      ],
+      "questionText": "Which choice completes the text so that it conforms to the conventions of standard English?",
+      "correctAnswer": "B",
+      "choices": [
+        { "id": "A", "text": "ways. By" },
+        { "id": "B", "text": "ways: by" },
+        { "id": "C", "text": "ways; by" },
+        { "id": "D", "text": "ways by:" }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "A pet rabbit is held by its owner on a beach in Boo and His Rabbit, a photograph by British ______ Chris Killip."
+        }
+      ],
+      "questionText": "Which choice completes the text so that it conforms to the conventions of standard English?",
+      "correctAnswer": "C",
+      "choices": [
+        { "id": "A", "text": "artist:" },
+        { "id": "B", "text": "artist---" },
+        { "id": "C", "text": "artist" },
+        { "id": "D", "text": "artist," }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "In his 2011 book, historian Sebouh David Aslanian quantifies the reading patterns of early modern Armenian merchants. Aslanian's macroanalysis ______ nearly 1,000 book titles published between 1512 and 1800 shows not only the steady popularity of religious texts but also a broadening interest in secular books."
+        }
+      ],
+      "questionText": "Which choice completes the text so that it conforms to the conventions of standard English?",
+      "correctAnswer": "B",
+      "choices": [
+        { "id": "A", "text": "had examined" },
+        { "id": "B", "text": "examining" },
+        { "id": "C", "text": "examined" },
+        { "id": "D", "text": "examines" }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "In 1920, the US Geological Survey determined the geographic center of Tennessee using only a cardboard cutout of the state and a piece of string. ______ this apparently crude technique yielded a relatively close approximation."
+        }
+      ],
+      "questionText": "Which choice completes the text with the most logical transition?",
+      "correctAnswer": "A",
+      "choices": [
+        { "id": "A", "text": "Still," },
+        { "id": "B", "text": "Similarly," },
+        { "id": "C", "text": "In other words," },
+        { "id": "D", "text": "Fittingly," }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "In astrophysics, debris orbiting outside an object's Roche limit would likely accrete into a satellite. Bruno Morgado and colleagues, ______ detected a dense ring of material orbiting the object Quaoar well outside its calculated Roche limit."
+        }
+      ],
+      "questionText": "Which choice completes the text with the most logical transition?",
+      "correctAnswer": "D",
+      "choices": [
+        { "id": "A", "text": "likewise," },
+        { "id": "B", "text": "fittingly," },
+        { "id": "C", "text": "for example," },
+        { "id": "D", "text": "though," }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "While most animals prefer nighttime migration, many poisonous amphibians safely migrate during the day. ______ with the sun in the sky, the amphibians' striking color patterns deter predators."
+        }
+      ],
+      "questionText": "Which choice completes the text with the most logical transition?",
+      "correctAnswer": "B",
+      "choices": [
+        { "id": "A", "text": "However," },
+        { "id": "B", "text": "At that time," },
+        { "id": "C", "text": "In other words," },
+        { "id": "D", "text": "For example," }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "The student wants to emphasize the different locations of the Niger River and the Indus River."
+        }
+      ],
+      "questionText": "Which choice most effectively uses relevant information from the notes to accomplish this goal?",
+      "correctAnswer": "B",
+      "choices": [
+        { "id": "A", "text": "The Indus River is 3,610 kilometers long." },
+        { "id": "B", "text": "The Niger River is in Africa, whereas the Indus River is located in Asia." },
+        { "id": "C", "text": "The Niger River ranks No. 14 among the longest rivers in the world." },
+        { "id": "D", "text": "At 4,200 kilometers long, the Niger River is the third longest in Africa." }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "The student wants to explain the purpose of national union federations."
+        }
+      ],
+      "questionText": "Which choice most effectively uses information from the given sentences to explain this purpose?",
+      "correctAnswer": "C",
+      "choices": [
+        { "id": "A", "text": "The MTUC is one of the national union federations represented by ITUC-Africa." },
+        { "id": "B", "text": "The MTUC is a national union federation in Africa." },
+        { "id": "C", "text": "National union federations, such as the MTUC, work to improve conditions for workers in their member nations." },
+        { "id": "D", "text": "Regional union federations like ITUC-Africa represent the national union federations in a specific area." }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "The student wants to emphasize the size of Tepeapulco."
+        }
+      ],
+      "questionText": "Which choice most effectively uses relevant information from the notes to accomplish this goal?",
+      "correctAnswer": "D",
+      "choices": [
+        { "id": "A", "text": "Providing water treatment is one example of the services municipalities provide." },
+        { "id": "B", "text": "Tepeapulco provides many public services to its residents." },
+        { "id": "C", "text": "Tepeapulco is one of 84 municipalities across Hidalgo." },
+        { "id": "D", "text": "The municipality of Tepeapulco in Hidalgo, Mexico, covers an area of roughly 243 km2." }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "type": "text",
+          "content": "The student wants to emphasize a difference between Pipturus albidus and Psidium cattleyanum."
+        }
+      ],
+      "questionText": "Which choice most effectively uses relevant information from the notes to accomplish this goal?",
+      "correctAnswer": "B",
+      "choices": [
+        { "id": "A", "text": "Most plant species found in Oahu, Hawaii, are non-native." },
+        { "id": "B", "text": "Though Pipturus albidus and Psidium cattleyanum can both be found in Oahu, Hawaii, only the former plant is native." },
+        { "id": "C", "text": "A 2019 study catalogued plant seeds found in bird fecal samples in Oahu." },
+        { "id": "D", "text": "Seeds from both plants were found in fecal samples of non-native birds." }
+      ]
+    }
       ]
     }
   ]

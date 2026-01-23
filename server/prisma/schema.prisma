@@ -94,7 +94,8 @@ model Test {
   title       String
   description String?
   duration    Int          @default(64) // Tổng thời gian (để hiển thị)
-  
+  type        String       @default("RW")
+
   sections    Section[]    // 1 Bài thi có nhiều phần (Module 1, Module 2)
   submissions Submission[]
 }
@@ -117,6 +118,7 @@ model Question {
   id            Int      @id @default(autoincrement())
   blocks        Json     // Cột trái chứa passage, table, graph, ...
   questionText  String   @db.Text
+  explanation   String?  @db.Text
   
   // Lưu danh sách đáp án dưới dạng JSON
   // Cấu trúc: [{"id": "A", "text": "Answer 1"}, {"id": "B", "text": "Answer 2"}]

@@ -189,9 +189,63 @@ app.get('/api/test/:id', async (req, res) => {
   }
 });
 
-// server/index.js
+app.post('/api/tests/create', async (req, res) => {
+  try {
+    const body = req.body;
 
-// ... (Các phần import và setup giữ nguyên)
+    // Validate cơ bản
+    if (!body.title || !body.sections) {
+      return res.status(400).json({ error: 'Thiếu thông tin (Title hoặc Sections)' });
+    }
+
+    console.log(`📝 Đang tạo đề thi: ${body.title} - ${body.sections.length} modules`);
+
+    // Thực hiện Nested Write vào Database
+    const newTest = await prisma.test.create({
+      data: {
+        title: body.title,
+        description: body.description,
+        duration: body.duration,
+        type: body.type, // "RW" hoặc "MATH"
+
+        sections: {
+          create: body.sections.map((section) => ({
+            name: section.name,
+            order: section.order,
+            duration: section.duration,
+
+            questions: {
+              create: section.questions.map((q) => ({
+                questionText: q.questionText,
+                correctAnswer: q.correctAnswer,
+                explanation: q.explanation || null,
+                blocks: q.blocks, // Prisma tự động stringify mảng JSON này
+                
+                choices: q.choices.map(c => ({
+                  id: c.id,
+                  text: c.text
+                }))
+              }))
+            }
+          }))
+        }
+      },
+      // Trả về dữ liệu đã tạo để kiểm tra
+      include: {
+        sections: {
+          select: { id: true, name: true, questions: { select: { id: true } } }
+        }
+      }
+    });
+
+    console.log(`✅ Tạo thành công Test ID: ${newTest.id}`);
+    res.status(200).json(newTest);
+
+  } catch (error) {
+    console.error("❌ Lỗi tạo đề thi:", error);
+    res.status(500).json({ error: 'Lỗi server khi tạo đề thi', details: error.message });
+  }
+});
 
 app.post('/api/test/:id/submit', async (req, res) => {
   // Nhận thêm userId từ Frontend gửi lên

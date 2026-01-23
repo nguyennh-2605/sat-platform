@@ -42,8 +42,9 @@ export interface QuestionData {
   questionText: string;
   correctAnswer: string;
   // Định nghĩa cho choices (vì choices trong DB cũng là JSON)
-  options: {
+  choices: {
     id: string;
     text: string;
   }[];
+  moduleIndex: number
 }

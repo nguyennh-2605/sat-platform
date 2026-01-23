@@ -36,7 +36,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
       
       {/* 1. VÒNG TRÒN CHỮ CÁI (A, B, C...) */}
       <div className={`
-        w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold border transition-colors
+        w-8 h-8 shrink-0 flex items-center justify-center rounded-full text-sm font-bold border transition-colors
         ${isSelected && !isEliminated ? 'bg-indigo-600 text-white border-indigo-600'
           : 'bg-white text-gray-500 border-gray-500 group-hover:border-indigo-400 group-hover:text-indigo-500'}
         ${isEliminated ? 'text-gray-500 border-gray-300' : ''}
@@ -54,7 +54,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
           transition-opacity duration-300
           ${isEliminated ? 'opacity-100' : 'opacity-0'}
       `}>
-        {/* 👇 Đổi màu đỏ thành màu xám đậm (bg-slate-500) và làm dày hơn chút */}
+        {/* Đổi màu đỏ thành màu xám đậm (bg-slate-500) và làm dày hơn chút */}
         <div className={`
           h-[3px] bg-slate-600/80 w-[95%] rounded-full
           transition-all duration-300 origin-left shadow-sm

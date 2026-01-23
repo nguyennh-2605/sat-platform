@@ -6,6 +6,7 @@ import {
   X, LayoutDashboard, ArrowLeft
 } from 'lucide-react';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 
 // Cấu hình URL Backend
 const API_URL = import.meta.env.VITE_API_URL;
@@ -85,7 +86,7 @@ const HomeworkModule = () => {
       setClasses([res.data, ...classes]);
       setSelectedClassId(res.data.id);
     } catch (error) {
-      alert("Lỗi tạo lớp học!");
+      toast.error("Lỗi tạo lớp học!");
     }
   };
 
@@ -97,10 +98,10 @@ const HomeworkModule = () => {
         classId: selectedClassId
       }, getAuthHeader());
       
-      alert("Đã giao bài tập thành công!");
+      toast.success("Đã giao bài tập thành công!");
       fetchClassDetail(selectedClassId);
     } catch (error) {
-      alert("Lỗi khi tạo bài tập");
+      toast.error("Lỗi khi tạo bài tập");
     }
   };
 
@@ -108,10 +109,10 @@ const HomeworkModule = () => {
     if (!selectedClassId) return;
     try {
       await axios.post(`${API_URL}/api/classes/${selectedClassId}/students`, { email }, getAuthHeader());
-      alert("Thêm học sinh thành công!");
+      toast.success("Thêm học sinh thành công!");
       fetchClassDetail(selectedClassId);
     } catch (error: any) {
-      alert(error.response?.data?.error || "Không tìm thấy email này!");
+      toast.error(error.response?.data?.error || "Không tìm thấy email này!");
     }
   };
 
@@ -123,10 +124,10 @@ const HomeworkModule = () => {
         fileUrl: type === 'FILE' ? content : undefined,
       }, getAuthHeader());
       
-      alert("Nộp bài thành công!");
+      toast.success("Nộp bài thành công!");
       if (selectedClassId) fetchClassDetail(selectedClassId);
     } catch (error) {
-      alert("Lỗi nộp bài!");
+      toast.error("Lỗi nộp bài!");
     }
   };
 
@@ -177,7 +178,7 @@ const TeacherDashboard = ({
   const [activeTab, setActiveTab] = useState('ASSIGNMENTS');
 
   const submitNewClass = () => {
-    if (!newClassName.trim()) return alert("Vui lòng nhập tên lớp!");
+    if (!newClassName.trim()) return toast("Vui lòng nhập tên lớp!");
     onAddClass(newClassName);
     setNewClassName("");
     setIsAddClassModalOpen(false);
@@ -191,7 +192,7 @@ const TeacherDashboard = ({
   }
 
   const submitAssignment = () => {
-      if(!newAssignment.title || !newAssignment.deadline) return alert("Thiếu thông tin!");
+      if(!newAssignment.title || !newAssignment.deadline) return toast.error("Thiếu thông tin!");
       onCreateAssignment({
           ...newAssignment,
           deadline: new Date(newAssignment.deadline).toISOString()
@@ -706,7 +707,7 @@ const StudentAssignmentCard = ({ assignment, studentId, onSubmit }: any) => {
    const [content, setContent] = useState("");
 
    const handleSubmit = () => {
-       if(!content.trim()) return alert("Vui lòng nhập nội dung!");
+       if(!content.trim()) return toast("Vui lòng nhập nội dung!");
        onSubmit(assignment.id, content, activeTab);
    };
 

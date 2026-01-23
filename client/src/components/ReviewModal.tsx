@@ -77,7 +77,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle }) =
 
               {/* Danh sách đáp án */}
               <div className="grid grid-cols-1 gap-3">
-                {data.options.map((opt, index) => {
+                {data.choices.map((opt, index) => {
                   const label = String.fromCharCode(65 + index);
                   const styleClass = getOptionStyle(opt.text, opt.id);
                   

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Test" ADD COLUMN     "type" TEXT NOT NULL DEFAULT 'RW';
