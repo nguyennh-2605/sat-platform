@@ -132,13 +132,13 @@ const BlockRenderer: React.FC<Props> = ({ blocks }) => {
           
           case 'image':
             return (
-              <div key={index} className="flex justify-center my-4">
+              <div key={index} className="flex flex-col items-center justify-center my-4">
                 <img 
                   src={block.src} 
                   alt={block.alt || 'Question image'} 
-                  className="max-w-full h-auto rounded-md shadow-sm border border-gray-200"
+                  className="max-w-lg max-h-80 w-auto h-auto object-contain rounded-md shadow-sm border border-gray-200"
                 />
-                {block.caption && <p className="text-center text-sm text-gray-500 mt-2">{block.caption}</p>}
+                {block.caption && <p className="text-center text-sm text-gray-500 mt-2 max-w-lg">{block.caption}</p>}
               </div>
             );
 
