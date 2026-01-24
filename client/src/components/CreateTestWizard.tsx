@@ -1,4 +1,4 @@
-import { useState, memo, useRef } from 'react';
+import { useState, memo, useRef, useCallback } from 'react';
 import { Play, Save, ArrowLeft, X, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { parseSATInput, type SATQuestion } from '../utlis/satParser';
 import { createPortal } from "react-dom";
@@ -23,6 +23,12 @@ interface FinalTestStructure {
 interface FormattedTextRendererProps {
   text: string;       // Bắt buộc phải là chuỗi
   className?: string; // Có thể có hoặc không (optional)
+}
+
+interface PreviewSectionProps {
+  questions: SATQuestion[];
+  onSave: () => void;
+  isSubmitting: boolean;
 }
 
 const CreateTestWizard = ({ onClose }: any) => {
@@ -71,7 +77,7 @@ const CreateTestWizard = ({ onClose }: any) => {
   };
 
   // --- BƯỚC CUỐI: GỬI API ---
-  const handleCreateTest = async () => {
+  const handleCreateTest = useCallback(async () => {
     // 1. Nhóm các câu hỏi theo Module (1, 2, ...)
     setIsSubmitting(true);
     const modulesMap = new Map<number, any[]>();
@@ -130,7 +136,7 @@ const CreateTestWizard = ({ onClose }: any) => {
       setIsSubmitting(false);
       console.error(error);
     }
-  };
+  }, [parsedQuestions]);
 
   const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, className = "" }) => {
     if (!text) return null;
@@ -248,6 +254,181 @@ const CreateTestWizard = ({ onClose }: any) => {
       </div>
     </div>
   ));
+
+  const PreviewSection = memo(({ questions, onSave, isSubmitting } : PreviewSectionProps) => {
+    console.log("Render Preview Section");
+
+    return (
+      <div className="w-1/2 p-4 flex flex-col bg-gray-50 h-full border-l">
+        <div className="flex justify-between items-center mb-4 sticky top-0 bg-gray-50 z-10 py-2">
+          <span className="font-bold text-gray-700 text-lg">Kết quả ({questions.length} câu)</span>
+          <button
+            onClick={onSave}
+            disabled={questions.length === 0 || isSubmitting}
+            className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-emerald-700 shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            <Save size={18} /> {isSubmitting ? "Saving..." : "Save"}
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-6 pr-2 pb-20 scrollbar-thin scrollbar-thumb-gray-300">
+          {questions.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+              <svg className="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p>Paste nội dung và nhấn "Phân tích" để xem trước.</p>
+            </div>
+          )}
+
+          {/* VÒNG LẶP CÂU HỎI */}
+          {questions.map((q, idx) => (
+            <div key={idx} className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 text-sm hover:shadow-md transition-shadow">
+              {/* Header câu hỏi */}
+              <div className="flex justify-between items-center mb-4 border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white bg-indigo-600 px-2 py-0.5 rounded text-xs">Câu {idx + 1}</span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Module {q.module}</span>
+                </div>
+                <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-mono">ID: {idx + 1}</span>
+              </div>
+
+              {/* KHUNG TRÁI/TRÊN CỦA SAT (PASSAGE) */}
+              <div className="bg-[#fcfcfc] p-4 rounded border border-gray-100 text-gray-800 mb-4">
+                {q.blocks.map((block, i) => (
+                  <div key={i} className="mb-4 last:mb-0">
+                    
+                    {/* 1. TEXT BLOCK (Dùng Component mới để render Bullet points) */}
+                    {block.type === 'text' && (
+                      <FormattedTextRenderer text={block.content} />
+                    )}
+
+                    {block.type === 'note' && (
+                      <div className="my-3 font-sans text-[15px] leading-relaxed text-gray-800">
+                        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                          
+                          {/* 1. Hiển thị dòng đầu tiên (Intro text) - Không có bullet */}
+                          {block.lines.length > 0 && (
+                            <p className="mb-2 text-gray-900 font-medium">
+                              {block.lines[0]}
+                            </p>
+                          )}
+
+                          {/* 2. Hiển thị các dòng còn lại (Bullet points) */}
+                          {block.lines.length > 1 && (
+                            <ul className="list-disc pl-5 space-y-1.5 text-gray-900">
+                              {/* @ts-ignore */}
+                              {/* Dùng slice(1) để bỏ qua phần tử đầu tiên, lấy từ phần tử thứ 2 trở đi */}
+                              {block.lines.slice(1).map((line, idx) => (
+                                <li key={idx} className="pl-1">
+                                  {line}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 2. TABLE BLOCK */}
+                    {block.type === 'table' && (
+                      <div className="overflow-x-auto border rounded bg-white shadow-sm">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50 font-semibold text-gray-700">
+                            <tr>
+                              {block.headers.map((h, idx) => (
+                                <th key={idx} className="px-3 py-2 text-left text-xs uppercase tracking-wider font-bold border-b">
+                                  {h}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {block.rows.map((row, rIdx) => (
+                              <tr key={rIdx} className="hover:bg-gray-50">
+                                {row.map((cell, cIdx) => (
+                                  <td key={cIdx} className="px-3 py-2 whitespace-nowrap text-xs text-gray-600 border-r last:border-r-0">
+                                    {cell}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* 3. POEM BLOCK */}
+                    {block.type === 'poem' && (
+                      <div className="pl-8 text-center italic text-gray-800 font-sans leading-8">
+                        {block.lines.map((line, idx) => (
+                          <div key={idx}>{line}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 4. IMAGE BLOCK */}
+                    {block.type === 'image' && (
+                      <div className="my-4 flex justify-center">
+                        {block.src ? (
+                          <img 
+                            src={block.src} 
+                            alt="Question Image" 
+                            className="max-h-64 rounded-lg border border-gray-200 shadow-sm object-contain"
+                            loading="lazy"
+                          />
+                        ) : (
+                          // Fallback nếu không parse được src
+                          <div className="h-20 bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                            [Ảnh lỗi: Không tìm thấy link]
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* KHUNG DƯỚI/PHẢI CỦA SAT (QUESTION & CHOICES) */}
+              <div className="space-y-3">
+                  {/* Câu hỏi dẫn nhập */}
+                  <div className="font-sans font-bold text-gray-900 text-[15px]">
+                      {q.questionText}
+                  </div>
+
+                  {/* Các đáp án */}
+                  <div className="grid grid-cols-1 gap-2.5">
+                      {q.choices.map((choice) => (
+                          <div
+                              key={choice.id}
+                              className={`p-3 border rounded-lg text-sm transition-all flex items-start gap-3 ${
+                                  choice.id === q.correctAnswer
+                                      ? 'bg-emerald-50 border-emerald-500 shadow-sm'
+                                      : 'bg-white border-gray-200'
+                              }`}
+                          >
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border ${
+                                  choice.id === q.correctAnswer
+                                      ? 'bg-emerald-600 text-white border-emerald-600'
+                                      : 'bg-white text-gray-500 border-gray-300'
+                              }`}>
+                                  {choice.id}
+                              </div>
+                              <span className={`pt-0.5 ${choice.id === q.correctAnswer ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
+                                  {choice.text}
+                              </span>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  });
 
   return createPortal(
     <div className="fixed inset-0 bg-slate-900/60 z-[50] flex items-center justify-center p-4">
@@ -421,164 +602,11 @@ const CreateTestWizard = ({ onClose }: any) => {
                   </button>
                 </div>
               </div>
-
-              {/* CỘT PHẢI: PREVIEW (Đã nâng cấp) */}
-              <div className="w-1/2 p-4 flex flex-col bg-gray-50 h-full border-l">
-                <div className="flex justify-between items-center mb-4 sticky top-0 bg-gray-50 z-10 py-2">
-                  <span className="font-bold text-gray-700 text-lg">Kết quả ({parsedQuestions.length} câu)</span>
-                  <button
-                    onClick={handleCreateTest}
-                    disabled={parsedQuestions.length === 0 || isSubmitting}
-                    className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-emerald-700 shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                  >
-                    <Save size={18} /> {isSubmitting ? "Saving..." : "Save"}
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto space-y-6 pr-2 pb-20 scrollbar-thin scrollbar-thumb-gray-300">
-                  {parsedQuestions.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                      <svg className="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <p>Paste nội dung và nhấn "Phân tích" để xem trước.</p>
-                    </div>
-                  )}
-
-                  {/* VÒNG LẶP CÂU HỎI */}
-                  {parsedQuestions.map((q, idx) => (
-                    <div key={idx} className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 text-sm hover:shadow-md transition-shadow">
-                      {/* Header câu hỏi */}
-                      <div className="flex justify-between items-center mb-4 border-b pb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white bg-indigo-600 px-2 py-0.5 rounded text-xs">Câu {idx + 1}</span>
-                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Module {q.module}</span>
-                        </div>
-                        <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-mono">ID: {idx + 1}</span>
-                      </div>
-
-                      {/* KHUNG TRÁI/TRÊN CỦA SAT (PASSAGE) */}
-                      <div className="bg-[#fcfcfc] p-4 rounded border border-gray-100 text-gray-800 mb-4">
-                        {q.blocks.map((block, i) => (
-                          <div key={i} className="mb-4 last:mb-0">
-                            
-                            {/* 1. TEXT BLOCK (Dùng Component mới để render Bullet points) */}
-                            {block.type === 'text' && (
-                              <FormattedTextRenderer text={block.content} />
-                            )}
-
-                       {block.type === 'note' && (
-                        <div className="my-3 font-sans text-[15px] leading-relaxed text-gray-800">
-                          {/* Box: Viền mỏng hơn (gray-200), padding vừa đủ (p-4), bo góc mềm (rounded-lg) */}
-                          <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                            <ul className="list-disc pl-5 space-y-1.5 text-gray-900">
-                              {/* @ts-ignore */}
-                              {block.lines.map((line, idx) => (
-                                <li key={idx} className="pl-1">
-                                  {line}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      )}
-
-                            {/* 2. TABLE BLOCK */}
-                            {block.type === 'table' && (
-                              <div className="overflow-x-auto border rounded bg-white shadow-sm">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                  <thead className="bg-gray-50 font-semibold text-gray-700">
-                                    <tr>
-                                      {block.headers.map((h, idx) => (
-                                        <th key={idx} className="px-3 py-2 text-left text-xs uppercase tracking-wider font-bold border-b">
-                                          {h}
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody className="bg-white divide-y divide-gray-200">
-                                    {block.rows.map((row, rIdx) => (
-                                      <tr key={rIdx} className="hover:bg-gray-50">
-                                        {row.map((cell, cIdx) => (
-                                          <td key={cIdx} className="px-3 py-2 whitespace-nowrap text-xs text-gray-600 border-r last:border-r-0">
-                                            {cell}
-                                          </td>
-                                        ))}
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-
-                            {/* 3. POEM BLOCK */}
-                            {block.type === 'poem' && (
-                              <div className="pl-8 text-center italic text-gray-800 font-sans leading-8">
-                                {block.lines.map((line, idx) => (
-                                  <div key={idx}>{line}</div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* 4. IMAGE BLOCK */}
-                            {block.type === 'image' && (
-                              <div className="my-4 flex justify-center">
-                                {block.src ? (
-                                  <img 
-                                    src={block.src} 
-                                    alt="Question Image" 
-                                    className="max-h-64 rounded-lg border border-gray-200 shadow-sm object-contain"
-                                    loading="lazy"
-                                  />
-                                ) : (
-                                  // Fallback nếu không parse được src
-                                  <div className="h-20 bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                                    [Ảnh lỗi: Không tìm thấy link]
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* KHUNG DƯỚI/PHẢI CỦA SAT (QUESTION & CHOICES) */}
-                      <div className="space-y-3">
-                          {/* Câu hỏi dẫn nhập */}
-                          <div className="font-sans font-bold text-gray-900 text-[15px]">
-                              {q.questionText}
-                          </div>
-
-                          {/* Các đáp án */}
-                          <div className="grid grid-cols-1 gap-2.5">
-                              {q.choices.map((choice) => (
-                                  <div
-                                      key={choice.id}
-                                      className={`p-3 border rounded-lg text-sm transition-all flex items-start gap-3 ${
-                                          choice.id === q.correctAnswer
-                                              ? 'bg-emerald-50 border-emerald-500 shadow-sm'
-                                              : 'bg-white border-gray-200'
-                                      }`}
-                                  >
-                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border ${
-                                          choice.id === q.correctAnswer
-                                              ? 'bg-emerald-600 text-white border-emerald-600'
-                                              : 'bg-white text-gray-500 border-gray-300'
-                                      }`}>
-                                          {choice.id}
-                                      </div>
-                                      <span className={`pt-0.5 ${choice.id === q.correctAnswer ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
-                                          {choice.text}
-                                      </span>
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <PreviewSection
+              questions={parsedQuestions}
+              onSave={handleCreateTest}
+              isSubmitting={isSubmitting}
+            />
             </div>
           )}
         </div>
@@ -597,3 +625,4 @@ const CreateTestWizard = ({ onClose }: any) => {
 };
 
 export default CreateTestWizard;
+

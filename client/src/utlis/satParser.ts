@@ -212,9 +212,9 @@ const parseSingleQuestion = (rawQText: string, modIndex: number, qIndex: number)
     }
 
     return {
+        
         module: modIndex + 1,
         index: qIndex + 1,
-        // Gọi hàm parsePassageToBlocks ("Bất Tử" bạn đã copy trước đó)
         blocks: parsePassageToBlocks(rawPassage), 
         questionText: questionText,
         choices: Array.from(choices),

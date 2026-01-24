@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import axios from 'axios';
 import { 
   BookOpen, Upload, FileText, CheckCircle, 
   Users, Plus, Clock, ChevronRight, Paperclip,
-  X, LayoutDashboard, ArrowLeft
+  X, LayoutDashboard, ArrowLeft, Link, Calendar, CheckCircle2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -161,6 +161,99 @@ const HomeworkModule = () => {
   );
 };
 
+const ClassSidebarItem = memo(({ cls, isSelected, onClick }: any) => {
+  return (
+    <button
+      onClick={() => onClick(cls.id)}
+      className={`w-full text-left px-4 py-4 rounded-2xl group border transition-all duration-200 flex items-center justify-between ${
+        isSelected 
+          ? 'bg-white border-indigo-600 ring-1 ring-indigo-600 shadow-md z-10' 
+          : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50 text-gray-600'
+      }`}
+    >
+      <div className="flex items-center gap-3 overflow-hidden">
+        <div className={`w-2 h-10 rounded-full flex-shrink-0 transition-colors ${isSelected ? 'bg-indigo-600' : 'bg-gray-200 group-hover:bg-gray-300'}`}></div>
+        <span className={`font-semibold text-sm truncate ${isSelected ? 'text-indigo-900' : ''}`}>{cls.name}</span>
+      </div>
+      {isSelected && <ChevronRight size={18} className="text-indigo-600" />}
+    </button>
+  );
+});
+
+// --- 2. COMPONENT FORM TẠO BÀI TẬP (Tách State ra khỏi cha để gõ phím siêu mượt) ---
+const CreateAssignmentSection = memo(({ onClose, onSubmit }: any) => {
+  const [form, setForm] = useState({ title: '', content: '', deadline: '', fileUrl: '' });
+
+  const handleSubmit = () => {
+    if (!form.title || !form.deadline) return toast.error("Thiếu thông tin!");
+    onSubmit({
+      ...form,
+      deadline: new Date(form.deadline).toISOString()
+    });
+    // Reset form local
+    setForm({ title: '', content: '', deadline: '', fileUrl: '' });
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-3xl border border-indigo-100 shadow-xl shadow-indigo-100/50 mb-6 animate-fade-in-down">
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+        <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><FileText size={20}/></div>
+        <div className="flex-1">
+          <h3 className="font-bold text-gray-800">Soạn bài tập mới</h3>
+          <p className="text-xs text-gray-500">Điền thông tin chi tiết bên dưới</p>
+        </div>
+        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X size={18} className="text-gray-400"/></button>
+      </div>
+      
+      <div className="space-y-5">
+        <div className="space-y-4">
+          <input 
+            type="text" placeholder="Tiêu đề bài tập (VD: Homework #4)" 
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition font-medium text-gray-800 placeholder-gray-400" 
+            value={form.title}
+            onChange={e => setForm({...form, title: e.target.value})}
+          />
+          <textarea 
+            rows={4} placeholder="Nội dung, yêu cầu chi tiết..." 
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm text-gray-700"
+            value={form.content}
+            onChange={e => setForm({...form, content: e.target.value})}
+          ></textarea>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">
+              <Calendar size={14}/> Hạn nộp
+            </label>
+            <input 
+              type="datetime-local" className="w-full p-3 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+              value={form.deadline}
+              onChange={e => setForm({...form, deadline: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">
+              <Link size={14}/> Link File đề
+            </label>
+            <input 
+              type="text" className="w-full p-3 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+              placeholder="https://..."
+              value={form.fileUrl}
+              onChange={e => setForm({...form, fileUrl: e.target.value})}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end pt-2 gap-2">
+            <button onClick={onClose} className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl text-sm font-medium transition">Hủy bỏ</button>
+            <button onClick={handleSubmit} className="px-8 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition text-sm flex items-center gap-2">
+                <Plus size={18}/> Đăng bài tập
+            </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 // ==========================================
 // A. GIAO DIỆN GIÁO VIÊN (TEACHER MODE)
 // ==========================================
@@ -171,11 +264,15 @@ const TeacherDashboard = ({
   const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   
-  // Form State
+  // State cho Modal (giữ nguyên ở đây vì modal ít khi render list chính)
   const [newClassName, setNewClassName] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
-  const [newAssignment, setNewAssignment] = useState({ title: '', content: '', deadline: '', fileUrl: '' });
   const [activeTab, setActiveTab] = useState('ASSIGNMENTS');
+
+  // UseCallback để function không bị tạo lại mỗi lần render -> Giúp ClassSidebarItem không bị re-render
+  const handleClassSelect = useCallback((id: string) => {
+    setSelectedClassId(id);
+  }, [setSelectedClassId]);
 
   const submitNewClass = () => {
     if (!newClassName.trim()) return toast("Vui lòng nhập tên lớp!");
@@ -191,236 +288,240 @@ const TeacherDashboard = ({
       setIsAddStudentModalOpen(false);
   }
 
-  const submitAssignment = () => {
-      if(!newAssignment.title || !newAssignment.deadline) return toast.error("Thiếu thông tin!");
-      onCreateAssignment({
-          ...newAssignment,
-          deadline: new Date(newAssignment.deadline).toISOString()
-      });
-      setShowCreateForm(false);
-      setNewAssignment({ title: '', content: '', deadline: '', fileUrl: '' });
-  }
+  // Hàm xử lý khi submit từ Component con
+  const handleCreateAssignment = useCallback((data: any) => {
+    onCreateAssignment(data);
+    setShowCreateForm(false);
+  }, [onCreateAssignment]);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 relative">
-      {/* --- MODAL ADD CLASS --- */}
+    <div className="flex flex-col lg:flex-row gap-8 relative min-h-[600px] bg-gray-50/50 p-2 lg:p-0">
+      
+      {/* --- MODALS (Code Modal giữ nguyên logic nhưng có thể tách component nếu muốn tối ưu hơn nữa) --- */}
       {isAddClassModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-800">Thêm lớp học mới</h3>
-              <button onClick={() => setIsAddClassModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
-            </div>
-            <input 
-              autoFocus type="text" value={newClassName} onChange={(e) => setNewClassName(e.target.value)}
-              placeholder="VD: SAT Reading K15..." 
-              className="w-full p-3 border border-gray-200 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 outline-none bg-gray-50"
-            />
-            <button onClick={submitNewClass} className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">Tạo lớp ngay</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 transition-opacity">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100 border border-gray-100">
+             <div className="flex justify-between items-center mb-6">
+               <h3 className="text-xl font-bold text-gray-800">Tạo lớp mới</h3>
+               <button onClick={() => setIsAddClassModalOpen(false)} className='p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition'><X/></button>
+             </div>
+             <input autoFocus value={newClassName} onChange={(e) => setNewClassName(e.target.value)} className="w-full p-3 border rounded-xl mb-4" placeholder="VD: SAT Reading K15..."  />
+             <button onClick={submitNewClass} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 flex justify-center items-center gap-2">Tạo lớp</button>
           </div>
         </div>
       )}
 
-      {/* --- MODAL ADD STUDENT --- */}
       {isAddStudentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-800">Thêm học sinh</h3>
-              <button onClick={() => setIsAddStudentModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 transition-opacity">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all border border-gray-100">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-gray-800">Thêm học sinh</h3>
+              <button onClick={() => setIsAddStudentModalOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition"><X size={18}/></button>
             </div>
-            <p className="text-sm text-gray-500 mb-2">Nhập email học sinh:</p>
-            <input 
-              autoFocus type="email" value={studentEmail} onChange={(e) => setStudentEmail(e.target.value)}
-              placeholder="student@example.com" 
-              className="w-full p-3 border border-gray-200 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 outline-none bg-gray-50"
-            />
-            <button onClick={submitAddStudent} className="w-full py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition shadow-lg shadow-green-200">Thêm vào lớp</button>
+            <div className="space-y-4">
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
+                    <div className="bg-blue-100 p-1 rounded-full"><Users size={16} className="text-blue-600"/></div>
+                    <p className="text-sm text-blue-800 leading-tight pt-0.5">Học sinh sẽ được thêm ngay lập tức vào danh sách lớp.</p>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email học sinh</label>
+                    <input 
+                      autoFocus type="email" value={studentEmail} onChange={(e) => setStudentEmail(e.target.value)}
+                      placeholder="student@example.com" 
+                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                    />
+                </div>
+                <button onClick={submitAddStudent} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 flex justify-center items-center gap-2">
+                    <CheckCircle2 size={20}/> Xác nhận thêm
+                </button>
+            </div>
           </div>
         </div>
       )}
       
-      {/* 1. SIDEBAR */}
-      <div className="w-full lg:w-64 flex-shrink-0 space-y-2">
-        <div className="flex justify-between items-center mb-2 px-1">
-          <h3 className="font-bold text-gray-400 text-xs uppercase tracking-wider">Lớp học của bạn</h3>
-          <button onClick={() => setIsAddClassModalOpen(true)} className="text-indigo-600 hover:bg-indigo-50 p-1 rounded transition"><Plus size={16} /></button>
+      {/* 1. SIDEBAR (Đã tối ưu scroll với content-visibility) */}
+      <div className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-4">
+        <div className="flex justify-between items-center px-2">
+          <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2"><LayoutDashboard size={20} className="text-indigo-600"/> Lớp học</h3>
+          <button onClick={() => setIsAddClassModalOpen(true)} className="text-sm bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg font-medium hover:bg-indigo-100 transition flex items-center gap-1"><Plus size={16} /> Mới</button>
         </div>
-        {classes.map((cls: any) => (
-          <button
-            key={cls.id}
-            onClick={() => setSelectedClassId(cls.id)}
-            className={`w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all duration-200 ${
-              selectedClassId === cls.id 
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 translate-x-1' 
-                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100 hover:border-indigo-100'
-            }`}
-          >
-            <span className="font-medium text-sm truncate">{cls.name}</span>
-            {selectedClassId === cls.id && <ChevronRight size={16} />}
-          </button>
-        ))}
-        {classes.length === 0 && <div className="text-xs text-center text-gray-400 py-4 italic border border-dashed rounded-lg">Chưa có lớp nào</div>}
+
+        {/* contentVisibility: 'auto' giúp trình duyệt chỉ render những item đang nhìn thấy */}
+        <div 
+          className="space-y-2 overflow-y-auto max-h-[calc(100vh-150px)] pr-2 custom-scrollbar" 
+          style={{ contentVisibility: 'auto', containIntrinsicSize: '60px' }}
+        >
+            {classes.map((cls: any) => (
+                <ClassSidebarItem 
+                    key={cls.id} 
+                    cls={cls} 
+                    isSelected={selectedClassId === cls.id} 
+                    onClick={handleClassSelect} 
+                />
+            ))}
+            {classes.length === 0 && <div className="text-center p-8 border-2 border-dashed rounded-xl text-gray-400">Chưa có lớp nào</div>}
+        </div>
       </div>
 
       {/* 2. MAIN CONTENT */}
-      <div className="flex-1 space-y-6">
+      <div className="flex-1 min-w-0">
         {classDetail ? (
-           <>
-            {/* Header Lớp */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-800">{classDetail.name}</h2>
-                  <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                    <Users size={14} className="text-gray-400"/> {classDetail.students?.length || 0} học sinh 
-                    <span className="text-gray-300">|</span>
-                    <BookOpen size={14} className="text-gray-400"/> {classDetail.assignments?.length || 0} bài tập
-                  </p>
-                </div>
-                <div className="flex gap-3">
-                   <button 
-                      onClick={() => setIsAddStudentModalOpen(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm transition"
-                   >
-                      <Users size={16} /> Thêm HS
-                   </button>
-                   <button 
-                      onClick={() => setShowCreateForm(!showCreateForm)}
-                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md shadow-indigo-100 font-medium text-sm transition"
-                   >
-                      <Plus size={16} /> Tạo bài tập
-                   </button>
-                </div>
-            </div>
-
-            {/* 👉 THÊM ĐOẠN CODE NÀY ĐỂ HIỂN THỊ TAB: */}
-            <div className="flex gap-6 border-b border-gray-200 mb-6">
-              <button 
-                onClick={() => setActiveTab('ASSIGNMENTS')}
-                className={`pb-2 border-b-2 font-bold transition ${activeTab === 'ASSIGNMENTS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}
-              >
-                📚 Bài tập
-              </button>
-              <button 
-                onClick={() => setActiveTab('MEMBERS')}
-                className={`pb-2 border-b-2 font-bold transition ${activeTab === 'MEMBERS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}
-              >
-                👥 Thành viên ({classDetail.students?.length || 0})
-              </button>
-            </div>
-
-            {/* Form Tạo Bài tập */}
-            {showCreateForm && (
-              <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 animate-in fade-in slide-in-from-top-4 duration-300">
-                  <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2"><FileText size={18}/> Soạn bài tập mới</h3>
-                  <div className="space-y-4 bg-white p-6 rounded-xl shadow-sm">
-                    <input 
-                        type="text" placeholder="Tiêu đề bài tập (VD: Homework #4)" 
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
-                        value={newAssignment.title}
-                        onChange={e => setNewAssignment({...newAssignment, title: e.target.value})}
-                    />
-                    <textarea 
-                        rows={3} placeholder="Nội dung, yêu cầu chi tiết..." 
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                        value={newAssignment.content}
-                        onChange={e => setNewAssignment({...newAssignment, content: e.target.value})}
-                    ></textarea>
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-gray-500 block mb-1 uppercase">Hạn nộp (Deadline)</label>
-                          <input 
-                              type="datetime-local" className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50 text-sm" 
-                              value={newAssignment.deadline}
-                              onChange={e => setNewAssignment({...newAssignment, deadline: e.target.value})}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-gray-500 block mb-1 uppercase">Link File đề (URL)</label>
-                          <input 
-                              type="text" className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50 text-sm" 
-                              placeholder="https://..."
-                              value={newAssignment.fileUrl}
-                              onChange={e => setNewAssignment({...newAssignment, fileUrl: e.target.value})}
-                          />
-                        </div>
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                        <button onClick={() => setShowCreateForm(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium">Hủy bỏ</button>
-                        <button onClick={submitAssignment} className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition text-sm">Đăng bài tập</button>
-                    </div>
-                  </div>
-              </div>
-            )}
-
-            {/* Danh sách bài tập & Tracking */}
-              {activeTab === 'ASSIGNMENTS' && (
-                <div className="space-y-6">
-                  {classDetail.assignments && classDetail.assignments.map((assignment: any) => (
-                    <AssignmentTracker 
-                      key={assignment.id} 
-                      assignment={assignment} 
-                      classStudents={classDetail.students || []} 
-                    />
-                  ))}
-
-                  {(!classDetail.assignments || classDetail.assignments.length === 0) && !showCreateForm && (
-                    <div className="text-center py-16 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
-                      <BookOpen size={48} className="mx-auto mb-3 opacity-20 text-indigo-500" />
-                      <p>Lớp này chưa có bài tập nào.</p>
-                      <button
-                        onClick={() => setShowCreateForm(true)}
-                        className="text-indigo-600 font-bold hover:underline mt-2 text-sm"
-                      >
-                        Tạo bài tập đầu tiên
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'MEMBERS' && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                      <tr>
-                        <th className="p-4">Tên học sinh</th>
-                        <th className="p-4">Email</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {classDetail.students && classDetail.students.length > 0 ? (
-                        classDetail.students.map((st: any) => (
-                          <tr key={st.id} className="hover:bg-gray-50">
-                            <td className="p-4 font-medium text-gray-800 flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
-                                {st.name ? st.name.charAt(0) : 'S'}
+            <div className="flex flex-col h-full space-y-6 animate-fade-in-up">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 p-8 rounded-3xl shadow-lg text-white relative overflow-hidden">
+                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-end gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-indigo-200 mb-2 text-sm uppercase tracking-wider"><BookOpen size={16}/> Lớp học đang chọn</div>
+                              <h2 className="text-3xl font-bold">{classDetail.name}</h2>
+                                                      <div className="flex gap-4 mt-4">
+                              <div className="flex items-center gap-2 bg-indigo-800/50 px-3 py-1.5 rounded-lg border border-indigo-500/30">
+                                  <Users size={16} className="text-indigo-300"/> 
+                                  <span className="font-semibold">{classDetail.students?.length || 0}</span> <span className="text-indigo-300 text-sm">học sinh</span>
                               </div>
-                              {st.name || "Chưa cập nhật tên"}
-                            </td>
-                            <td className="p-4 text-gray-600">{st.email}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={2} className="p-8 text-center text-gray-400 italic">
-                            Lớp chưa có thành viên nào.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                              <div className="flex items-center gap-2 bg-indigo-800/50 px-3 py-1.5 rounded-lg border border-indigo-500/30">
+                                  <FileText size={16} className="text-indigo-300"/> 
+                                  <span className="font-semibold">{classDetail.assignments?.length || 0}</span> <span className="text-indigo-300 text-sm">bài tập</span>
+                              </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                             <button onClick={() => setIsAddStudentModalOpen(true)} className="px-4 py-2 bg-indigo-600/50 rounded-xl border border-indigo-400 text-sm font-bold hover:bg-indigo-600">Thêm HS</button>
+                             <button onClick={() => setShowCreateForm(!showCreateForm)} className="px-4 py-2 bg-white text-indigo-700 rounded-xl text-sm font-bold hover:bg-indigo-50">
+                                 {showCreateForm ? 'Đóng' : 'Tạo bài tập'}
+                             </button>
+                        </div>
+                    </div>
                 </div>
-              )}
 
-           </>
+                {/* Tabs */}
+                <div className="bg-gray-100/80 p-1.5 rounded-xl inline-flex gap-1 self-start">
+                  <button 
+                    onClick={() => setActiveTab('ASSIGNMENTS')}
+                    className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                        activeTab === 'ASSIGNMENTS' 
+                        ? 'bg-white text-indigo-700 shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                    }`}
+                  >
+                    <BookOpen size={16}/> Bài tập
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('MEMBERS')}
+                    className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                        activeTab === 'MEMBERS' 
+                        ? 'bg-white text-indigo-700 shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                    }`}
+                  >
+                    <Users size={16}/> Thành viên
+                  </button>
+                </div>
+
+                {/* Form Tạo (Đã tách ra Component riêng để tránh lag) */}
+                {showCreateForm && (
+                    <CreateAssignmentSection 
+                        onClose={() => setShowCreateForm(false)}
+                        onSubmit={handleCreateAssignment}
+                    />
+                )}
+
+                {/* Content Area */}
+                <div className="flex-1">
+                {activeTab === 'ASSIGNMENTS' && (
+                <div className="space-y-6">
+                    {classDetail.assignments && classDetail.assignments.length > 0 ? (
+                      <div className="grid gap-4">
+                        {classDetail.assignments.map((assignment: any) => (
+                          <div key={assignment.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                            <AssignmentTracker 
+                              assignment={assignment} 
+                              classStudents={classDetail.students || []} 
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                        !showCreateForm && (
+                          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-gray-300 text-gray-400">
+                            <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mb-4">
+                                <FileText size={40} className="text-indigo-300 opacity-80" />
+                            </div>
+                            <h4 className="text-lg font-bold text-gray-700 mb-1">Chưa có bài tập nào</h4>
+                            <p className="text-sm text-gray-500 mb-6">Hãy bắt đầu tạo bài tập đầu tiên cho lớp học này.</p>
+                            <button
+                                onClick={() => setShowCreateForm(true)}
+                                className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-md"
+                            >
+                                Tạo bài tập mới
+                            </button>
+                          </div>
+                        )
+                    )}
+                </div>
+                )}
+                {activeTab === 'MEMBERS' && (
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-gray-50/80 border-b border-gray-100 text-gray-500 text-xs font-bold uppercase tracking-wider">
+                                <tr>
+                                    <th className="p-5">Học sinh</th>
+                                    <th className="p-5">Thông tin liên hệ</th>
+                                    <th className="p-5 text-right">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                            {classDetail.students && classDetail.students.length > 0 ? (
+                                classDetail.students.map((st: any) => (
+                                <tr key={st.id} className="hover:bg-indigo-50/30 transition group">
+                                    <td className="p-5">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 flex items-center justify-center font-bold text-sm shadow-sm border border-white">
+                                                {st.name ? st.name.charAt(0).toUpperCase() : 'S'}
+                                            </div>
+                                            <span className="font-semibold text-gray-800 group-hover:text-indigo-700 transition">
+                                                {st.name || "Chưa cập nhật tên"}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="p-5 text-gray-600 text-sm">{st.email}</td>
+                                    <td className="p-5 text-right">
+                                        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Active</span>
+                                    </td>
+                                </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={3} className="py-16 text-center">
+                                        <div className="inline-block p-4 rounded-full bg-gray-50 mb-3"><Users size={32} className="text-gray-300"/></div>
+                                        <p className="text-gray-500 font-medium">Lớp chưa có thành viên nào.</p>
+                                        <button onClick={() => setIsAddStudentModalOpen(true)} className="text-indigo-600 font-bold text-sm hover:underline mt-2">Thêm học sinh ngay</button>
+                                    </td>
+                                </tr>
+                            )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+                    
+                </div>
+            </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-96 bg-white rounded-2xl border border-dashed border-gray-200 text-gray-400 shadow-sm">
-             <div className="bg-indigo-50 p-4 rounded-full mb-4">
-                 <LayoutDashboard size={32} className="text-indigo-300"/>
-             </div>
-             <p className="font-medium">Vui lòng chọn một lớp học để bắt đầu.</p>
-          </div>
+            // EMPTY STATE KHI CHƯA CHỌN LỚP
+            <div className="h-full flex flex-col items-center justify-center bg-white rounded-3xl border border-gray-200 shadow-sm p-8 text-center">
+                <div className="w-64 h-64 bg-indigo-50 rounded-full flex items-center justify-center mb-6 relative">
+                     <div className="absolute inset-0 border-4 border-indigo-100 rounded-full animate-pulse"></div>
+                     <LayoutDashboard size={80} className="text-indigo-400"/>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Chào mừng trở lại!</h2>
+                <p className="text-gray-500 max-w-md mb-8">
+                    Chọn một lớp học từ danh sách bên trái để xem chi tiết, quản lý học sinh và giao bài tập.
+                </p>
+                <button onClick={() => setIsAddClassModalOpen(true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 flex items-center gap-2">
+                    <Plus size={20}/> Tạo lớp học đầu tiên
+                </button>
+            </div>
         )}
       </div>
     </div>
@@ -609,7 +710,7 @@ const StudentDashboard = ({ classes, selectedClassId, setSelectedClassId, classD
                         <h2 className="text-2xl font-bold mb-2 relative z-10">Thông tin lớp học</h2>
                         <p className="opacity-90 relative z-10">Lớp đang chọn: <span className="font-bold bg-white/20 px-2 py-0.5 rounded">{classDetail.name}</span></p>
                         <div className="mt-6 flex gap-4 relative z-10">
-                            <div className="bg-white/20 backdrop-blur-md px-5 py-3 rounded-xl border border-white/10">
+                            <div className="bg-white/20 px-5 py-3 rounded-xl border border-white/10">
                                <span className="block text-3xl font-bold">{classDetail.assignments?.length || 0}</span>
                                <span className="text-xs opacity-80 uppercase tracking-wider">Bài tập</span>
                             </div>
