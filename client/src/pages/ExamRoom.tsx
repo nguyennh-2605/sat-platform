@@ -361,7 +361,7 @@ function ExamRoom() {
       if (document.hidden) {
         setViolationCount(prev => {
           const newCount = prev + 1;
-          if (newCount > 50) finishTest();
+          if (newCount > 3) finishTest();
           else toast(`⚠️ CẢNH BÁO (${newCount}/3): Đừng rời khỏi màn hình!`);
           return newCount;
         });
@@ -372,7 +372,7 @@ function ExamRoom() {
       if (!document.fullscreenElement && isTimerRunning) {
         setViolationCount(prev => {
           const newCount = prev + 1;
-          if (newCount > 50) {
+          if (newCount > 3) {
             finishTest();
             return newCount;
           } else {
