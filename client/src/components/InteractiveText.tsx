@@ -293,7 +293,7 @@ const InteractiveText: React.FC<Props> = ({ content }) => {
 
       {/* --- MODAL EDIT NOTE --- */}
       {activeNoteId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-[1px]" onClick={() => setActiveNoteId(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20" onClick={() => setActiveNoteId(null)}>
           <div 
             className="bg-white p-4 rounded-xl shadow-2xl w-80 border border-gray-200 animate-in zoom-in-95 duration-200" 
             onClick={(e) => e.stopPropagation()}

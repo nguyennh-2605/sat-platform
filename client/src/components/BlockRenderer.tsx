@@ -6,7 +6,7 @@ import InteractiveText from './InteractiveText';
 // --- 1. Component hiển thị Bảng (Table) ---
 const TableRenderer = ({ block }: { block: TableBlock }) => (
   <div className="my-6 w-full overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm
-      font-sans text-[1.125rem] font-normal text-slate-800 leading-[1.5] tracking-[-0.01em]">
+      font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
     {/* Tiêu đề bảng */}
     {block.title && (
       <div className="bg-gray-100 px-4 py-3 text-center font-bold text-gray-800 border-b border-gray-300">
@@ -61,7 +61,7 @@ const PoemRenderer = ({ block }: { block: PoemBlock }) => (
     )}
     
     {/* Nội dung thơ (Font sans cho nghệ thuật) */}
-    <div className="font-sans text-gray-800 leading-relaxed text-lg space-y-1">
+    <div className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
       {block.lines.map((line, idx) => (
         // Thêm padding-left cho các dòng chẵn để tạo hiệu ứng thụt đầu dòng thơ
         <div key={idx} className={idx % 2 !== 0 ? "pl-4" : ""}>
@@ -78,6 +78,38 @@ const PoemRenderer = ({ block }: { block: PoemBlock }) => (
     )}
   </div>
 );
+
+const NotesRenderer = ({ lines }: { lines: string[] }) => {
+  // Guard clause: Nếu không có dữ liệu thì không render gì cả
+  if (!lines || lines.length === 0) return null;
+
+  // TÁCH DỮ LIỆU:
+  // introLine: Lấy phần tử đầu tiên
+  // bulletLines: Lấy toàn bộ các phần tử còn lại
+  const [introLine, ...bulletLines] = lines;
+
+  return (
+    <div className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
+      
+      <div className="mb-3 leading-relaxed">
+        <InteractiveText content={introLine} />
+      </div>
+
+      {/* 2. HIỂN THỊ BULLET POINTS (Các dòng còn lại) */}
+      {bulletLines.length > 0 && (
+        <div className="pl-2"> {/* Thêm chút padding trái nếu muốn list thụt vào so với câu dẫn */}
+          <ul className="list-disc pl-6 space-y-2 text-slate-800">
+            {bulletLines.map((line, idx) => (
+              <li key={idx} className="pl-1 leading-normal">
+                <InteractiveText content={line} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // --- 3. Component Chính ---
 interface Props {
@@ -115,6 +147,9 @@ const BlockRenderer: React.FC<Props> = ({ blocks }) => {
 
           case 'poem':
             return <PoemRenderer key={index} block={block} />;
+
+          case 'note':
+            return <NotesRenderer key={index} lines={block.lines} />;
 
           default:
             return null;

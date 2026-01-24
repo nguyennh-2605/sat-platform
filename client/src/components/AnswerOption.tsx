@@ -45,7 +45,8 @@ const AnswerOption: React.FC<AnswerProps> = ({
       </div>
 
       {/* 2. NỘI DUNG ĐÁP ÁN */}
-      <span className="font-sans text-[1.05rem] font-normal tracking-[-0.005em]">
+      <span className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] 
+                      leading-relaxed tracking-normal">
         <InteractiveText content={content} />
       </span>
 

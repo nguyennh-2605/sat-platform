@@ -361,7 +361,7 @@ function ExamRoom() {
       if (document.hidden) {
         setViolationCount(prev => {
           const newCount = prev + 1;
-          if (newCount > 3) finishTest();
+          if (newCount > 50) finishTest();
           else toast(`⚠️ CẢNH BÁO (${newCount}/3): Đừng rời khỏi màn hình!`);
           return newCount;
         });
@@ -372,7 +372,7 @@ function ExamRoom() {
       if (!document.fullscreenElement && isTimerRunning) {
         setViolationCount(prev => {
           const newCount = prev + 1;
-          if (newCount > 3) {
+          if (newCount > 50) {
             finishTest();
             return newCount;
           } else {
@@ -780,18 +780,28 @@ function ExamRoom() {
           {/* --- NỘI DUNG CHÍNH (BODY) --- */}
           <div className="flex-1 flex overflow-hidden">
           {/*  CỘT TRÁI: CHỈ HIỆN BLOCKS (Bài đọc, Graph...) */}
-            <div className="w-1/2 p-8 border-r border-gray-200 overflow-y-auto bg-white custom-scrollbar">
-              <div   className=" font-['Georgia','Times_New_Roman', serif] text-[1.05rem] font-normal text-slate-800 leading-[1.45] tracking-[-0.01em] whitespace-pre-line">
-                {/* Nếu không có block nào (ví dụ câu hỏi ngắn) thì ẩn hoặc hiện placeholder */}
+          <div className="w-1/2 h-full bg-white border-r border-gray-200 flex flex-col">
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-6 md:px-8 md:py-8">
+              
+              {/* Container Text:
+                  - font-serif: Giống style bài đọc văn học/lịch sử của SAT.
+                  - text-[15px] md:text-[16px]: Kích thước chữ chuẩn, không quá to.
+                  - leading-relaxed: Giãn dòng 1.625, giúp mắt dễ chịu khi đọc đoạn dài.
+                  - text-[#1a1a1a]: Màu đen than (không đen tuyền) để đỡ mỏi mắt.
+              */}
+              <div className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
+                
                 {currentQ.blocks && currentQ.blocks.length > 0 ? (
-                    <BlockRenderer blocks={currentQ.blocks} />
+                  <BlockRenderer blocks={currentQ.blocks} />
                 ) : (
-                    <div className="text-gray-400 italic flex items-center justify-center h-40">
-                      No passage or data provided.
-                    </div>
+                  <div className="text-gray-400 italic flex items-center justify-center h-40 text-sm font-sans">
+                    No passage provided.
+                  </div>
                 )}
+
               </div>
             </div>
+          </div>
 
         {/* Cột phải: CÂU HỎI */}
           <div className="w-1/2 p-8 overflow-y-auto bg-gray-50 custom-scrollbar">
@@ -810,9 +820,8 @@ function ExamRoom() {
 
                 <h3
                   className="
-                    font-sans text-[1.125rem] font-normal text-slate-800 leading-[1.5]
-                    tracking-[-0.01em]
-                    mb-8
+                    font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] 
+                    leading-relaxed tracking-normal mb-6
                   "
                 >
                   <InteractiveText content={currentQ.questionText} />

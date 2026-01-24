@@ -1,11 +1,4 @@
-// src/utils/satParser.ts
-
-// --- 1. ĐỊNH NGHĨA TYPE ---
-export interface TextBlock { type: 'text'; content: string; }
-export interface ImageBlock { type: 'image'; src: string; }
-export interface TableBlock { type: 'table'; headers: string[]; rows: string[][]; }
-export interface PoemBlock { type: 'poem'; lines: string[]; }
-export type ContentBlock = TextBlock | ImageBlock | TableBlock | PoemBlock;
+import { type ContentBlock } from "../types/quiz";
 
 export interface SATQuestion {
   id?: string;
@@ -52,10 +45,7 @@ const smartFormatText = (rawText: string): string => {
 const parsePassageToBlocks = (rawPassage: string): ContentBlock[] => {
   if (!rawPassage) return [];
 
-  // Log để debug: Nếu bạn thấy dòng này trong Console nghĩa là file mới đã chạy
-  console.log("🛠️ Đang chạy Parser Bất Tử cho đoạn văn:", rawPassage.substring(0, 20) + "...");
-
-  const parts = rawPassage.split(/(\[(?:TEXT|TABLE|IMG|POEM)\])/i);
+  const parts = rawPassage.split(/(\[(?:TEXT|TABLE|IMG|POEM|NOTE)\])/i);
   const blocks: ContentBlock[] = [];
   let currentType = 'TEXT'; 
 
@@ -63,11 +53,13 @@ const parsePassageToBlocks = (rawPassage: string): ContentBlock[] => {
     let cleanPart = part.trim();
     if (!cleanPart) continue;
 
-    const matchType = cleanPart.match(/^\[(TEXT|TABLE|IMG|POEM)\]$/i);
+    const matchType = cleanPart.match(/^\[(TEXT|TABLE|IMG|POEM|NOTE)\]$/i);
     if (matchType) {
       currentType = matchType[1].toUpperCase();
       continue;
     }
+
+    // --- XỬ LÝ CÁC LOẠI BLOCK ---
 
     if (currentType === 'TABLE') {
       const tableData = parseTableData(cleanPart);
@@ -76,32 +68,43 @@ const parsePassageToBlocks = (rawPassage: string): ContentBlock[] => {
     else if (currentType === 'POEM') {
       blocks.push({ type: 'poem', lines: cleanPart.split('\n').map(l => l.trim()).filter(Boolean) });
     } 
+    // === 3. LOGIC MỚI CHO NOTES ===
+    else if (currentType === 'NOTE') {
+      const lines = cleanPart
+        .split('\n')
+        .map(line => {
+             // Trim và xóa các ký tự gạch đầu dòng có sẵn (-, *, •) để tránh trùng lặp
+             return line.trim().replace(/^[-*•]\s*/, '');
+        })
+        .filter(Boolean); // Lọc dòng trống
+
+      if (lines.length > 0) {
+          // Lưu ý: Bạn cần chắc chắn Interface ContentBlock đã có type 'notes'
+          blocks.push({ type: 'note', lines: lines }); 
+      }
+    }
     else if (currentType === 'IMG') {
       blocks.push({ type: 'image', src: cleanPart }); 
     } 
     else {
-      // === LOGIC QUÉT TÌM ẢNH (SCAN MODE) ===
-      // Regex cực mạnh: Chấp nhận mọi loại xuống dòng, khoảng trắng giữa các phần tử
+      // === LOGIC CŨ: TEXT & QUÉT TÌM ẢNH (SCAN MODE) ===
       const imgRegex = /!\[([\s\S]*?)\]\s*\(([\s\S]*?)\)/g;
       
       let lastIndex = 0;
       let match;
 
       while ((match = imgRegex.exec(cleanPart)) !== null) {
-        // 1. Lấy text trước ảnh
+        // Lấy text trước ảnh
         const textBefore = cleanPart.slice(lastIndex, match.index);
         if (textBefore.trim()) {
           blocks.push({ type: 'text', content: smartFormatText(textBefore) });
         }
-
-        // 2. Lấy URL ảnh (match[2])
-        console.log("✅ Tìm thấy ảnh:", match[2]); // Log debug
+        // Lấy URL ảnh
         blocks.push({ type: 'image', src: match[2].trim() });
-
         lastIndex = imgRegex.lastIndex;
       }
 
-      // 3. Lấy text sau ảnh cuối cùng
+      // Lấy text sau ảnh cuối cùng
       const textAfter = cleanPart.slice(lastIndex);
       if (textAfter.trim()) {
         blocks.push({ type: 'text', content: smartFormatText(textAfter) });

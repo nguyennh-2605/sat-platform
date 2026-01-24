@@ -135,29 +135,19 @@ const CreateTestWizard = ({ onClose }: any) => {
   const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, className = "" }) => {
     if (!text) return null;
 
-    // Tách dòng để xử lý từng dòng một
     const lines = text.split('\n');
 
     return (
       <div className={`font-sans text-gray-800 ${className}`}>
         {lines.map((line, index) => {
           const trimmedLine = line.trim();
-          if (!trimmedLine) return <div key={index} className="h-2"></div>;
 
-          // Xử lý Bullet points (Rhetorical Synthesis)
-          if (trimmedLine.startsWith('-') || trimmedLine.startsWith('•')) {
-            const contentText = trimmedLine.replace(/^[-•]\s*/, '');
-            return (
-              <div key={index} className="flex items-start gap-3 ml-4 mb-2">
-                <span className="mt-2 w-1.5 h-1.5 bg-black rounded-full shrink-0"></span>
-                <span className="leading-relaxed">{contentText}</span>
-              </div>
-            );
+          if (!trimmedLine) {
+            return <div key={index} className="h-4"></div>; 
           }
-
-          // Text bình thường
+          // Render mọi thứ dưới dạng đoạn văn thường (Paragraph)
           return (
-            <p key={index} className="mb-2 leading-relaxed text-[15px]">
+            <p key={index} className="mb-2 leading-relaxed text-[15px] whitespace-pre-wrap">
               {trimmedLine}
             </p>
           );
@@ -461,7 +451,7 @@ const CreateTestWizard = ({ onClose }: any) => {
                       {/* Header câu hỏi */}
                       <div className="flex justify-between items-center mb-4 border-b pb-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-white bg-indigo-600 px-2 py-0.5 rounded text-xs">Câu {q.index}</span>
+                          <span className="font-bold text-white bg-indigo-600 px-2 py-0.5 rounded text-xs">Câu {idx + 1}</span>
                           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Module {q.module}</span>
                         </div>
                         <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-mono">ID: {idx + 1}</span>
@@ -476,6 +466,22 @@ const CreateTestWizard = ({ onClose }: any) => {
                             {block.type === 'text' && (
                               <FormattedTextRenderer text={block.content} />
                             )}
+
+                       {block.type === 'note' && (
+                        <div className="my-3 font-sans text-[15px] leading-relaxed text-gray-800">
+                          {/* Box: Viền mỏng hơn (gray-200), padding vừa đủ (p-4), bo góc mềm (rounded-lg) */}
+                          <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                            <ul className="list-disc pl-5 space-y-1.5 text-gray-900">
+                              {/* @ts-ignore */}
+                              {block.lines.map((line, idx) => (
+                                <li key={idx} className="pl-1">
+                                  {line}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
 
                             {/* 2. TABLE BLOCK */}
                             {block.type === 'table' && (
@@ -579,10 +585,6 @@ const CreateTestWizard = ({ onClose }: any) => {
       </div>
       <InputGuideModal isOpen={showGuide} onClose={() => setShowGuide(false)} />
       {isSubmitting && (
-      // <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
-      //   <div className="h-12 w-12 animate-spin rounded-full border-4 border-white border-t-transparent"></div>
-      //   <p className="mt-4 font-medium text-white">Đang tải đề thi lên hệ thống, vui lòng đợi...</p>
-      // </div>
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
           {/* Icon Spinner xoay xoay */}
           <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>

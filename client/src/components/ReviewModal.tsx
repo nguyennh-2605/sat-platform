@@ -22,7 +22,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
       
       {/* Container chính: Bo góc lớn hơn, shadow sâu hơn */}
       <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col h-[90vh] overflow-hidden ring-1 ring-gray-900/5">
@@ -71,7 +71,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle }) =
             <div className="max-w-3xl mx-auto">
             
               {/* Câu hỏi prompt */}
-              <div className="font-sans text-xl font-semibold text-gray-900 mb-6 leading-snug">
+              <div className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal mb-6">
                 {data.questionText}
               </div>
 
@@ -100,7 +100,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle }) =
                         {label}
                       </div>
 
-                      <div className="flex-1 text-base leading-relaxed text-gray-800 pt-0.5 font-normal">
+                      <div className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
                           {opt.text}
                       </div>
                     </div>

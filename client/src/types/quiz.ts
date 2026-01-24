@@ -29,8 +29,13 @@ export interface PoemBlock {
   lines: string[];       // Mảng chứa từng dòng thơ (để xuống dòng cho chuẩn)
 }
 
+export interface NoteBlock {
+  type: 'note';
+  lines: string[];       // Mảng chứa từng dòng thơ (để xuống dòng cho chuẩn)
+}
+
 // 3. Gom tất cả các loại khối lại thành một kiểu chung
-export type ContentBlock = TextBlock | ImageBlock | TableBlock | PoemBlock;
+export type ContentBlock = TextBlock | ImageBlock | TableBlock | PoemBlock | NoteBlock;
 
 // 4. Định nghĩa khuôn mẫu cho một CÂU HỎI hoàn chỉnh
 export interface QuestionData {
