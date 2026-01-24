@@ -119,6 +119,7 @@ model Question {
   blocks        Json     // Cột trái chứa passage, table, graph, ...
   questionText  String   @db.Text
   explanation   String?  @db.Text
+  order         Int      @default(0)
   
   // Lưu danh sách đáp án dưới dạng JSON
   // Cấu trúc: [{"id": "A", "text": "Answer 1"}, {"id": "B", "text": "Answer 2"}]

@@ -90,7 +90,9 @@ app.get('/api/test/:id', async (req, res) => {
           orderBy: { order: 'asc' }, // Sắp xếp Module 1 trước, Module 2 sau
           include: {
             questions: {
-              // ⚠️ QUAN TRỌNG: Chỉ lấy nội dung câu hỏi và options
+              orderBy: {
+                order: 'asc'
+              },
               // KHÔNG lấy trường 'correctAnswer' để tránh lộ đáp án
               select: {
                 id: true,
@@ -215,7 +217,8 @@ app.post('/api/tests/create', async (req, res) => {
             duration: section.duration,
 
             questions: {
-              create: section.questions.map((q) => ({
+              create: section.questions.map((q, index) => ({
+                order: index + 1,
                 questionText: q.questionText,
                 correctAnswer: q.correctAnswer,
                 explanation: q.explanation || null,
