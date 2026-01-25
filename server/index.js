@@ -20,14 +20,15 @@ app.use(express.json());
 
 // --- ROUTES (Đường dẫn) ---
 
-// 1. AUTHENTICATION
+// Route xử lí đăng nhập
 app.post('/api/register', register);
 app.post('/api/login', login);
-// route xử lý đăng nhập Google
 app.post('/api/auth/google-login', googleLogin);
-
+// Route xử lí các pages
 app.use("/api/challenge", require("./src/routes/challengeRoutes"));
-app.use("/api/classes", require("./src/routes/classRoute"));
+app.use("/api/classes", require("./src/routes/classRoutes"));
+app.use("/api/error-logs", require("./src/routes/errorLogRoutes"));
+app.use("/api/results-analytics", require("./src/routes/analyticsRoutes"));
 
 // 2. API LẤY DANH SÁCH BÀI THI (Cho Dashboard)
 app.get('/api/tests', async (req, res) => {

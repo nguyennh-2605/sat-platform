@@ -27,12 +27,10 @@ model User {
   
   submissions Submission[]
 
-  // Nếu là Teacher
   taughtClasses   Class[]      @relation("TeacherClasses")
-  // Nếu là Student
   studyingClasses Class[]      @relation("StudentClasses")
-  // 3. Các bài tập về nhà đã nộp
   homeworkSubmissions HomeworkSubmission[]
+  errorLogs   ErrorLog[]
 }
 
 model Class {
@@ -176,5 +174,24 @@ model Passage {
   content        String   // Nội dung đoạn văn cần đọc
   difficulty     String  @default("Medium") // Easy, Medium, Hard
   createdAt      DateTime @default(now())
+}
+
+model ErrorLog {
+  id            String    @id @default(uuid())
+  source        String?  // Nguồn đề 
+  category      String?  // Dạng bài 
+  
+  userAnswer    String?  // Đáp án user chọn (A, B...)
+  correctAnswer String?  // Đáp án đúng (A, B...)
+  
+  whyWrong      String?  @db.Text // @db.Text để lưu văn bản dài (Analysis)
+  whyRight      String?  @db.Text // @db.Text để lưu văn bản dài (Solution)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt // Tự động cập nhật thời gian khi sửa
+
+  // Liên kết với User (Để biết log này của ai)
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
