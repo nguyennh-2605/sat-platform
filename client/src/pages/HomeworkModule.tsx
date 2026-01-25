@@ -180,7 +180,6 @@ const ClassSidebarItem = memo(({ cls, isSelected, onClick }: any) => {
   );
 });
 
-// --- 2. COMPONENT FORM TẠO BÀI TẬP (Tách State ra khỏi cha để gõ phím siêu mượt) ---
 const CreateAssignmentSection = memo(({ onClose, onSubmit }: any) => {
   const [form, setForm] = useState({ title: '', content: '', deadline: '', fileUrl: '' });
 
@@ -264,7 +263,6 @@ const TeacherDashboard = ({
   const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   
-  // State cho Modal (giữ nguyên ở đây vì modal ít khi render list chính)
   const [newClassName, setNewClassName] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
   const [activeTab, setActiveTab] = useState('ASSIGNMENTS');
@@ -288,7 +286,6 @@ const TeacherDashboard = ({
       setIsAddStudentModalOpen(false);
   }
 
-  // Hàm xử lý khi submit từ Component con
   const handleCreateAssignment = useCallback((data: any) => {
     onCreateAssignment(data);
     setShowCreateForm(false);
@@ -296,8 +293,6 @@ const TeacherDashboard = ({
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 relative min-h-[600px] bg-gray-50/50 p-2 lg:p-0">
-      
-      {/* --- MODALS (Code Modal giữ nguyên logic nhưng có thể tách component nếu muốn tối ưu hơn nữa) --- */}
       {isAddClassModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 transition-opacity">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100 border border-gray-100">

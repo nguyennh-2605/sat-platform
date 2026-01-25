@@ -519,7 +519,6 @@ function ExamRoom() {
       });
   };
 
-  // 👇 3. HÀM XỬ LÝ KHI BẤM NÚT GẠCH TRÊN ĐÁP ÁN
   const handleEliminate = (questionIdx: number, optionIdx: number, e: React.MouseEvent) => {
     e.stopPropagation(); // Chặn click lan ra ngoài (để không bị tính là chọn đáp án)
     
@@ -591,18 +590,24 @@ function ExamRoom() {
     const userId = localStorage.getItem('userId');
     const savedMod1TimeUsed = localStorage.getItem(`mod1TimeUsed_${userId}_${id}`);
     const mod1TimeUsed = parseInt(savedMod1TimeUsed || "0", 10);
-    const secondsUsed = mod1TimeUsed + Math.max(0, examConfig.mod2Duration * 60 - timeLeft);
-    console.log("Thoi gian su dung o mod 1", mod1TimeUsed);
-    console.log("Thoi gian su dung o mod 2", Math.max(0, examConfig.mod2Duration * 60 - timeLeft));
-    console.log("Thoi gian da su dung o ca 2 mod", secondsUsed);
+    const savedMod2Start = localStorage.getItem(`mod2Start_${userId}_${id}`);
+    let mod2TimeUsed = 0
+    if (savedMod2Start) {
+      mod2TimeUsed = Math.max(0, examConfig.mod2Duration - timeLeft);
+    }
+    const secondsUsed = mod1TimeUsed + mod2TimeUsed;
+
+    const reportData = {
+      examTitle: TestInfo.title,
+      subject: TestInfo.description,
+      date: new Date().toLocaleString(),
+      duration: formatDuration(secondsUsed <= 0 ? TestInfo.duration * 60 : secondsUsed), // Thời gian làm bài thực tế
+      questions: getResults()
+    }
 
     return (
       <ScoreReport 
-        examTitle={TestInfo.title}
-        subject={TestInfo.description}
-        date={new Date().toLocaleString()}
-        duration={formatDuration(secondsUsed <= 0 ? TestInfo.duration * 60 : secondsUsed)} // Thời gian làm bài thực tế
-        questions={getResults()}
+        initialData={reportData}
         onBackToHome={() => {
           localStorage.removeItem('current_exam_info');
           window.location.href = '/dashboard';

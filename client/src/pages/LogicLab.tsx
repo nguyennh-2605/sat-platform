@@ -25,7 +25,7 @@ const QUESTION_TYPES = [
   "Words in Context", "Text Structure", "Cross-Text Connections"
 ];
 
-const SATChallenge = () => {
+const LogicLab = () => {
   const [step, setStep] = useState<'SETUP' | 'DOING' | 'RESULT'>('SETUP');
   const [isLoading, setIsLoading] = useState(false);
   const [config, setConfig] = useState({ difficulty: "Medium", type: QUESTION_TYPES[0] });
@@ -356,4 +356,4 @@ const SATChallenge = () => {
   );
 };
 
-export default SATChallenge;
+export default LogicLab;

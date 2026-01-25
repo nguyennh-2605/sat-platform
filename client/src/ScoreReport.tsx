@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { type ContentBlock } from './types/quiz';
+import { CheckCircle2, BookmarkPlus, Loader2 } from 'lucide-react';
 import ReviewModal from './components/ReviewModal';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 // 1. Cập nhật Interface dữ liệu đầu vào
 export interface QuestionResult {
@@ -20,31 +26,106 @@ export interface QuestionResult {
 }
 
 interface ScoreReportProps {
-  examTitle: string;
-  subject: string;
-  date: string;
-  duration: string;
-  questions: QuestionResult[];
-  onBackToHome: () => void;
+  initialData?: {
+    examTitle: string;
+    subject: string;
+    date: string;
+    duration: string;
+    questions: QuestionResult[];
+  }
+  onBackToHome?: () => void;
 }
 
-const ScoreReport: React.FC<ScoreReportProps> = ({
-  examTitle,
-  subject,
-  date,
-  duration,
-  questions,
-  onBackToHome
-}) => {
-  const totalQuestions = questions.length;
-  const correctCount = questions.filter(q => q.isCorrect).length;
-  const incorrectCount = totalQuestions - correctCount;
-  const [reviewingQuestion, setReviewingQuestion] = useState<QuestionResult | null>(null);
+const ScoreReport: React.FC<ScoreReportProps> = ({ initialData, onBackToHome }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Lấy danh sách câu sai (Format: M1-Q5) để hiển thị header
-  // const incorrectList = questions
-  //   .filter(q => !q.isCorrect)
-  //   .map(q => `${q.module.charAt(0)}1-Q${q.questionNumber}`); // VD: M1-Q5
+  const [data, setData] = useState(initialData || null);
+  const [loading, setLoading] = useState(!initialData);
+  const [reviewingQuestion, setReviewingQuestion] = useState<QuestionResult | null>(null);
+  const [addedQuestions, setAddedQuestions] = useState<Set<number | string>>(new Set());
+
+  const resultIdFromState = location.state?.resultId;
+
+  useEffect(() => {
+    // Nếu ĐÃ CÓ dữ liệu từ props (từ ExamRoom truyền sang), thì KHÔNG gọi API nữa
+    if (initialData) {
+      return;
+    }
+    // Nếu KHÔNG có props, thì mới đi gọi API (trường hợp xem từ Dashboard)
+    const fetchDetail = async () => {
+      if (!resultIdFromState) return;
+
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/results-analytics/submission/${resultIdFromState}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Map dữ liệu API vào state
+        setData({
+          examTitle: res.data.examTitle,
+          subject: res.data.subject,
+          date: res.data.date, // Nhớ format ngày
+          duration: res.data.duration,
+          questions: res.data.questions
+        });
+      } catch (error) {
+        console.error("Lỗi:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDetail();
+  }, [initialData, resultIdFromState]);
+
+  const handleBack = () => {
+    if (onBackToHome) {
+      onBackToHome(); // Ưu tiên dùng hàm props truyền vào (logic xóa localStorage của ExamRoom)
+    } else {
+      navigate('/dashboard/results-analytics'); // Mặc định quay về dashboard
+    }
+  };
+
+  if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin"/></div>;
+  if (!data) return <div>Không tìm thấy dữ liệu</div>;
+
+  const handleAddToErrorLog = async (q: QuestionResult) => {
+    if (addedQuestions.has(q.id)) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      
+      const payload = {
+        source: `${data.examTitle}`, 
+        userAnswer: q.userAnswer || 'Omitted',
+        category: 'General',
+        correctAnswer: q.correctAnswer,
+        whyWrong: '', 
+        whyRight: ''
+      };
+
+      const response = await axios.post(
+        `${API_URL}/api/error-logs`, 
+        payload, 
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.status === 201 || response.status === 200) {
+        toast.success(`Đã thêm Câu ${q.questionNumber} vào Error Log!`);
+        setAddedQuestions(prev => new Set(prev).add(q.id));
+      }
+    } catch (error) {
+      console.error("Error adding to log:", error);
+      toast.error("Không thể thêm vào Error Log!");
+    }
+  };
+
+  const totalQuestions = data.questions.length;
+  const correctCount = data.questions.filter(q => q.isCorrect).length;
+  const incorrectCount = totalQuestions - correctCount;
 
   return (
     <div className="max-w-5xl mx-auto p-8 bg-white font-sans text-gray-800 min-h-screen">
@@ -58,7 +139,7 @@ const ScoreReport: React.FC<ScoreReportProps> = ({
               Result
             </span>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 leading-tight">
-              {examTitle}
+              {data.examTitle}
             </h2>
           </div>
 
@@ -66,7 +147,7 @@ const ScoreReport: React.FC<ScoreReportProps> = ({
             {/* Subject */}
             <div className="flex items-center gap-1.5 font-medium text-gray-700">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
-              {subject}
+              {data.subject}
             </div>
 
             <span className="hidden sm:inline-block w-1 h-1 bg-gray-300 rounded-full"></span>
@@ -74,7 +155,7 @@ const ScoreReport: React.FC<ScoreReportProps> = ({
             {/* Date */}
             <div className="flex items-center gap-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-              {date}
+              {data.date}
             </div>
 
             <span className="hidden sm:inline-block w-1 h-1 bg-gray-300 rounded-full"></span>
@@ -82,7 +163,7 @@ const ScoreReport: React.FC<ScoreReportProps> = ({
             {/* Duration */}
             <div className="flex items-center gap-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              Time Used: <span className="font-semibold text-gray-700">{duration}</span>
+              Time Used: <span className="font-semibold text-gray-700">{data.duration}</span>
             </div>
           </div>
         </div>
@@ -90,7 +171,7 @@ const ScoreReport: React.FC<ScoreReportProps> = ({
         {/* Bên phải: Nút bấm */}
         <div>
           <button 
-            onClick={onBackToHome}
+            onClick={() => handleBack()}
             className="group flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white font-medium text-sm rounded-lg hover:bg-gray-800 transition-all shadow-md hover:shadow-lg active:scale-95"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:-translate-x-1 transition-transform">
@@ -137,7 +218,7 @@ const ScoreReport: React.FC<ScoreReportProps> = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {questions.map((q) => (
+            {data.questions.map((q) => (
               <tr key={q.id} className="hover:bg-gray-50 transition-colors">
                 
                 {/* 1. Question Info */}
@@ -174,12 +255,36 @@ const ScoreReport: React.FC<ScoreReportProps> = ({
                 
                 {/* 4. Actions */}
                 <td className="py-4 px-6 align-middle text-center">
-                   <button 
-                     onClick={() => setReviewingQuestion(q)}
-                     className="border border-gray-300 text-gray-600 rounded-full px-5 py-1.5 text-sm font-semibold hover:bg-gray-800 hover:text-white transition-all shadow-sm"
-                   >
-                     Review
-                   </button>
+                  <div className="flex gap-2 justify-center items-center">
+                    <button 
+                      onClick={() => setReviewingQuestion(q)}
+                      className="border border-slate-200 text-slate-600 rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-slate-800 hover:text-white transition-all"
+                    >
+                      Review
+                    </button>
+                    <button 
+                      onClick={() => handleAddToErrorLog(q)}
+                      disabled={addedQuestions.has(q.id)}
+                      title={addedQuestions.has(q.id) ? "Đã thêm vào log" : "Thêm vào Error Log để ôn tập"} 
+                      className={`
+                        flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shadow-sm
+                        ${addedQuestions.has(q.id)
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-100 cursor-default" // Style khi đã add
+                          : "bg-white text-slate-500 border-slate-200 hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50" // Style mặc định
+                        }
+                      `}
+                    >
+                      {addedQuestions.has(q.id) ? (
+                          <>
+                            <CheckCircle2 size={14} /> <span>Saved</span>
+                          </>
+                      ) : (
+                          <>
+                            <BookmarkPlus size={14} /> <span>Log</span>
+                          </>
+                      )}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
