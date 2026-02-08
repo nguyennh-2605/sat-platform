@@ -11,8 +11,25 @@ datasource db {
 
 // 1. Enum cho phân quyền
 enum Role {
+  ADMIN
   TEACHER
   STUDENT
+}
+
+enum TestMode {
+  PRACTICE // Luyện tập (Thoải mái)
+  EXAM     // Kiểm tra (Nghiêm ngặt)
+}
+
+enum TestCategory {
+  REAL      // Đề thi thật (Real Tests)
+  CLASS     // Bài tập riêng của lớp
+  PRACTICE  // Đề ôn tập đại trà
+}
+
+enum TestSubject {
+  RW      // Reading & Writing
+  MATH    // Math
 }
 
 // 2. Bảng người dùng
@@ -27,10 +44,11 @@ model User {
   
   submissions Submission[]
 
-  taughtClasses   Class[]      @relation("TeacherClasses")
-  studyingClasses Class[]      @relation("StudentClasses")
+  taughtClasses       Class[]      @relation("TeacherClasses")
+  studyingClasses     Class[]      @relation("StudentClasses")
   homeworkSubmissions HomeworkSubmission[]
-  errorLogs   ErrorLog[]
+  errorLogs           ErrorLog[]
+  createdTests        Test[]  // Các bài thi do user này tạo (nếu là Teacher)
 }
 
 model Class {
@@ -48,6 +66,7 @@ model Class {
 
   // Danh sách bài tập trong lớp này
   assignments Assignment[]
+  classTests  ClassTest[]
 }
 
 model Assignment {
@@ -86,16 +105,44 @@ model HomeworkSubmission {
   @@unique([studentId, assignmentId])
 }
 
-// 3. Bảng Đề thi (Ví dụ: SAT Practice Test #1)
+// 3. Bảng Đề thi
 model Test {
   id          Int          @id @default(autoincrement())
   title       String
   description String?
   duration    Int          @default(64) // Tổng thời gian (để hiển thị)
-  type        String       @default("RW")
+
+  subject     TestSubject  @default(RW)
+  mode        TestMode     @default(PRACTICE)
+  category    TestCategory @default(PRACTICE)
+  
+  // Filter date and privacy
+  testDate    String?   
+  isPublic    Boolean      @default(false)
+
+  authorId    Int?
+  author      User?     @relation(fields: [authorId], references: [id])
+
 
   sections    Section[]    // 1 Bài thi có nhiều phần (Module 1, Module 2)
   submissions Submission[]
+  classTests  ClassTest[]
+}
+
+model ClassTest {
+  id         Int      @id @default(autoincrement())
+  
+  classId    String
+  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  
+  testId     Int
+  test       Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  
+  assignedAt DateTime @default(now())
+  dueDate    DateTime? // Hạn chót làm bài riêng cho lớp này
+  isHidden   Boolean   @default(false) // Giáo viên có thể tạm ẩn đề khỏi lớp
+
+  @@unique([classId, testId]) // 1 Đề chỉ add vào 1 lớp 1 lần
 }
 
 // 4. Bảng Phần thi (Ví dụ: Reading Module 1, Math Module 2)

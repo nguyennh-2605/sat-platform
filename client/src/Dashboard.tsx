@@ -86,7 +86,7 @@ function Dashboard() {
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-bold text-slate-800 truncate">{user.name}</p>
-              <p className="text-xs text-slate-500 truncate">{user.role === 'STUDENT' ? "Học viên" : "Giáo viên"}</p>
+              <p className="text-xs text-slate-500 truncate">{user.role === 'STUDENT' ? "Học viên" : user.role === 'TEACHER' ? 'Giáo viên' : 'Admin'}</p>
             </div>
             <button 
               onClick={handleLogout}

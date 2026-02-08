@@ -11,6 +11,7 @@ import type { QuestionData } from '../types/quiz';
 import type { QuestionResult } from '../ScoreReport';
 import ScoreReport from '../ScoreReport';
 import toast from 'react-hot-toast';
+import { AlertTriangle, Maximize } from 'lucide-react';
 
 function ExamRoom() {
   const { id } = useParams();
@@ -77,6 +78,12 @@ function ExamRoom() {
 
   // State lưu độ dài module 1
   const [firstModuleLength, setFirstModuleLength] = useState(0);
+
+  // State lưu mode của Test
+  const [testMode, setTestMode] = useState<'PRACTICE' | 'EXAM'>('PRACTICE');
+
+  // State để hiển thị màn hình chặn khi thoát fullscreen
+  const [isFullscreenBlocked, setIsFullscreenBlocked] = useState(false);
 
   // Dữ liệu Backend trả về sau khi nộp bài
   interface BackendResult {
@@ -150,6 +157,13 @@ function ExamRoom() {
           });
 
           setQuestions(allQuestions);
+        }
+
+        if (data.mode) {
+          setTestMode(data.mode);
+          if (data.mode === 'PRACTICE') {
+            setShowStartModal(false);
+          }
         }
 
         if (data.session) {
@@ -248,10 +262,15 @@ function ExamRoom() {
           console.log("Đã khôi phục đáp án cũ:", parsedAnswers);
         }
 
-        const savedViolations = localStorage.getItem(`violations_${userId}_${id}`);
-        if (savedViolations) {
-          setViolationCount(parseInt(savedViolations, 10));
-          console.log("Đã khôi phục số lỗi vi phạm:", savedViolations);
+        if (data.mode === 'EXAM') {
+          const savedViolations = localStorage.getItem(`violations_${userId}_${id}`);
+          if (savedViolations) {
+            setViolationCount(parseInt(savedViolations, 10));
+            console.log("Đã khôi phục số lỗi vi phạm:", savedViolations);
+          }
+        }
+        else {
+          setViolationCount(0);
         }
         setIsLoading(false);
       })
@@ -308,10 +327,8 @@ function ExamRoom() {
 
         if (res.ok) {
           // Nộp thành công mới xóa localStorage
-          localStorage.removeItem(`mod2Start_${userId}_${id}`);
           localStorage.removeItem(`answers_${userId}_${id}`);
           localStorage.removeItem(`violations_${userId}_${id}`);
-          localStorage.removeItem(`mod1TimeUsed_${userId}_${id}`);
           setApiResult(data);
           setIsSubmitted(true);
         } else {
@@ -353,34 +370,27 @@ function ExamRoom() {
     };
   }, [isTimerRunning, endTime, phase, finishTest]);
 
+  useEffect(() => {
+    if (violationCount > 3 && !isSubmitted) {
+      finishTest();
+    }
+  }, [violationCount, isSubmitted, finishTest]);
+
   // --- LOGIC ANTICHEAT ---
   useEffect(() => {    
-    if (!isTimerRunning || isSubmitted) return;
+    if (!isTimerRunning || isSubmitted || testMode !== 'EXAM') return;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setViolationCount(prev => {
-          const newCount = prev + 1;
-          if (newCount > 3) finishTest();
-          else toast(`⚠️ CẢNH BÁO (${newCount}/3): Đừng rời khỏi màn hình!`);
-          return newCount;
-        });
+        setViolationCount(prev => prev + 1);
+        toast(`⚠️ CẢNH BÁO: Đừng rời khỏi màn hình!`);
       }
     };
 
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && isTimerRunning) {
-        setViolationCount(prev => {
-          const newCount = prev + 1;
-          if (newCount > 3) {
-            finishTest();
-            return newCount;
-          } else {
-            toast(`⚠️ CẢNH BÁO (${newCount}/3): Quay lại fullscreen ngay!`);
-            enterFullscreen(); 
-            return newCount;
-          }
-        });
+        setViolationCount(prev => prev + 1);
+        setIsFullscreenBlocked(true);
       }
     };
 
@@ -424,7 +434,7 @@ function ExamRoom() {
       document.removeEventListener('paste', handleCopyCutPaste);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isTimerRunning, finishTest, isSubmitted]);
+  }, [isTimerRunning, isSubmitted, testMode]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -446,7 +456,9 @@ function ExamRoom() {
   };
 
   const handleStartTest = () => {
-    enterFullscreen();
+    if (testMode === 'EXAM') {
+      enterFullscreen();
+    }
     setShowStartModal(false);
     setIsTimerRunning(true);
   };
@@ -482,6 +494,7 @@ function ExamRoom() {
     // BẬT MÀN HÌNH LOADING NGAY LẬP TỨC
     setIsTransitioning(true);
     const mod1UsedSecond = Math.max(0, examConfig.mod1Duration * 60 - timeLeft);
+    console.log("mod 1", mod1UsedSecond);
     const now  = Date.now();
     const userId = localStorage.getItem('userId');
     localStorage.setItem(`mod1TimeUsed_${userId}_${id}`, mod1UsedSecond.toString());
@@ -560,6 +573,17 @@ function ExamRoom() {
     });
   };
 
+  const handleReturnToFullscreen = async () => {
+    try {
+      await document.documentElement.requestFullscreen();
+      // Nếu thành công thì tắt màn hình chặn đi
+      setIsFullscreenBlocked(false);
+    } catch (err) {
+      console.error("Lỗi fullscreen:", err);
+      toast.error("Vui lòng cho phép Fullscreen để tiếp tục làm bài!");
+    }
+  };
+
   // --- RENDER LOADING ---
   if (isLoading) {
     return (
@@ -590,6 +614,7 @@ function ExamRoom() {
     const userId = localStorage.getItem('userId');
     const savedMod1TimeUsed = localStorage.getItem(`mod1TimeUsed_${userId}_${id}`);
     const mod1TimeUsed = parseInt(savedMod1TimeUsed || "0", 10);
+    console.log("Tong thoi gian lam bai mod 1", mod1TimeUsed);
     const savedMod2Start = localStorage.getItem(`mod2Start_${userId}_${id}`);
     let mod2TimeUsed = 0
     if (savedMod2Start) {
@@ -609,6 +634,8 @@ function ExamRoom() {
       <ScoreReport 
         initialData={reportData}
         onBackToHome={() => {
+          localStorage.removeItem(`mod2Start_${userId}_${id}`);
+          localStorage.removeItem(`mod1TimeUsed_${userId}_${id}`);
           localStorage.removeItem('current_exam_info');
           window.location.href = '/dashboard';
         }}
@@ -975,6 +1002,67 @@ function ExamRoom() {
           </div>
         </div>
       )}  
+
+      {/* --- MODAL CHẶN MÀN HÌNH KHI THOÁT FULLSCREEN --- */}
+     {isFullscreenBlocked && (
+      <div className="fixed inset-0 z-50 bg-white/80 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        
+        {/* Card chính - Màu trắng, bo góc mềm mại */}
+        <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center relative overflow-hidden">
+          
+          {/* Decorative Background Blob - tạo cảm giác chiều sâu nhẹ */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-rose-500"></div>
+
+          {/* Icon */}
+          <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-6 text-orange-600">
+            <AlertTriangle size={32} />
+          </div>
+
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
+            Gián đoạn chế độ toàn màn hình
+          </h2>
+          
+          <p className="text-gray-600 mb-6 leading-relaxed">
+            Hệ thống phát hiện bạn đã rời khỏi màn hình thi. 
+            Vui lòng quay lại ngay để tránh bị ghi nhận vi phạm.
+          </p>
+
+          {/* Hiển thị số lần vi phạm dạng Visual */}
+          <div className="bg-gray-50 rounded-xl p-4 mb-8 border border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+              Số lần cảnh báo ({violationCount}/3)
+            </p>
+            <div className="flex justify-center gap-3">
+              {[1, 2, 3].map((index) => (
+                <div 
+                  key={index}
+                  className={`h-3 w-3 rounded-full transition-all duration-300 ${
+                    index <= violationCount 
+                      ? 'bg-rose-500 scale-110 shadow-sm' // Đã vi phạm
+                      : 'bg-gray-200' // Chưa vi phạm
+                  }`}
+                />
+              ))}
+            </div>
+            {violationCount >= 2 && (
+              <p className="text-xs text-rose-500 mt-2 font-medium italic">
+                Cảnh báo: Bài thi sẽ tự động nộp nếu vi phạm lần 3.
+              </p>
+            )}
+          </div>
+
+          {/* Button Action */}
+          <button 
+            onClick={handleReturnToFullscreen}
+            className="w-full bg-gray-900 text-white font-bold py-3.5 px-6 rounded-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-gray-200"
+          >
+            <Maximize size={18} />
+            Quay lại làm bài
+          </button>
+
+        </div>
+      </div>
+    )}
       </div>
   );
 }

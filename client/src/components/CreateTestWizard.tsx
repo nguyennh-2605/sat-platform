@@ -1,9 +1,14 @@
-import { useState, memo, useRef, useCallback } from 'react';
-import { Play, Save, ArrowLeft, X, FileText, ImageIcon, Loader2 } from 'lucide-react';
+import { useState, memo, useRef, useCallback, useEffect } from 'react';
+import { Play, Save, ArrowLeft, X, FileText, ImageIcon, Loader2,
+  BookOpen, Clock, Layers, ShieldCheck, ShieldAlert, ArrowRight, FileType, AlignLeft,
+  AlertCircle,
+  Users
+ } from 'lucide-react';
 import { parseSATInput, type SATQuestion } from '../utlis/satParser';
 import { createPortal } from "react-dom";
 import InputGuideModal from './InputGuideModal';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 interface Section {
   name: string;      // Vd: "Reading and Writing - Module 1"
@@ -15,9 +20,13 @@ interface Section {
 interface FinalTestStructure {
   title: string;
   description: string;
-  type: string;
+  subject: string;
   duration: number; // Tổng thời gian (vd: 64)
+  mode: string;
   sections: Section[];
+  assignClassId?: string;
+  category: string;
+  testDate?: string;
 }
 
 interface FormattedTextRendererProps {
@@ -31,7 +40,12 @@ interface PreviewSectionProps {
   isSubmitting: boolean;
 }
 
-const CreateTestWizard = ({ onClose }: any) => {
+interface ClassOption {
+  id: string; // Hoặc string, tùy vào database bạn dùng Int hay UUID
+  name: string;
+}
+
+const CreateTestWizard = ({ onClose, userRole }: any) => {
   // --- STATE QUẢN LÝ ---
   const [step, setStep] = useState(1); // 1: Info, 2: Content
   
@@ -39,20 +53,55 @@ const CreateTestWizard = ({ onClose }: any) => {
   const [testInfo, setTestInfo] = useState({
     title: '',
     description: '',
-    type: 'RW', // RW (Reading Writing) hoặc MATH
+    subject: 'RW', // RW (Reading Writing) hoặc MATH
     moduleCount: 2, // 1 hoặc 2
     duration: 64, // Phút
+    mode: 'PRACTICE',
+    assignClassId: '',
+    category: 'PRACTICE',
+    testDate: ''
   });
 
   // Dữ liệu Bước 2: Nội dung raw và json parsed
   const [rawText, setRawText] = useState('');
   const [parsedQuestions, setParsedQuestions] = useState<SATQuestion[]>([]);
   const [showGuide, setShowGuide] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [myClasses, setMyClasses] = useState<ClassOption[]>([]);
 
-  const [isUploading, setIsUploading] = useState(false); // Trạng thái đang upload
+  const [isLoading, setIsLoading] = useState(false); // Trạng thái đang loading
   const fileInputRef = useRef<HTMLInputElement>(null);   // Để kích hoạt input file
   const textareaRef = useRef<HTMLTextAreaElement>(null); // Để thao tác con trỏ trong textarea
+
+  useEffect(() => {
+    if (userRole !== 'TEACHER') return;
+    const fetchClasses = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        // Gọi endpoint mà chúng ta đã làm ở bài trước  
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/tests/classes`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setMyClasses(res.data);
+      } catch (error) {
+        console.error("Lỗi tải lớp:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchClasses();
+  }, []);
+
+  useEffect(() => {
+    if (userRole !== 'TEACHER') return;
+    if (myClasses.length > 0 && !testInfo.assignClassId) {
+      setTestInfo(prev => ({
+        ...prev,
+        assignClassId: myClasses[0].id
+      }));
+    }
+  }, [myClasses]);
+
 
   // --- XỬ LÝ BƯỚC 1 ---
   const handleInfoSubmit = (e: any) => {
@@ -79,7 +128,7 @@ const CreateTestWizard = ({ onClose }: any) => {
   // --- BƯỚC CUỐI: GỬI API ---
   const handleCreateTest = useCallback(async () => {
     // 1. Nhóm các câu hỏi theo Module (1, 2, ...)
-    setIsSubmitting(true);
+    setIsLoading(true);
     const modulesMap = new Map<number, any[]>();
 
     parsedQuestions.forEach((q) => {
@@ -105,24 +154,40 @@ const CreateTestWizard = ({ onClose }: any) => {
       }))
     }));
 
+    let finalCategory = 'PRACTICE';
+    if (userRole === 'ADMIN') {
+      finalCategory = testInfo.category;
+    } else {
+      finalCategory = 'CLASS';
+    }
+
+    console.log("CLass Id", testInfo.assignClassId);
+
     // 3. Tạo Object cuối cùng
     const finalPayload: FinalTestStructure = {
       title: testInfo.title,
       description: testInfo.description || "Reading and Writing - Full Test",
       duration: parseInt(testInfo.duration.toString()),
-      type: testInfo.type,
-      sections: sections
+      mode: testInfo.mode,
+      subject: testInfo.subject,
+      sections: sections,
+      assignClassId: testInfo.assignClassId === '' ? undefined : testInfo.assignClassId,
+      category: finalCategory,
+      testDate: testInfo.testDate == '' ? undefined : testInfo.testDate
     };
 
     // --- LOG RA KẾT QUẢ HOẶC GỌI API TẠI ĐÂY ---
     console.log("JSON chuẩn DB:", JSON.stringify(finalPayload, null, 2));
-    console.log("Kiểm tra mảng trước khi gửi:", Array.isArray(finalPayload.sections[0].questions[0].choices));
 
     // --- GỌI API ---
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tests/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify(finalPayload),
       });
 
@@ -130,10 +195,10 @@ const CreateTestWizard = ({ onClose }: any) => {
         window.location.reload();
       } else {
         toast.error("❌ Lỗi khi lưu vào Database");
-        setIsSubmitting(false);
+        setIsLoading(false);
       }
     } catch (error) {
-      setIsSubmitting(false);
+      setIsLoading(false);
       console.error(error);
     }
   }, [parsedQuestions]);
@@ -192,7 +257,7 @@ const CreateTestWizard = ({ onClose }: any) => {
       return;
     }
 
-    setIsUploading(true);
+    setIsLoading(true);
     const formData = new FormData();
     formData.append('file', file);
     
@@ -203,7 +268,7 @@ const CreateTestWizard = ({ onClose }: any) => {
 
     if (!cloudName || !uploadPreset) {
         toast.error("Thiếu cấu hình Cloudinary trong .env");
-        setIsUploading(false);
+        setIsLoading(false);
         return;
     }
 
@@ -232,7 +297,7 @@ const CreateTestWizard = ({ onClose }: any) => {
       console.error(err);
       toast.error("Có lỗi xảy ra khi upload");
     } finally {
-      setIsUploading(false);
+      setIsLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
     }
   };
@@ -454,76 +519,293 @@ const CreateTestWizard = ({ onClose }: any) => {
       </div>
 
         {/* BODY MODAL */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-gray-50/30">
           
           {/* === GIAO DIỆN BƯỚC 1: FORM NHẬP INFO === */}
           {step === 1 && (
-            <div className="p-8 max-w-2xl mx-auto">
-              <form onSubmit={handleInfoSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Tên bài kiểm tra</label>
-                  <input 
-                    type="text" 
-                    className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="VD: SAT Practice Test #1"
-                    value={testInfo.title}
-                    onChange={e => setTestInfo({...testInfo, title: e.target.value})}
-                  />
+            <div className="p-6 max-w-3xl mx-auto">
+              <form onSubmit={handleInfoSubmit} className="space-y-8">
+                {/* === PHẦN 1: THÔNG TIN CƠ BẢN === */}
+                <div className="space-y-4">
+                  <div className="grid gap-5">
+                    {/* Tên bài thi */}
+                    <div className="relative group">
+                      <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
+                        <BookOpen size={16} className="text-indigo-600"/> Tên bài kiểm tra
+                      </label>
+                      <input 
+                        type="text" 
+                        className="w-full border-gray-300 border bg-gray-50/50 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                        placeholder="Ví dụ: SAT Practice Test #1"
+                        value={testInfo.title}
+                        onChange={e => setTestInfo({...testInfo, title: e.target.value})}
+                      />
+                    </div>
+
+                    {/* Mô tả (Dùng Textarea thay vì Input) */}
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
+                        <AlignLeft size={16} className="text-indigo-600"/> Mô tả ngắn
+                      </label>
+                      <textarea
+                        rows={2}
+                        className="w-full border-gray-300 border bg-gray-50/50 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm resize-none"
+                        value={testInfo.description}
+                        onChange={(e) => setTestInfo({ ...testInfo, description: e.target.value })}
+                        placeholder="Ví dụ: Bài thi thử kỹ năng Reading & Writing..."
+                      />
+                    </div>
+                  </div>
                 </div>
 
+                {/* === PHẦN 2: CẤU HÌNH BÀI THI (Grid 3 cột) === */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Mô tả</label>
-                  <input
-                    type="text"
-                    className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                    value={testInfo.description}
-                    onChange={(e) => setTestInfo({ ...testInfo, description: e.target.value })}
-                    placeholder="VD: Reading and Writing - Full Test"
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* Môn thi */}
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
+                        <FileType size={16} className="text-indigo-600"/> Môn thi
+                      </label>
+                      <div className="relative">
+                        <select 
+                          className="w-full appearance-none border-gray-300 border bg-white p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer"
+                          value={testInfo.subject}
+                          onChange={e => setTestInfo({...testInfo, subject: e.target.value})}
+                        >
+                          <option value="RW">Reading & Writing</option>
+                          <option value="MATH">Mathematics</option>
+                        </select>
+                        <div className="absolute right-3 top-3.5 pointer-events-none text-gray-500">
+                          <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Thời gian */}
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
+                        <Clock size={16} className="text-indigo-600"/> Thời gian
+                      </label>
+                      <div className="relative">
+                          <input 
+                            type="number" 
+                            className="w-full border-gray-300 border p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm pr-12"
+                            value={testInfo.duration}
+                            onChange={e => setTestInfo({...testInfo, duration: parseInt(e.target.value)})}
+                          />
+                          <span className="absolute right-4 top-3 text-gray-400 text-sm font-medium">phút</span>
+                      </div>
+                    </div>
+
+                    {/* Số lượng Module (Dạng Toggle) */}
+                    <div>
+                      <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
+                        <Layers size={16} className="text-indigo-600"/> Modules
+                      </label>
+                      <div className="flex bg-gray-100 p-1 rounded-xl">
+                        {[1, 2].map((num) => (
+                          <button
+                              key={num}
+                              type="button"
+                              onClick={() => setTestInfo({...testInfo, moduleCount: num})}
+                              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                                testInfo.moduleCount === num 
+                                ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' 
+                                : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                          >
+                              {num} Mod
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Môn thi</label>
-                    <select 
-                      className="w-full border p-3 rounded-lg"
-                      value={testInfo.type}
-                      onChange={e => setTestInfo({...testInfo, type: e.target.value})}
+                {/* DÒNG MỚI: CHỌN LỚP HỌC (Full Width) */}
+                {userRole === 'ADMIN' ? (
+                // --- GIAO DIỆN CHO ADMIN ---
+                  <div className="p-5 bg-blue-50 border border-blue-200 rounded-xl space-y-4">
+                    
+                    {/* 1. Chọn loại đề thi */}
+                    <div>
+                      <label className="text-sm font-bold text-blue-900 mb-2 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Loại đề thi (Category)
+                      </label>
+                      
+                      <div className="flex items-center gap-4">
+                        {/* Option: PRACTICE */}
+                        <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-blue-100 shadow-sm hover:border-blue-300 transition-all">
+                          <input 
+                            type="radio" 
+                            name="category" 
+                            value="PRACTICE"
+                            className="text-blue-600 focus:ring-blue-500"
+                            checked={testInfo.category !== 'REAL'} // Mặc định hoặc chọn Practice
+                            onChange={() => setTestInfo({ ...testInfo, category: 'PRACTICE', testDate: '' })} 
+                          />
+                          <span className="text-sm font-medium text-gray-700">Luyện tập (Practice)</span>
+                        </label>
+
+                        {/* Option: REAL TEST */}
+                        <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-blue-100 shadow-sm hover:border-blue-300 transition-all">
+                          <input 
+                            type="radio" 
+                            name="category" 
+                            value="REAL"
+                            className="text-blue-600 focus:ring-blue-500"
+                            checked={testInfo.category === 'REAL'}
+                            onChange={() => setTestInfo({ ...testInfo, category: 'REAL' })} 
+                          />
+                          <span className="text-sm font-medium text-gray-700">Đề thi thật (Real Test)</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* 2. Chọn ngày thi (Chỉ hiện khi chọn REAL) */}
+                    {testInfo.category === 'REAL' && (
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label className="text-sm font-bold text-blue-900 mb-1.5 flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                          Ngày thi (Test Date)
+                        </label>
+                        <input
+                          type="date"
+                          className="w-full border-gray-300 border bg-white p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none shadow-sm text-sm"
+                          value={testInfo.testDate || ''}
+                          onChange={(e) => setTestInfo({ ...testInfo, testDate: e.target.value })}
+                        />
+                        <p className="text-xs text-blue-600 mt-1 italic">* Ngày này sẽ hiển thị để học sinh biết đợt thi.</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                 <div className="mt-5">
+                  {isLoading ? (
+                    <div className="text-sm text-gray-500 italic">Đang tải danh sách lớp...</div>
+                  ) : myClasses.length > 0 ? (
+                    // TRƯỜNG HỢP 1: CÓ LỚP -> HIỆN DROPDOWN
+                    <div className="mt-5">
+                      <>
+                        <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
+                          <Users size={16} className="text-indigo-600"/> Giao cho lớp (Tùy chọn)
+                        </label>
+                        
+                        {/* Logic Dropdown chọn lớp của Teacher */}
+                        <div className="relative">
+                          <select 
+                            className="w-full appearance-none border-gray-300 border bg-white p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer"
+                            value={testInfo.assignClassId}
+                            onChange={e => setTestInfo({...testInfo, assignClassId: e.target.value})}
+                          >
+                            {myClasses.map((cls) => (
+                              <option key={cls.id} value={cls.id}>
+                                {cls.name}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="absolute right-3 top-3.5 pointer-events-none text-gray-500">
+                            <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                          </div>
+                        </div>
+                      </>
+                    </div>
+                  ) : (
+                    // TRƯỜNG HỢP 2: KHÔNG CÓ LỚP -> CẢNH BÁO & YÊU CẦU TẠO
+                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 p-4 rounded-xl text-amber-800">
+                      <AlertCircle size={24} className="text-amber-600 shrink-0" />
+                      <div className="flex-1 text-sm">
+                        <span className="font-bold">Bạn chưa quản lý lớp nào.</span>
+                        <br/>
+                        Để giao bài tập này cho học sinh, bạn cần tạo lớp trước.
+                      </div>
+                    </div>
+                  )}
+                </div>
+                )}
+
+                {/* === PHẦN 3: CHẾ ĐỘ THI (Highlight) === */}
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-indigo-600"/> Chọn chế độ thi
+                  </label>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Option: PRACTICE */}
+                    <div 
+                      onClick={() => setTestInfo({...testInfo, mode: 'PRACTICE'})}
+                      className={`cursor-pointer relative overflow-hidden border-2 rounded-2xl p-4 transition-all duration-200 flex flex-col gap-2
+                      ${testInfo.mode === 'PRACTICE' 
+                        ? 'border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500 shadow-md' 
+                        : 'border-gray-200 hover:border-emerald-200 hover:bg-gray-50'}`}
                     >
-                      <option value="RW">Reading & Writing</option>
-                      <option value="MATH">Math</option>
-                    </select>
-                  </div>
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          <div className={`p-2 rounded-lg ${testInfo.mode === 'PRACTICE' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                            <BookOpen size={20} />
+                          </div>
+                          <span className={`font-bold text-lg ${testInfo.mode === 'PRACTICE' ? 'text-emerald-800' : 'text-gray-700'}`}>
+                            Luyện tập
+                          </span>
+                        </div>
+                        {testInfo.mode === 'PRACTICE' && <div className="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white ring-2 ring-emerald-200"></div>}
+                      </div>
+                      <p className="text-sm text-gray-500 pl-[3.25rem]">
+                        Thoải mái ôn tập. Cho phép rời màn hình, copy/paste và xem đáp án ngay.
+                      </p>
+                    </div>
 
-                  <div>
-                     <label className="block text-sm font-bold text-gray-700 mb-2">Thời gian (phút)</label>
-                     <input 
-                        type="number" 
-                        className="w-full border p-3 rounded-lg"
-                        value={testInfo.duration}
-                        onChange={e => setTestInfo({...testInfo, duration: parseInt(e.target.value)})}
-                     />
+                    {/* Option: EXAM */}
+                    <div 
+                      onClick={() => setTestInfo({...testInfo, mode: 'EXAM'})}
+                      className={`cursor-pointer relative overflow-hidden border-2 rounded-2xl p-4 transition-all duration-200 flex flex-col gap-2
+                      ${testInfo.mode === 'EXAM' 
+                        ? 'border-rose-500 bg-rose-50/50 ring-1 ring-rose-500 shadow-md' 
+                        : 'border-gray-200 hover:border-rose-200 hover:bg-gray-50'}`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          <div className={`p-2 rounded-lg ${testInfo.mode === 'EXAM' ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-500'}`}>
+                            <ShieldAlert size={20} />
+                          </div>
+                          <span className={`font-bold text-lg ${testInfo.mode === 'EXAM' ? 'text-rose-800' : 'text-gray-700'}`}>
+                            Kiểm tra
+                          </span>
+                        </div>
+                        {testInfo.mode === 'EXAM' && <div className="w-4 h-4 bg-rose-500 rounded-full border-2 border-white ring-2 ring-rose-200"></div>}
+                      </div>
+                      <p className="text-sm text-gray-500 pl-[3.25rem]">
+                        Chống gian lận (Anti-Cheat). Chặn chuột phải, bắt buộc Fullscreen, cảnh báo rời tab.
+                      </p>
+                    </div>
+
                   </div>
                 </div>
 
-                <div>
-                   <label className="block text-sm font-bold text-gray-700 mb-2">Số lượng Module</label>
-                   <div className="flex gap-4">
-                      <label className={`flex-1 border p-4 rounded-lg cursor-pointer flex items-center gap-3 transition ${testInfo.moduleCount === 1 ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600' : 'hover:bg-gray-50'}`}>
-                         <input type="radio" name="mod" checked={testInfo.moduleCount === 1} onChange={() => setTestInfo({...testInfo, moduleCount: 1})} />
-                         <span className="font-medium">1 Module (Mini Test)</span>
-                      </label>
-                      <label className={`flex-1 border p-4 rounded-lg cursor-pointer flex items-center gap-3 transition ${testInfo.moduleCount === 2 ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600' : 'hover:bg-gray-50'}`}>
-                         <input type="radio" name="mod" checked={testInfo.moduleCount === 2} onChange={() => setTestInfo({...testInfo, moduleCount: 2})} />
-                         <span className="font-medium">2 Modules (Full Test)</span>
-                      </label>
-                   </div>
-                </div>
-
-                <div className="pt-4 text-right">
-                   <button type="submit" className="bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition">
-                      Tiếp tục &rarr;
-                   </button>
+                {/* FOOTER BUTTON */}
+                <div className="pt-2 flex justify-end border-t border-gray-100 mt-8">
+                  <button 
+                    disabled={userRole !== 'ADMIN' && myClasses.length === 0}
+    
+                    type="submit" 
+                    className="
+                      group flex items-center gap-2 px-8 py-3.5 rounded-xl font-bold transition-all duration-200
+                      
+                      text-white
+                      bg-indigo-600 
+                      hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5
+                      
+                      disabled:bg-gray-400 
+                      disabled:cursor-not-allowed 
+                      disabled:shadow-none 
+                      disabled:transform-none
+                    "
+                  >
+                    Tiếp tục
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform"/>
+                  </button>
                 </div>
               </form>
             </div>
@@ -550,15 +832,15 @@ const CreateTestWizard = ({ onClose }: any) => {
                     {/* Nút Upload Ảnh */}
                     <button 
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
+                      disabled={isLoading}
                       className={`p-2 rounded-md transition-all flex items-center gap-2 text-sm font-medium
-                        ${isUploading 
+                        ${isLoading 
                           ? 'bg-gray-100 text-gray-400 cursor-wait' 
                           : 'text-gray-600 hover:text-indigo-600 hover:bg-white hover:shadow-sm active:scale-95'
                         }`}
                       title="Tải ảnh lên (Max 5MB)"
                     >
-                      {isUploading ? (
+                      {isLoading ? (
                         <Loader2 size={18} className="animate-spin" />
                       ) : (
                         <ImageIcon size={18} />
@@ -605,14 +887,14 @@ const CreateTestWizard = ({ onClose }: any) => {
             <PreviewSection
               questions={parsedQuestions}
               onSave={handleCreateTest}
-              isSubmitting={isSubmitting}
+              isSubmitting={isLoading}
             />
             </div>
           )}
         </div>
       </div>
       <InputGuideModal isOpen={showGuide} onClose={() => setShowGuide(false)} />
-      {isSubmitting && (
+      {isLoading && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
           {/* Icon Spinner xoay xoay */}
           <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>

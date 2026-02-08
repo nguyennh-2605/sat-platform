@@ -301,22 +301,18 @@ const ResultAnalytics = () => {
 
                         {/* 5. Action (Căn giữa - Không dính phải nữa) */}
                         <td className="px-4 py-4 text-center">
-                          {item.status === 'COMPLETED' ? (
                             <div className="flex justify-center gap-2"> {/* Flex center để nút nằm giữa ô */}
                                 <button 
+                                  disabled={item.status != 'COMPLETED'}
                                   onClick={() => navigate('/score-report', { state: { resultId: item.id } })}
-                                  className="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap"
+                                  className= {item.status === 'COMPLETED' ? "text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap"
+                                                                          : "text-gray-400 bg-gray-100 px-3 py-1.5 rounded text-xs font-medium"
+                                  }
                                 >
                                   View Details
                                 </button>
                             </div>
-                          ) : (
-                            <button className="text-gray-400 bg-gray-100 px-3 py-1.5 rounded text-xs font-medium cursor-not-allowed">
-                              Continue
-                            </button>
-                          )}
                         </td>
-
                       </tr>
                     ))
                   ) : (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 function HomePage() {
@@ -28,7 +29,7 @@ function HomePage() {
   const handleLogout = () => {
     localStorage.removeItem('isLoggedIn');
     setIsLoggedIn(false);
-    alert("Đã đăng xuất!");
+    toast("Đã đăng xuất!");
   };
 
   return (

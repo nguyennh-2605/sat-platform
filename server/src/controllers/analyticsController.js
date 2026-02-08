@@ -22,7 +22,7 @@ exports.getData = async (req, res) => {
       },
       orderBy: { startedAt: 'asc' }, // Sắp xếp cũ -> mới để vẽ biểu đồ cho thuận
       include: { 
-        test: { select: { title: true } },
+        test: { select: { id: true, title: true } },
         answers: { select: { isCorrect: true } } 
       }
     });
@@ -34,6 +34,7 @@ exports.getData = async (req, res) => {
       
       return {
         id: r.id,
+        testId: r.test?.id,
         date: r.startedAt, 
         testName: r.test?.title || "Practice Test",
         status: r.status,
@@ -53,21 +54,29 @@ exports.getData = async (req, res) => {
         testName: item.testName
       }));
 
-    // 5. DATA CHO HISTORY TABLE (Đảo ngược: Mới -> Cũ)
-    const historyData = [...processedData].reverse().map(item => ({
-      id: item.id,
-      createdAt: item.date, // Frontend đang map theo key 'createdAt'
-      status: item.status,  // Để nguyên status gốc, Frontend tự map màu sắc
-      test: { title: item.testName },
-      correctCount: item.correctCount, // Cần thêm cái này
-      totalQuestions: item.totalQuestions, 
-      accuracy: item.accuracy
-    }));
+    const latestSubmissionMap = new Map()
+
+    processedData.forEach(item => {
+      const key = item.testId || item.testName;
+      latestSubmissionMap.set(key, item);
+    });
+
+    const historyData = Array.from(latestSubmissionMap.values())
+      .reverse()
+      .map(item => ({
+        id: item.id,
+        createdAt: item.date, // Frontend đang map theo key 'createdAt'
+        status: item.status,  // Để nguyên status gốc, Frontend tự map màu sắc
+        test: { title: item.testName },
+        correctCount: item.correctCount, // Cần thêm cái này
+        totalQuestions: item.totalQuestions, 
+        accuracy: item.accuracy
+      }))
 
     res.json({ chartData, historyData });
 
   } catch (error) {
-    console.error("🔥 Lỗi Analytics:", error);
+    console.error("Lỗi Analytics:", error);
     res.status(500).json({ message: "Lỗi server khi lấy thống kê" });
   }
 };
@@ -156,7 +165,7 @@ exports.getSubmissionDetail = async (req, res) => {
     res.json(responseData);
 
   } catch (error) {
-    console.error("🔥 Lỗi lấy chi tiết bài thi:", error);
+    console.error("Lỗi lấy chi tiết bài thi:", error);
     res.status(500).json({ message: "Lỗi server khi tải chi tiết bài thi." });
   }
 };
