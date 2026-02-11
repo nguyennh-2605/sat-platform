@@ -82,7 +82,6 @@ exports.getTests = async (req, res) => {
       : { category: 'REAL', isPublic: true }; // Nếu không có user, chỉ trả về đề Public
 
     // 3. Query Database (Tối ưu hóa query select)
-    console.log('getTests - userId:', userId, 'hasUser:', hasUser, 'whereCondition:', JSON.stringify(whereCondition));
     const tests = await prisma.test.findMany({
       where: whereCondition,
       orderBy: { id: 'desc' },

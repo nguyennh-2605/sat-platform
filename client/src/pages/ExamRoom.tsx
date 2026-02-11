@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import QuestionHeader from '../components/QuestionHeader';
 import AnswerOption from '../components/AnswerOption';
@@ -12,6 +12,8 @@ import type { QuestionResult } from '../ScoreReport';
 import ScoreReport from '../ScoreReport';
 import toast from 'react-hot-toast';
 import { AlertTriangle, Maximize } from 'lucide-react';
+import axios from 'axios';
+import ReviewScreen from '../components/ReviewModule';
 
 function ExamRoom() {
   const { id } = useParams();
@@ -47,7 +49,7 @@ function ExamRoom() {
   const [endTime, setEndTime] = useState<number | null>(null);
 
   // 1. State quản lý giai đoạn hiện tại
-  type ExamPhase = 'MODULE_1' | 'REVIEW_1' | 'MODULE_2';
+  type ExamPhase = 'MODULE_1' | 'REVIEW_1' | 'MODULE_2' | 'REVIEW_2';
   const [phase, setPhase] = useState<ExamPhase>('MODULE_1');
 
   // state để quyết định khi nào hiện cửa sổ xác nhận
@@ -85,6 +87,18 @@ function ExamRoom() {
   // State để hiển thị màn hình chặn khi thoát fullscreen
   const [isFullscreenBlocked, setIsFullscreenBlocked] = useState(false);
 
+  const [isBackAnimating, setIsBackAnimating] = useState(false);
+  const [isNextAnimating, setIsNextAnimating] = useState(false);
+
+  const [isTimeVisible, setIsTimeVisible] = useState(true); // State quan li hien thoi gian
+
+  // --- STATE QUẢN LÝ RESIZE ---
+  const [leftWidth, setLeftWidth] = useState(50); // Mặc định 50%
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+
+  const hasFetched = useRef(false);
+
   // Dữ liệu Backend trả về sau khi nộp bài
   interface BackendResult {
     score: number;
@@ -110,39 +124,37 @@ function ExamRoom() {
       return;
     }
 
-    const savedData = localStorage.getItem('current_exam_info');
-    if (savedData) {
-      const parsedData = JSON.parse(savedData);
-      if (parsedData.id.toString() === id) {
-        setTestInfo({
-          title: parsedData.title,
-          description: parsedData.description,
-          duration: parsedData.duration
-        });
-      }
-      else {
-        console.log("ID không khớp!");
-        // Nếu user bấm test này nhưng mà đổi url sang test khác thì sẽ gọi API?
-      }
+    if (hasFetched.current) {
+      return;
     }
+    hasFetched.current = true;
 
-    // Gửi kèm thêm cả userId để tìm bài làm dở
-    fetch(`${import.meta.env.VITE_API_URL}/api/test/${id}?userId=${userId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.sections) {
+    const getAuthHeader = () => {
+      const token = localStorage.getItem('token');
+      return { headers: { Authorization: `Bearer ${token}` } };
+    };
+
+    const fetchExamData = async () => {
+      try {
+        setIsLoading(true);
+
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/test/${id}?userId=${userId}`, getAuthHeader());
+
+        if (!response) throw new Error("Không có dữ liệu");
+
+        const data = response.data;
+
+        if (data.sections) {
           let allQuestions: QuestionData[] = [];
-          
-          // Làm phẳng dữ liệu
           data.sections.forEach((section: any) => {
             if (section.questions) {
               const qs = section.questions.map((q: any) => {
                 let formattedChoices = [];
                 if (Array.isArray(q.choices)) {
-                    formattedChoices = q.choices.map((c: any) => ({
-                      id: c.id,
-                      text: c.text
-                    }));
+                  formattedChoices = q.choices.map((c: any) => ({
+                    id: c.id,
+                    text: c.text
+                  }));
                 }
                 return {
                   id: q.id,
@@ -155,129 +167,129 @@ function ExamRoom() {
               allQuestions = [...allQuestions, ...qs];
             }
           });
-
           setQuestions(allQuestions);
-        }
 
-        if (data.mode) {
-          setTestMode(data.mode);
-          if (data.mode === 'PRACTICE') {
-            setShowStartModal(false);
+          setExamConfig({
+            mod1Duration: data.sections[0]?.duration || 0,
+            mod2Duration: data.sections[1]?.duration || 0,
+            totalModules: data.sections.length
+          });
+          
+          if (data.sections.length > 0) {
+            setFirstModuleLength(data.sections[0].questions.length);
           }
         }
 
-        if (data.session) {
-          const currentSubmissionId = data.session.submissionId;
-          // Lấy ID của lượt làm bài lần trước đã lưu (nếu có)
-          const savedSubmissionId = localStorage.getItem(`lastSubmissionId_${userId}_${id}`);
-          if (savedSubmissionId && savedSubmissionId !== currentSubmissionId.toString()) {
-            console.log("Phát hiện lượt làm bài mới! Đang dọn dẹp dữ liệu cũ...");
-            // XÓA SẠCH DỮ LIỆU CŨ CỦA BÀI THI NÀY
-            localStorage.removeItem(`mod2Start_${userId}_${id}`);
-            localStorage.removeItem(`answers_${userId}_${id}`);
-            localStorage.removeItem(`violations_${userId}_${id}`);
-            localStorage.removeItem(`mod1TimeUsed_${userId}_${id}`);
-            // Cập nhật lại ID mới để lần sau so sánh
-            localStorage.setItem(`lastSubmissionId_${userId}_${id}`, currentSubmissionId);
-          }
-          else {
-            // Nếu chưa có, lưu lại để dùng cho lần sau
-            if (!savedSubmissionId) {
-                localStorage.setItem(`lastSubmissionId_${userId}_${id}`, currentSubmissionId);
-            }
-          }
-        }
-
-        if (data.sections && data.sections.length > 0) {
-          setFirstModuleLength(data.sections[0].questions.length);
-        }
-
-        let durationMod1 = data.sections[0]?.duration || 0;
-        let durationMod2 = (data.sections.length > 1 ? data.sections[1].duration : 0);
-
-        setExamConfig({
-          mod1Duration: durationMod1,
-          mod2Duration: durationMod2,
-          totalModules: data.sections.length
+        setTestInfo({
+          title: data.title,
+          description: data.description,
+          duration: data.duration
         });
 
-        const savedMod2Start = localStorage.getItem(`mod2Start_${userId}_${id}`);
-        console.log("Thời gian mod 2 bắt đầu", savedMod2Start);
-        let currentPhase = 'MODULE_1'; // Mặc định
-        let mod2StartVal = null;
-
-        if (savedMod2Start && data.sections.length > 1) {
-          currentPhase = 'MODULE_2';
-          mod2StartVal = parseInt(savedMod2Start, 10);
-          setPhase('MODULE_2'); // Cập nhật state phase
-          setCurrentQuestionIndex(data.sections[0].questions.length);
-        }
-        else {
-          setPhase('MODULE_1')
+        const mode = data.mode || 'PRACTICE';
+        setTestMode(mode);
+        if (mode === 'PRACTICE') {
+          setShowStartModal(false); // Vào làm luôn ko cần confirm
         }
 
         if (data.session) {
-          const currentSubmissionId = data.session.submissionId;
-          setSubmissionId(currentSubmissionId);
-          let startMs = 0;
-          let durationMs = 0;
-          if (currentPhase === 'MODULE_2' && mod2StartVal != null) {
-            startMs = mod2StartVal;
-            durationMs = durationMod2 * 60 * 1000;
+          const {
+            submissionId, 
+            startedAt, 
+            timeLeft: dbTimeLeft, 
+            savedAnswers: dbSavedAnswers, 
+            currentQuestionIndex: dbCurrentQuestionIndex,
+            violationCount: dbViolationCount
+          } = data.session;
+
+          setSubmissionId(submissionId);
+
+         let currentPhase = 'MODULE_1';
+          if (data.sections.length > 1 && dbCurrentQuestionIndex >= data.sections[0].questions.length) {
+            currentPhase = 'MODULE_2';
+            setPhase('MODULE_2');
           } else {
-            startMs = new Date(data.session.startedAt).getTime();
-            durationMs = durationMod1 * 60 * 1000;
+            setPhase('MODULE_1');
           }
-          const endMs = startMs + durationMs;
-          setEndTime(endMs);
 
-          const now = Date.now();
-          const remaining = Math.max(0, Math.floor((endMs - now) / 1000));
-          setTimeLeft(remaining);
+          const mod1DurationMinutes = data.sections[0].duration;
+          const totalDurationMinutes = data.duration; 
 
-          if (remaining <= 0) {
-            if (currentPhase === 'MODULE_2') {
-              finishTest(currentSubmissionId);
-            }
-            else {
-              if (data.sections.length < 2) {
-                finishTest(currentSubmissionId);
+          let targetEndTime = 0;
+          let secondsRemaining = 0;
+
+          if (mode === 'PRACTICE') {
+            const totalTimeLeft = dbTimeLeft !== null ? dbTimeLeft : (totalDurationMinutes * 60);
+            targetEndTime = Date.now() + (totalTimeLeft * 1000);
+            secondsRemaining = totalTimeLeft;
+          } else {
+              // Thời gian trôi không ngừng nghỉ
+              const startMs = new Date(startedAt).getTime();
+
+              if (currentPhase === 'MODULE_1') {
+                  // Deadline Mod 1 = Bắt đầu + Duration Mod 1
+                  targetEndTime = startMs + (mod1DurationMinutes * 60 * 1000);
+              } else {
+                  // Deadline Mod 2 = Bắt đầu + Tổng thời gian (Vì Mod 2 nối đuôi Mod 1)
+                  targetEndTime = startMs + (totalDurationMinutes * 60 * 1000);
               }
-              else {
-                startModule2();
-                toast("Hết giờ Module 1, chuyển sang module tiếp theo.");
+              
+              secondsRemaining = Math.max(0, Math.floor((targetEndTime - Date.now()) / 1000));
+          }
+
+          setEndTime(targetEndTime);
+          setTimeLeft(secondsRemaining);
+
+          // Logic chạy timer
+          if (secondsRemaining <= 0) {
+              if (currentPhase === 'MODULE_1') {
+                  // Nếu vừa load trang mà đã thấy hết giờ Mod 1 -> Tự chuyển
+                  startModule2(); 
+              } else {
+                  finishTest(submissionId);
               }
+          } else {
+              setIsTimerRunning(true);
+          }
+
+          setCurrentQuestionIndex(dbCurrentQuestionIndex);
+
+          // Uu tien khoi phuc dap an tu db hon
+          if (dbSavedAnswers && Object.keys(dbSavedAnswers).length > 0) {
+            setAnswers(dbSavedAnswers)
+          } else {
+            // KHÔI PHỤC ĐÁP ÁN TỪ LOCAL STORAGE (Nếu user refresh trang)
+            const localSavedAnswers = localStorage.getItem(`answers_${userId}_${id}`);
+            if (localSavedAnswers) {
+              const parsedAnswers = JSON.parse(localSavedAnswers);
+              setAnswers(parsedAnswers);
             }
           }
-          else {
-            setIsTimerRunning(true);
+          if (data.mode === 'EXAM') {
+            if (dbViolationCount > 0) {
+              setViolationCount(dbViolationCount);
+            } else {
+              const savedViolations = localStorage.getItem(`violations_${userId}_${id}`);
+              if (savedViolations) {
+                setViolationCount(parseInt(savedViolations, 10));
+              } else {
+                setViolationCount(0);
+              }
+            }
+          } else {
+            setViolationCount(0);
           }
         }
-
-        // KHÔI PHỤC ĐÁP ÁN TỪ LOCAL STORAGE (Nếu user refresh trang)
-        const savedAnswers = localStorage.getItem(`answers_${userId}_${id}`);
-        if (savedAnswers) {
-          const parsedAnswers = JSON.parse(savedAnswers);
-          setAnswers(parsedAnswers);
-          console.log("Đã khôi phục đáp án cũ:", parsedAnswers);
-        }
-
-        if (data.mode === 'EXAM') {
-          const savedViolations = localStorage.getItem(`violations_${userId}_${id}`);
-          if (savedViolations) {
-            setViolationCount(parseInt(savedViolations, 10));
-            console.log("Đã khôi phục số lỗi vi phạm:", savedViolations);
-          }
-        }
-        else {
-          setViolationCount(0);
-        }
+      } catch (error) {
+      console.error("Lỗi tải đề:", error);
+      toast.error("Không thể tải bài thi. Vui lòng thử lại.");
+      navigate('/dashboard');
+      } finally {
         setIsLoading(false);
-      })
-      .catch(err => {
-        console.error("Lỗi tải đề:", err);
-        setIsLoading(false);
-      });
+      }
+    };
+
+    fetchExamData();
   }, [id]);
 
   // --- HÀM HỖ TRỢ ---
@@ -312,28 +324,22 @@ function ExamRoom() {
              return;
         }
 
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/test/${id}/submit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              submissionId: idToSubmit, // Gửi cái này để backend biết update bài nào
-              answers,
-              userId: userId,
-              violationCount: violationCount,
-            })
-        });
+        const getAuthHeader = () => {
+          const token = localStorage.getItem('token');
+          return { headers: { Authorization: `Bearer ${token}` } };
+        };
 
-        const data = await res.json();
+        const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/test/${id}/submit`, {
+          submissionId: idToSubmit,
+          answers,
+          violationCount
+        }, getAuthHeader());
 
-        if (res.ok) {
-          // Nộp thành công mới xóa localStorage
-          localStorage.removeItem(`answers_${userId}_${id}`);
-          localStorage.removeItem(`violations_${userId}_${id}`);
-          setApiResult(data);
-          setIsSubmitted(true);
-        } else {
-            toast.error("Lỗi khi nộp bài: " + (data.error || data.message));
-        }
+        localStorage.removeItem(`answers_${userId}_${id}`);
+        localStorage.removeItem(`violations_${userId}_${id}`);
+        setApiResult(response.data);
+        setIsSubmitted(true);
+        toast.success("Nộp bài thành công!");
     } catch (error) {
         console.error("Lỗi mạng:", error);
         toast.error("Không thể kết nối đến server để nộp bài!");
@@ -349,8 +355,7 @@ function ExamRoom() {
     if (isTimerRunning && endTime) {
       timer = setInterval(() => {
         const now = Date.now();
-        // 👇 LOGIC CHUẨN: Lấy (Mốc kết thúc - Giờ hiện tại)
-        const secondsRemaining = Math.floor((endTime - now) / 1000);
+        const secondsRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
         setTimeLeft(secondsRemaining);
 
         if (secondsRemaining <= 0) {
@@ -360,6 +365,7 @@ function ExamRoom() {
           }
           else {
             startModule2();
+            toast("Hết giờ Module 1, chuyển sang Module 2.");
           }
         }
       }, 1000);
@@ -368,7 +374,7 @@ function ExamRoom() {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isTimerRunning, endTime, phase, finishTest]);
+  }, [isTimerRunning, endTime, phase]);
 
   useEffect(() => {
     if (violationCount > 3 && !isSubmitted) {
@@ -450,8 +456,12 @@ function ExamRoom() {
 
   // --- CÁC HÀM SỰ KIỆN ---
   const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    let displaySeconds = seconds;
+    if (testMode === 'PRACTICE' && (phase === 'MODULE_1' || phase === 'REVIEW_1')) {
+      displaySeconds = Math.max(0, seconds - (examConfig.mod2Duration * 60));
+    }
+    const m = Math.floor(displaySeconds / 60);
+    const s = displaySeconds % 60;
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
@@ -493,17 +503,15 @@ function ExamRoom() {
     if (phase !== 'REVIEW_1' && phase !== 'MODULE_1') return;
     // BẬT MÀN HÌNH LOADING NGAY LẬP TỨC
     setIsTransitioning(true);
-    const mod1UsedSecond = Math.max(0, examConfig.mod1Duration * 60 - timeLeft);
-    console.log("mod 1", mod1UsedSecond);
     const now  = Date.now();
+    const mod1UsedSecond = Math.max(0, examConfig.mod1Duration * 60 - timeLeft);
     const userId = localStorage.getItem('userId');
     localStorage.setItem(`mod1TimeUsed_${userId}_${id}`, mod1UsedSecond.toString());
-    localStorage.setItem(`mod2Start_${userId}_${id}`, now.toString());
     // Tính toán lại endTime mới
-    const durationMs = examConfig.mod2Duration * 60 * 1000;
-    const newEndTime = now + durationMs;
+    const mod2Duration = examConfig.mod2Duration * 60;
+    const newEndTime = now + mod2Duration * 1000;
     setEndTime(newEndTime);
-    // Nhảy ngay tới câu đầu tiên của Mod 2 (splitIndex)
+    setTimeLeft(mod2Duration);
     setCurrentQuestionIndex(splitIndex);
     window.scrollTo(0, 0);
     setTimeout(() => {
@@ -573,6 +581,47 @@ function ExamRoom() {
     });
   };
 
+  // Hàm bắt đầu kéo
+  const handleMouseDown = () => {
+    isDragging.current = true;
+    document.body.style.cursor = 'col-resize'; // Đổi con trỏ chuột toàn trang
+    document.body.style.userSelect = 'none';   // Chặn bôi đen văn bản khi đang kéo
+  };
+
+  // Hàm xử lý khi di chuột (được gắn vào document)
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !containerRef.current) return;
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      // Tính % độ rộng mới dựa trên vị trí chuột trong container
+      let newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+
+      // Giới hạn không cho kéo quá nhỏ hoặc quá to (VD: min 20%, max 80%)
+      if (newLeftWidth < 20) newLeftWidth = 20;
+      if (newLeftWidth > 80) newLeftWidth = 80;
+
+      setLeftWidth(newLeftWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false;
+        document.body.style.cursor = '';      // Trả lại con trỏ chuột
+        document.body.style.userSelect = '';  // Trả lại khả năng bôi đen
+      }
+    };
+
+    // Gắn sự kiện vào document để khi kéo chuột ra ngoài khung vẫn nhận
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   const handleReturnToFullscreen = async () => {
     try {
       await document.documentElement.requestFullscreen();
@@ -582,6 +631,66 @@ function ExamRoom() {
       console.error("Lỗi fullscreen:", err);
       toast.error("Vui lòng cho phép Fullscreen để tiếp tục làm bài!");
     }
+  };
+
+  const handleSaveExamData = useCallback(async () => {
+    if (!id) return;
+
+    const userId = localStorage.getItem('userId');
+    const token = localStorage.getItem('token');
+    if (!userId || !token) {
+      toast.error("Vui lòng đăng nhập lại!");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      localStorage.setItem(`answers_${userId}_${id}`, JSON.stringify(answers));
+      if (violationCount > 0) {
+        localStorage.setItem(`violations_${userId}_${id}`, violationCount.toString());
+      }
+      localStorage.setItem(`lastQuestionIndex_${userId}_${id}`, currentQuestionIndex.toString());
+      // URL API save (Thường là POST hoặc PUT)
+      // Dựa trên URL fetch của bạn: `${import.meta.env.VITE_API_URL}/api/test/${id}`
+      const saveUrl = `${import.meta.env.VITE_API_URL}/api/test/${id}/save-progress`; 
+
+      const payload = {
+        submissionId: Number(submissionId), // Lấy từ state (đã set trong useEffect)
+        answers: answers,           // Object đáp án hiện tại
+        timeLeft: timeLeft,         // Thời gian còn lại  
+        violationCount: violationCount,
+        currentQuestionIndex: currentQuestionIndex
+      };
+
+      console.log("payload gui ve backend", payload);
+
+      const getAuthHeader = () => {
+        const token = localStorage.getItem('token');
+        return { headers: { Authorization: `Bearer ${token}` } };
+      };
+
+      await axios.post(saveUrl, payload, getAuthHeader());
+
+      console.log("Đã đồng bộ dữ liệu lên Server thành công");
+      toast.success("Lưu bài làm thành công!");
+      navigate('/dashboard'); // Hoặc trang danh sách bài thi
+
+    } catch (error) {
+      console.error("Lỗi save:", error);
+      navigate('/dashboard');
+    }
+
+  }, [id, answers, violationCount, currentQuestionIndex, submissionId, phase, timeLeft, navigate]);
+
+  const handleQuestionJump = (realIndex: number) => {
+    // Xác định xem câu hỏi đó thuộc Module nào để chuyển phase cho đúng
+    if (realIndex < splitIndex) {
+        setPhase('MODULE_1');
+    } else {
+        setPhase('MODULE_2');
+    }
+    setCurrentQuestionIndex(realIndex);
   };
 
   // --- RENDER LOADING ---
@@ -669,177 +778,325 @@ function ExamRoom() {
       )}
 
       {/* HEADER */}
-      <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shadow-sm z-20 relative">
-        <div className="flex items-center gap-4">
-          <span className="font-bold text-lg text-slate-800">
-            Section 1, {phase === 'MODULE_2' ? "Module 2" : "Module 1"}: {TestInfo.description}
-          </span>
-          {violationCount > 0 && (
-             <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-               ⚠️ {violationCount}/3
-             </span>
-          )}
-        </div>
+      <div className="relative z-20">
+          {/* HEADER CHÍNH */}
+          <header className="bg-blue-50 h-auto py-3 px-6 flex items-center justify-between relative">
+            
+            {/* --- PHẦN TRÁI: Tiêu đề Module --- */}
+            <div className="flex items-center gap-4 w-1/3"> {/* Đặt w-1/3 để cân bằng layout */}
+              <span className="font-bold text-lg text-slate-800 truncate">
+                Section 1, {phase === 'MODULE_2' ? "Module 2" : "Module 1"}: {TestInfo.description}
+              </span>
+            </div>
 
-        <div className="flex items-center gap-6">
-          {/* Nút bật tắt Highlight & Notes */}
-          <ToolsHeader />
-          <div className={`font-mono text-xl font-bold ${timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-slate-700'}`}>
-            {formatTime(timeLeft)}
-          </div>
-          <button 
-            onClick={() => setIsReviewOpen(true)}
-            className="flex items-center gap-2 text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition font-medium"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-            Review 
-          </button>
+            {/* --- PHẦN GIỮA: Đồng hồ (Canh giữa tuyệt đối) --- */}
+           <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center">
+              {isTimeVisible ? (
+                <>
+                  {/* Hiển thị giờ */}
+                  <div className={`font-mono text-xl font-bold mb-1 ${timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-slate-800'}`}>
+                    {formatTime(timeLeft)}
+                  </div>
+                  
+                  {/* Nút Hide: Có viền + Hiệu ứng nảy */}
+                  <button 
+                    onClick={() => setIsTimeVisible(false)}
+                    className="
+                      text-xs font-medium text-slate-700
+                      border border-gray-500 bg-white rounded-full px-3 py-0.5 shadow-sm
+                      active:scale-90 transition-transform duration-100 ease-in-out
+                      hover:ring-1 hover:ring-black
+                    "
+                  >
+                    Hide
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Khi ẩn: Gom Icon và nút Show thành 1 khối click được cho tiện */}
+                  <button 
+                    onClick={() => setIsTimeVisible(true)}
+                    className="
+                      flex flex-col items-center gap-1 group
+                      active:scale-90 transition-transform duration-100 ease-in-out
+                    "
+                    title="Show Timer"
+                  >
+                    {/* Icon Đồng hồ */}
+                    <div className="text-slate-500 group-hover:text-gray-700 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    </div>
+                    
+                    {/* Nút Show: Style giống nút Hide */}
+                    <span className="
+                      text-xs font-medium text-slate-700
+                      border border-gray-500 bg-white rounded-full px-3 py-0.5 shadow-sm
+                      active:scale-90 transition-transform duration-100 ease-in-out
+                      hover:ring-1 hover:ring-black
+                    ">
+                      Show
+                    </span>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* --- PHẦN PHẢI: Công cụ (Tools) --- */}
+            <div className="flex items-center justify-end gap-6 w-1/3">
+              <ToolsHeader 
+                onSaveAction={handleSaveExamData}
+                currentMode={testMode}
+              />
+            </div>
+          </header>
+
+          {/* ĐƯỜNG KẺ NÉT ĐỨT (Gradient Style) */}
+          {/* Nằm ngay dưới header, dùng chung wrapper div */}
+          <div className="w-full h-[2px] bg-[linear-gradient(90deg,#374151_90%,transparent_90%)] bg-[length:25px_2px]"></div>
         </div>
-      </header>
       
       {/* === TRƯỜNG HỢP 1: GIAO DIỆN REVIEW (FULL SCREEN) === */}
       
-      {phase === 'REVIEW_1' ? (
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-8">
-          <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-center mb-2">Review Module 1</h2>
-              <p className="text-center text-gray-500 mb-8">
-                Hãy kiểm tra kỹ các câu hỏi bên dưới. <br/>
-                <span className="text-red-500 font-bold">Lưu ý:</span> Khi bấm "Bắt đầu Module 2", bạn sẽ không thể quay lại sửa bài phần này.
-              </p>
-
-              <div className="grid grid-cols-5 md:grid-cols-8 gap-4 mb-10">
-                {questions.slice(0, splitIndex).map((q, idx) => {
-                  const isAnswered = answers[q.id] !== undefined;
-                  const isMarked = markedQuestions.includes(q.id);
-                  return (
-                    <div key={q.id} className={`p-3 rounded-lg border text-center relative ${
-                      isMarked ? 'bg-yellow-100 border-yellow-500' : 
-                      isAnswered ? 'bg-blue-50 border-blue-500' : 'bg-gray-50 border-gray-300'
-                    }`}>
-                      <div className="font-bold text-gray-700">{idx + 1}</div>
-                      <div className="text-xs mt-1 text-gray-500">{isAnswered ? 'Đã làm' : 'Chưa làm'}</div>
-                      {isMarked && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="flex justify-center gap-6">
-                <button 
-                  onClick={() => setPhase('MODULE_1')} 
-                  className="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition"
-                >
-                  Quay lại sửa bài
-                </button>
-                <button 
-                  onClick={startModule2} 
-                  className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg transition transform hover:scale-105"
-                >
-                  Bắt đầu Module 2
-                </button>
-              </div>
-          </div>
-        </div>
+      {(phase === 'REVIEW_1' || phase === 'REVIEW_2') ? (
+        <ReviewScreen
+          phase={phase}
+          questions={questions}
+          answers={answers}
+          markedQuestions={markedQuestions}
+          splitIndex={splitIndex}
+          onQuestionClick={handleQuestionJump}
+          description={TestInfo.description}
+        />
       ) : (
         <>
-          {/* --- SIDEBAR REVIEW (Đã sửa logic màu) --- */}
-          {isReviewOpen && (
-            <div 
-              className="fixed inset-0 bg-black/30 z-30 transition-opacity" 
-              onClick={() => setIsReviewOpen(false)}
-            />
-          )}
-      
-          <div className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-40 transform transition-transform duration-300 ease-in-out ${isReviewOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-              <h3 className="font-bold text-lg text-slate-800">Question Palette</h3>
-              <button onClick={() => setIsReviewOpen(false)} className="text-gray-500 hover:text-red-500">
+         {/* --- MODAL REVIEW (Theo phong cách Bluebook) --- */}
+        {isReviewOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-end pb-24">
+          {/* Overlay nền tối (Click để đóng) */}
+          <div 
+            className="absolute inset-0" 
+            onClick={() => setIsReviewOpen(false)}
+          />
+          
+          {/* MODAL CONTAINER */}
+          <div className="relative bg-white w-[520px] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-300 animate-in slide-in-from-bottom-4 duration-200">
+            
+            {/* 1. HEADER */}
+            <div className="py-3 px-4 flex items-start justify-between">
+              <div className="flex-1 text-center mt-1">
+                <h3 className="font-bold text-base text-gray-900">
+                  Review Page
+                </h3>
+              </div>
+              <button 
+                onClick={() => setIsReviewOpen(false)} 
+                className="
+                  text-gray-400 hover:text-gray-600 
+                  p-1 
+                  border border-transparent      /* 1. Viền trong suốt mặc định */
+                  hover:border-gray-300          /* 2. Hiện viền khi hover */
+                  hover:bg-gray-50               /* (Tùy chọn) Thêm nền nhẹ cho đẹp */
+                  active:scale-95 active:bg-gray-100 /* 3. Hiệu ứng nhún và đổi màu khi ấn */
+                  transition-all duration-200    /* Làm mượt chuyển động */
+                  rounded-md
+                "
+              >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
+
+            <div className="mx-6 border-b border-gray-400"></div>
+
+            {/* 2. LEGEND (CHÚ THÍCH) - Clean style */}
+            <div className="flex justify-center items-center gap-8 py-4 text-sm font-medium text-gray-700">
+              {/* Current */}
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-gray-800 fill-current" viewBox="0 0 24 24">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>
+                <span>Current</span>
+              </div>
+
+              {/* Unanswered */}
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 border border-dashed border-gray-600 rounded-sm"></div>
+                <span>Unanswered</span>
+              </div>
+
+              {/* For Review */}
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-red-700 fill-current" viewBox="0 0 24 24">
+                  <path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+                </svg>
+                <span>For Review</span>
+              </div>
+            </div>
+
+            <div className="mx-6 border-b border-gray-400"></div>
             
-            <div className="p-4 overflow-y-auto h-[calc(100%-140px)]">
-              <div className="grid grid-cols-5 gap-3">
+            {/* 3. GRID CÂU HỎI */}
+            <div className="p-6">
+              {/* Grid 10 cột giống ảnh */}
+              <div className="grid grid-cols-10 gap-y-6 gap-x-2"> 
                 {sidebarQuestions.map((q, index) => {
-                  const realIndex = index + sidebarOffset
-                  const isAnswered = answers[q.id] !== undefined;
+                  const realIndex = index + sidebarOffset;
+                  const isAnswered = answers[q.id] !== undefined; // Logic check đã trả lời
                   const isMarked = markedQuestions.includes(realIndex);
                   const isCurrent = currentQuestionIndex === realIndex;
                   
-                  // LOGIC MÀU SẮC CHUẨN: Ưu tiên Marked -> Answered -> Default
-                  let btnClass = "bg-white text-gray-700 border-gray-200 hover:bg-gray-100";
-                  
-                  if (isMarked) {
-                      btnClass = "bg-yellow-400 text-white border-yellow-600 shadow-sm"; // Vàng
-                  } else if (isAnswered) {
-                      btnClass = "bg-blue-600 text-white border-blue-700 shadow-sm"; // Xanh
-                  }
-
-                  if (isCurrent) {
-                      btnClass += " ring-2 ring-offset-1 ring-blue-500 border-blue-600"; // Viền highlight
-                  }
-
                   return (
-                    <button
-                      key={q.id}
-                      onClick={() => jumpToQuestion(realIndex)}
-                      className={`aspect-square rounded-lg flex flex-col items-center justify-center text-sm font-bold border transition-all relative ${btnClass}`}
-                    >
-                      {index + 1}
-                      {/* Icon cờ nhỏ xíu nếu vừa làm vừa mark */}
-                      {isMarked && isAnswered && (
-                          <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-                      )}
-                    </button>
-                  )
+                    <div key={q.id} className="flex items-center justify-center">
+                      <div className="relative w-8 h-8">
+                        {isCurrent && (
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                            <svg className="w-5 h-5 text-gray-800 fill-current drop-shadow-sm" viewBox="0 0 24 24">
+                              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                            </svg>
+                          </div>
+                        )}
+
+                        {isMarked && (
+                          <div className="absolute -top-1.5 -right-1.5 z-20 pointer-events-none">
+                            <svg className="w-4 h-4 text-red-700 fill-current drop-shadow-md" viewBox="0 0 24 24">
+                              <path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+                            </svg>
+                          </div>
+                        )}
+
+                        {/* Ô SỐ (BUTTON) */}
+                        <button
+                          onClick={() => {
+                            jumpToQuestion(realIndex);
+                            setIsReviewOpen(false);
+                          }}
+                          className={`
+                            w-full h-full flex items-center justify-center text-sm font-semibold transition-all
+                            rounded-sm
+                            ${/* Style cho câu HIỆN TẠI (viền xanh đậm) */
+                              isCurrent
+                              ? isAnswered
+                              ? 'text-white underline underline-offset-2 decoration-2 text-xl font-bold hover:border-gray-600 bg-blue-700 hover:bg-blue-800' 
+                              : 'border border-dashed border-gray-600 text-blue-700 underline underline-offset-2 decoration-2 text-xl font-bold hover:bg-gray-100'
+                              : ''
+                            }
+                            ${/* Style cho câu CHƯA TRẢ LỜI (nét đứt, màu xanh) */
+                              !isCurrent && !isAnswered 
+                              ? 'border border-dashed border-gray-600 text-blue-700 text-xl font-bold hover:bg-gray-100' 
+                              : ''
+                            }
+                            ${/* Style cho câu ĐÃ TRẢ LỜI (nét liền, màu đen) */
+                              !isCurrent && isAnswered 
+                              ? 'text-white text-xl font-bold hover:border-gray-600 bg-blue-700 hover:bg-blue-800' 
+                              : ''
+                            }
+                          `}
+                        >
+                          {index + 1}
+                        </button>
+                      </div>
+                    </div>
+                  );
                 })}
               </div>
             </div>
 
-            {/* Chú thích màu sắc */}
-            <div className="absolute bottom-0 w-full p-4 bg-gray-50 border-t border-gray-200 text-xs text-slate-600 space-y-2">
-                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-blue-600 rounded"></div> Đã trả lời</div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-yellow-400 rounded"></div> Đã đánh dấu (Mark)</div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-white border border-gray-300 rounded"></div> Chưa làm</div>
+            {/* 4. FOOTER */}
+            <div className="pb-6 pt-2 flex justify-center">
+              <button 
+                onClick={() => {
+                  setIsReviewOpen(false)
+                  if (phase === 'MODULE_1') {
+                    setPhase('REVIEW_1');
+                  } else {
+                    setPhase('REVIEW_2');
+                  }
+                }}
+                className="px-8 py-2 border-[1.5px] border-blue-700 text-blue-700 text-sm font-bold rounded-full hover:bg-blue-50 transition-colors"
+              >
+                Go to Review Page
+              </button>
+            </div>
+
+            {/* 5. CÁI ĐUÔI (ARROW) - BIG & SEAMLESS */}
+            {/* Sử dụng một hình vuông xoay 45 độ, cùng màu nền với modal để che viền */}
+            <div className="
+              absolute 
+              -bottom-4        /* Đẩy lên một chút (-2 thay vì -3) để khớp nền */
+              left-1/2 
+              -translate-x-1/2 
+              w-8 h-8     
+              bg-white 
+              border-r border-b border-gray-300 /* Giữ nguyên viền phải/dưới */
+              rotate-45
+            "></div>
             </div>
           </div>
+        )}
 
           {/* --- NỘI DUNG CHÍNH (BODY) --- */}
-          <div className="flex-1 flex overflow-hidden">
-          {/*  CỘT TRÁI: CHỈ HIỆN BLOCKS (Bài đọc, Graph...) */}
-          <div className="w-1/2 h-full bg-white border-r border-gray-200 flex flex-col">
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-6 md:px-8 md:py-8">
-              
-              {/* Container Text:
-                  - font-serif: Giống style bài đọc văn học/lịch sử của SAT.
-                  - text-[15px] md:text-[16px]: Kích thước chữ chuẩn, không quá to.
-                  - leading-relaxed: Giãn dòng 1.625, giúp mắt dễ chịu khi đọc đoạn dài.
-                  - text-[#1a1a1a]: Màu đen than (không đen tuyền) để đỡ mỏi mắt.
-              */}
-              <div className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
-                
-                {currentQ.blocks && currentQ.blocks.length > 0 ? (
-                  <BlockRenderer blocks={currentQ.blocks} />
-                ) : (
-                  <div className="text-gray-400 italic flex items-center justify-center h-40 text-sm font-sans">
-                    No passage provided.
-                  </div>
-                )}
-
+          <div ref={containerRef} className="flex-1 flex overflow-hidden w-full h-full relative">
+            
+            {/* --- CỘT TRÁI (BÀI ĐỌC) --- */}
+            {/* Thay w-1/2 bằng style width động */}
+            <div 
+              style={{ width: `${leftWidth}%` }} 
+              className="h-full bg-white border-r border-gray-200 flex flex-col min-w-[200px]"
+            >
+              <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-6 md:px-8 md:py-8">
+                <div className="
+                  font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums
+                  font-normal text-[#1a1a1a] leading-relaxed tracking-normal
+                  text-[16px]           /* Set cho h3 */
+                  [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
+                  [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
+                ">
+                  {currentQ.blocks && currentQ.blocks.length > 0 ? (
+                    <BlockRenderer blocks={currentQ.blocks} />
+                  ) : (
+                    <div className="text-gray-400 italic flex items-center justify-center h-40 text-sm font-sans">
+                      No passage provided.
+                    </div>
+                  )}
+                  <div className="h-40 w-full shrink-0"></div>
+                </div>
               </div>
             </div>
-          </div>
 
-        {/* Cột phải: CÂU HỎI */}
-          <div className="w-1/2 p-8 overflow-y-auto bg-gray-50 custom-scrollbar">
-            <div className="max-w-2xl mx-auto">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            {/* --- THANH KÉO (RESIZER) --- */}
+            <div
+              onMouseDown={handleMouseDown}
+              className="
+                w-6 -ml-3 h-full cursor-col-resize 
+                flex justify-center items-center 
+                absolute z-20 transition-colors
                 
+                /* Hiệu ứng khi di chuột vào vùng kéo: Xanh nhạt */
+                hover:bg-blue-500/10 
+                active:bg-blue-500/20
+              "
+              style={{ left: `${leftWidth}%` }}
+            >
+              {/* 1. Đường kẻ dọc chạy suốt chiều cao (Divider Line) */}
+              <div className="w-[2px] h-full bg-gray-500 group-hover:bg-blue-200/50 absolute"></div>
+
+              {/* 2. Thanh hình chữ nhật lơ lửng (Handle) */}
+              <div className="
+                relative z-10 
+                w-[6px] h-10            /* To hơn một chút */
+                bg-gray-700            /* Đậm hơn (gray-600) */
+                rounded-full shadow-sm
+              "></div>
+            </div>
+
+            {/* --- CỘT PHẢI (CÂU HỎI) --- */}
+            {/* Chiếm phần còn lại (flex-1) */}
+            <div className="flex-1 h-full bg-white flex flex-col min-w-[300px] overflow-hidden">
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                    
                 <QuestionHeader 
                   currentPhase={phase}
                   splitIndex={splitIndex}
@@ -850,106 +1107,187 @@ function ExamRoom() {
                   onToggleStrikeMode={() => setIsStrikeMode(!isStrikeMode)}
                 />
 
-                <h3
-                  className="
-                    font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] 
-                    leading-relaxed tracking-normal mb-6
-                  "
-                >
+                <h3 className="
+                  font-['Source_Serif_4',_'Georgia',_serif] 
+                  lining-nums tabular-nums 
+                  font-normal text-[#1a1a1a] 
+                  leading-relaxed tracking-normal mb-3
+                  
+                  text-[16px]           /* Set cho h3 */
+                  [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
+                  [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
+                ">
                   <InteractiveText content={currentQ.questionText} />
                 </h3>
                 
                 <div className="space-y-3">
                   {currentQ.choices.map((opt: any, index: number) => {
-                      const isEliminated = eliminatedMap[currentQuestionIndex]?.includes(index);
-                      const charLabel = String.fromCharCode(65 + index); // 0->A, 1->B
-
-                      return (
-                        <AnswerOption
+                    const isEliminated = eliminatedMap[currentQuestionIndex]?.includes(index);
+                    const charLabel = String.fromCharCode(65 + index);
+                    return (
+                      <AnswerOption
                         key={index}
-                        label={charLabel} // Tự động sinh A, B, C, D
+                        label={charLabel}
                         content={opt.text}
-                        // Logic hiển thị
                         isSelected={answers[currentQ.id] === charLabel}
                         isEliminated={!!isEliminated}
                         isStrikeMode={isStrikeMode}
-                        
-                        // Logic hành động
-                        onSelect={() => handleSelectOption(charLabel)} // Hàm chọn đáp án cũ của bạn
+                        onSelect={() => handleSelectOption(charLabel)}
                         onEliminate={(e) => handleEliminate(currentQuestionIndex, index, e)}
-                        />
-                      );
+                      />
+                    );
                   })}
                 </div>
-                
+                <div className="h-40 w-full shrink-0"></div>
               </div>
             </div>
-          </div>
-        </div>
 
-          {/* FOOTER */}
-          <footer className="bg-white border-t h-20 px-8 flex items-center justify-between z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center gap-2 text-slate-600">
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold">HV</div>
-                <div className="font-bold">{localStorage.getItem('userName') || 'Học viên'}</div>
-            </div>
-            <div className="flex gap-4">
-                <button 
-                  onClick={() => setCurrentQuestionIndex(p => Math.max(phase === 'MODULE_2' ? splitIndex : 0, p - 1))}
-                  disabled={currentQuestionIndex === (phase === 'MODULE_2' ? splitIndex : 0)}
-                  className="px-6 py-2.5 bg-white border border-gray-300 text-slate-700 rounded-lg font-semibold disabled:opacity-50 hover:bg-gray-50 transition"
-                >
-                    Back
-                </button>
-                <button 
-                  onClick={() => {
-                    if (phase === 'MODULE_2' && currentQuestionIndex == questions.length - 1) {
-                      setShowSubmitModal(true);
-                    }
-                    else {
-                      if (phase === 'MODULE_1' && currentQuestionIndex == splitIndex - 1) {
-                        if (examConfig.totalModules == 1){
-                          setShowSubmitModal(true);
-                        }
-                        else {
-                          setPhase('REVIEW_1');
-                        }
-                      }
-                      else {
-                        setCurrentQuestionIndex(p => Math.min(questions.length - 1, p + 1))
-                      }
-                    }
-                  }}
-                  className={`px-6 py-2.5 text-white rounded-lg font-bold flex items-center gap-2 transition shadow-lg
-                    ${
-                      // Đổi màu nút bấm để cảnh báo sự thay đổi trạng thái
-                      (phase === 'MODULE_1' && currentQuestionIndex === splitIndex - 1)
-                      ? "bg-indigo-600 hover:bg-indigo-700" // Màu tím: Báo hiệu chuyển sang Review
-                      : "bg-blue-600 hover:bg-blue-700"     // Màu xanh: Next bình thường
-                    }
-                  `}
-                >
-                  {/* Logic đổi tên nút bấm */}
-                  {
-                    // Nếu là câu cuối cùng của toàn bộ bài thi (Mod 2 HOẶC Mod 1 nếu chỉ có 1 mod)
-                    (phase === 'MODULE_2' && currentQuestionIndex === questions.length - 1) || 
-                    (phase === 'MODULE_1' && currentQuestionIndex === splitIndex - 1 && examConfig.totalModules === 1)
-                      ? "Submit" 
-                      // Nếu là câu cuối Mod 1 (nhưng còn Mod 2)
-                      : (phase === 'MODULE_1' && currentQuestionIndex === splitIndex - 1)
-                        ? "Review Module 1"
-                        // Còn lại
-                        : "Next"
-                    }
-                </button>
-            </div>
-          </footer>
+          </div>
         </>
       )}
 
+      {/* FOOTER */}
+      <div className="fixed bottom-0 left-0 right-0 z-50">
+        <div className="w-full h-[2px] bg-[linear-gradient(90deg,#374151_90%,transparent_90%)] bg-[length:25px_2px]"></div>
+
+        <footer className="bg-blue-50 h-auto py-3 px-8 flex items-center justify-between z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <div className="flex items-center gap-2 text-slate-600">
+            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold">HV</div>
+            <div className="font-bold">{localStorage.getItem('userName') || 'Học viên'}</div>
+          </div>
+
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
+            {phase != 'REVIEW_1' && phase != 'REVIEW_2' && (
+              <button
+                onClick={() => {
+                  isReviewOpen ? setIsReviewOpen(false) : setIsReviewOpen(true);
+                }} // Mở sidebar khi click
+                className="bg-black text-white px-4 py-1.5 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition-all font-medium text-base group"
+              >
+                <span>
+                  Question { phase === 'MODULE_2' ? currentQuestionIndex - splitIndex + 1 : currentQuestionIndex + 1 } of {
+                    phase === 'MODULE_2' ? questions.length - splitIndex : splitIndex
+                  }
+                </span>
+                <svg 
+                  className={`w-4 h-4 transition-transform duration-300 ${isReviewOpen ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-4">
+            <button 
+              // 1. Logic xử lý Click
+              onClick={() => {
+                if (isBackAnimating || currentQuestionIndex === (phase === 'MODULE_2' ? splitIndex : 0)) return;
+                setIsBackAnimating(true);
+                if (phase === 'REVIEW_1') {
+                  setPhase('MODULE_1');
+                  setCurrentQuestionIndex(splitIndex - 1);
+                }
+                else if (phase === 'REVIEW_2') {
+                  setPhase('MODULE_2');
+                  setCurrentQuestionIndex(questions.length - 1);
+                }
+                else {
+                  setCurrentQuestionIndex(p => Math.max(phase === 'MODULE_2' ? splitIndex : 0, p - 1));
+                } 
+                setTimeout(() => {
+                  setIsBackAnimating(false);
+                }, 300);
+              }}
+
+              // 2. Logic Disable (Gộp cả điều kiện cũ + điều kiện đang animation)
+              disabled={
+                currentQuestionIndex === (phase === 'MODULE_2' ? splitIndex : 0) || 
+                isBackAnimating
+              }
+
+              // 3. Class Styling
+              className={`
+                px-6 py-2.5 rounded-full font-bold flex items-center gap-2 shadow-lg
+                transition-all duration-200 ease-in-out  /* Quan trọng: Tạo độ mượt khi đổi màu */
+
+                ${currentQuestionIndex === (phase === 'MODULE_2' ? splitIndex : 0) 
+                  ? 'invisible pointer-events-none'  // Tàng hình + không click được
+                  : 'visible' 
+                }
+
+                ${isBackAnimating 
+                  ? 'bg-white text-gray-700 ring-2 ring-gray-600 scale-95' // Trạng thái NHÁY: Nền trắng, chữ xanh, co lại xíu
+                  : 'bg-blue-700 text-white hover:bg-blue-800' // Trạng thái THƯỜNG: Nền xanh, chữ trắng
+                }
+
+                /* Style cho nút khi bị Disable thực sự (đầu trang) */
+                disabled:opacity-50 disabled:cursor-not-allowed
+              `}
+            >
+              Back
+            </button>
+            <button 
+              onClick={() => {
+                if (isNextAnimating) return;
+                setIsNextAnimating(true);
+                if (phase === 'REVIEW_2') {
+                  setShowSubmitModal(true);
+                }
+                else if (phase === 'REVIEW_1') {
+                  if (examConfig.totalModules == 1) {
+                    setShowSubmitModal(true);
+                  }
+                  else startModule2();
+                }
+                else if (phase === 'MODULE_2' && currentQuestionIndex == questions.length - 1) {
+                  setIsReviewOpen(false);
+                  setPhase('REVIEW_2');
+                }
+                else if (phase === 'MODULE_1' && currentQuestionIndex == splitIndex - 1) {
+                  setIsReviewOpen(false);
+                  setPhase('REVIEW_1');
+                }
+                else {
+                  setCurrentQuestionIndex(p => Math.min(questions.length - 1, p + 1))
+                }
+                setTimeout(() => {
+                  setIsNextAnimating(false);
+                }, 300);
+              }}
+
+              disabled={isNextAnimating}
+
+              className={`
+                px-6 py-2.5 rounded-full font-bold flex items-center gap-2 shadow-lg
+                transition-all duration-200 ease-in-out  /* Quan trọng: Tạo độ mượt khi đổi màu */
+
+                ${isNextAnimating 
+                  ? 'bg-white text-gray-700 ring-2 ring-gray-600 scale-95' // Trạng thái NHÁY: Nền trắng, chữ xanh, co lại xíu
+                  : 'bg-blue-700 text-white hover:bg-blue-800' // Trạng thái THƯỜNG: Nền xanh, chữ trắng
+                }
+                disabled:opacity-50 disabled:cursor-not-allowed
+              `}
+            >
+              {/* Logic đổi tên nút bấm */}
+              {
+                // Nếu là câu cuối cùng của toàn bộ bài thi (Mod 2 HOẶC Mod 1 nếu chỉ có 1 mod)
+                (phase === 'REVIEW_2') || (phase === 'REVIEW_1' && examConfig.totalModules === 1)
+                  ? "Submit" 
+                  // Nếu là câu cuối Mod 1 (nhưng còn Mod 2)
+                  : "Next"
+                }
+            </button>
+          </div>
+        </footer>
+      </div>
+
       {/* --- MODAL XÁC NHẬN NỘP BÀI --- */}
       {showSubmitModal && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform transition-all scale-100">
             <div className="text-center">
               <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -965,7 +1303,7 @@ function ExamRoom() {
               <div className="flex gap-3">
                 <button 
                   onClick={() => setShowSubmitModal(false)} // Tắt modal
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-slate-700 font-bold rounded-lg hover:bg-gray-200 transition"
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-slate-700 font-bold rounded-full hover:bg-gray-200 transition"
                 >
                   Hủy bỏ
                 </button>
@@ -974,9 +1312,9 @@ function ExamRoom() {
                     setShowSubmitModal(false); // Tắt modal
                     finishTest(); // Gọi hàm nộp thật
                   }}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition shadow-lg shadow-red-500/30"
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition shadow-lg shadow-red-500/30"
                 >
-                  Nộp bài ngay
+                  Nộp bài
                 </button>
               </div>
             </div>

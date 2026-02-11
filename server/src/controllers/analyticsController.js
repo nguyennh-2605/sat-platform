@@ -124,8 +124,8 @@ exports.getSubmissionDetail = async (req, res) => {
 
     // 3. Tính toán thời gian làm bài (Duration)
     let durationString = "N/A";
-    if (submission.startTime && submission.endTime) {
-      const diffSeconds = Math.floor((new Date(submission.endTime) - new Date(submission.startTime)) / 1000);
+    if (submission.startedAt && submission.endTime) {
+      const diffSeconds = Math.floor((new Date(submission.endTime) - new Date(submission.startedAt)) / 1000);
       const h = Math.floor(diffSeconds / 3600);
       const m = Math.floor((diffSeconds % 3600) / 60);
       const s = diffSeconds % 60;

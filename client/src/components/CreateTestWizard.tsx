@@ -75,7 +75,6 @@ const CreateTestWizard = ({ onClose, userRole }: any) => {
   useEffect(() => {
     if (userRole !== 'TEACHER') return;
     const fetchClasses = async () => {
-      setIsLoading(true);
       try {
         const token = localStorage.getItem('token');
         // Gọi endpoint mà chúng ta đã làm ở bài trước  
@@ -86,7 +85,6 @@ const CreateTestWizard = ({ onClose, userRole }: any) => {
       } catch (error) {
         console.error("Lỗi tải lớp:", error);
       } finally {
-        setIsLoading(false);
       }
     };
     fetchClasses();
@@ -898,7 +896,6 @@ const CreateTestWizard = ({ onClose, userRole }: any) => {
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
           {/* Icon Spinner xoay xoay */}
           <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-          <p className="text-slate-500 mt-2">Đang tải đề thi lên hệ thống...</p>
         </div>
       )}
     </div>,

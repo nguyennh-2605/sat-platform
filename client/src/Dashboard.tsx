@@ -30,7 +30,7 @@ function Dashboard() {
       className={({ isActive }) => 
         `group w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 font-medium ${
           isActive 
-            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
+            ? 'bg-blue-700 text-white shadow-lg' 
             : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
         }`
       }

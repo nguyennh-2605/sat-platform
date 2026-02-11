@@ -32,6 +32,12 @@ enum TestSubject {
   MATH    // Math
 }
 
+enum SubmissionStatus {
+  DOING       // Đang làm
+  PAUSED      // Đã lưu và thoát (Save & Exit)
+  COMPLETED   // Đã nộp bài
+}
+
 // 2. Bảng người dùng
 model User {
   id          Int          @id @default(autoincrement())
@@ -181,21 +187,19 @@ model Question {
 
 // 6. Bảng Nộp bài (Lịch sử thi)
 model Submission {
-  id             Int       @id @default(autoincrement())
-  startTime      DateTime  @default(now())
-  endTime        DateTime?
-  score          Int?      // Điểm số
-  startedAt      DateTime  @default(now())
-  status         String    @default("DOING")
+  id                       Int       @id @default(autoincrement())
+  startedAt                DateTime  @default(now())
+  endTime                  DateTime?
+  score                    Int?      // Điểm số
+  status                   SubmissionStatus   @default(DOING)
   
-  // Các field chống gian lận
+  timeRemaining            Int?
+  currentQuestionIndex     Int       @default(0)
+  savedAnswers             Json?
   violationCount Int       @default(0)
-  terminated     Boolean   @default(false)
-  submitReason   String?   // Lý do nộp: "Hết giờ", "Nộp bài", "Vi phạm"
 
   userId         Int
   user           User      @relation(fields: [userId], references: [id])
-  
   testId         Int
   test           Test      @relation(fields: [testId], references: [id])
 

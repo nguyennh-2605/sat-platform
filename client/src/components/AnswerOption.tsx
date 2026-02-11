@@ -20,33 +20,37 @@ const AnswerOption: React.FC<AnswerProps> = ({
   const showActionColumn = isStrikeMode || isEliminated;
 
   return (
-    <div className="flex items-center gap-4 w-full group">
+    <div className="flex items-start gap-4 w-full group">
       <div 
       // Nếu bị gạch thì disable click, ngược lại thì cho chọn
       onClick={!isEliminated ? onSelect : undefined} 
       className={`
-        relative flex-1 flex items-center gap-3 p-4 border-2 rounded-2xl bg-white
-        transition-all duration-200 ease-in-out overflow-hidden
-        ${isEliminated ? 'cursor-default border-gray-200 bg-white' : 'cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-300 hover:shadow-md'}
-        ${isSelected && !isEliminated ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-200 ring-offset-1' : 'border-gray-400'}
-        active:scale-[0.99]
+        relative flex-1 flex items-start gap-5 p-2 border rounded-xl bg-white overflow-hidden
+        ${isEliminated ? 'cursor-default border-gray-200 bg-white' : 'cursor-pointer hover:shadow-md'}
+        ${isSelected && !isEliminated ? 'border-blue-700 border-2' : 'border-gray-600'}
         ${isEliminated ? 'opacity-50 grayscale' : ''}
       `}
     >
       
       {/* 1. VÒNG TRÒN CHỮ CÁI (A, B, C...) */}
       <div className={`
-        w-8 h-8 shrink-0 flex items-center justify-center rounded-full text-sm font-bold border transition-colors
-        ${isSelected && !isEliminated ? 'bg-indigo-600 text-white border-indigo-600'
-          : 'bg-white text-gray-500 border-gray-500 group-hover:border-indigo-400 group-hover:text-indigo-500'}
+        w-6 h-6 mt-1 shrink-0 flex items-center justify-center rounded-full text-sm font-bold border-2 transition-colors
+        ${isSelected && !isEliminated ? 'bg-blue-700 text-white border-gray-800'
+          : 'bg-white text-gray-500 border-gray-500'}
         ${isEliminated ? 'text-gray-500 border-gray-300' : ''}
       `}>
         {label}
       </div>
 
       {/* 2. NỘI DUNG ĐÁP ÁN */}
-      <span className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] 
-                      leading-relaxed tracking-normal">
+      <span className="
+        font-['Source_Serif_4',_'Georgia',_serif] lining-nums
+        tabular-nums font-normal text-[#1a1a1a] 
+        leading-relaxed tracking-normal
+        text-[16px]           /* Set cho h3 */
+        [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
+        [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
+        ">
         <InteractiveText content={content} />
       </span>
 
@@ -70,7 +74,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
         onClick={onEliminate}
         // 👇 Quan trọng: Chỉ để margin, xóa hết background và padding
         className={`
-          flex items-center justify-end shrink-0 cursor-pointer overflow-hidden
+          flex items-start justify-end shrink-0 cursor-pointer overflow-hidden mt-1
           transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
           ${showActionColumn 
             ? 'w-[50px] opacity-100 ml-1' 
@@ -88,9 +92,9 @@ const AnswerOption: React.FC<AnswerProps> = ({
             </span>
           ) : (
             <div className={`
-              relative w-7 h-7 rounded-full border-2 flex items-center justify-center font-bold text-xs select-none
+              relative w-6 h-6 rounded-full border-2 flex items-center justify-center font-bold text-xs select-none
               transition-all duration-200
-              text-slate-500 border-slate-400
+              text-slate-500 border-slate-500
             `}>
               {/* Chữ cái A, B, C... */}
               <span className="pb-[1px]">{label}</span>

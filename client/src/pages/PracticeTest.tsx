@@ -43,7 +43,7 @@ interface ClassInfo {
 // Component con: Chip Filter (Nút bấm bộ lọc)
 const FilterChip = ({ label, active, onClick, icon: Icon, colorClass = "blue" }: FilterChipProps) => {
   const activeStyle = colorClass === "blue" 
-    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200'
+    ? 'bg-blue-600 text-white border-blue-600'
     : 'bg-slate-800 text-white border-slate-800 shadow-md';
 
   return (
@@ -187,11 +187,11 @@ const PracticeTest = () => {
       </div>
 
       {/* === FILTER UI SECTION === */}
-      <div className="space-y-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+      <div className="space-y-4 bg-white p-4 rounded-2xl border border-slate-300 shadow-sm">
         
         {/* ROW 1: Context (Category) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          <div className="text-slate-400 mr-2 flex items-center gap-1 font-medium text-sm">
+        <div className="flex items-center gap-2 overflow-x-auto pb-0 scrollbar-hide">
+          <div className="text-slate-600 mr-2 flex items-center gap-1 font-medium text-sm">
             <Filter size={16}/> Nguồn:
           </div>
           
@@ -222,13 +222,13 @@ const PracticeTest = () => {
         </div>
 
         {/* ROW 2: Details (Date & Subject) */}
-        <div className="flex flex-wrap items-center gap-4 border-t border-slate-100 pt-3">
+        <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 pt-4">
           
           {/* Subject Filter */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Môn thi:</span>
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Môn thi:</span>
             <div className="flex bg-slate-100 p-1 rounded-lg">
-              {['ALL', 'RW', 'MATH'].map((sub) => (
+              {['RW', 'MATH'].map((sub) => (
                 <button
                   key={sub}
                   onClick={() => setActiveSubject(sub)}
@@ -248,7 +248,7 @@ const PracticeTest = () => {
           {activeCategory === 'REAL' && (
             <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-4">
                <div className="h-4 w-[1px] bg-slate-300 mx-2"></div>
-               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+               <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
                  <Calendar size={12}/> Kỳ thi:
                </span>
                <select 
@@ -333,7 +333,7 @@ const PracticeTest = () => {
                   className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all transform active:scale-95 ${
                     test.isDoing
                       ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                      : "bg-slate-900 text-white hover:bg-blue-600 shadow-lg shadow-slate-200 hover:shadow-blue-200"
+                      : "bg-slate-900 text-white hover:bg-blue-600 shadow-lg shadow-slate-200"
                   }`}
                 >
                   {test.isDoing ? "Tiếp tục bài thi" : "Bắt đầu làm bài"}
