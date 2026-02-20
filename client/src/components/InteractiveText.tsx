@@ -33,7 +33,7 @@ const InteractiveText: React.FC<Props> = ({ content }) => {
   const syncDomToState = () => {
     if (contentRef.current) {
       const newHtml = contentRef.current.innerHTML;
-      console.log("🔥 HTML SẮP LƯU VÀO STATE:", newHtml);
+      console.log("HTML SẮP LƯU VÀO STATE:", newHtml);
       setHtmlContent(newHtml);
       // báo hiệu React: "DOM bẩn rồi, vẽ lại cái mới đi"
       setRenderKey(prev => prev + 1);

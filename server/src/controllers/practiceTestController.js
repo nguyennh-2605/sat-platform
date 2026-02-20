@@ -196,6 +196,7 @@ exports.createTest = async (req, res) => {
                 order: index + 1,
                 questionText: q.questionText,
                 correctAnswer: q.correctAnswer,
+                type: q.type,
                 explanation: q.explanation || null,
                 blocks: q.blocks, // Prisma tự động stringify mảng JSON này
                 

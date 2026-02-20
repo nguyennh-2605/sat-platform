@@ -28,7 +28,8 @@ exports.startOrResumeTest = async (req, res) => {
                 id: true,
                 blocks: true,
                 questionText: true,
-                choices: true // Trả về JSON đáp án
+                choices: true, // Trả về JSON đáp án
+                type: true
               }
             }
           }

@@ -7,8 +7,9 @@ import { Play, Save, ArrowLeft, X, FileText, ImageIcon, Loader2,
 import { parseSATInput, type SATQuestion } from '../utlis/satParser';
 import { createPortal } from "react-dom";
 import InputGuideModal from './InputGuideModal';
+import FormattedTextRenderer from '../utlis/TextRenderer';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 
 interface Section {
   name: string;      // Vd: "Reading and Writing - Module 1"
@@ -27,11 +28,6 @@ interface FinalTestStructure {
   assignClassId?: string;
   category: string;
   testDate?: string;
-}
-
-interface FormattedTextRendererProps {
-  text: string;       // Bắt buộc phải là chuỗi
-  className?: string; // Có thể có hoặc không (optional)
 }
 
 interface PreviewSectionProps {
@@ -76,12 +72,8 @@ const CreateTestWizard = ({ onClose, userRole }: any) => {
     if (userRole !== 'TEACHER') return;
     const fetchClasses = async () => {
       try {
-        const token = localStorage.getItem('token');
-        // Gọi endpoint mà chúng ta đã làm ở bài trước  
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/tests/classes`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setMyClasses(res.data);
+        const data = await axiosClient.get<ClassOption[], ClassOption[]>(`/api/tests/classes`);
+        setMyClasses(data);
       } catch (error) {
         console.error("Lỗi tải lớp:", error);
       } finally {
@@ -143,7 +135,7 @@ const CreateTestWizard = ({ onClose, userRole }: any) => {
 
     // 2. Tạo mảng sections theo đúng cấu trúc JSON
     const sections: Section[] = Array.from(modulesMap.keys()).sort().map((modNum) => ({
-      name: `Reading and Writing - Module ${modNum}`, // Tự sinh tên
+      name: `Module ${modNum}`, // Tự sinh tên
       order: modNum,
       duration: durationPerModule, // (Ví dụ: chia đều hoặc hardcode 32 phút/module chuẩn SAT)
       questions: (modulesMap.get(modNum) || []).map(q => ({
@@ -179,51 +171,15 @@ const CreateTestWizard = ({ onClose, userRole }: any) => {
 
     // --- GỌI API ---
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tests/create`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify(finalPayload),
-      });
-
-      if (response.ok) {
-        window.location.reload();
-      } else {
-        toast.error("❌ Lỗi khi lưu vào Database");
-        setIsLoading(false);
-      }
+      await axiosClient.post('/api/tests/create', finalPayload);
+      window.location.reload();
     } catch (error) {
-      setIsLoading(false);
+      toast.error("❌ Lỗi khi lưu vào Database");
       console.error(error);
+    } finally {
+      setIsLoading(false);
     }
   }, [parsedQuestions]);
-
-  const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, className = "" }) => {
-    if (!text) return null;
-
-    const lines = text.split('\n');
-
-    return (
-      <div className={`font-sans text-gray-800 ${className}`}>
-        {lines.map((line, index) => {
-          const trimmedLine = line.trim();
-
-          if (!trimmedLine) {
-            return <div key={index} className="h-4"></div>; 
-          }
-          // Render mọi thứ dưới dạng đoạn văn thường (Paragraph)
-          return (
-            <p key={index} className="mb-2 leading-relaxed text-[15px] whitespace-pre-wrap">
-              {trimmedLine}
-            </p>
-          );
-        })}
-      </div>
-    );
-  };
 
   // === 2. HÀM CHÈN TEXT VÀO VỊ TRÍ CON TRỎ ===
   const insertAtCursor = (textToInsert: string) => {
@@ -454,36 +410,57 @@ const CreateTestWizard = ({ onClose, userRole }: any) => {
               </div>
 
               {/* KHUNG DƯỚI/PHẢI CỦA SAT (QUESTION & CHOICES) */}
-              <div className="space-y-3">
-                  {/* Câu hỏi dẫn nhập */}
+              <div className="space-y-4">
+                  {/* 1. Câu hỏi dẫn nhập */}
                   <div className="font-sans font-bold text-gray-900 text-[15px]">
-                      {q.questionText}
+                      {/* Dùng FormattedTextRenderer để lỡ có Math LaTeX thì nó render được */}
+                      {q.questionText ? <FormattedTextRenderer text={q.questionText} /> : null}
                   </div>
 
-                  {/* Các đáp án */}
-                  <div className="grid grid-cols-1 gap-2.5">
-                      {q.choices.map((choice) => (
-                          <div
-                              key={choice.id}
-                              className={`p-3 border rounded-lg text-sm transition-all flex items-start gap-3 ${
-                                  choice.id === q.correctAnswer
-                                      ? 'bg-emerald-50 border-emerald-500 shadow-sm'
-                                      : 'bg-white border-gray-200'
-                              }`}
-                          >
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border ${
-                                  choice.id === q.correctAnswer
-                                      ? 'bg-emerald-600 text-white border-emerald-600'
-                                      : 'bg-white text-gray-500 border-gray-300'
-                              }`}>
-                                  {choice.id}
+                  {/* 2. Các đáp án (Phân nhánh MCQ và SPR) */}
+                  {q.type === 'SPR' ? (
+                      // Hiển thị cho dạng điền khuyết (SPR)
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
+                          <span className="font-semibold text-amber-800">Đáp án điền (SPR):</span>
+                          <span className="bg-white border border-amber-300 font-mono font-bold text-amber-900 px-3 py-1.5 rounded shadow-sm">
+                              {q.correctAnswer}
+                          </span>
+                      </div>
+                  ) : (
+                      // Hiển thị cho dạng trắc nghiệm (MCQ)
+                      <div className="grid grid-cols-1 gap-2.5">
+                          {q.choices.map((choice) => (
+                              <div
+                                  key={choice.id}
+                                  className={`p-3 border rounded-lg text-sm transition-all flex items-start gap-3 ${
+                                      choice.id === q.correctAnswer
+                                          ? 'bg-emerald-50 border-emerald-500 shadow-sm'
+                                          : 'bg-white border-gray-200'
+                                  }`}
+                              >
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border mt-0.5 ${
+                                      choice.id === q.correctAnswer
+                                          ? 'bg-emerald-600 text-white border-emerald-600'
+                                          : 'bg-white text-gray-500 border-gray-300'
+                                  }`}>
+                                      {choice.id}
+                                  </div>
+                                  <div className={`flex-1 pt-0.5 ${choice.id === q.correctAnswer ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
+                                      {/* Tương tự, dùng FormattedTextRenderer để render Toán trong đáp án */}
+                                      <FormattedTextRenderer text={choice.text} />
+                                  </div>
                               </div>
-                              <span className={`pt-0.5 ${choice.id === q.correctAnswer ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
-                                  {choice.text}
-                              </span>
-                          </div>
-                      ))}
-                  </div>
+                          ))}
+                      </div>
+                  )}
+
+                  {/* 3. Hiển thị Giải thích (Explanation) nếu có */}
+                  {q.explanation && (
+                      <div className="mt-4 p-3 bg-gray-50 border-l-4 border-indigo-400 rounded-r-lg text-sm text-gray-600">
+                          <span className="font-bold text-indigo-600 block mb-1">Giải thích:</span>
+                          <FormattedTextRenderer text={q.explanation} />
+                      </div>
+                  )}
               </div>
 
             </div>

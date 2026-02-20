@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Clock, ChevronRight, Filter, Layers, Calendar, GraduationCap } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce';
 import CreateTestWizard from '../components/CreateTestWizard';
-import axios from 'axios';
+import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 
 // --- CONSTANTS ---
@@ -94,18 +94,13 @@ const PracticeTest = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem('token');
-        const config = {
-          headers: { Authorization: `Bearer ${token}` }
-        };
-
         const [classesRes, testsRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_API_URL}/api/tests/classes`, config),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/tests`, config)
+          axiosClient.get<ClassInfo[], ClassInfo[]>(`/api/tests/classes`),
+          axiosClient.get<Test[], Test[]>(`/api/tests`)
         ]);
 
-        setMyClasses(classesRes.data);
-        setTests(testsRes.data);
+        setMyClasses(classesRes);
+        setTests(testsRes);
         console.log("Tat ca test nhan duoc", testsRes);
       } catch (error) {
         console.error("Error fetching data:", error);

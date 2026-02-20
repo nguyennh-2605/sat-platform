@@ -5,9 +5,7 @@ import {
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import axiosClient from '../api/axiosClient';
 
 interface ErrorEntry {
   id: string; // Prisma UUID
@@ -52,17 +50,12 @@ const ErrorLog = () => {
     source: '', category: '', userAnswer: '', correctAnswer: '', whyWrong: '', whyRight: '',
   });
 
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('token');
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
-
   // -- 1. LOAD DATA TỪ API --
   const fetchLogs = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get(`${API_URL}/api/error-logs`, getAuthHeader());
-      setLogs(response.data);
+      const data = await axiosClient.get<ErrorEntry[], ErrorEntry[]>(`/api/error-logs`);
+      setLogs(data);
     } catch (error) {
       console.error("Failed to fetch logs:", error);
       toast.error("Không thể tải dữ liệu từ server!");
@@ -97,11 +90,11 @@ const ErrorLog = () => {
       
       if (formData.id) {
           // --- UPDATE ---
-        await axios.put(`${API_URL}/api/error-logs/${formData.id}`, payload, getAuthHeader());
+        await axiosClient.put(`/api/error-logs/${formData.id}`, payload);
         toast.success("Đã cập nhật dữ liệu!");
       } else {
           // --- CREATE ---
-        await axios.post(`${API_URL}/api/error-logs`, payload, getAuthHeader());
+        await axiosClient.post(`/api/error-logs`, payload);
         toast.success("Đã lưu vào Database!");
       }
       
@@ -124,7 +117,7 @@ const ErrorLog = () => {
       try {
         // Optimistic Update: Xóa trên UI trước cho nhanh
         setLogs(prev => prev.filter(l => l.id !== id));
-        await axios.delete(`${API_URL}/api/error-logs/${id}`, getAuthHeader());
+        await axiosClient.delete(`/api/error-logs/${id}`);
         toast.success("Đã xóa!");
         if (currentItems.length === 1 && currentPage > 1) {
             setCurrentPage(prev => prev - 1);

@@ -11,7 +11,7 @@ import ExamRoom from './pages/ExamRoom';
 import LogicLab from './pages/LogicLab';
 import PracticeTest from './pages/PracticeTest';
 import ErrorLog from './pages/ErrorLog';
-import HomeworkModule from './pages/HomeworkModule';
+import Classroom from './pages/Classroom';
 import ResultAnalytics from './pages/ResultAnalytics';
 import ScoreReport from './ScoreReport';
 
@@ -31,7 +31,7 @@ function App() {
               <Route index element={<Navigate to="practice-test" replace />} />
               {/* Các đường dẫn con */}
               <Route path="practice-test" element={<PracticeTest />} />
-              <Route path="homework" element={<HomeworkModule />} />
+              <Route path="class/:classId" element={<Classroom />} />
               <Route path="error-log" element={<ErrorLog />} />
               <Route path="logic-lab" element={<LogicLab />} />
               <Route path='results-analytics' element = {<ResultAnalytics />} />

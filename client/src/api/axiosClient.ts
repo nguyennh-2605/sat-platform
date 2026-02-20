@@ -16,14 +16,12 @@ const axiosClient: AxiosInstance = axios.create({
 axiosClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('token');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      config.headers.set('Authorization', `Bearer ${token}`);
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Interceptor Response
@@ -45,7 +43,7 @@ axiosClient.interceptors.response.use(
         window.location.href = '/login';
       }
     }
-    throw error;
+    return Promise.reject(error);
   }
 );
 

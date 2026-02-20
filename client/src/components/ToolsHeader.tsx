@@ -4,10 +4,11 @@ import { useQuizTool } from '../context/QuizToolContext';
 interface ToolsHeaderProps {
   onSaveAction: () => Promise<void>;
   currentMode: string;
+  currentSubject: string;
 }
 
-const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode }) => {
-  const { isHighlightMode, toggleHighlightMode } = useQuizTool();
+const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, currentSubject }) => {
+  const { isHighlightMode, toggleHighlightMode, isCalculatorOpen, toggleCalculator } = useQuizTool();
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSaveAndExit = async () => {
@@ -24,65 +25,86 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode }) 
 
   return (
     <div className="flex items-center gap-3">
-      <button 
-        onClick={toggleHighlightMode}
-        className={`
-          group flex flex-col items-center gap-1 focus:outline-none
-          transition-colors duration-200 
-          rounded-lg px-2 py-1 -my-1 
-          hover:bg-green-50      
-        `}
-        title={isHighlightMode ? "Turn off Highlights & Notes" : "Turn on Highlights & Notes"}
-      >
-        {/* 1. ICON CUSTOM (Thấp hơn & Rộng hơn) */}
-        <div className={`
-            w-6 h-6 transition-colors duration-200 
-            text-slate-700'
-          `}>
-            <svg 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              {/* 1. ĐƯỜNG GẠCH CHÂN (Stroke Line) */}
-              {/* Nằm ở y=22 (sát đáy), từ x=3 đến x=21 */}
-              <line x1="3" y1="22" x2="21" y2="22" />
-
-              {/* 2. THÂN BÚT (Pen Body) */}
-              {/* Vẽ hình chữ nhật nghiêng, đầu nhọn hướng về (3, 19) */}
-              {/* M 15 4: Điểm trên cùng */}
-              {/* L 20 9: Góc phải trên */}
-              {/* L 6 23: Xuống gần ngòi (chỉnh lại chút cho khớp nét gạch) */}
-              {/* Logic: Ngòi nằm ở khoảng (3, 19) */}
-              
-              <path d="M16 3L21 8L7.5 21.5L3 21.5L3 17L16 3Z" />
-              
-              {/* 3. CHI TIẾT (Nắp/Ngấn bút) */}
-              <line x1="11" y1="8" x2="16" y2="13" />
-            </svg>
-          </div>
-
-        {/* 2. TEXT & UNDERLINE */}
-        <div className="flex flex-col items-center">
-          <span className={`
-            text-sm font-sans transition-all duration-200 text-slate-700 font-bold
-          `}>
-            Highlights & Notes
-          </span>
-
-          {/* Đường gạch chân */}
+      {currentSubject != 'MATH' && (
+        <button 
+          onClick={toggleHighlightMode}
+          className={`
+            group flex flex-col items-center gap-1 focus:outline-none
+            transition-colors duration-200 
+            rounded-lg px-2 py-1 -my-1 
+            hover:bg-green-50      
+          `}
+          title={isHighlightMode ? "Turn off Highlights & Notes" : "Turn on Highlights & Notes"}
+        >
+          {/* 1. ICON CUSTOM (Thấp hơn & Rộng hơn) */}
           <div className={`
-            h-[2px] bg-slate-900 mt-0.5 transition-all duration-200
-            ${isHighlightMode ? 'w-full opacity-100' : 'w-0 opacity-0'}
-          `}></div>
-        </div>
-      </button>
-      {/* -----------------------------------------------------------------
-          BUTTON 2: SAVE & EXIT
-      ------------------------------------------------------------------ */}
+              w-6 h-6 transition-colors duration-200 
+              text-slate-700'
+            `}>
+              <svg 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                {/* 1. ĐƯỜNG GẠCH CHÂN (Stroke Line) */}
+                {/* Nằm ở y=22 (sát đáy), từ x=3 đến x=21 */}
+                <line x1="3" y1="22" x2="21" y2="22" />
+
+                {/* 2. THÂN BÚT (Pen Body) */}
+                {/* Vẽ hình chữ nhật nghiêng, đầu nhọn hướng về (3, 19) */}
+                {/* M 15 4: Điểm trên cùng */}
+                {/* L 20 9: Góc phải trên */}
+                {/* L 6 23: Xuống gần ngòi (chỉnh lại chút cho khớp nét gạch) */}
+                {/* Logic: Ngòi nằm ở khoảng (3, 19) */}
+                
+                <path d="M16 3L21 8L7.5 21.5L3 21.5L3 17L16 3Z" />
+                
+                {/* 3. CHI TIẾT (Nắp/Ngấn bút) */}
+                <line x1="11" y1="8" x2="16" y2="13" />
+              </svg>
+            </div>
+
+          {/* 2. TEXT & UNDERLINE */}
+          <div className="flex flex-col items-center">
+            <span className={`
+              text-sm font-sans transition-all duration-200 text-slate-700 font-bold
+            `}>
+              Highlights & Notes
+            </span>
+
+            {/* Đường gạch chân */}
+            <div className={`
+              h-[2px] bg-slate-900 mt-0.5 transition-all duration-200
+              ${isHighlightMode ? 'w-full opacity-100' : 'w-0 opacity-0'}
+            `}></div>
+          </div>
+        </button>
+      )}
+      {currentSubject === 'MATH' && (
+        <button 
+          onClick={toggleCalculator}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#1a1a1a] font-bold rounded-full transition-colors"
+          title={isCalculatorOpen ? "Turn off Calculator" : "Turn on Calculator"}
+        >
+          {/* Biểu tượng máy tính (Tùy chọn, bạn có thể dùng thư viện icon hoặc SVG) */}
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+            <line x1="8" y1="6" x2="16" y2="6"></line>
+            <line x1="16" y1="14" x2="16" y2="14.01"></line>
+            <line x1="16" y1="10" x2="16" y2="10.01"></line>
+            <line x1="16" y1="18" x2="16" y2="18.01"></line>
+            <line x1="12" y1="14" x2="12" y2="14.01"></line>
+            <line x1="12" y1="10" x2="12" y2="10.01"></line>
+            <line x1="12" y1="18" x2="12" y2="18.01"></line>
+            <line x1="8" y1="14" x2="8" y2="14.01"></line>
+            <line x1="8" y1="10" x2="8" y2="10.01"></line>
+            <line x1="8" y1="18" x2="8" y2="18.01"></line>
+          </svg>
+        </button>
+      )}
       {currentMode != 'EXAM' && (
         <button 
           onClick={handleSaveAndExit}

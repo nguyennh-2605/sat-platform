@@ -1,12 +1,9 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// ==========================================
-// 1. TẠO LỚP HỌC MỚI (Chỉ Teacher)
-// ==========================================
 exports.createClass = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name } = req.body;
     
     // Giả sử middleware đã decode token và gán user vào req.user
     // Nếu bạn chưa có auth, bạn có thể hardcode: const userId = 1;
@@ -27,7 +24,6 @@ exports.createClass = async (req, res) => {
     const newClass = await prisma.class.create({
       data: {
         name: name,
-        description: description || "",
         teacherId: userId, // Link lớp này với ID của giáo viên đang đăng nhập
       }
     });
@@ -84,9 +80,7 @@ exports.getMyClasses = async (req, res) => {
   }
 };
 
-// ==========================================
 // 3. LẤY CHI TIẾT 1 LỚP (Kèm bài tập & HS)
-// ==========================================
 exports.getClassDetail = async (req, res) => {
   try {
     const { id } = req.params; // ID lớp học (UUID string)
@@ -239,5 +233,183 @@ exports.createSubmission = async (req, res) => {
   } catch (error) {
     console.error("❌ Lỗi nộp bài:", error);
     res.status(500).json({ error: "Lỗi server khi nộp bài" });
+  }
+};
+
+exports.getExamTests = async (req, res) => {
+  try {
+    const { classId } = req.query;
+    if (!classId) {
+      return res.status(400).json({ error: "Thiếu thông tin classId" });
+    }
+    const tests = await prisma.test.findMany({
+      where: {
+        classTests: {
+          some: {
+            classId: classId
+          }
+        },
+        mode: 'EXAM'
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        _count: {
+          select: { submissions: true }
+        }
+      }
+    });
+
+    const formattedTests = tests.map(test => ({
+      id: test.id,
+      title: test.title,
+      // Format ngày tháng (VD: Feb 16)
+      date: new Date(test.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      submissionCount: test._count.submissions
+    }));
+
+    res.json(formattedTests);
+  } catch (error) {
+    console.error("Lỗi lấy danh sách bài thi:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách" });
+  }
+};
+
+exports.getTestAnalytics = async (req, res) => {
+  try {
+    const { testId } = req.params;
+
+    if (!testId) return res.status(400).json({ error: "Thiếu testId" });
+
+    const id = parseInt(testId);
+
+    // 1. Lấy cấu trúc đề thi
+    const testStructure = await prisma.test.findUnique({
+      where: { id: id },
+      include: {
+        sections: {
+          include: {
+            questions: {
+              select: { id: true, correctAnswer: true, order: true } // Lấy thêm order nếu cần sort
+            }
+          }
+        }
+      }
+    });
+
+    if (!testStructure) {
+      return res.status(404).json({ error: "Không tìm thấy bài thi" });
+    }
+
+    // --- FIX LỖI 81 CÂU & TRÙNG LẶP ---
+    // Sử dụng Map để lọc trùng câu hỏi theo ID
+    const uniqueQuestionsMap = new Map();
+    
+    testStructure.sections.forEach(section => {
+      section.questions.forEach(q => {
+        // Chỉ thêm nếu chưa tồn tại trong Map
+        if (!uniqueQuestionsMap.has(q.id)) {
+            uniqueQuestionsMap.set(q.id, q);
+        }
+      });
+    });
+
+    // Chuyển Map về mảng và sắp xếp lại (nếu cần theo thứ tự câu hỏi)
+    const allQuestions = Array.from(uniqueQuestionsMap.values())
+        .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort lại cho chắc chắn
+
+    // 2. Lấy danh sách bài nộp
+    const submissions = await prisma.submission.findMany({
+      where: {
+        testId: id,
+        status: 'COMPLETED'
+      },
+      select: {
+        id: true, score: true, startedAt: true, endTime: true,
+        user: { select: { id: true, name: true, email: true } },
+        answers: { select: { questionId: true, selectedChoice: true } }
+      },
+      orderBy: { score: 'desc' }
+    });
+
+    // A. Tạo Leaderboard (Giữ nguyên logic của bạn - Tốt)
+    const leaderboard = submissions.map(sub => {
+      let timeString = "--";
+      if (sub.startedAt && sub.endTime) {
+        const diffMs = new Date(sub.endTime) - new Date(sub.startedAt);
+        const minutes = Math.floor(diffMs / 60000);
+        timeString = `${minutes}p`;
+      }
+      return {
+        id: sub.user.id,
+        name: sub.user.name || sub.user.email || "Học sinh",
+        score: sub.score || 0,
+        time: timeString
+      };
+    });
+
+    // --- TỐI ƯU HIỆU NĂNG TÍNH TOÁN ---
+    // Thay vì loop lồng nhau (Questions x Submissions), 
+    // ta gom nhóm tất cả câu trả lời của Submissions vào một Lookup Object trước.
+    
+    // Tạo map: { questionId: [List các lựa chọn của HS] }
+    // Ví dụ: { 101: ['A', 'B', 'A'], 102: ['C', 'C'] }
+    const answersMap = {}; 
+
+    submissions.forEach(sub => {
+        const studentName = sub.user.name || "No Name";
+        sub.answers.forEach(ans => {
+            if (!answersMap[ans.questionId]) {
+                answersMap[ans.questionId] = [];
+            }
+            // Lưu object gồm choice và tên HS để dùng bên dưới
+            if (ans.selectedChoice) {
+                answersMap[ans.questionId].push({
+                    choice: ans.selectedChoice,
+                    student: studentName
+                });
+            }
+        });
+    });
+
+    // B. Tạo Thống kê (Chạy nhanh hơn nhiều)
+    const questionsReport = allQuestions.map(question => {
+      const choiceKeys = ['A', 'B', 'C', 'D'];
+      const statsMap = { A: [], B: [], C: [], D: [] };
+
+      // Lấy danh sách bài làm cho câu hỏi này từ answersMap (O(1) lookup)
+      const studentAnswers = answersMap[question.id] || [];
+
+      // Phân loại vào A, B, C, D
+      studentAnswers.forEach(({ choice, student }) => {
+          if (statsMap[choice]) {
+              statsMap[choice].push(student);
+          }
+      });
+
+      // Format kết quả
+      const statsArray = choiceKeys.map(key => ({
+        key: key,
+        count: statsMap[key].length,
+        students: statsMap[key]
+      }));
+
+      return {
+        id: question.id,
+        correctChoice: question.correctAnswer,
+        stats: statsArray
+      };
+    });
+
+    res.json({
+      leaderboard,
+      questions: questionsReport
+    });
+
+  } catch (error) {
+    console.error("Lỗi Test Analytics:", error);
+    res.status(500).json({ error: "Lỗi server" });
   }
 };

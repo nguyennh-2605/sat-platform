@@ -1,19 +1,24 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { AlertTriangle, Maximize } from 'lucide-react';
+import toast from 'react-hot-toast';
+import axios from 'axios';
+// import cac component
 import QuestionHeader from '../components/QuestionHeader';
 import AnswerOption from '../components/AnswerOption';
 import BlockRenderer from '../components/BlockRenderer';
 import ToolsHeader from '../components/ToolsHeader';
 import InteractiveText from '../components/InteractiveText';
-
-// 2. Import Type
+import ReviewScreen from '../components/ReviewModule';
+import ScoreReport from '../ScoreReport';
 import type { QuestionData } from '../types/quiz';
 import type { QuestionResult } from '../ScoreReport';
-import ScoreReport from '../ScoreReport';
-import toast from 'react-hot-toast';
-import { AlertTriangle, Maximize } from 'lucide-react';
-import axios from 'axios';
-import ReviewScreen from '../components/ReviewModule';
+import FormattedTextRenderer from '../utlis/TextRenderer';
+import ResizableSplitLayout from '../components/layouts/ResizableSplitLayout';
+import SingleColumnLayout from '../components/layouts/SingleColumnLayout';
+import SPRInstructions from '../components/SPRInstructions';
+import { useQuizTool } from '../context/QuizToolContext';
+import Calculator from '../components/Calculator';
 
 function ExamRoom() {
   const { id } = useParams();
@@ -75,7 +80,8 @@ function ExamRoom() {
   const [TestInfo, setTestInfo] = useState({
     title: '',
     description: '',
-    duration: 0
+    duration: 0,
+    subject: ''
   }) 
 
   // State lưu độ dài module 1
@@ -98,6 +104,9 @@ function ExamRoom() {
   const isDragging = useRef(false);
 
   const hasFetched = useRef(false);
+
+  // State quan li calculator
+  const { isCalculatorOpen, toggleCalculator } = useQuizTool();
 
   // Dữ liệu Backend trả về sau khi nộp bài
   interface BackendResult {
@@ -161,7 +170,8 @@ function ExamRoom() {
                   blocks: q.blocks,
                   questionText: q.questionText,
                   choices: formattedChoices,
-                  moduleIndex: section.order
+                  moduleIndex: section.order,
+                  type: q.type || 'MCQ'
                 } as QuestionData; 
               });
               allQuestions = [...allQuestions, ...qs];
@@ -183,8 +193,11 @@ function ExamRoom() {
         setTestInfo({
           title: data.title,
           description: data.description,
-          duration: data.duration
+          duration: data.duration,
+          subject: data.subject
         });
+
+        console.log("subject hien tai", data.subject);
 
         const mode = data.mode || 'PRACTICE';
         setTestMode(mode);
@@ -475,7 +488,7 @@ function ExamRoom() {
 
   const handleSelectOption = (optionId: string) => {
     setAnswers(prev => {
-        const newAnswers = { ...prev, [questions[currentQuestionIndex].id]: optionId };
+        const newAnswers = { ...prev, [currentQ.id]: optionId };
         
         // Lưu ngay vào localStorage
         const userId = localStorage.getItem('userId');
@@ -483,6 +496,18 @@ function ExamRoom() {
         
         return newAnswers;
     });
+  };
+
+  const handleSprChange = (value: string) => {
+    // Tùy chọn: Lọc bỏ các ký tự không hợp lệ (chỉ giữ lại số, dấu chấm, dấu /, và dấu -)
+    const sanitizedValue = value.replace(/[^0-9./-]/g, '');
+
+    // Cập nhật vào state answers chung (Giả sử bạn đang dùng setAnswers)
+    // Thay setAnswers bằng hàm update state thực tế của bạn nếu tên khác nhé
+    setAnswers((prevAnswers: any) => ({
+      ...prevAnswers,
+      [currentQ.id]: sanitizedValue // Lưu chuỗi học sinh vừa nhập theo ID câu hỏi
+    }));
   };
 
   const splitIndex = useMemo(() => {
@@ -693,6 +718,23 @@ function ExamRoom() {
     setCurrentQuestionIndex(realIndex);
   };
 
+  const formatSprPreview = (value: string | undefined) => {
+    if (!value) return '';
+    
+    // Nếu chuỗi có dấu gạch chéo -> Chuyển thành phân số LaTeX
+    if (value.includes('/')) {
+      const [numerator, denominator] = value.split('/');
+      
+      // Chỉ render phân số khi học sinh đã gõ cả tử và mẫu (tránh vỡ UI khi mới gõ "3/")
+      if (numerator !== undefined && denominator !== undefined && denominator !== '') {
+        return `$\\frac{${numerator}}{${denominator}}$`;
+      }
+    }
+    
+    // Nếu là số bình thường, số âm, hoặc thập phân -> Bọc $ để dùng font Toán học
+    return `$${value}$`;
+  };
+
   // --- RENDER LOADING ---
   if (isLoading) {
     return (
@@ -759,10 +801,118 @@ function ExamRoom() {
 
   // --- BIẾN CHO CÂU HỎI HIỆN TẠI ---
   const currentQ = questions[currentQuestionIndex]; 
-  // Offset index để sidebar luôn hiển thị đúng số thứ tự
+  console.log("type cau hien tai", currentQ.type);
   const sidebarOffset = phase === 'MODULE_2' ? splitIndex : 0;
 
   // --- RENDER PHÒNG THI ---
+
+  const renderLeftContent = () => {
+    if (TestInfo.subject === 'MATH' && currentQ.type != 'MCQ') {
+      return (
+        <div className="h-full overflow-y-auto custom-scrollbar">
+          <SPRInstructions />
+        </div>
+      );
+    } 
+    if (currentQ.blocks && currentQ.blocks.length > 0) {
+      return <BlockRenderer blocks={currentQ.blocks}/>
+    }
+    return null;
+  };
+
+  const renderRightContent = () => {
+    return (
+      <>
+        <QuestionHeader 
+          currentPhase={phase}
+          splitIndex={splitIndex}
+          currentIndex={currentQuestionIndex}
+          isMarked={markedQuestions.includes(currentQuestionIndex)}
+          onToggleMark={toggleMarkQuestion}
+          isStrikeMode={isStrikeMode}
+          onToggleStrikeMode={() => setIsStrikeMode(!isStrikeMode)}
+        />
+        {TestInfo.subject === 'MATH' && currentQ.type !== 'SPR' && (
+          <div className="my-0"> {/* Thêm margin y-6 để tạo khoảng cách trên dưới */}
+            {renderLeftContent()}
+          </div>
+        )} 
+        {TestInfo.subject === 'MATH' && currentQ.type !== 'MCQ' && currentQ.blocks && currentQ.blocks.length > 0 && (
+          <div className="my-0"> 
+            <BlockRenderer blocks={currentQ.blocks}/>
+          </div>
+        )}
+        <h3 className="
+          font-['Source_Serif_4',_'Georgia',_serif] 
+          lining-nums tabular-nums 
+          font-normal text-[#1a1a1a] 
+          leading-relaxed tracking-normal mb-3
+          
+          text-[16px]           /* Set cho h3 */
+          [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
+          [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
+        ">
+          {TestInfo.subject === 'MATH' 
+            ? <FormattedTextRenderer text={currentQ.questionText}/>
+            : <InteractiveText content={currentQ.questionText}/>
+          }
+        </h3>
+        <div className="space-y-3 mt-6">
+          {currentQ.type === 'SPR' ? (
+            <div className="mt-4">
+             <div className="flex flex-col items-start"> {/* Căn lề trái cho khối nhập */}
+                <div className="relative w-36 font-mono"> {/* Tăng w-36 cho rộng rãi chút */}
+                  <input
+                    type="text"
+                    // 3. pb-1: Giảm padding bottom một chút để chữ nằm sát đường kẻ hơn
+                    className="w-full p-3 pb-3 text-xl border border-gray-400 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-transparent relative z-10"
+                    value={answers[currentQ.id] || ''}
+                    onChange={(e) => handleSprChange(e.target.value)}
+                    maxLength={5}
+                    placeholder=" "
+                  />
+                  
+                  <div className="absolute bottom-3 left-4 right-4 border-b border-gray-400 z-0 pointer-events-none"></div>
+                </div>
+              </div>
+              
+              {/* Khu vực Answer Preview */}
+              <div className="mt-8 flex items-center space-x-3">
+                <span className="font-bold text-[18px] font-['Source_Serif_4',_'Georgia',_serif] text-[#1a1a1a]">
+                  Answer Preview:
+                </span>
+                
+                {/* Render kết quả Preview bằng LaTeX */}
+                <div className="text-[18px] min-h-[30px] flex items-center justify-center">
+                  {answers[currentQ.id] && (
+                    <FormattedTextRenderer text={formatSprPreview(answers[currentQ.id])} />
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            currentQ.choices.map((opt: any, index: number) => {
+              const isEliminated = eliminatedMap[currentQuestionIndex]?.includes(index);
+              const charLabel = String.fromCharCode(65 + index);
+              return (
+                <AnswerOption
+                  key={index}
+                  label={charLabel}
+                  content={opt.text}
+                  isSelected={answers[currentQ.id] === charLabel}
+                  isEliminated={!!isEliminated}
+                  isStrikeMode={isStrikeMode}
+                  onSelect={() => handleSelectOption(charLabel)}
+                  onEliminate={(e) => handleEliminate(currentQuestionIndex, index, e)}
+                  currentSubject={TestInfo.subject}
+                />
+              );
+            })
+          )}
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans relative overflow-hidden">
@@ -785,7 +935,7 @@ function ExamRoom() {
             {/* --- PHẦN TRÁI: Tiêu đề Module --- */}
             <div className="flex items-center gap-4 w-1/3"> {/* Đặt w-1/3 để cân bằng layout */}
               <span className="font-bold text-lg text-slate-800 truncate">
-                Section 1, {phase === 'MODULE_2' ? "Module 2" : "Module 1"}: {TestInfo.description}
+                Section {TestInfo.subject === 'RW' ? 1 : 2}, {phase === 'MODULE_2' ? "Module 2" : "Module 1"}: {TestInfo.description}
               </span>
             </div>
 
@@ -848,6 +998,7 @@ function ExamRoom() {
               <ToolsHeader 
                 onSaveAction={handleSaveExamData}
                 currentMode={testMode}
+                currentSubject={TestInfo.subject}
               />
             </div>
           </header>
@@ -1038,111 +1189,19 @@ function ExamRoom() {
         )}
 
           {/* --- NỘI DUNG CHÍNH (BODY) --- */}
-          <div ref={containerRef} className="flex-1 flex overflow-hidden w-full h-full relative">
-            
-            {/* --- CỘT TRÁI (BÀI ĐỌC) --- */}
-            {/* Thay w-1/2 bằng style width động */}
-            <div 
-              style={{ width: `${leftWidth}%` }} 
-              className="h-full bg-white border-r border-gray-200 flex flex-col min-w-[200px]"
-            >
-              <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-6 md:px-8 md:py-8">
-                <div className="
-                  font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums
-                  font-normal text-[#1a1a1a] leading-relaxed tracking-normal
-                  text-[16px]           /* Set cho h3 */
-                  [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
-                  [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
-                ">
-                  {currentQ.blocks && currentQ.blocks.length > 0 ? (
-                    <BlockRenderer blocks={currentQ.blocks} />
-                  ) : (
-                    <div className="text-gray-400 italic flex items-center justify-center h-40 text-sm font-sans">
-                      No passage provided.
-                    </div>
-                  )}
-                  <div className="h-40 w-full shrink-0"></div>
-                </div>
-              </div>
-            </div>
-
-            {/* --- THANH KÉO (RESIZER) --- */}
-            <div
-              onMouseDown={handleMouseDown}
-              className="
-                w-6 -ml-3 h-full cursor-col-resize 
-                flex justify-center items-center 
-                absolute z-20 transition-colors
-                
-                /* Hiệu ứng khi di chuột vào vùng kéo: Xanh nhạt */
-                hover:bg-blue-500/10 
-                active:bg-blue-500/20
-              "
-              style={{ left: `${leftWidth}%` }}
-            >
-              {/* 1. Đường kẻ dọc chạy suốt chiều cao (Divider Line) */}
-              <div className="w-[2px] h-full bg-gray-500 group-hover:bg-blue-200/50 absolute"></div>
-
-              {/* 2. Thanh hình chữ nhật lơ lửng (Handle) */}
-              <div className="
-                relative z-10 
-                w-[6px] h-10            /* To hơn một chút */
-                bg-gray-700            /* Đậm hơn (gray-600) */
-                rounded-full shadow-sm
-              "></div>
-            </div>
-
-            {/* --- CỘT PHẢI (CÂU HỎI) --- */}
-            {/* Chiếm phần còn lại (flex-1) */}
-            <div className="flex-1 h-full bg-white flex flex-col min-w-[300px] overflow-hidden">
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-                    
-                <QuestionHeader 
-                  currentPhase={phase}
-                  splitIndex={splitIndex}
-                  currentIndex={currentQuestionIndex}
-                  isMarked={markedQuestions.includes(currentQuestionIndex)}
-                  onToggleMark={toggleMarkQuestion}
-                  isStrikeMode={isStrikeMode}
-                  onToggleStrikeMode={() => setIsStrikeMode(!isStrikeMode)}
-                />
-
-                <h3 className="
-                  font-['Source_Serif_4',_'Georgia',_serif] 
-                  lining-nums tabular-nums 
-                  font-normal text-[#1a1a1a] 
-                  leading-relaxed tracking-normal mb-3
-                  
-                  text-[16px]           /* Set cho h3 */
-                  [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
-                  [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
-                ">
-                  <InteractiveText content={currentQ.questionText} />
-                </h3>
-                
-                <div className="space-y-3">
-                  {currentQ.choices.map((opt: any, index: number) => {
-                    const isEliminated = eliminatedMap[currentQuestionIndex]?.includes(index);
-                    const charLabel = String.fromCharCode(65 + index);
-                    return (
-                      <AnswerOption
-                        key={index}
-                        label={charLabel}
-                        content={opt.text}
-                        isSelected={answers[currentQ.id] === charLabel}
-                        isEliminated={!!isEliminated}
-                        isStrikeMode={isStrikeMode}
-                        onSelect={() => handleSelectOption(charLabel)}
-                        onEliminate={(e) => handleEliminate(currentQuestionIndex, index, e)}
-                      />
-                    );
-                  })}
-                </div>
-                <div className="h-40 w-full shrink-0"></div>
-              </div>
-            </div>
-
-          </div>
+          {(TestInfo.subject === 'MATH' && currentQ.type !== 'SPR') ? (
+            <SingleColumnLayout>
+              {renderRightContent()}
+            </SingleColumnLayout>
+          ) : (
+            <ResizableSplitLayout
+              containerRef={containerRef}
+              leftWidth={leftWidth}
+              handleMouseDown={handleMouseDown}
+              leftContent={renderLeftContent()}
+              rightContent={renderRightContent()}
+            />
+          )}
         </>
       )}
 
@@ -1272,12 +1331,10 @@ function ExamRoom() {
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}
             >
-              {/* Logic đổi tên nút bấm */}
               {
                 // Nếu là câu cuối cùng của toàn bộ bài thi (Mod 2 HOẶC Mod 1 nếu chỉ có 1 mod)
                 (phase === 'REVIEW_2') || (phase === 'REVIEW_1' && examConfig.totalModules === 1)
                   ? "Submit" 
-                  // Nếu là câu cuối Mod 1 (nhưng còn Mod 2)
                   : "Next"
                 }
             </button>
@@ -1344,28 +1401,18 @@ function ExamRoom() {
       {/* --- MODAL CHẶN MÀN HÌNH KHI THOÁT FULLSCREEN --- */}
      {isFullscreenBlocked && (
       <div className="fixed inset-0 z-50 bg-white/80 flex items-center justify-center p-4 animate-in fade-in duration-200">
-        
-        {/* Card chính - Màu trắng, bo góc mềm mại */}
         <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center relative overflow-hidden">
-          
-          {/* Decorative Background Blob - tạo cảm giác chiều sâu nhẹ */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-rose-500"></div>
-
-          {/* Icon */}
           <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-6 text-orange-600">
             <AlertTriangle size={32} />
           </div>
-
           <h2 className="text-xl font-bold text-gray-800 mb-2">
             Gián đoạn chế độ toàn màn hình
           </h2>
-          
           <p className="text-gray-600 mb-6 leading-relaxed">
             Hệ thống phát hiện bạn đã rời khỏi màn hình thi. 
             Vui lòng quay lại ngay để tránh bị ghi nhận vi phạm.
           </p>
-
-          {/* Hiển thị số lần vi phạm dạng Visual */}
           <div className="bg-gray-50 rounded-xl p-4 mb-8 border border-gray-100">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
               Số lần cảnh báo ({violationCount}/3)
@@ -1388,8 +1435,6 @@ function ExamRoom() {
               </p>
             )}
           </div>
-
-          {/* Button Action */}
           <button 
             onClick={handleReturnToFullscreen}
             className="w-full bg-gray-900 text-white font-bold py-3.5 px-6 rounded-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-gray-200"
@@ -1401,7 +1446,13 @@ function ExamRoom() {
         </div>
       </div>
     )}
-      </div>
+    {TestInfo.subject === 'MATH' && (
+      <Calculator 
+        isOpen={isCalculatorOpen}
+        onClose={toggleCalculator}
+      />
+    )}
+    </div>
   );
 }
 

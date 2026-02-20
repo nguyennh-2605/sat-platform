@@ -51,5 +51,6 @@ export interface QuestionData {
     id: string;
     text: string;
   }[];
-  moduleIndex: number
+  moduleIndex: number;
+  type: 'MCQ' | 'SPR';
 }

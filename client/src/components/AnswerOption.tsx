@@ -1,6 +1,6 @@
-// FILE: src/components/AnswerOption.tsx
 import React from 'react';
 import InteractiveText from './InteractiveText';
+import FormattedTextRenderer from '../utlis/TextRenderer';
 
 interface AnswerProps {
   label: string;         // Ví dụ: "A", "B", "C"
@@ -10,10 +10,11 @@ interface AnswerProps {
   isStrikeMode: boolean; // Chế độ gạch đang BẬT hay TẮT
   onSelect: () => void;  // Hàm khi bấm chọn đáp án
   onEliminate: (e: React.MouseEvent) => void; // Hàm khi bấm nút gạch
+  currentSubject: string;
 }
 
 const AnswerOption: React.FC<AnswerProps> = ({ 
-  label, content, isSelected, isEliminated, isStrikeMode, onSelect, onEliminate 
+  label, content, isSelected, isEliminated, isStrikeMode, onSelect, onEliminate, currentSubject
 }) => {
 
   // Logic: Hiển thị cột bên phải khi đang bật chế độ Strike HOẶC đáp án này đã bị gạch (để hiện nút Undo)
@@ -51,7 +52,10 @@ const AnswerOption: React.FC<AnswerProps> = ({
         [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
         [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
         ">
-        <InteractiveText content={content} />
+        {currentSubject === 'RW' 
+          ? <InteractiveText content={content} />
+          : <FormattedTextRenderer text={content} />
+        }
       </span>
 
       <div className={`
@@ -72,7 +76,6 @@ const AnswerOption: React.FC<AnswerProps> = ({
       {/* 4. NÚT HÀNH ĐỘNG (Undo / Strike) */}
       <div 
         onClick={onEliminate}
-        // 👇 Quan trọng: Chỉ để margin, xóa hết background và padding
         className={`
           flex items-start justify-end shrink-0 cursor-pointer overflow-hidden mt-1
           transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
@@ -86,7 +89,6 @@ const AnswerOption: React.FC<AnswerProps> = ({
         {/* Dùng div con để cố định kích thước nội dung, tránh bị méo khi div cha co lại */}
         <div className="w-[50px] flex justify-center">
           {isEliminated ? (
-            // 👇 SỬA: Chữ luôn màu đen (slate-900), BỎ class hover đổi màu
             <span className="text-sm font-bold text-slate-900 underline decoration-2 underline-offset-4">
               Undo
             </span>

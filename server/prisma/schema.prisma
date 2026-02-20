@@ -1,7 +1,5 @@
-// server/prisma/schema.prisma
-
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
@@ -10,240 +8,185 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 1. Enum cho phân quyền
-enum Role {
-  ADMIN
-  TEACHER
-  STUDENT
-}
-
-enum TestMode {
-  PRACTICE // Luyện tập (Thoải mái)
-  EXAM     // Kiểm tra (Nghiêm ngặt)
-}
-
-enum TestCategory {
-  REAL      // Đề thi thật (Real Tests)
-  CLASS     // Bài tập riêng của lớp
-  PRACTICE  // Đề ôn tập đại trà
-}
-
-enum TestSubject {
-  RW      // Reading & Writing
-  MATH    // Math
-}
-
-enum SubmissionStatus {
-  DOING       // Đang làm
-  PAUSED      // Đã lưu và thoát (Save & Exit)
-  COMPLETED   // Đã nộp bài
-}
-
-// 2. Bảng người dùng
 model User {
-  id          Int          @id @default(autoincrement())
-  email       String       @unique
-  password    String?
-  name        String?      // Tên hiển thị
-  role        Role         @default(STUDENT) // Dùng Enum Role ở đây
-  createdAt   DateTime     @default(now())
-  avatar      String? 
-  
-  submissions Submission[]
-
-  taughtClasses       Class[]      @relation("TeacherClasses")
-  studyingClasses     Class[]      @relation("StudentClasses")
-  homeworkSubmissions HomeworkSubmission[]
+  id                  Int                  @id @default(autoincrement())
+  email               String               @unique
+  password            String?
+  createdAt           DateTime             @default(now())
+  name                String?
+  role                Role                 @default(STUDENT)
+  avatar              String?
+  taughtClasses       Class[]              @relation("TeacherClasses")
   errorLogs           ErrorLog[]
-  createdTests        Test[]  // Các bài thi do user này tạo (nếu là Teacher)
+  homeworkSubmissions HomeworkSubmission[]
+  submissions         Submission[]
+  createdTests        Test[]
+  studyingClasses     Class[]              @relation("StudentClasses")
 }
 
 model Class {
-  id          String   @id @default(uuid()) // Dùng ID chuỗi cho bảo mật hơn (VD: cl_123abc)
+  id          String       @id @default(uuid())
   name        String
-  description String?
-  createdAt   DateTime @default(now())
-
-  // Giáo viên chủ nhiệm (1 Lớp thuộc về 1 Giáo viên)
+  createdAt   DateTime     @default(now())
   teacherId   Int
-  teacher     User     @relation("TeacherClasses", fields: [teacherId], references: [id])
-
-  // Danh sách học sinh (1 Lớp có nhiều HS, 1 HS học nhiều lớp) -> Quan hệ N-N
-  students    User[]   @relation("StudentClasses")
-
-  // Danh sách bài tập trong lớp này
   assignments Assignment[]
+  teacher     User         @relation("TeacherClasses", fields: [teacherId], references: [id])
   classTests  ClassTest[]
+  students    User[]       @relation("StudentClasses")
 }
 
 model Assignment {
-  id          String   @id @default(uuid())
+  id          String               @id @default(uuid())
   title       String
-  content     String?  // Nội dung đề bài text
-  fileUrl     String?  // File đề bài đính kèm (PDF/DOC)
+  content     String?
+  fileUrl     String?
   deadline    DateTime?
-  createdAt   DateTime @default(now())
-
-  // Thuộc về lớp nào
+  createdAt   DateTime             @default(now())
   classId     String
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-
-  // Danh sách bài nộp của học sinh
+  class       Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
   submissions HomeworkSubmission[]
 }
 
-// Bảng Nộp bài tập về nhà (Bài làm)
 model HomeworkSubmission {
-  id          String   @id @default(uuid())
-  fileUrl     String?  // File bài làm học sinh up lên
-  textResponse String? // Hoặc trả lời trực tiếp dạng text
-  score       Float?   // Điểm số giáo viên chấm
-  feedback    String?  // Lời phê của giáo viên
-  submittedAt DateTime @default(now())
-  status      String   @default("SUBMITTED") // SUBMITTED, LATE, GRADED
-
-  // Ai nộp?
-  studentId   Int
-  student     User     @relation(fields: [studentId], references: [id])
-
-  // Nộp cho bài tập nào?
+  id           String     @id @default(uuid())
+  fileUrl      String?
+  textResponse String?
+  score        Float?
+  feedback     String?
+  submittedAt  DateTime   @default(now())
+  status       String     @default("SUBMITTED")
+  studentId    Int
   assignmentId String
   assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student      User       @relation(fields: [studentId], references: [id])
+
   @@unique([studentId, assignmentId])
 }
 
-// 3. Bảng Đề thi
 model Test {
   id          Int          @id @default(autoincrement())
-  title       String
   description String?
-  duration    Int          @default(64) // Tổng thời gian (để hiển thị)
-
-  subject     TestSubject  @default(RW)
+  duration    Int          @default(64)
+  title       String
   mode        TestMode     @default(PRACTICE)
-  category    TestCategory @default(PRACTICE)
-  
-  // Filter date and privacy
-  testDate    String?   
-  isPublic    Boolean      @default(false)
-
   authorId    Int?
-  author      User?     @relation(fields: [authorId], references: [id])
-
-
-  sections    Section[]    // 1 Bài thi có nhiều phần (Module 1, Module 2)
-  submissions Submission[]
+  category    TestCategory @default(PRACTICE)
+  isPublic    Boolean      @default(false)
+  subject     TestSubject  @default(RW)
+  createdAt   DateTime     @default(now())
+  testDate    String?
   classTests  ClassTest[]
+  sections    Section[]
+  submissions Submission[]
+  author      User?        @relation(fields: [authorId], references: [id])
 }
 
 model ClassTest {
-  id         Int      @id @default(autoincrement())
-  
+  id         Int       @id @default(autoincrement())
   classId    String
-  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  
   testId     Int
-  test       Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
-  
-  assignedAt DateTime @default(now())
-  dueDate    DateTime? // Hạn chót làm bài riêng cho lớp này
-  isHidden   Boolean   @default(false) // Giáo viên có thể tạm ẩn đề khỏi lớp
+  assignedAt DateTime  @default(now())
+  dueDate    DateTime?
+  isHidden   Boolean   @default(false)
+  class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  test       Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
 
-  @@unique([classId, testId]) // 1 Đề chỉ add vào 1 lớp 1 lần
+  @@unique([classId, testId])
 }
 
-// 4. Bảng Phần thi (Ví dụ: Reading Module 1, Math Module 2)
 model Section {
   id        Int        @id @default(autoincrement())
-  name      String     // VD: "Reading & Writing - Module 1"
-  order     Int        // Thứ tự: 1, 2, 3...
-  duration  Int        // Thời gian riêng cho section này (giây)
-  
   testId    Int
+  name      String
+  order     Int
+  duration  Int
+  questions Question[]
   test      Test       @relation(fields: [testId], references: [id])
-  
-  questions Question[] // 1 Section có nhiều câu hỏi
 }
 
-// 5. Bảng Câu hỏi
 model Question {
   id            Int      @id @default(autoincrement())
-  blocks        Json     // Cột trái chứa passage, table, graph, ...
-  questionText  String   @db.Text
-  explanation   String?  @db.Text
-  order         Int      @default(0)
-  
-  // Lưu danh sách đáp án dưới dạng JSON
-  // Cấu trúc: [{"id": "A", "text": "Answer 1"}, {"id": "B", "text": "Answer 2"}]
-  choices       Json     
-  
-  correctAnswer String   // "A", "B", "C", hoặc "D"
-  
   sectionId     Int
+  type          QuestionType  @default(MCQ)
+  choices       Json
+  correctAnswer String
+  blocks        Json
+  questionText  String
+  explanation   String?
+  order         Int      @default(0)
+  answers       Answer[]
   section       Section  @relation(fields: [sectionId], references: [id])
-
-  // Quan hệ ngược để biết câu này đã được trả lời thế nào trong các bài nộp
-  answers       Answer[] 
 }
 
-// 6. Bảng Nộp bài (Lịch sử thi)
 model Submission {
-  id                       Int       @id @default(autoincrement())
-  startedAt                DateTime  @default(now())
-  endTime                  DateTime?
-  score                    Int?      // Điểm số
-  status                   SubmissionStatus   @default(DOING)
-  
-  timeRemaining            Int?
-  currentQuestionIndex     Int       @default(0)
-  savedAnswers             Json?
-  violationCount Int       @default(0)
-
-  userId         Int
-  user           User      @relation(fields: [userId], references: [id])
-  testId         Int
-  test           Test      @relation(fields: [testId], references: [id])
-
-  answers        Answer[]
+  id                   Int              @id @default(autoincrement())
+  userId               Int
+  testId               Int
+  endTime              DateTime?
+  score                Int?
+  violationCount       Int              @default(0)
+  startedAt            DateTime         @default(now())
+  currentQuestionIndex Int              @default(0)
+  savedAnswers         Json?
+  timeRemaining        Int?
+  status               SubmissionStatus @default(DOING)
+  answers              Answer[]
+  test                 Test             @relation(fields: [testId], references: [id])
+  user                 User             @relation(fields: [userId], references: [id])
 }
 
-// 7. Bảng Chi tiết câu trả lời của User
 model Answer {
   id             Int        @id @default(autoincrement())
-  selectedChoice String?    // User chọn "A", "B"... (Nếu null là bỏ qua)
-  isCorrect      Boolean    @default(false)
-  
   submissionId   Int
-  submission     Submission @relation(fields: [submissionId], references: [id])
-  
   questionId     Int
+  selectedChoice String?
+  isCorrect      Boolean    @default(false)
   question       Question   @relation(fields: [questionId], references: [id])
-}
-
-model Passage {
-  id             String   @id @default(uuid())
-  title          String?  // Tiêu đề (VD: The Great Gatsby)
-  content        String   // Nội dung đoạn văn cần đọc
-  difficulty     String  @default("Medium") // Easy, Medium, Hard
-  createdAt      DateTime @default(now())
+  submission     Submission @relation(fields: [submissionId], references: [id])
 }
 
 model ErrorLog {
-  id            String    @id @default(uuid())
-  source        String?  // Nguồn đề 
-  category      String?  // Dạng bài 
-  
-  userAnswer    String?  // Đáp án user chọn (A, B...)
-  correctAnswer String?  // Đáp án đúng (A, B...)
-  
-  whyWrong      String?  @db.Text // @db.Text để lưu văn bản dài (Analysis)
-  whyRight      String?  @db.Text // @db.Text để lưu văn bản dài (Solution)
-  
+  id            String   @id @default(uuid())
+  source        String?
+  category      String?
+  userAnswer    String?
+  correctAnswer String?
+  whyWrong      String?
+  whyRight      String?
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt // Tự động cập nhật thời gian khi sửa
-
-  // Liên kết với User (Để biết log này của ai)
+  updatedAt     DateTime @updatedAt
   userId        Int
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+enum Role {
+  TEACHER
+  STUDENT
+  ADMIN
+}
+
+enum TestMode {
+  PRACTICE
+  EXAM
+}
+
+enum TestCategory {
+  REAL
+  CLASS
+  PRACTICE
+}
+
+enum TestSubject {
+  RW
+  MATH
+}
+
+enum SubmissionStatus {
+  DOING
+  COMPLETED
+}
+
+enum QuestionType {
+  MCQ      // Trắc nghiệm
+  SPR      // Tự luận điền số (Grid-in)
+}

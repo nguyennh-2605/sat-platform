@@ -5,11 +5,10 @@ const { authenticateToken } = require('../middleware/authMiddleware'); // Middle
 
 // API lấy danh sách lớp (cho Sidebar)
 router.get('/', authenticateToken, classController.getMyClasses);
-// API tạo lớp mới
-router.post('/', authenticateToken, classController.createClass);
-// API lấy chi tiết 1 lớp (khi click vào lớp)
+router.get('/list', authenticateToken, classController.getExamTests);
 router.get('/:id', authenticateToken, classController.getClassDetail);
-// API thêm học sinh vào lớp
+router.get('/:testId/report', authenticateToken, classController.getTestAnalytics);
+router.post('/', authenticateToken, classController.createClass);
 router.post('/:classId/students', authenticateToken, classController.addStudentToClass);
 router.post('/assignments', authenticateToken, classController.createAssignment);
 router.post('/submissions', authenticateToken, classController.createSubmission);
