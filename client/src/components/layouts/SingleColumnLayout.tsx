@@ -9,7 +9,6 @@ const SingleColumnLayout = ({ children }: { children: React.ReactNode }) => {
         {children}
         <div className="h-40 w-full shrink-0"></div>
       </div>
-
     </div>
   );
 };
