@@ -1,10 +1,11 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Clock, ChevronRight, Filter, Layers, Calendar, GraduationCap } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce';
 import CreateTestWizard from '../components/CreateTestWizard';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
+import Ripple from '../components/RippleButton';
 
 // --- CONSTANTS ---
 const TEST_DATES = [
@@ -84,6 +85,8 @@ const PracticeTest = () => {
   const [activeSubject, setActiveSubject] = useState('ALL');
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // 1. Setup User
@@ -112,6 +115,20 @@ const PracticeTest = () => {
 
     fetchData();
   }, []);
+
+  useEffect(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    // Nếu flyout đang mở VÀ vị trí click không nằm trong filterRef
+    if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+      setIsFilterOpen(false);
+    }
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  // Quan trọng: Gỡ bỏ sự kiện khi component unmount để tránh rò rỉ bộ nhớ
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, []);
 
   const debouncedSearch = useDebounce(searchQuery, 150);
 
@@ -160,116 +177,130 @@ const PracticeTest = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-extrabold text-slate-800 mb-2">
-            Xin chào, {user.name.split(' ').pop()}! 👋
-          </h2>
-          <p className="text-slate-500 text-lg">Hôm nay bạn muốn luyện tập kỹ năng nào?</p>
-        </div>
-        
-        {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
-          <button 
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-xl font-semibold hover:bg-slate-800 hover:shadow-lg hover:-translate-y-0.5 transition-all"
-          >
-            <Plus size={20} /> 
-            <span>Tạo đề thi mới</span>
-          </button>
-        )}
+      {/* 1. HEADER SECTION (Chỉ còn chữ) */}
+      <div className="mb-6">
+        <h2 className="text-3xl font-extrabold text-slate-800 mb-2">
+          Xin chào, {user.name.split(' ').pop()}! 👋
+        </h2>
+        <p className="text-slate-500 text-lg">Hôm nay bạn muốn luyện tập kỹ năng nào?</p>
       </div>
 
-      {/* === FILTER UI SECTION === */}
-      <div className="space-y-4 bg-white p-4 rounded-2xl border border-slate-300 shadow-sm">
-        
-        {/* ROW 1: Context (Category) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-0 scrollbar-hide">
-          <div className="text-slate-600 mr-2 flex items-center gap-1 font-medium text-sm">
-            <Filter size={16}/> Nguồn:
+      {/* 2. ACTION TOOLBAR (Search, Filter, Add Button nằm cùng 1 dòng) */}
+      <div className="flex flex-col sm:flex-row items-center gap-3 mb-6 relative">
+        {/* Search Bar (flex-1 để tự động chiếm hết khoảng trống) */}
+        <div className="flex-1 w-full bg-white px-4 h-[52px] rounded-2xl shadow-sm 
+          border border-slate-300 flex items-center gap-2 focus-within:border-2 focus-within:border-blue-500">
+          <div className="pl-1 text-slate-400">
+            <Search size={20} />
           </div>
-          
-          <FilterChip 
-            label="Tất cả" 
-            active={activeCategory === 'ALL'} 
-            onClick={() => setActiveCategory('ALL')} 
+          <input 
+            type="text"   
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tests by name..." 
+            className="w-full outline-none text-slate-700 placeholder-slate-400 bg-transparent text-base font-medium"
           />
-          <FilterChip 
-            label="Real Tests" 
-            icon={Layers}
-            active={activeCategory === 'REAL'} 
-            onClick={() => setActiveCategory('REAL')} 
-          />
-          
-          <div className="h-6 w-[1px] bg-slate-300 mx-1"></div>
-
-          {myClasses.map(cls => (
-            <FilterChip 
-              key={cls.id}
-              label={cls.name} 
-              icon={GraduationCap}
-              active={activeCategory === cls.id} 
-              onClick={() => setActiveCategory(cls.id)} 
-              colorClass="slate"
-            />
-          ))}
         </div>
 
-        {/* ROW 2: Details (Date & Subject) */}
-        <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 pt-4">
-          
-          {/* Subject Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Môn thi:</span>
-            <div className="flex bg-slate-100 p-1 rounded-lg">
-              {['RW', 'MATH'].map((sub) => (
-                <button
-                  key={sub}
-                  onClick={() => setActiveSubject(sub)}
-                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
-                    activeSubject === sub 
-                    ? 'bg-white text-blue-600 shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {sub === 'ALL' ? 'Tất cả' : sub}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Nút Filter & Flyout */}
+        <div className="relative w-full sm:w-auto z-40" ref={filterRef}>
+          <button 
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className={`w-full sm:w-auto relative overflow-hidden flex items-center justify-center gap-2 px-5 h-[52px] rounded-2xl font-semibold transition-all border shadow-sm ${
+              isFilterOpen || activeCategory !== 'ALL' 
+                ? 'bg-slate-100 border-slate-300 text-slate-800' 
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Ripple color="rgba(15, 23, 42, 0.1)" />
+            <span className="relative z-10 pointer-events-none flex items-center gap-2 text-sm">
+              <Filter size={18} /> 
+              <span>Filter</span>
+            </span>
+            {activeCategory !== 'ALL' && (
+              <span className="absolute top-2.5 right-2.5 h-2.5 w-2.5 rounded-full bg-red-500 border border-slate-100 shadow-sm z-20"></span>
+            )}
+          </button>
 
-          {/* Date Filter (Chỉ hiện khi chọn Real Test) */}
-          {activeCategory === 'REAL' && (
-            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-4">
-               <div className="h-4 w-[1px] bg-slate-300 mx-2"></div>
-               <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
-                 <Calendar size={12}/> Kỳ thi:
-               </span>
-               <select 
-                  value={activeDate}
-                  onChange={(e) => setActiveDate(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5 outline-none"
-               >
-                 {TEST_DATES.map(date => <option key={date} value={date}>{date}</option>)}
-               </select>
+          {/* FLYOUT FILTER (Hiển thị khi isFilterOpen === true) */}
+          {isFilterOpen && (
+            <div className="absolute right-0 top-full mt-2 w-full sm:w-[420px] bg-white border border-slate-200 rounded-2xl shadow-xl p-5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+              <div className="space-y-5">
+                
+                {/* Nhóm 1: Nguồn */}
+                <div>
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Nguồn đề thi</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FilterChip label="Tất cả" active={activeCategory === 'ALL'} onClick={() => setActiveCategory('ALL')} />
+                    <FilterChip label="Real Tests" icon={Layers} active={activeCategory === 'REAL'} onClick={() => setActiveCategory('REAL')} />
+                    
+                    {myClasses.length > 0 && <div className="h-6 w-[1px] bg-slate-300 mx-1"></div>}
+
+                    {myClasses.map(cls => (
+                      <FilterChip 
+                        key={cls.id} label={cls.name} icon={GraduationCap} 
+                        active={activeCategory === cls.id} onClick={() => setActiveCategory(cls.id)} colorClass="slate"
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="h-[1px] w-full bg-slate-100"></div>
+
+                {/* Nhóm 2: Chi tiết (Môn & Ngày) */}
+                <div className="flex flex-col gap-4">
+                  {/* Môn thi */}
+                  <div>
+                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Môn thi</div>
+                    <div className="inline-flex bg-slate-100 p-1 rounded-xl">
+                      {['RW', 'MATH', 'ALL'].map((sub) => (
+                        <button
+                          key={sub}
+                          onClick={() => setActiveSubject(sub)}
+                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            activeSubject === sub ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          {sub === 'ALL' ? 'ALL' : sub}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Kỳ thi (Chỉ hiện khi chọn Real Test) */}
+                  {activeCategory === 'REAL' && (
+                    <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                        <Calendar size={14}/> Kỳ thi
+                      </div>
+                      <select 
+                        value={activeDate}
+                        onChange={(e) => setActiveDate(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none"
+                      >
+                        {TEST_DATES.map(date => <option key={date} value={date}>{date}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-2 max-w-md">
-        <div className="p-2 text-slate-400">
-          <Search size={20} />
-        </div>
-        <input 
-          type="text" 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Tìm kiếm theo tên đề thi..." 
-          className="w-full outline-none text-slate-700 placeholder-slate-400 bg-transparent"
-        />
+        {/* Nút Thêm đề thi */}
+        {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            className="w-full sm:w-auto relative overflow-hidden flex items-center justify-center gap-2 bg-slate-900 text-white px-5 h-[52px] rounded-2xl font-semibold hover:bg-slate-800 hover:shadow-lg transition-all"
+          >
+            <Ripple color="rgba(255, 255, 255, 0.2)" />
+            <span className="relative z-10 pointer-events-none flex items-center gap-2 text-sm">
+              <Plus size={18} /> 
+              <span>Add new</span>
+            </span>
+          </button>
+        )}
       </div>
 
       {/* List Cards */}
@@ -284,7 +315,7 @@ const PracticeTest = () => {
             filteredTests.map((test, index) => (
               <div 
                 key={test.id} 
-                className="group bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-[0_8px_30px_-6px_rgba(6,81,237,0.15)] hover:border-blue-100 transition-all duration-300 flex flex-col"
+                className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-md transition-all duration-300 flex flex-col"
               >
                 {/* Card Header */}
                 <div className="flex justify-between items-start mb-4">
@@ -314,11 +345,11 @@ const PracticeTest = () => {
 
                 {/* Card Content */}
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                  <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-2">
                     {test.title}
                   </h3>
                   <p className="text-slate-500 text-sm mb-4 line-clamp-2">
-                    {test.description || "Bài kiểm tra tổng hợp Reading & Math chuẩn SAT."}
+                    {test.description || "No description"}
                   </p>
                 </div>
 

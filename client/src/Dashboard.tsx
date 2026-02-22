@@ -360,10 +360,19 @@ function Dashboard() {
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <h3 className="font-bold text-lg text-slate-800">Create new class</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700 hover:bg-slate-200 p-1 rounded-md transition-colors">
-                <X size={20} />
+              
+              {/* --- 1. NÚT X (ĐÓNG) --- */}
+              <button 
+                onClick={() => setIsModalOpen(false)} 
+                className="relative overflow-hidden text-slate-400 hover:text-slate-700 hover:bg-slate-200 p-1 rounded-md transition-colors"
+              >
+                <Ripple color="rgba(15, 23, 42, 0.1)" />
+                <span className="relative z-10 pointer-events-none flex items-center justify-center">
+                  <X size={20} />
+                </span>
               </button>
             </div>
+            
             <form onSubmit={handleCreateClass} className="p-6 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Class Name <span className="text-red-500">*</span></label>
@@ -377,20 +386,31 @@ function Dashboard() {
                 />
               </div>
               <div className="flex justify-end gap-3 pt-2">
+                
+                {/* --- 2. NÚT CANCEL --- */}
                 <button 
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="relative overflow-hidden px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
                 >
-                  Cancel
+                  <Ripple color="rgba(15, 23, 42, 0.1)" />
+                  <span className="relative z-10 pointer-events-none flex items-center justify-center w-full h-full">
+                    Cancel
+                  </span>
                 </button>
+                
+                {/* --- 3. NÚT CREATE CLASS --- */}
                 <button 
                   type="submit" 
                   disabled={loading}
-                  className="px-5 py-2.5 text-sm font-bold text-white bg-[#1E293B] hover:bg-slate-800 rounded-xl shadow-md transition-all flex items-center gap-2"
+                  className="relative overflow-hidden px-5 py-2.5 text-sm font-bold text-white bg-[#1E293B] hover:bg-slate-800 rounded-full shadow-md transition-all"
                 >
-                  {loading ? 'Creating...' : 'Create Class'}
+                  <Ripple color="rgba(255, 255, 255, 0.2)" />
+                  <span className="relative z-10 pointer-events-none flex items-center gap-2 justify-center w-full h-full">
+                    {loading ? 'Creating...' : 'Create'}
+                  </span>
                 </button>
+
               </div>
             </form>
           </div>
