@@ -96,7 +96,7 @@ exports.getSubmissionDetail = async (req, res) => {
         test: {
           select: {
             title: true,
-            type: true, // Ví dụ: "RW" hoặc "Math"
+            subject: true, // Ví dụ: "RW" hoặc "Math"
             description: true
           }
         },

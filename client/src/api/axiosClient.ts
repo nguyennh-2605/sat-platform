@@ -33,8 +33,9 @@ axiosClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Xử lý lỗi
-    console.error("Lỗi API:", error.response);
+    if (error.code === "ERR_CANCELED") {
+      return Promise.reject(error);
+    }
 
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('token');

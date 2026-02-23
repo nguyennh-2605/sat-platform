@@ -2,7 +2,6 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Clock, ChevronRight, Filter, Layers, Calendar, GraduationCap } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce';
-import CreateTestWizard from '../components/CreateTestWizard';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 import Ripple from '../components/RippleButton';
@@ -66,7 +65,6 @@ const FilterChip = ({ label, active, onClick, icon: Icon, colorClass = "blue" }:
 
 const PracticeTest = () => {
   const navigate = useNavigate();
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [user, setUser] = useState({ name: '', role: '' });
   
   // State dữ liệu
@@ -291,7 +289,7 @@ const PracticeTest = () => {
         {/* Nút Thêm đề thi */}
         {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
           <button 
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => navigate('create')}
             className="w-full sm:w-auto relative overflow-hidden flex items-center justify-center gap-2 bg-slate-900 text-white px-5 h-[52px] rounded-2xl font-semibold hover:bg-slate-800 hover:shadow-lg transition-all"
           >
             <Ripple color="rgba(255, 255, 255, 0.2)" />
@@ -378,17 +376,6 @@ const PracticeTest = () => {
             </div>
           )}
         </div>
-      )}
-
-      {/* WIZARD MODAL */}
-      {showCreateModal && (
-        <CreateTestWizard 
-          onClose={() => setShowCreateModal(false)}
-          onUploadSuccess={() => {
-            window.location.reload(); 
-          }}
-          userRole={user?.role}
-        />
       )}
     </div>
   );

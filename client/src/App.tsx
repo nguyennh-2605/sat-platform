@@ -14,6 +14,7 @@ import ErrorLog from './pages/ErrorLog';
 import Classroom from './pages/Classroom';
 import ResultAnalytics from './pages/ResultAnalytics';
 import ScoreReport from './ScoreReport';
+import CreateTestWizard from './components/CreateTestWizard';
 
 function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -35,6 +36,7 @@ function App() {
               <Route path="error-log" element={<ErrorLog />} />
               <Route path="logic-lab" element={<LogicLab />} />
               <Route path='results-analytics' element = {<ResultAnalytics />} />
+              <Route path="practice-test/create" element={<CreateTestWizard />} />
             </Route>
             <Route path="/test/:id" element={<ExamRoom />} /> 
             <Route path="/score-report" element={<ScoreReport />} />
