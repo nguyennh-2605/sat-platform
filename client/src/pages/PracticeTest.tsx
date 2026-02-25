@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Clock, ChevronRight, Filter, Layers, Calendar, GraduationCap } from 'lucide-react';
+import { Plus, Search, Clock, ChevronRight, Filter, Layers, Calendar, GraduationCap, ArrowUp } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
@@ -63,6 +63,81 @@ const FilterChip = ({ label, active, onClick, icon: Icon, colorClass = "blue" }:
   );
 };
 
+const TestCard = memo(({ test, index, onStart }: { test: Test, index: number, onStart: (t: Test) => void }) => {
+  return (
+    <div className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-md transition-all duration-300 flex flex-col">
+      {/* Card Header */}
+      <div className="flex justify-between items-start mb-4">
+        <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold text-lg group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+          {String(index + 1).padStart(2, '0')}
+        </div>
+        
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+            <Clock size={12} className="text-slate-400"/>
+            <span>{Math.floor(test.duration)} phút</span>
+          </div>
+          
+          <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border 
+            ${test.mode === 'PRACTICE' 
+              ? 'text-emerald-600 bg-emerald-50 border-emerald-100' 
+              : 'text-rose-600 bg-rose-50 border-rose-100'
+            }`}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full animate-pulse 
+              ${test.mode === 'PRACTICE' ? 'bg-emerald-500' : 'bg-rose-500'}`}
+            ></div>
+            <span>{test.mode}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Card Content */}
+      <div className="flex-1">
+        <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-2">
+          {test.title}
+        </h3>
+        <p className="text-slate-500 text-sm mb-4 line-clamp-2">
+          {test.description || "No description"}
+        </p>
+      </div>
+
+      {/* Action Button */}
+      <button 
+        onClick={() => onStart(test)} 
+        className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all transform active:scale-95 ${
+          test.isDoing
+            ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+            : "bg-slate-900 text-white hover:bg-blue-600 shadow-lg shadow-slate-200"
+        }`}
+      >
+        {test.isDoing ? "Tiếp tục bài thi" : "Bắt đầu làm bài"}
+        {!test.isDoing && <ChevronRight size={18} />}
+      </button>
+    </div>
+  );
+});
+
+const SearchInput = memo(({ onSearch }: { onSearch: (val: string) => void }) => {
+  const [localSearch, setLocalSearch] = useState('');
+  const debouncedValue = useDebounce(localSearch, 150);
+
+  // Chỉ gọi lên cha khi giá trị debounce thay đổi
+  useEffect(() => {
+    onSearch(debouncedValue);
+  }, [debouncedValue, onSearch]);
+
+  return (
+    <input 
+      type="text"   
+      value={localSearch}
+      onChange={(e) => setLocalSearch(e.target.value)}
+      placeholder="Search tests by name..." 
+      className="w-full outline-none text-slate-700 placeholder-slate-400 bg-transparent text-base font-medium"
+    />
+  );
+});
+
 const PracticeTest = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState({ name: '', role: '' });
@@ -86,6 +161,11 @@ const PracticeTest = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
+  // State quan li Infinite Scroll
+  const [visibleCount, setVisibleCount] = useState(12);
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
   useEffect(() => {
     // 1. Setup User
     const name = localStorage.getItem('userName') || 'Student';
@@ -102,7 +182,6 @@ const PracticeTest = () => {
 
         setMyClasses(classesRes);
         setTests(testsRes);
-        console.log("Tat ca test nhan duoc", testsRes);
       } catch (error) {
         console.error("Error fetching data:", error);
         toast.error("Không thể tải dữ liệu bài thi");
@@ -115,28 +194,65 @@ const PracticeTest = () => {
   }, []);
 
   useEffect(() => {
-  const handleClickOutside = (event: MouseEvent) => {
-    // Nếu flyout đang mở VÀ vị trí click không nằm trong filterRef
-    if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-      setIsFilterOpen(false);
-    }
-  };
-  document.addEventListener('mousedown', handleClickOutside);
-  // Quan trọng: Gỡ bỏ sự kiện khi component unmount để tránh rò rỉ bộ nhớ
-  return () => {
-    document.removeEventListener('mousedown', handleClickOutside);
-  };
-}, []);
+    const handleClickOutside = (event: MouseEvent) => {
+      // Nếu flyout đang mở VÀ vị trí click không nằm trong filterRef
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setIsFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    // Quan trọng: Gỡ bỏ sự kiện khi component unmount để tránh rò rỉ bộ nhớ
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
-  const debouncedSearch = useDebounce(searchQuery, 150);
+  useEffect(() => {
+    const mainContainer = document.getElementById("dashboard-main");
+    if (!mainContainer) {
+      return;
+    }
+    const toggleVisibility = () => {
+      if (mainContainer.scrollTop > 400) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    mainContainer.addEventListener("scroll", toggleVisibility);
+    return () => mainContainer.removeEventListener("scroll", toggleVisibility);
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Nếu user cuộn chuột chạm tới thẻ div gác cổng
+        if (entries[0].isIntersecting) {
+          // Tăng thêm 12 bài thi nữa (có thể chỉnh số lượng tùy ý)
+          setVisibleCount((prev) => prev + 12);
+        }
+      },
+      { threshold: 0.1 } // Kích hoạt khi thẻ div lộ diện 10% trên màn hình
+    );
+    // Bắt đầu theo dõi
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+    // Dọn dẹp khi unmount
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [observerTarget]);
 
   // --- LOGIC FILTER (CORE) ---
   const filteredTests = useMemo(() => {
-    const query = debouncedSearch.toLowerCase().trim();
+    const query = searchQuery.toLowerCase().trim();
 
     return tests.filter(test => {
       // 1. Search Query
-      if (debouncedSearch && !test.title.toLowerCase().includes(query)) {
+      if (searchQuery && !test.title.toLowerCase().includes(query)) {
         return false;
       }
 
@@ -160,9 +276,9 @@ const PracticeTest = () => {
 
       return true;
     });
-  }, [tests, activeCategory, activeDate, activeSubject, debouncedSearch]);
+  }, [tests, activeCategory, activeDate, activeSubject, searchQuery]);
 
-  const handleStartExam = (exam: Test) => {
+  const handleStartExam = useCallback((exam: Test) => {
     const examInfo = {
       id: exam.id,
       title: exam.title,
@@ -171,6 +287,20 @@ const PracticeTest = () => {
     };
     localStorage.setItem('current_exam_info', JSON.stringify(examInfo));
     navigate(`/test/${exam.id}`);
+  }, [navigate]);
+
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [filteredTests]);
+
+  const scrollToTop = () => {
+    const mainContainer = document.getElementById("dashboard-main");
+    if (mainContainer) {
+      mainContainer.scrollTo({
+        top: 0,
+        behavior: "smooth" // Tạo hiệu ứng lướt lên mượt mà thay vì giật cục
+      });
+    }
   };
 
   return (
@@ -191,13 +321,7 @@ const PracticeTest = () => {
           <div className="pl-1 text-slate-400">
             <Search size={20} />
           </div>
-          <input 
-            type="text"   
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tests by name..." 
-            className="w-full outline-none text-slate-700 placeholder-slate-400 bg-transparent text-base font-medium"
-          />
+          <SearchInput onSearch={setSearchQuery} />
         </div>
 
         {/* Nút Filter & Flyout */}
@@ -310,61 +434,25 @@ const PracticeTest = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
           {filteredTests.length > 0 ? (
-            filteredTests.map((test, index) => (
-              <div 
-                key={test.id} 
-                className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-md transition-all duration-300 flex flex-col"
-              >
-                {/* Card Header */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold text-lg group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                    {String(index + 1).padStart(2, '0')}
-                  </div>
-                  
-                  <div className="flex flex-col items-end gap-1.5">
-                    <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
-                      <Clock size={12} className="text-slate-400"/>
-                      <span>{Math.floor(test.duration)} phút</span>
-                    </div>
-                    
-                    <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border 
-                      ${test.mode === 'PRACTICE' 
-                        ? 'text-emerald-600 bg-emerald-50 border-emerald-100' 
-                        : 'text-rose-600 bg-rose-50 border-rose-100'
-                      }`}
-                    >
-                      <div className={`w-1.5 h-1.5 rounded-full animate-pulse 
-                        ${test.mode === 'PRACTICE' ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                      ></div>
-                      <span>{test.mode}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Content */}
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-2">
-                    {test.title}
-                  </h3>
-                  <p className="text-slate-500 text-sm mb-4 line-clamp-2">
-                    {test.description || "No description"}
-                  </p>
-                </div>
-
-                {/* Action Button */}
-                <button 
-                  onClick={() => handleStartExam(test)} 
-                  className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all transform active:scale-95 ${
-                    test.isDoing
-                      ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                      : "bg-slate-900 text-white hover:bg-blue-600 shadow-lg shadow-slate-200"
-                  }`}
+            <>
+              {filteredTests.slice(0, visibleCount).map((test, index) => (
+                <TestCard
+                  key={test.id}
+                  test={test}
+                  index={index}
+                  onStart={handleStartExam}
+              />
+              ))}
+              {visibleCount < filteredTests.length && (
+                <div 
+                  ref={observerTarget} 
+                  className="col-span-full py-8 flex justify-center items-center"
                 >
-                  {test.isDoing ? "Tiếp tục bài thi" : "Bắt đầu làm bài"}
-                  {!test.isDoing && <ChevronRight size={18} />}
-                </button>
-              </div>
-            ))
+                  {/* Nút loading xoay xoay nhỏ cho đẹp mắt */}
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin opacity-50"></div>
+                </div>
+              )}
+            </>
           ) : (
             // Empty State
             <div className="col-span-full py-20 flex flex-col items-center justify-center text-center bg-white rounded-3xl border border-dashed border-slate-300">
@@ -377,6 +465,22 @@ const PracticeTest = () => {
           )}
         </div>
       )}
+      {/* --- NÚT SCROLL TO TOP --- */}
+      <button
+        onClick={scrollToTop}
+        className={`
+          fixed bottom-8 right-8 p-3 rounded-full bg-slate-900 text-white 
+          shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:bg-blue-600 hover:shadow-lg hover:-translate-y-1
+          transition-all duration-300 z-50 flex items-center justify-center
+          ${showScrollTop 
+            ? 'opacity-100 translate-y-0' 
+            : 'opacity-0 translate-y-10 pointer-events-none' // Ẩn và vô hiệu hóa click khi ở trên đầu
+          }
+        `}
+        aria-label="Scroll to top"
+      >
+        <ArrowUp size={24} strokeWidth={2.5} />
+      </button>
     </div>
   );
 };

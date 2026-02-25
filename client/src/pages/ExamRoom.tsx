@@ -815,7 +815,7 @@ function ExamRoom() {
       );
     } 
     if (currentQ.blocks && currentQ.blocks.length > 0) {
-      return <BlockRenderer blocks={currentQ.blocks}/>
+      return <BlockRenderer blocks={currentQ.blocks} subject={TestInfo.subject}/>
     }
     return null;
   };
@@ -839,7 +839,7 @@ function ExamRoom() {
         )} 
         {TestInfo.subject === 'MATH' && currentQ.type !== 'MCQ' && currentQ.blocks && currentQ.blocks.length > 0 && (
           <div className="my-0"> 
-            <BlockRenderer blocks={currentQ.blocks}/>
+            <BlockRenderer blocks={currentQ.blocks} subject={TestInfo.subject}/>
           </div>
         )}
         <h3 className="

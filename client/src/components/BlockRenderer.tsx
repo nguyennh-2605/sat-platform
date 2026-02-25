@@ -3,8 +3,13 @@ import React from 'react';
 import type { ContentBlock, TableBlock, PoemBlock } from '../types/quiz';
 import InteractiveText from './InteractiveText';
 
+interface Props {
+  blocks: ContentBlock[];
+  subject: string;
+}
+
 // --- 1. Component hiển thị Bảng (Table) ---
-const TableRenderer = ({ block }: { block: TableBlock }) => (
+const TableRenderer = ({ block, isMath }: { block: TableBlock, isMath: boolean }) => (
   <div className="my-6 w-full overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm
       font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
     {/* Tiêu đề bảng */}
@@ -21,7 +26,7 @@ const TableRenderer = ({ block }: { block: TableBlock }) => (
           <tr>
             {block.headers.map((header, idx) => (
               <th key={idx} className="px-4 py-3 border-r border-gray-200 last:border-r-0 whitespace-nowrap">
-                {header}
+                <InteractiveText content={header} isMath={isMath}/>
               </th>
             ))}
           </tr>
@@ -32,7 +37,7 @@ const TableRenderer = ({ block }: { block: TableBlock }) => (
             <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
               {row.map((cell, cIdx) => (
                 <td key={cIdx} className="px-4 py-3 text-gray-700 border-r border-gray-200 last:border-r-0">
-                  {cell}
+                  <InteractiveText content={cell} isMath={isMath} />
                 </td>
               ))}
             </tr>
@@ -51,7 +56,7 @@ const TableRenderer = ({ block }: { block: TableBlock }) => (
 );
 
 // --- 2. Component hiển thị Thơ (Poem) ---
-const PoemRenderer = ({ block }: { block: PoemBlock }) => (
+const PoemRenderer = ({ block, isMath }: { block: PoemBlock, isMath: boolean }) => (
   <div className="my-6 pl-6 border-l-4 border-indigo-300 bg-gray-50 p-5 rounded-r-md">
     {/* Tiêu đề bài thơ */}
     {block.title && (
@@ -65,7 +70,7 @@ const PoemRenderer = ({ block }: { block: PoemBlock }) => (
       {block.lines.map((line, idx) => (
         // Thêm padding-left cho các dòng chẵn để tạo hiệu ứng thụt đầu dòng thơ
         <div key={idx} className={idx % 2 !== 0 ? "pl-4" : ""}>
-          <InteractiveText content={line} />
+          <InteractiveText content={line} isMath={isMath}/>
         </div>
       ))}
     </div>
@@ -79,7 +84,7 @@ const PoemRenderer = ({ block }: { block: PoemBlock }) => (
   </div>
 );
 
-const NotesRenderer = ({ lines }: { lines: string[] }) => {
+const NotesRenderer = ({ lines, isMath }: { lines: string[], isMath: boolean }) => {
   // Guard clause: Nếu không có dữ liệu thì không render gì cả
   if (!lines || lines.length === 0) return null;
 
@@ -101,7 +106,7 @@ const NotesRenderer = ({ lines }: { lines: string[] }) => {
           <ul className="list-disc pl-6 space-y-2 text-slate-800">
             {bulletLines.map((line, idx) => (
               <li key={idx} className="pl-1 leading-normal">
-                <InteractiveText content={line} />
+                <InteractiveText content={line} isMath={isMath}/>
               </li>
             ))}
           </ul>
@@ -111,13 +116,9 @@ const NotesRenderer = ({ lines }: { lines: string[] }) => {
   );
 };
 
-// --- 3. Component Chính ---
-interface Props {
-  blocks: ContentBlock[];
-}
-
-const BlockRenderer: React.FC<Props> = ({ blocks }) => {
+const BlockRenderer: React.FC<Props> = ({ blocks, subject }) => {
   if (!blocks || !Array.isArray(blocks)) return null;
+  const isMath = subject === 'MATH';
 
   return (
     <div className="flex flex-col gap-4 text-gray-800">
@@ -126,7 +127,7 @@ const BlockRenderer: React.FC<Props> = ({ blocks }) => {
           case 'text':
             return (
               <div key={index} className="leading-relaxed">
-                <InteractiveText content={block.content} />
+                <InteractiveText content={block.content} isMath={isMath}/>
               </div>
             );
           
@@ -143,13 +144,13 @@ const BlockRenderer: React.FC<Props> = ({ blocks }) => {
             );
 
           case 'table':
-            return <TableRenderer key={index} block={block} />;
+            return <TableRenderer key={index} block={block} isMath={isMath}/>;
 
           case 'poem':
-            return <PoemRenderer key={index} block={block} />;
+            return <PoemRenderer key={index} block={block} isMath={isMath}/>;
 
           case 'note':
-            return <NotesRenderer key={index} lines={block.lines} />;
+            return <NotesRenderer key={index} lines={block.lines} isMath={isMath}/>;
 
           default:
             return null;

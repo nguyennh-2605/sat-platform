@@ -1,126 +1,268 @@
-// components/ReviewModal.tsx
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { type QuestionResult } from '../ScoreReport';
-import BlockRenderer from './BlockRenderer'
+import BlockRenderer from './BlockRenderer';
 
 interface ReviewModalProps {
   data: QuestionResult;
   onClose: () => void;
   examTitle?: string;
+  examSubject: string;
 }
 
-const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle }) => {
-  // Logic tô màu đáp án (Giữ nguyên logic chuẩn)
+// Kiểu dữ liệu cho tin nhắn Chat
+interface ChatMessage {
+  role: 'user' | 'ai';
+  content: string;
+}
+
+const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, examSubject }) => {
+  // --- STATE CHO AI CHAT ---
+  const [isAiOpen, setIsAiOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'ai', content: 'Chào bạn! Mình là trợ lý AI. Mình có thể giúp bạn giải thích đáp án hoặc dịch đề bài này.' }
+  ]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Tự động cuộn xuống tin nhắn mới nhất
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
+
+  // Logic tô màu đáp án
   const getOptionStyle = (optText: string, optId: string) => {
-    // Backend trả về correctOption là ID hoặc Text, cần so sánh linh hoạt
     const isCorrect = optId === data.correctAnswer || optText === data.correctAnswer;
     const isUserSelected = optId === data.userAnswer || optText === data.userAnswer;
 
-    if (isCorrect) return "border-green-600 bg-green-100 text-gray-900 font-medium ring-1 ring-green-600"; // Đáp án đúng luôn xanh
-    if (isUserSelected) return "border-red-300 bg-red-50 text-gray-700 dashed-border"; // (Tuỳ chọn) User chọn sai thì báo đỏ nhẹ
+    if (isCorrect) return "border-green-600 bg-green-100 text-gray-900 font-medium ring-1 ring-green-600"; 
+    if (isUserSelected) return "border-red-300 bg-red-50 text-gray-700 dashed-border"; 
     return "border-gray-300 bg-white hover:bg-gray-50 text-gray-700";
+  };
+
+  // --- HÀM XỬ LÝ GỬI TIN NHẮN CHO AI ---
+  const handleSendMessage = async (text: string) => {
+    if (!text.trim()) return;
+
+    // 1. Thêm tin nhắn của User vào UI
+    const newMessages: ChatMessage[] = [...messages, { role: 'user', content: text }];
+    setMessages(newMessages);
+    setChatInput('');
+    setIsTyping(true);
+
+    try {
+      // 2. GỌI API GEMINI Ở ĐÂY
+      // TODO: Thay thế setTimeout bằng Axios call đến Backend của bạn
+      /* Ví dụ:
+        const response = await axiosClient.post('/api/ai/chat', { 
+           prompt: text, 
+           questionContext: data // Gửi kèm data câu hỏi để AI hiểu bối cảnh
+        });
+        const aiResponse = response.data.answer;
+      */
+
+      // Fake delay API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const aiResponse = "Đây là câu trả lời giả lập từ AI. Hãy thay thế phần này bằng API call thực tế tới Gemini nhé!";
+
+      // 3. Cập nhật câu trả lời của AI
+      setMessages([...newMessages, { role: 'ai', content: aiResponse }]);
+    } catch (error) {
+      setMessages([...newMessages, { role: 'ai', content: 'Xin lỗi, đã có lỗi kết nối đến AI. Vui lòng thử lại.' }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // --- NÚT HÀNH ĐỘNG NHANH ---
+  const handleTranslateQuestion = () => {
+    if (!isAiOpen) setIsAiOpen(true);
+    // Gom nội dung câu hỏi và đáp án để nhờ AI dịch
+    const choicesText = data.choices.map((c, i) => `${String.fromCharCode(65 + i)}: ${c.text}`).join('\n');
+    const prompt = `Hãy dịch câu hỏi sau và các đáp án sang tiếng Việt một cách tự nhiên nhất:\n\nCâu hỏi: ${data.questionText}\n\nĐáp án:\n${choicesText}`;
+    handleSendMessage(prompt);
+  };
+
+  const handleExplainAnswer = () => {
+    if (!isAiOpen) setIsAiOpen(true);
+    const prompt = `Hãy giải thích chi tiết tại sao đáp án đúng của câu hỏi này lại là phần được tô màu xanh, và tại sao các phương án khác lại sai.\n\nCâu hỏi: ${data.questionText}`;
+    handleSendMessage(prompt);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
       
-      {/* Container chính: Bo góc lớn hơn, shadow sâu hơn */}
-      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col h-[90vh] overflow-hidden ring-1 ring-gray-900/5">
+      {/* Container chính: Mở rộng max-w khi mở AI (từ 5xl lên 7xl) */}
+      <div className={`bg-white rounded-2xl shadow-2xl flex flex-row h-[90vh] overflow-hidden ring-1 ring-gray-900/5 transition-all duration-300 ease-in-out w-full ${isAiOpen ? 'max-w-7xl' : 'max-w-5xl'}`}>
         
-        {/* --- HEADER --- */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white/80 backdrop-blur z-10">
-          <div className="flex items-center gap-3">
-            {/* Badge Module màu xanh nhẹ, hiện đại hơn */}
-             <span className="bg-blue-50 text-blue-700 ring-1 ring-blue-700/10 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-               {data.module}
-             </span>
-             <h2 className="text-lg font-bold text-gray-800 tracking-tight">
-               Question {data.questionNumber}
-             </h2>
-          </div>
+        {/* ================= PHẦN TRÁI: NỘI DUNG BÀI THI (GIỮ NGUYÊN) ================= */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
           
-          {/* Nút đóng hiện đại bằng SVG */}
-          <button 
-            onClick={onClose} 
-            className="group p-2 rounded-full hover:bg-gray-100 transition-colors"
-            aria-label="Close modal"
-          >
-             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 group-hover:text-gray-800 transition-colors">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-
-        {/* --- BODY (Scrollable - GIỮ NGUYÊN CẤU TRÚC) --- */}
-        <div className="flex-1 overflow-y-auto bg-white scroll-smooth">
-          
-          {/* PHẦN TRÊN: ĐỀ BÀI (BLOCKS) - Nền trắng sạch */}
-          <div className="bg-white p-8 md:px-12 pt-8 pb-4">
-             <div className="max-w-3xl mx-auto">
-                {/* Giả sử BlockRenderer render nội dung text/ảnh đẹp rồi */}
-                <BlockRenderer blocks={data.blocks} />
-             </div>
-          </div>
-
-          {/* Đường phân cách mềm mại hơn */ }
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent" /> 
-
-          {/* PHẦN DƯỚI: CÂU HỎI & ĐÁP ÁN - Nền xám nhẹ (Slate) để phân biệt */}
-          <div className="bg-slate-50 p-8 md:px-12 pt-6 pb-10">
-            <div className="max-w-3xl mx-auto">
+          {/* HEADER */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white/80 backdrop-blur z-10 flex-shrink-0">
+            <div className="flex items-center gap-3">
+               <span className="bg-blue-50 text-blue-700 ring-1 ring-blue-700/10 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                 {data.module}
+               </span>
+               <h2 className="text-lg font-bold text-gray-800 tracking-tight">
+                 Question {data.questionNumber}
+               </h2>
+            </div>
             
-              {/* Câu hỏi prompt */}
-              <div className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal mb-6">
-                {data.questionText}
-              </div>
+            <div className="flex items-center gap-2">
+              {/* NÚT TOGGLE AI */}
+              <button 
+                onClick={() => setIsAiOpen(!isAiOpen)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${isAiOpen ? 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-300' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-md hover:-translate-y-0.5'}`}
+              >
+                {/* Sparkles Icon */}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                  <path d="M5 3v4M3 5h4"/>
+                </svg>
+              </button>
 
-              {/* Danh sách đáp án */}
-              <div className="grid grid-cols-1 gap-3">
-                {data.choices.map((opt, index) => {
-                  const label = String.fromCharCode(65 + index);
-                  const styleClass = getOptionStyle(opt.text, opt.id);
-                  
-                  const isCorrect = opt.id === data.correctAnswer || opt.text === data.correctAnswer;
-                  
-                  return (
-                    // Thêm shadow-sm, bo góc lớn hơn (rounded-xl) và hiệu ứng hover
-                    <div key={index} className={`relative flex items-center p-4 border rounded-xl transition-all shadow-sm 
-                      ${isCorrect ? 'bg-green-50 border-green-500'
-                                  : 'bg-white border-gray-300 hover:border-gray-400'}
-                      ${styleClass}`}>
-                      
-                      {/* Nhãn A/B/C/D */}
-                      <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full border-[1.5px] text-sm font-bold mr-4 transition-colors
-                        ${isCorrect 
-                          ? 'bg-green-600 text-white border-green-600 shadow-sm' // Style khi đúng
-                          : 'bg-white border-gray-300 text-gray-500 group-hover:border-gray-400' // Style thường
-                        }
-                      `}>
-                        {label}
-                      </div>
+              {/* Nút đóng */}
+              <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-800">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
 
-                      <div className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
-                          {opt.text}
+          {/* BODY (Scrollable) */}
+          <div className="flex-1 overflow-y-auto bg-white scroll-smooth relative">
+            <div className="bg-white p-8 md:px-12 pt-8 pb-4">
+               <div className="max-w-3xl mx-auto">
+                 <BlockRenderer blocks={data.blocks} subject={examSubject}/>
+               </div>
+            </div>
+
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent" /> 
+
+            <div className="bg-slate-50 p-8 md:px-12 pt-6 pb-10 min-h-full">
+              <div className="max-w-3xl mx-auto">
+                <div className="font-['Source_Serif_4',_'Georgia',_serif] text-[16px] text-[#1a1a1a] leading-relaxed mb-6">
+                  {data.questionText}
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {data.choices.map((opt, index) => {
+                    const label = String.fromCharCode(65 + index);
+                    const styleClass = getOptionStyle(opt.text, opt.id);
+                    const isCorrect = opt.id === data.correctAnswer || opt.text === data.correctAnswer;
+                    
+                    return (
+                      <div key={index} className={`relative flex items-center p-4 border rounded-xl transition-all shadow-sm ${isCorrect ? 'bg-green-50 border-green-500' : 'bg-white border-gray-300 hover:border-gray-400'} ${styleClass}`}>
+                        <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full border-[1.5px] text-sm font-bold mr-4 transition-colors ${isCorrect ? 'bg-green-600 text-white border-green-600 shadow-sm' : 'bg-white border-gray-300 text-gray-500 group-hover:border-gray-400'}`}>
+                          {label}
+                        </div>
+                        <div className="font-['Source_Serif_4',_'Georgia',_serif] text-[16px] text-[#1a1a1a] leading-relaxed">
+                            {opt.text}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
 
+          {/* FOOTER */}
+          <div className="px-6 py-3 bg-white border-t border-gray-100 text-xs font-medium text-gray-400 flex justify-between items-center flex-shrink-0">
+             <span className="flex items-center gap-1">
+               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29-3.5.804v-10A7.963 7.963 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
+               {examTitle}
+             </span>
+             <span className="font-mono text-[10px] tracking-wider opacity-70">ID: {data.id}</span>
+          </div>
         </div>
 
-        {/* --- FOOTER --- */}
-        <div className="px-6 py-3 bg-white border-t border-gray-100 text-xs font-medium text-gray-400 flex justify-between items-center">
-           <span className="flex items-center gap-1">
-             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.963 7.963 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
-             {examTitle}
-           </span>
-           <span className="font-mono text-[10px] tracking-wider opacity-70">ID: {data.id}</span>
-        </div>
+        {/* ================= PHẦN PHẢI: KHUNG CHAT AI ================= */}
+        <div 
+          className={`flex flex-col bg-slate-50 border-l border-gray-200 transition-all duration-300 ease-in-out ${isAiOpen ? 'w-[400px] opacity-100' : 'w-0 opacity-0 overflow-hidden border-l-0'}`}
+        >
+          {/* AI Header */}
+          <div className="px-5 py-4 border-b border-gray-200 bg-white flex items-center gap-2 flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-800">Trợ lý AI</h3>
+              <p className="text-[10px] text-green-600 font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Sẵn sàng
+              </p>
+            </div>
+          </div>
 
+          {/* Quick Actions (Gợi ý lệnh) */}
+          <div className="px-4 py-3 bg-white border-b border-gray-100 flex gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
+             <button onClick={handleTranslateQuestion} disabled={isTyping} className="whitespace-nowrap px-3 py-1.5 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-700 text-xs font-semibold text-gray-600 rounded-lg transition-colors border border-transparent hover:border-indigo-200 disabled:opacity-50">
+               🌐 Dịch đề bài
+             </button>
+             <button onClick={handleExplainAnswer} disabled={isTyping} className="whitespace-nowrap px-3 py-1.5 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-700 text-xs font-semibold text-gray-600 rounded-lg transition-colors border border-transparent hover:border-indigo-200 disabled:opacity-50">
+               💡 Giải thích đáp án
+             </button>
+          </div>
+
+          {/* Khu vực hiển thị tin nhắn */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                  msg.role === 'user' 
+                    ? 'bg-indigo-600 text-white rounded-tr-sm shadow-sm' 
+                    : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm shadow-sm'
+                }`}>
+                  {/* Có thể dùng ReactMarkdown ở đây để render chữ in đậm/in nghiêng của AI */}
+                  <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                </div>
+              </div>
+            ))}
+            
+            {/* Loading Indicator */}
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1 shadow-sm">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Khung nhập text */}
+          <div className="p-4 bg-white border-t border-gray-200 flex-shrink-0">
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendMessage(chatInput);
+              }}
+              className="relative flex items-center"
+            >
+              <input 
+                type="text" 
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                disabled={isTyping}
+                placeholder="Hỏi AI về câu này..." 
+                className="w-full bg-gray-100 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 rounded-full pl-4 pr-12 py-2.5 text-sm outline-none transition-all disabled:opacity-60"
+              />
+              <button 
+                type="submit"
+                disabled={!chatInput.trim() || isTyping}
+                className="absolute right-1.5 p-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-full transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+              </button>
+            </form>
+          </div>
+
+        </div>
       </div>
     </div>
   );

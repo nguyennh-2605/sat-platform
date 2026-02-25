@@ -2,12 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import parse from 'html-react-parser';
 import { useQuizTool } from '../context/QuizToolContext';
 import toast from 'react-hot-toast';
+import FormattedTextRenderer from '../utlis/TextRenderer';
 
 interface Props {
   content: string;
+  isMath?: boolean;
 }
 
-const InteractiveText: React.FC<Props> = ({ content }) => {
+const InteractiveText: React.FC<Props> = ({ content, isMath = false }) => {
   const { isHighlightMode } = useQuizTool();
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -241,6 +243,10 @@ const InteractiveText: React.FC<Props> = ({ content }) => {
     // 6. Đóng modal
     setActiveNoteId(null);
   };
+
+  if (isMath) {
+    return <FormattedTextRenderer text={content} />;
+  }
 
   const cursorClass = isHighlightMode ? "cursor-text" : "cursor-default";
 

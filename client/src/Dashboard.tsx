@@ -206,8 +206,7 @@ function Dashboard() {
             setIsSidebarCollapsed(!isSidebarCollapsed);
             setIsFlyoutOpen(false); 
           }}
-          className="absolute -right-3.5 top-8 flex items-center justify-center w-6 h-6 bg-white border border-slate-400 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-50 shadow-sm z-50 transition-colors cursor-pointer"
-        >
+          className="absolute -right-3.5 top-8 flex items-center justify-center w-6 h-6 bg-white border border-slate-400 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-50 shadow-sm z-50 transition-colors cursor-pointer">
           {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
 
@@ -348,7 +347,7 @@ function Dashboard() {
       </aside>
 
       {/* --- MAIN CONTENT --- */}
-      <main className="flex-1 overflow-y-auto relative scroll-smooth bg-white/50 z-10">
+      <main id="dashboard-main" className="flex-1 overflow-y-auto relative scroll-smooth bg-white/50 z-10">
         <div className="max-w-7xl mx-auto p-8 relative">
           <Outlet />
         </div>

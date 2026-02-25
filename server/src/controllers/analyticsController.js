@@ -156,7 +156,7 @@ exports.getSubmissionDetail = async (req, res) => {
     // 5. Trả về Response
     const responseData = {
       examTitle: submission.test.title,
-      subject: submission.test.type === 'RW' ? 'Reading & Writing' : 'Math', // Map lại tên môn cho đẹp
+      subject: submission.test.subject,
       date: submission.endTime.toLocaleString(), // Ngày làm bài
       duration: durationString,
       questions: formattedQuestions

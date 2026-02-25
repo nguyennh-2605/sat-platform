@@ -295,6 +295,7 @@ const ScoreReport: React.FC<ScoreReportProps> = ({ initialData, onBackToHome }) 
         <ReviewModal 
           data={reviewingQuestion} 
           onClose={() => setReviewingQuestion(null)} // Đóng modal thì set về null
+          examSubject={data.subject}
         />
       )}
     </div>
