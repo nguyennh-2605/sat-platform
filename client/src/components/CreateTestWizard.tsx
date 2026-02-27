@@ -6,10 +6,11 @@ import { Play, Save, ArrowLeft, ImageIcon, Loader2,
  } from 'lucide-react';
 import { parseSATInput, type SATQuestion } from '../utlis/satParser';
 import InputGuideModal from './InputGuideModal';
-import FormattedTextRenderer from '../utlis/TextRenderer';
 import toast from 'react-hot-toast';
 import axiosClient from '../api/axiosClient';
 import { Virtuoso } from 'react-virtuoso';
+import BlockRenderer from './BlockRenderer';
+import InteractiveText from './InteractiveText';
 
 interface Section {
   name: string;      // Vd: "Reading and Writing - Module 1"
@@ -34,6 +35,7 @@ interface PreviewSectionProps {
   questions: SATQuestion[];
   onSave: () => void;
   isSubmitting: boolean;
+  subject: string;
 }
 
 interface ClassOption {
@@ -41,7 +43,7 @@ interface ClassOption {
   name: string;
 }
 
-const PreviewSection = memo(({ questions, onSave, isSubmitting }: PreviewSectionProps) => {
+const PreviewSection = memo(({ questions, onSave, isSubmitting, subject }: PreviewSectionProps) => {
   return (
     <div className="flex flex-col h-full p-4 overflow-hidden relative">
       
@@ -76,162 +78,81 @@ const PreviewSection = memo(({ questions, onSave, isSubmitting }: PreviewSection
           style={{ height: '100%' }}
           className='scrollbar-thin scrollbar-thumb-gray-300 pr-2'
           data={questions}
-          itemContent={(idx, q) => (
-            <div className="pb-6"> 
-              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 text-sm hover:shadow-md transition-shadow">
-                {/* Header câu hỏi */}
-                <div className="flex justify-between items-center mb-4 border-b pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white bg-indigo-600 px-2 py-0.5 rounded text-xs">Câu {idx + 1}</span>
-                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Module {q.module}</span>
+          itemContent={(idx, q) => {
+            const isMath = subject === 'MATH';
+            return (
+              <div className="pb-6"> 
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 text-sm hover:shadow-md transition-shadow">
+                  {/* Header câu hỏi */}
+                  <div className="flex justify-between items-center mb-4 border-b pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white bg-indigo-600 px-2 py-0.5 rounded text-xs">Câu {idx + 1}</span>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Module {q.module}</span>
+                    </div>
+                    <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-mono">ID: {idx + 1}</span>
                   </div>
-                  <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-mono">ID: {idx + 1}</span>
-                </div>
 
-                {/* KHUNG TRÁI/TRÊN CỦA SAT (PASSAGE) */}
-                <div className="bg-[#fcfcfc] p-4 rounded border border-gray-100 text-gray-800 mb-4">
-                  {q.blocks.map((block, i) => (
-                    <div key={i} className="mb-4 last:mb-0">
-                      
-                      {/* 1. TEXT BLOCK */}
-                      {block.type === 'text' && (
-                        <FormattedTextRenderer text={block.content} />
+                  {/* KHUNG TRÁI/TRÊN CỦA SAT (PASSAGE) */}
+                  <div className="bg-[#fcfcfc] p-4 rounded border border-gray-100 text-gray-800 mb-4">
+                    <BlockRenderer blocks={q.blocks} subject={subject} readOnly={true} />
+                  </div>
+
+                  {/* KHUNG DƯỚI/PHẢI CỦA SAT (QUESTION & CHOICES) */}
+                  <div className="space-y-4">
+                    
+                    {/* 1. Câu hỏi dẫn nhập */}
+                    <div className="font-sans font-bold text-gray-900 text-[15px]">
+                      {q.questionText && (
+                        <InteractiveText content={q.questionText} isMath={isMath} />
                       )}
+                    </div>
 
-                      {/* 2. NOTE BLOCK */}
-                      {block.type === 'note' && (
-                        <div className="my-3 font-sans text-[15px] leading-relaxed text-gray-800">
-                          <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                            {block.lines.length > 0 && (
-                              <p className="mb-2 text-gray-900 font-medium">
-                                {block.lines[0]}
-                              </p>
-                            )}
-                            {block.lines.length > 1 && (
-                              <ul className="list-disc pl-5 space-y-1.5 text-gray-900">
-                                {/* @ts-ignore */}
-                                {block.lines.slice(1).map((line, idx) => (
-                                  <li key={idx} className="pl-1">
-                                    {line}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 3. TABLE BLOCK */}
-                      {block.type === 'table' && (
-                        <div className="overflow-x-auto border rounded bg-white shadow-sm">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50 font-semibold text-gray-700">
-                              <tr>
-                                {block.headers.map((h, idx) => (
-                                  <th key={idx} className="px-3 py-2 text-left text-xs uppercase tracking-wider font-bold border-b">
-                                    {h}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {block.rows.map((row, rIdx) => (
-                                <tr key={rIdx} className="hover:bg-gray-50">
-                                  {row.map((cell, cIdx) => (
-                                    <td key={cIdx} className="px-3 py-2 whitespace-nowrap text-xs text-gray-600 border-r last:border-r-0">
-                                      {cell}
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      {/* 4. POEM BLOCK */}
-                      {block.type === 'poem' && (
-                        <div className="pl-8 text-center italic text-gray-800 font-sans leading-8">
-                          {block.lines.map((line, idx) => (
-                            <div key={idx}>{line}</div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* 5. IMAGE BLOCK */}
-                      {block.type === 'image' && (
-                        <div className="my-4 flex justify-center">
-                          {block.src ? (
-                            <img 
-                              src={block.src} 
-                              alt="Question Image" 
-                              className="max-h-64 rounded-lg border border-gray-200 shadow-sm object-contain"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="h-20 bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-                              [Ảnh lỗi: Không tìm thấy link]
+                    {/* 2. Các đáp án (Phân nhánh MCQ và SPR) */}
+                    {q.type === 'SPR' ? (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
+                        <span className="font-semibold text-amber-800">Đáp án điền (SPR):</span>
+                        <span className="bg-white border border-amber-300 font-mono font-bold text-amber-900 px-3 py-1.5 rounded shadow-sm">
+                          {q.correctAnswer}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {q.choices.map((choice) => (
+                          <div
+                            key={choice.id}
+                            className={`p-3 border rounded-lg text-sm transition-all flex items-start gap-3 ${
+                              choice.id === q.correctAnswer
+                                ? 'bg-emerald-50 border-emerald-500 shadow-sm'
+                                : 'bg-white border-gray-200'
+                            }`}
+                          >
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border mt-0.5 ${
+                              choice.id === q.correctAnswer
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-white text-gray-500 border-gray-300'
+                            }`}>
+                              {choice.id}
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                            <div className={`flex-1 pt-0.5 ${choice.id === q.correctAnswer ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
+                              <InteractiveText content={choice.text} isMath={isMath}/>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-                {/* KHUNG DƯỚI/PHẢI CỦA SAT (QUESTION & CHOICES) */}
-                <div className="space-y-4">
-                  
-                  {/* 1. Câu hỏi dẫn nhập */}
-                  <div className="font-sans font-bold text-gray-900 text-[15px]">
-                    {q.questionText ? <FormattedTextRenderer text={q.questionText} /> : null}
+                    {/* 3. Hiển thị Giải thích (Explanation) nếu có */}
+                    {q.explanation && (
+                      <div className="mt-4 p-3 bg-gray-50 border-l-4 border-indigo-400 rounded-r-lg text-sm text-gray-600">
+                        <span className="font-bold text-indigo-600 block mb-1">Giải thích:</span>
+                        <InteractiveText content={q.explanation} isMath={isMath}/>
+                      </div>
+                    )}
                   </div>
-
-                  {/* 2. Các đáp án (Phân nhánh MCQ và SPR) */}
-                  {q.type === 'SPR' ? (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
-                      <span className="font-semibold text-amber-800">Đáp án điền (SPR):</span>
-                      <span className="bg-white border border-amber-300 font-mono font-bold text-amber-900 px-3 py-1.5 rounded shadow-sm">
-                        {q.correctAnswer}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-2.5">
-                      {q.choices.map((choice) => (
-                        <div
-                          key={choice.id}
-                          className={`p-3 border rounded-lg text-sm transition-all flex items-start gap-3 ${
-                            choice.id === q.correctAnswer
-                              ? 'bg-emerald-50 border-emerald-500 shadow-sm'
-                              : 'bg-white border-gray-200'
-                          }`}
-                        >
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border mt-0.5 ${
-                            choice.id === q.correctAnswer
-                              ? 'bg-emerald-600 text-white border-emerald-600'
-                              : 'bg-white text-gray-500 border-gray-300'
-                          }`}>
-                            {choice.id}
-                          </div>
-                          <div className={`flex-1 pt-0.5 ${choice.id === q.correctAnswer ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
-                            <FormattedTextRenderer text={choice.text} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 3. Hiển thị Giải thích (Explanation) nếu có */}
-                  {q.explanation && (
-                    <div className="mt-4 p-3 bg-gray-50 border-l-4 border-indigo-400 rounded-r-lg text-sm text-gray-600">
-                      <span className="font-bold text-indigo-600 block mb-1">Giải thích:</span>
-                      <FormattedTextRenderer text={q.explanation} />
-                    </div>
-                  )}
                 </div>
               </div>
-            </div>
-          )}
+            );
+          }}  
         />
       </div>
     </div>
@@ -728,6 +649,7 @@ const CreateTestWizard = () => {
                   questions={parsedQuestions}
                   onSave={handleCreateTest}
                   isSubmitting={isLoading}
+                  subject={testInfo.subject}
                 />
               </div>
             </div>

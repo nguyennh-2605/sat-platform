@@ -31,6 +31,7 @@ app.use("/api/error-logs", require("./src/routes/errorLogRoutes"));
 app.use("/api/results-analytics", require("./src/routes/analyticsRoutes"));
 app.use("/api/tests", require("./src/routes/practiceTestRoute"));
 app.use("/api/test", require('./src/routes/examRoomRoutes'));
+app.use("/api/ai", require("./src/routes/aiRoutes"));
 
 // --- KHỞI ĐỘNG SERVER ---
 app.listen(PORT, () => {

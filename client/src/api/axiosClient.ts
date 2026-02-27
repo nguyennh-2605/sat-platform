@@ -9,7 +9,7 @@ const axiosClient: AxiosInstance = axios.create({
   paramsSerializer: {
     serialize: (params) => queryString.stringify(params),
   },
-  timeout: 10000,
+  timeout: 60000,
 });
 
 // Interceptor Request

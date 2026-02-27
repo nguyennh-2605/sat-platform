@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { type QuestionResult } from '../ScoreReport';
 import BlockRenderer from './BlockRenderer';
+import type { ContentBlock } from '../types/quiz';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 interface ReviewModalProps {
   data: QuestionResult;
@@ -14,6 +20,38 @@ interface ChatMessage {
   role: 'user' | 'ai';
   content: string;
 }
+
+const TypewriterMarkdown = ({ content }: { content: string }) => {
+  const [displayedText, setDisplayedText] = useState('');
+
+  useEffect(() => {
+    // Nếu chữ trên màn hình vẫn ngắn hơn tổng số chữ AI đã gửi về kho
+    if (displayedText.length < content.length) {
+      const timeout = setTimeout(() => {
+        // Bắt đầu nhả chữ.
+        // Mẹo: Nếu mạng tải chữ về quá nhanh (kho dồn nhiều), ta cho gõ 2-3 chữ/lần để đuổi kịp
+        const diff = content.length - displayedText.length;
+        const charsToAdd = diff > 50 ? 3 : 1; 
+        
+        setDisplayedText(content.slice(0, displayedText.length + charsToAdd));
+      }, 40); // 10ms là tốc độ gõ, bạn có thể chỉnh to lên để gõ chậm lại
+
+      return () => clearTimeout(timeout);
+    }
+  }, [content, displayedText]);
+
+  return (
+    <div className="markdown-content prose prose-sm max-w-none prose-table:border-collapse">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+      >
+        {/* Render đoạn chữ đang được nhả từ từ ra */}
+        {displayedText}
+      </ReactMarkdown>
+    </div>
+  );
+};
 
 const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, examSubject }) => {
   // --- STATE CHO AI CHAT ---
@@ -40,35 +78,151 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
     return "border-gray-300 bg-white hover:bg-gray-50 text-gray-700";
   };
 
+  const parseQuestionData = () => {
+    let textContent = "";
+    const imageUrls: string[] = [];
+
+    if (data.blocks && Array.isArray(data.blocks)) {
+      data.blocks.forEach((block: ContentBlock) => {
+        switch (block.type) {
+          case 'text':
+            textContent += `${block.content}\n\n`;
+            break;
+            
+          case 'note':
+            textContent += `[Ghi chú]:\n${block.lines.join('\n')}\n\n`;
+            break;
+            
+          case 'poem':
+            if (block.title) textContent += `**Tác phẩm: ${block.title}**\n`;
+            if (block.author) textContent += `*Tác giả: ${block.author}*\n`;
+            // Nối các dòng thơ bằng ký tự xuống dòng
+            textContent += `${block.lines.join('\n')}\n\n`;
+            break;
+            
+          case 'table':
+            if (block.title) textContent += `**Bảng dữ liệu: ${block.title}**\n`;
+            
+            // Vẽ bảng chuẩn Markdown cho AI đọc
+            if (block.headers && block.headers.length > 0) {
+              textContent += `| ${block.headers.join(' | ')} |\n`;
+              // Dòng gạch ngang ngăn cách header và rows
+              textContent += `| ${block.headers.map(() => '---').join(' | ')} |\n`; 
+            }
+            if (block.rows && block.rows.length > 0) {
+              block.rows.forEach(row => {
+                textContent += `| ${row.join(' | ')} |\n`;
+              });
+            }
+            if (block.note) textContent += `*Chú thích bảng: ${block.note}*\n`;
+            textContent += `\n`;
+            break;
+            
+          case 'image':
+            textContent += `[Hệ thống có đính kèm một hình ảnh`;
+            if (block.alt) textContent += ` minh họa cho: ${block.alt}`;
+            if (block.caption) textContent += ` (${block.caption})`;
+            textContent += `]\n\n`;
+            
+            if (block.src) imageUrls.push(block.src);
+            break;
+            
+          default:
+            break;
+        }
+      });
+    }
+
+    // Gom Context (từ blocks) và Câu hỏi chính lại với nhau
+    const combinedText = textContent.trim() 
+      ? `NGỮ CẢNH / ĐOẠN VĂN:\n${textContent}\nCÂU HỎI:\n${data.questionText}`
+      : data.questionText;
+
+    return {
+      subject: examSubject, // Biến này bạn lấy từ props hoặc state nhé
+      questionText: combinedText,
+      imageUrls: imageUrls,
+      choices: data.choices ? data.choices.map((c: any) => `${c.id}: ${c.text}`) : [],
+      correctAnswer: data.correctAnswer
+    };
+  };
+
   // --- HÀM XỬ LÝ GỬI TIN NHẮN CHO AI ---
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, isHiddenPrompt: boolean = false) => {
     if (!text.trim()) return;
 
     // 1. Thêm tin nhắn của User vào UI
-    const newMessages: ChatMessage[] = [...messages, { role: 'user', content: text }];
-    setMessages(newMessages);
+    const userMessage = { role: 'user' as const, content: text };
+    const updatedMessages = isHiddenPrompt ? [...messages] : [...messages, userMessage];
+
+    setMessages([...updatedMessages, { role: 'ai', content: '' }]);
     setChatInput('');
     setIsTyping(true);
 
     try {
-      // 2. GỌI API GEMINI Ở ĐÂY
-      // TODO: Thay thế setTimeout bằng Axios call đến Backend của bạn
-      /* Ví dụ:
-        const response = await axiosClient.post('/api/ai/chat', { 
-           prompt: text, 
-           questionContext: data // Gửi kèm data câu hỏi để AI hiểu bối cảnh
-        });
-        const aiResponse = response.data.answer;
-      */
+    const chatHistory = messages
+      .filter((_, index) => index !== 0) // Bỏ câu chào đầu tiên
+      .map(msg => ({
+        role: msg.role === 'ai' ? 'model' : 'user',
+        content: msg.content
+      }));
 
-      // Fake delay API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const aiResponse = "Đây là câu trả lời giả lập từ AI. Hãy thay thế phần này bằng API call thực tế tới Gemini nhé!";
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          message: text,
+          history: chatHistory,
+          context: parseQuestionData()
+        })
+      });
 
-      // 3. Cập nhật câu trả lời của AI
-      setMessages([...newMessages, { role: 'ai', content: aiResponse }]);
+      if (!response.ok) throw new Error('Network response was not ok');
+
+      // 3. Xử lý đọc Stream từng dòng
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          // Giải mã chunk nhận được
+          const chunk = decoder.decode(value, { stream: true });
+          accumulatedContent += chunk;
+
+          let displayText = accumulatedContent;
+
+          // Kiểm tra xem chuỗi có bị bọc trong {"answer":"... không
+          if (displayText.trim().startsWith('{"answer":"')) {
+            displayText = displayText.replace(/^\{"answer":"/, '');
+            displayText = displayText.replace(/"\}$/, ''); 
+            displayText = displayText.replace(/\\n/g, '\n');
+            displayText = displayText.replace(/\\"/g, '"');
+          }
+
+          // Cập nhật tin nhắn AI cuối cùng liên tục
+          setMessages(prev => {
+            const newMsgList = [...prev];
+            const lastMsgIndex = newMsgList.length - 1;
+            if (newMsgList[lastMsgIndex].role === 'ai') {
+              newMsgList[lastMsgIndex] = { ...newMsgList[lastMsgIndex], content: displayText };
+            }
+            return newMsgList;
+          });
+        }
+      }
     } catch (error) {
-      setMessages([...newMessages, { role: 'ai', content: 'Xin lỗi, đã có lỗi kết nối đến AI. Vui lòng thử lại.' }]);
+      console.error("Lỗi gọi AI Stream:", error);
+      setMessages(prev => [
+        ...prev.slice(0, -1), // Bỏ tin nhắn AI trống đang lỗi
+        { role: 'ai', content: 'Xin lỗi, đã có lỗi kết nối đến AI. Vui lòng thử lại.' }
+      ]);
     } finally {
       setIsTyping(false);
     }
@@ -77,16 +231,14 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
   // --- NÚT HÀNH ĐỘNG NHANH ---
   const handleTranslateQuestion = () => {
     if (!isAiOpen) setIsAiOpen(true);
-    // Gom nội dung câu hỏi và đáp án để nhờ AI dịch
-    const choicesText = data.choices.map((c, i) => `${String.fromCharCode(65 + i)}: ${c.text}`).join('\n');
-    const prompt = `Hãy dịch câu hỏi sau và các đáp án sang tiếng Việt một cách tự nhiên nhất:\n\nCâu hỏi: ${data.questionText}\n\nĐáp án:\n${choicesText}`;
-    handleSendMessage(prompt);
+    setMessages(prev => [...prev, { role: 'user', content: 'Dịch đề bài này giúp mình nhé.' }]);
+    handleSendMessage("Nhiệm vụ của bạn CHỈ LÀ DỊCH đoạn văn và các đáp án sang tiếng Việt. Tuyệt đối không giải thích tại sao đúng/sai, không phân tích đáp án", true);
   };
 
   const handleExplainAnswer = () => {
     if (!isAiOpen) setIsAiOpen(true);
-    const prompt = `Hãy giải thích chi tiết tại sao đáp án đúng của câu hỏi này lại là phần được tô màu xanh, và tại sao các phương án khác lại sai.\n\nCâu hỏi: ${data.questionText}`;
-    handleSendMessage(prompt);
+    setMessages(prev => [...prev, { role: 'user', content: 'Giải thích giúp mình đáp án câu này.' }]);
+    handleSendMessage("Hãy giải thích chi tiết tại sao đáp án đúng lại là đáp án được cung cấp trong context, và tại sao các phương án khác lại sai.", true);
   };
 
   return (
@@ -216,8 +368,15 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
                     ? 'bg-indigo-600 text-white rounded-tr-sm shadow-sm' 
                     : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm shadow-sm'
                 }`}>
-                  {/* Có thể dùng ReactMarkdown ở đây để render chữ in đậm/in nghiêng của AI */}
-                  <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                  {/* SỬA LẠI ĐOẠN NÀY ĐỂ RENDER MARKDOWN */}
+                  <div className="leading-relaxed">
+                    {msg.role === 'user' ? (
+                      // Tin nhắn của User thường là text thuần, không cần Markdown
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                    ) : (
+                      <TypewriterMarkdown content={msg.content} />
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

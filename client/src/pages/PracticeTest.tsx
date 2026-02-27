@@ -163,8 +163,8 @@ const PracticeTest = () => {
 
   // State quan li Infinite Scroll
   const [visibleCount, setVisibleCount] = useState(12);
-  const observerTarget = useRef<HTMLDivElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const observer = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
     // 1. Setup User
@@ -223,28 +223,27 @@ const PracticeTest = () => {
     return () => mainContainer.removeEventListener("scroll", toggleVisibility);
   }, []);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Nếu user cuộn chuột chạm tới thẻ div gác cổng
-        if (entries[0].isIntersecting) {
-          // Tăng thêm 12 bài thi nữa (có thể chỉnh số lượng tùy ý)
-          setVisibleCount((prev) => prev + 12);
-        }
-      },
-      { threshold: 0.1 } // Kích hoạt khi thẻ div lộ diện 10% trên màn hình
-    );
-    // Bắt đầu theo dõi
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-    // Dọn dẹp khi unmount
-    return () => {
-      if (observerTarget.current) {
-        observer.unobserve(observerTarget.current);
+  const lastElementRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      // Nếu observer cũ đang chạy, ngắt kết nối nó đi
+      if (observer.current) observer.current.disconnect();
+      // Khởi tạo observer mới
+      observer.current = new IntersectionObserver(
+        (entries) => {
+          // Nếu người dùng cuộn tới thẻ div này
+          if (entries[0].isIntersecting) {
+            setVisibleCount((prev) => prev + 12);
+          }
+        },
+        { threshold: 0.1 }
+      );
+      // Nếu thẻ div (node) đã được render trên màn hình -> bắt đầu theo dõi nó
+      if (node) {
+        observer.current.observe(node);
       }
-    };
-  }, [observerTarget]);
+    },
+    [] // Không cần dependency vì ta dùng functional update (prev => prev + 12)
+  );
 
   // --- LOGIC FILTER (CORE) ---
   const filteredTests = useMemo(() => {
@@ -445,7 +444,7 @@ const PracticeTest = () => {
               ))}
               {visibleCount < filteredTests.length && (
                 <div 
-                  ref={observerTarget} 
+                  ref={lastElementRef} 
                   className="col-span-full py-8 flex justify-center items-center"
                 >
                   {/* Nút loading xoay xoay nhỏ cho đẹp mắt */}

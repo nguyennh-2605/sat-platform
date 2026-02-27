@@ -6,10 +6,11 @@ import InteractiveText from './InteractiveText';
 interface Props {
   blocks: ContentBlock[];
   subject: string;
+  readOnly?: boolean;
 }
 
 // --- 1. Component hiển thị Bảng (Table) ---
-const TableRenderer = ({ block, isMath }: { block: TableBlock, isMath: boolean }) => (
+const TableRenderer = ({ block, isMath, readOnly }: { block: TableBlock, isMath: boolean, readOnly: boolean }) => (
   <div className="my-6 w-full overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm
       font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
     {/* Tiêu đề bảng */}
@@ -26,7 +27,7 @@ const TableRenderer = ({ block, isMath }: { block: TableBlock, isMath: boolean }
           <tr>
             {block.headers.map((header, idx) => (
               <th key={idx} className="px-4 py-3 border-r border-gray-200 last:border-r-0 whitespace-nowrap">
-                <InteractiveText content={header} isMath={isMath}/>
+                <InteractiveText content={header} isMath={isMath} readOnly={readOnly} />
               </th>
             ))}
           </tr>
@@ -37,7 +38,7 @@ const TableRenderer = ({ block, isMath }: { block: TableBlock, isMath: boolean }
             <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
               {row.map((cell, cIdx) => (
                 <td key={cIdx} className="px-4 py-3 text-gray-700 border-r border-gray-200 last:border-r-0">
-                  <InteractiveText content={cell} isMath={isMath} />
+                  <InteractiveText content={cell} isMath={isMath} readOnly={readOnly} />
                 </td>
               ))}
             </tr>
@@ -56,7 +57,7 @@ const TableRenderer = ({ block, isMath }: { block: TableBlock, isMath: boolean }
 );
 
 // --- 2. Component hiển thị Thơ (Poem) ---
-const PoemRenderer = ({ block, isMath }: { block: PoemBlock, isMath: boolean }) => (
+const PoemRenderer = ({ block, isMath, readOnly }: { block: PoemBlock, isMath: boolean, readOnly: boolean }) => (
   <div className="my-6 pl-6 border-l-4 border-indigo-300 bg-gray-50 p-5 rounded-r-md">
     {/* Tiêu đề bài thơ */}
     {block.title && (
@@ -70,7 +71,7 @@ const PoemRenderer = ({ block, isMath }: { block: PoemBlock, isMath: boolean }) 
       {block.lines.map((line, idx) => (
         // Thêm padding-left cho các dòng chẵn để tạo hiệu ứng thụt đầu dòng thơ
         <div key={idx} className={idx % 2 !== 0 ? "pl-4" : ""}>
-          <InteractiveText content={line} isMath={isMath}/>
+          <InteractiveText content={line} isMath={isMath} readOnly={readOnly} />
         </div>
       ))}
     </div>
@@ -84,7 +85,7 @@ const PoemRenderer = ({ block, isMath }: { block: PoemBlock, isMath: boolean }) 
   </div>
 );
 
-const NotesRenderer = ({ lines, isMath }: { lines: string[], isMath: boolean }) => {
+const NotesRenderer = ({ lines, isMath, readOnly }: { lines: string[], isMath: boolean, readOnly: boolean }) => {
   // Guard clause: Nếu không có dữ liệu thì không render gì cả
   if (!lines || lines.length === 0) return null;
 
@@ -97,7 +98,7 @@ const NotesRenderer = ({ lines, isMath }: { lines: string[], isMath: boolean }) 
     <div className="font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums text-[16px] font-normal text-[#1a1a1a] leading-relaxed tracking-normal">
       
       <div className="mb-3 leading-relaxed">
-        <InteractiveText content={introLine} />
+        <InteractiveText content={introLine} readOnly={readOnly} />
       </div>
 
       {/* 2. HIỂN THỊ BULLET POINTS (Các dòng còn lại) */}
@@ -106,7 +107,7 @@ const NotesRenderer = ({ lines, isMath }: { lines: string[], isMath: boolean }) 
           <ul className="list-disc pl-6 space-y-2 text-slate-800">
             {bulletLines.map((line, idx) => (
               <li key={idx} className="pl-1 leading-normal">
-                <InteractiveText content={line} isMath={isMath}/>
+                <InteractiveText content={line} isMath={isMath} readOnly={readOnly}/>
               </li>
             ))}
           </ul>
@@ -116,7 +117,7 @@ const NotesRenderer = ({ lines, isMath }: { lines: string[], isMath: boolean }) 
   );
 };
 
-const BlockRenderer: React.FC<Props> = ({ blocks, subject }) => {
+const BlockRenderer: React.FC<Props> = ({ blocks, subject, readOnly = false }) => {
   if (!blocks || !Array.isArray(blocks)) return null;
   const isMath = subject === 'MATH';
 
@@ -127,7 +128,7 @@ const BlockRenderer: React.FC<Props> = ({ blocks, subject }) => {
           case 'text':
             return (
               <div key={index} className="leading-relaxed">
-                <InteractiveText content={block.content} isMath={isMath}/>
+                <InteractiveText content={block.content} isMath={isMath} readOnly={readOnly}/>
               </div>
             );
           
@@ -144,13 +145,13 @@ const BlockRenderer: React.FC<Props> = ({ blocks, subject }) => {
             );
 
           case 'table':
-            return <TableRenderer key={index} block={block} isMath={isMath}/>;
+            return <TableRenderer key={index} block={block} isMath={isMath} readOnly={readOnly} />;
 
           case 'poem':
-            return <PoemRenderer key={index} block={block} isMath={isMath}/>;
+            return <PoemRenderer key={index} block={block} isMath={isMath} readOnly={readOnly}/>;
 
           case 'note':
-            return <NotesRenderer key={index} lines={block.lines} isMath={isMath}/>;
+            return <NotesRenderer key={index} lines={block.lines} isMath={isMath} readOnly={readOnly}/>;
 
           default:
             return null;
