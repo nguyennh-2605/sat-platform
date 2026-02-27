@@ -21,7 +21,7 @@ interface ChatMessage {
   content: string;
 }
 
-const TypewriterMarkdown = ({ content }: { content: string }) => {
+const TypewriterMarkdown = ({ content, onTyping }: { content: string, onTyping?: () => void }) => {
   const [displayedText, setDisplayedText] = useState('');
 
   useEffect(() => {
@@ -32,13 +32,13 @@ const TypewriterMarkdown = ({ content }: { content: string }) => {
         // Mẹo: Nếu mạng tải chữ về quá nhanh (kho dồn nhiều), ta cho gõ 2-3 chữ/lần để đuổi kịp
         const diff = content.length - displayedText.length;
         const charsToAdd = diff > 50 ? 3 : 1; 
-        
         setDisplayedText(content.slice(0, displayedText.length + charsToAdd));
-      }, 40); // 10ms là tốc độ gõ, bạn có thể chỉnh to lên để gõ chậm lại
+        if (onTyping) onTyping();
+      }, 40); // Tốc độ gõ
 
       return () => clearTimeout(timeout);
     }
-  }, [content, displayedText]);
+  }, [content, displayedText, onTyping]);
 
   return (
     <div className="markdown-content prose prose-sm max-w-none prose-table:border-collapse">
@@ -46,7 +46,6 @@ const TypewriterMarkdown = ({ content }: { content: string }) => {
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
       >
-        {/* Render đoạn chữ đang được nhả từ từ ra */}
         {displayedText}
       </ReactMarkdown>
     </div>
@@ -61,12 +60,39 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'ai', content: 'Chào bạn! Mình là trợ lý AI. Mình có thể giúp bạn giải thích đáp án hoặc dịch đề bài này.' }
   ]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
 
-  // Tự động cuộn xuống tin nhắn mới nhất
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const isScrollingUp = scrollTop < lastScrollTopRef.current;
+    lastScrollTopRef.current = scrollTop;
+    const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+    if (isScrollingUp && distanceToBottom > 5) {
+    // NGƯỜI DÙNG CUỘN LÊN: Cắt auto-scroll ngay lập tức!
+      isAtBottomRef.current = false;
+    } else if (distanceToBottom <= 10) {
+      // CHẠM ĐÁY: Bật lại auto-scroll
+      isAtBottomRef.current = true;
+    }
+    setShowScrollButton(!isAtBottomRef.current);
+  };
+
+  const scrollToBottom = () => {
+    if (isAtBottomRef.current && scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'auto' 
+      });
+    }
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping]);
+    scrollToBottom();
+  }, [messages]);
 
   // Logic tô màu đáp án
   const getOptionStyle = (optText: string, optId: string) => {
@@ -251,13 +277,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           
           {/* HEADER */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white/80 backdrop-blur z-10 flex-shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-300 bg-gray-50 z-10 flex-shrink-0">
             <div className="flex items-center gap-3">
-               <span className="bg-blue-50 text-blue-700 ring-1 ring-blue-700/10 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                 {data.module}
-               </span>
                <h2 className="text-lg font-bold text-gray-800 tracking-tight">
-                 Question {data.questionNumber}
+                 {examTitle}, {examSubject === 'RW' ? 'Reading and Writing' : 'Math'}, Question {data.questionNumber}
                </h2>
             </div>
             
@@ -286,58 +309,43 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
 
           {/* BODY (Scrollable) */}
           <div className="flex-1 overflow-y-auto bg-white scroll-smooth relative">
-            <div className="bg-white p-8 md:px-12 pt-8 pb-4">
+            <div className="p-8 md:px-12 pb-4">
                <div className="max-w-3xl mx-auto">
-                 <BlockRenderer blocks={data.blocks} subject={examSubject}/>
+                  <div className="font-['Source_Serif_4','Georgia',serif] text-[16px] text-[#1a1a1a] leading-relaxed lining-nums tracking-normal">
+                    <BlockRenderer blocks={data.blocks} subject={examSubject} />
+                    <div className="mt-5 mb-6">
+                      {data.questionText}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    {data.choices.map((opt, index) => {
+                      const label = String.fromCharCode(65 + index);
+                      const styleClass = getOptionStyle(opt.text, opt.id);
+                      const isCorrect = opt.id === data.correctAnswer || opt.text === data.correctAnswer;
+                      
+                      return (
+                        <div key={index} className={`relative flex items-center p-3 border rounded-xl shadow-sm ${isCorrect ? 'bg-green-50 border-green-500' : 'bg-white border-gray-500'} ${styleClass}`}>
+                          <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full border-[1.5px] text-sm font-bold mr-4 transition-colors ${isCorrect ? 'bg-green-600 text-white border-green-600 shadow-sm' : 'bg-white border-gray-500 text-gray-500'}`}>
+                            {label}
+                          </div>
+                          <div className="font-['Source_Serif_4',_'Georgia',_serif] text-[16px] text-[#1a1a1a] lining-nums leading-relaxed">
+                              {opt.text}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                </div>
             </div>
-
-            <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent" /> 
-
-            <div className="bg-slate-50 p-8 md:px-12 pt-6 pb-10 min-h-full">
-              <div className="max-w-3xl mx-auto">
-                <div className="font-['Source_Serif_4',_'Georgia',_serif] text-[16px] text-[#1a1a1a] leading-relaxed mb-6">
-                  {data.questionText}
-                </div>
-
-                <div className="grid grid-cols-1 gap-3">
-                  {data.choices.map((opt, index) => {
-                    const label = String.fromCharCode(65 + index);
-                    const styleClass = getOptionStyle(opt.text, opt.id);
-                    const isCorrect = opt.id === data.correctAnswer || opt.text === data.correctAnswer;
-                    
-                    return (
-                      <div key={index} className={`relative flex items-center p-4 border rounded-xl transition-all shadow-sm ${isCorrect ? 'bg-green-50 border-green-500' : 'bg-white border-gray-300 hover:border-gray-400'} ${styleClass}`}>
-                        <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full border-[1.5px] text-sm font-bold mr-4 transition-colors ${isCorrect ? 'bg-green-600 text-white border-green-600 shadow-sm' : 'bg-white border-gray-300 text-gray-500 group-hover:border-gray-400'}`}>
-                          {label}
-                        </div>
-                        <div className="font-['Source_Serif_4',_'Georgia',_serif] text-[16px] text-[#1a1a1a] leading-relaxed">
-                            {opt.text}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* FOOTER */}
-          <div className="px-6 py-3 bg-white border-t border-gray-100 text-xs font-medium text-gray-400 flex justify-between items-center flex-shrink-0">
-             <span className="flex items-center gap-1">
-               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29-3.5.804v-10A7.963 7.963 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
-               {examTitle}
-             </span>
-             <span className="font-mono text-[10px] tracking-wider opacity-70">ID: {data.id}</span>
           </div>
         </div>
 
         {/* ================= PHẦN PHẢI: KHUNG CHAT AI ================= */}
         <div 
-          className={`flex flex-col bg-slate-50 border-l border-gray-200 transition-all duration-300 ease-in-out ${isAiOpen ? 'w-[400px] opacity-100' : 'w-0 opacity-0 overflow-hidden border-l-0'}`}
+          className={`relative flex flex-col bg-slate-50 border-l border-gray-200 transition-all duration-300 ease-in-out ${isAiOpen ? 'w-[450px] opacity-100' : 'w-0 opacity-0 overflow-hidden border-l-0'}`}
         >
           {/* AI Header */}
-          <div className="px-5 py-4 border-b border-gray-200 bg-white flex items-center gap-2 flex-shrink-0">
+          <div className="px-5 py-4 bg-white flex items-center gap-2 flex-shrink-0">
             <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
             </div>
@@ -360,7 +368,22 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
           </div>
 
           {/* Khu vực hiển thị tin nhắn */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div 
+            ref={scrollRef}
+            onScroll={handleScroll}
+            onWheel={(e) => {
+              if (e.deltaY < 0) { // deltaY < 0 nghĩa là lăn chuột hướng lên trên
+                isAtBottomRef.current = false;
+                setShowScrollButton(true);
+              }
+            }}
+            onTouchMove={() => {
+              // Chỉ cần người dùng chạm vuốt là ưu tiên quyền điều khiển cho họ
+              isAtBottomRef.current = false; 
+              setShowScrollButton(true);
+            }}
+            className="flex-1 overflow-y-auto p-4 space-y-4"
+          >
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
@@ -374,7 +397,12 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
                       // Tin nhắn của User thường là text thuần, không cần Markdown
                       <div className="whitespace-pre-wrap">{msg.content}</div>
                     ) : (
-                      <TypewriterMarkdown content={msg.content} />
+                      <TypewriterMarkdown 
+                        content={msg.content} 
+                        onTyping={() => {
+                          if (isAtBottomRef.current) scrollToBottom();  
+                        }}
+                      />
                     )}
                   </div>
                 </div>
@@ -391,8 +419,19 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
+
+          {showScrollButton && (
+            <button 
+              onClick={() => {
+                isAtBottomRef.current = true;
+                scrollToBottom();
+              }}
+              className="absolute left-1/2 -translate-x-1/2 bottom-[80px] z-20 bg-white border border-gray-200 shadow-lg rounded-full w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-all text-gray-500 hover:text-indigo-600"
+            >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+            </button>
+          )}
 
           {/* Khung nhập text */}
           <div className="p-4 bg-white border-t border-gray-200 flex-shrink-0">
