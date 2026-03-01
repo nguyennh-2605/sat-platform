@@ -45,16 +45,22 @@ exports.chatExplain = async (req, res) => {
     Đáp án đúng: ${context.correctAnswer || ''}
     Lựa chọn: ${context.choices ? context.choices.join(', ') : ''}
 
-    --- YÊU CẦU GIẢI THÍCH ---
-    Hãy trình bày lời giải theo cấu trúc 3 phần sau đây:
-    1. **Phân tích nhanh**: Giải thích ngắn gọn từ khóa hoặc logic của câu hỏi.
-    2. **Tại sao chọn ${context.correctAnswer}**: Chỉ ra lý do đáp án này đúng dựa trên ngữ cảnh.
-    3. **Loại trừ**: Giải thích nhanh 1-2 lỗi sai điển hình của các phương án khác.
+    --- CÁCH THỨC HOẠT ĐỘNG ---
+    1. NẾU người dùng yêu cầu giải thích câu hỏi chung chung: Hãy trình bày lời giải theo cấu trúc 3 phần sau đây. TUYỆT ĐỐI KHÔNG giải thích dông dài, đi thẳng vào trọng tâm. Tổng độ dài không vượt quá 200 từ:
+    - **Phân tích nhanh**: Viết TỐI ĐA 3 câu tóm tắt logic của câu hỏi.
+    - **Tại sao chọn ${context.correctAnswer}**: Giải thích trực diện lý do đúng trong 2-3 câu ngắn gọn.
+    - **Loại trừ**: Giải thích nhanh lỗi sai điển hình của các phương án khác. Mỗi đáp án TỐI ĐA 2 câu
 
-    --- QUY TẮC ĐỊNH DẠNG ---
-    - Dùng Markdown (in đậm từ khóa).
-    - Công thức toán học dùng LaTeX: $inline$ hoặc $$display$$.
-    - Tuyệt đối không nhắc lại toàn bộ đề bài.`;
+    2. NẾU người dùng hỏi cụ thể (Ví dụ: "Tại sao B sai?", "Dịch đề bài"):
+    - BỎ QUA cấu trúc 3 phần ở trên. 
+    - Trả lời TRỰC TIẾP, chính xác vào yêu cầu của họ một cách ngắn gọn nhất.
+    
+    3. Luôn ưu tiên thông tin trong tin nhắn mới nhất của người dùng hơn là dữ liệu đề bài mặc định.
+
+    --- LƯU Ý QUAN TRỌNG VỀ TRÌNH BÀY (MARKDOWN) ---
+    1. TUYỆT ĐỐI KHÔNG dùng dấu sao (*) để làm danh sách. Hãy luôn dùng dấu gạch ngang (-).
+    2. LUÔN LUÔN cách 1 dòng trắng (Enter) trước khi bắt đầu một danh sách gạch đầu dòng.
+    3. Không thụt lề lộn xộn trước các dấu gạch ngang. Hãy viết sát lề trái.`;
 
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
@@ -70,14 +76,14 @@ exports.chatExplain = async (req, res) => {
 
     // Format lại lịch sử chat
     const formattedHistory = history ? history.map(h => ({ 
-      role: h.role === 'ai' ? 'model' : 'user', // Đảm bảo đúng role của Gemini
+      role: h.role,
       parts: [{ text: h.content }] 
     })) : [];
 
     const chat = model.startChat({ 
       history: formattedHistory,
       generationConfig: {
-        maxOutputTokens: 800,
+        maxOutputTokens: 1500,
         temperature: 0.7
       },
       safetySettings
