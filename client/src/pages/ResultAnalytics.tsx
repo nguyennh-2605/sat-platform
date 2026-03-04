@@ -133,245 +133,253 @@ const ResultAnalytics = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8 min-h-screen bg-gray-50/50">
-      
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-             Analytics Overview
-          </h1>
-          <p className="text-gray-500 mt-2 text-base">
-            Theo dõi sự tiến bộ và lịch sử làm bài thi của bạn.
-          </p>
-        </div>
-        
-        {/* Time Filter */}
-        <div className="bg-white p-1 rounded-lg border border-gray-200 shadow-sm flex">
-          {[7, 30].map((days) => (
-            <button
-              key={days}
-              onClick={() => setTimeRange(days)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                timeRange === days 
-                  ? 'bg-indigo-50 text-indigo-700 shadow-sm' 
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Last {days} Days
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden">
+      <header className="flex-none h-16 bg-white border-b border-gray-200 px-4 md:px-8 flex items-center justify-center z-30 shadow-sm">
+        <h1 className="text-lg font-bold text-slate-800 tracking-tight">
+          Analytics And Results
+        </h1>
+      </header>
 
-      {/* --- PHẦN 1: LINE CHART (ACCURACY TREND) --- */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative">
-        <div className="flex justify-between items-center mb-6">
-           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-             <BarChart3 className="text-indigo-600" size={20}/> 
-             Accuracy Trend
-           </h2>
-        </div>
+      <main className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+                Analytics Overview
+              </h1>
+              <p className="text-gray-500 mt-2 text-base">
+                Theo dõi sự tiến bộ và lịch sử làm bài thi của bạn.
+              </p>
+            </div>
+            
+            {/* Time Filter */}
+            <div className="bg-white p-1 rounded-lg border border-gray-200 shadow-sm flex">
+              {[7, 30].map((days) => (
+                <button
+                  key={days}
+                  onClick={() => setTimeRange(days)}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                    timeRange === days 
+                      ? 'bg-indigo-50 text-indigo-700 shadow-sm' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Last {days} Days
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <div className="h-[350px] w-full">
-          {loading ? (
-             <div className="w-full h-full animate-pulse bg-gray-50 rounded-lg flex items-center justify-center">
-                <BarChart3 className="text-gray-200" size={48}/>
-             </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              {/* connectNulls={true} sẽ nối các điểm lại với nhau ngay cả khi có ngày ở giữa không làm bài */}
-              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                
-                {/* Trục X: Luôn hiện ngày tháng */}
-                <XAxis 
-                  dataKey="displayDate" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fill: '#9CA3AF', fontSize: 12}} 
-                  dy={10} 
-                  padding={{ left: 10, right: 10 }}
-                />
+          {/* --- PHẦN 1: LINE CHART (ACCURACY TREND) --- */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <BarChart3 className="text-indigo-600" size={20}/> 
+                Accuracy Trend
+              </h2>
+            </div>
 
-                {/* Trục Y: Luôn hiện thang 0-100 */}
-                <YAxis 
-                  domain={[0, 100]} 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fill: '#9CA3AF', fontSize: 12}} 
-                />
-
-                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#6366f1', strokeWidth: 1, strokeDasharray: '5 5' }} />
-                
-                {/* Đường trung bình tham khảo 50% */}
-                <ReferenceLine y={50} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'insideTopRight', value: 'Avg 50%', fill: '#EF4444', fontSize: 10 }} />
-
-                <Line 
-                  connectNulls={true} // Quan trọng: Nối các điểm có dữ liệu lại với nhau
-                  type="monotone" 
-                  dataKey="accuracy" 
-                  stroke="#4F46E5" 
-                  strokeWidth={3}
-                  // Chỉ hiện chấm tròn (dot) tại những ngày CÓ dữ liệu
-                  dot={(props) => {
-                      const { cx, cy, payload } = props;
-                      if (!payload.hasData) return <></>; // Ẩn dot nếu ngày đó không làm bài
-                      return (
-                          <circle cx={cx} cy={cy} r={4} fill="#4F46E5" stroke="#fff" strokeWidth={2} />
-                      );
-                  }}
-                  activeDot={{ r: 6, strokeWidth: 0 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      {/* --- PHẦN 2: HISTORY TABLE --- */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-                <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                    <History size={20}/>
+            <div className="h-[350px] w-full">
+              {loading ? (
+                <div className="w-full h-full animate-pulse bg-gray-50 rounded-lg flex items-center justify-center">
+                    <BarChart3 className="text-gray-200" size={48}/>
                 </div>
-                <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  {/* connectNulls={true} sẽ nối các điểm lại với nhau ngay cả khi có ngày ở giữa không làm bài */}
+                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                    
+                    {/* Trục X: Luôn hiện ngày tháng */}
+                    <XAxis 
+                      dataKey="displayDate" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fill: '#9CA3AF', fontSize: 12}} 
+                      dy={10} 
+                      padding={{ left: 10, right: 10 }}
+                    />
+
+                    {/* Trục Y: Luôn hiện thang 0-100 */}
+                    <YAxis 
+                      domain={[0, 100]} 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fill: '#9CA3AF', fontSize: 12}} 
+                    />
+
+                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#6366f1', strokeWidth: 1, strokeDasharray: '5 5' }} />
+                    
+                    {/* Đường trung bình tham khảo 50% */}
+                    <ReferenceLine y={50} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'insideTopRight', value: 'Avg 50%', fill: '#EF4444', fontSize: 10 }} />
+
+                    <Line 
+                      connectNulls={true} // Quan trọng: Nối các điểm có dữ liệu lại với nhau
+                      type="monotone" 
+                      dataKey="accuracy" 
+                      stroke="#4F46E5" 
+                      strokeWidth={3}
+                      // Chỉ hiện chấm tròn (dot) tại những ngày CÓ dữ liệu
+                      dot={(props) => {
+                          const { cx, cy, payload } = props;
+                          if (!payload.hasData) return <></>; // Ẩn dot nếu ngày đó không làm bài
+                          return (
+                              <circle cx={cx} cy={cy} r={4} fill="#4F46E5" stroke="#fff" strokeWidth={2} />
+                          );
+                      }}
+                      activeDot={{ r: 6, strokeWidth: 0 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
-            <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                Total: {history.length}
-            </span>
-        </div>
+          </div>
 
-        {loading ? (
-            // Skeleton cho Table
-            <div className="p-6 space-y-4">
-                {[1,2,3].map(i => <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse"></div>)}
-            </div>
-        ) : (
-        <>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse table-fixed min-w-[800px]">
-                <thead className="bg-gray-50/50 text-gray-500 text-xs uppercase font-semibold tracking-wider border-b border-gray-100">
-                  <tr>
-                    {/* Test Name: Căn trái + Padding để thoáng */}
-                    <th className="px-6 py-4 w-[30%]">Test Name</th>
-                    {/* Các cột còn lại: Căn giữa hoàn toàn */}
-                    <th className="px-4 py-4 w-[30%] text-center">Status</th>
-                    <th className="px-4 py-4 w-[25%] text-center">Date</th>
-                    <th className="px-4 py-4 w-[20%] text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {currentHistoryItems.length > 0 ? (
-                    currentHistoryItems.map((item: any) => (
-                      <tr key={item.id} className="hover:bg-gray-50/80 transition-colors group">
-                        
-                        {/* 1. Test Name */}
-                        <td className="px-6 py-4 text-left">
-                          <div className="flex flex-col">
-                            <span className="font-medium text-gray-900 line-clamp-1" title={item.test?.title}>
-                              {item.test?.title || "Unknown Test"}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* 2. Status (Căn giữa) */}
-                        <td className="px-4 py-4 text-center">
-                          {item.status === 'COMPLETED' ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                              <CheckCircle2 size={12} /> Completed
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                              <Clock size={12} /> Incomplete
-                            </span>
-                          )}
-                        </td>
-
-                        {/* 4. Date + Time (Căn giữa + Format AM/PM) */}
-                        <td className="px-4 py-4 text-center">
-                          <span className="text-sm text-gray-600 font-medium">
-                            {format(new Date(item.createdAt), 'MMM dd, yyyy')} •{' '}
-                            <span className="text-gray-400 font-normal">
-                              {format(new Date(item.createdAt), 'HH:mm a')}
-                            </span>
-                          </span>
-                        </td>
-
-                        {/* 5. Action (Căn giữa - Không dính phải nữa) */}
-                        <td className="px-4 py-4 text-center">
-                            <div className="flex justify-center gap-2"> {/* Flex center để nút nằm giữa ô */}
-                                <button 
-                                  disabled={item.status != 'COMPLETED'}
-                                  onClick={() => navigate('/score-report', { state: { resultId: item.id } })}
-                                  className= {item.status === 'COMPLETED' ? "text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap"
-                                                                          : "text-gray-400 bg-gray-100 px-3 py-1.5 rounded text-xs font-medium"
-                                  }
-                                >
-                                  View Details
-                                </button>
-                            </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">
-                        Chưa có dữ liệu.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* PAGINATION */}
-            {history.length > itemsPerPage && (
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
-                <span className="text-sm text-gray-500">
-                Page <span className="font-semibold text-gray-900">{currentPage}</span> of <span className="font-semibold text-gray-900">{totalPages}</span>
+          {/* --- PHẦN 2: HISTORY TABLE --- */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                        <History size={20}/>
+                    </div>
+                    <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                </div>
+                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    Total: {history.length}
                 </span>
-                
-                <div className="flex gap-2">
-                <button 
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                >
-                    <ChevronLeft size={16} />
-                </button>
-                
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
-                    // Logic ẩn bớt trang nếu quá nhiều trang (Optional simple logic)
-                    (Math.abs(currentPage - number) <= 1 || number === 1 || number === totalPages) && (
-                         <button
-                         key={number}
-                         onClick={() => handlePageChange(number)}
-                         className={`w-9 h-9 rounded-lg text-sm font-medium transition-all shadow-sm ${
-                             currentPage === number 
-                             ? "bg-indigo-600 text-white shadow-indigo-200 ring-2 ring-indigo-100" 
-                             : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                         }`}
-                         >
-                         {number}
-                         </button>
-                    )
-                ))}
-
-                <button 
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                >
-                    <ChevronRight size={16} />
-                </button>
-                </div>
             </div>
+
+            {loading ? (
+                // Skeleton cho Table
+                <div className="p-6 space-y-4">
+                    {[1,2,3].map(i => <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse"></div>)}
+                </div>
+            ) : (
+            <>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse table-fixed min-w-[800px]">
+                    <thead className="bg-gray-50/50 text-gray-500 text-xs uppercase font-semibold tracking-wider border-b border-gray-100">
+                      <tr>
+                        {/* Test Name: Căn trái + Padding để thoáng */}
+                        <th className="px-6 py-4 w-[30%]">Test Name</th>
+                        {/* Các cột còn lại: Căn giữa hoàn toàn */}
+                        <th className="px-4 py-4 w-[30%] text-center">Status</th>
+                        <th className="px-4 py-4 w-[25%] text-center">Date</th>
+                        <th className="px-4 py-4 w-[20%] text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {currentHistoryItems.length > 0 ? (
+                        currentHistoryItems.map((item: any) => (
+                          <tr key={item.id} className="hover:bg-gray-50/80 transition-colors group">
+                            
+                            {/* 1. Test Name */}
+                            <td className="px-6 py-4 text-left">
+                              <div className="flex flex-col">
+                                <span className="font-medium text-gray-900 line-clamp-1" title={item.test?.title}>
+                                  {item.test?.title || "Unknown Test"}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* 2. Status (Căn giữa) */}
+                            <td className="px-4 py-4 text-center">
+                              {item.status === 'COMPLETED' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                  <CheckCircle2 size={12} /> Completed
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                                  <Clock size={12} /> Incomplete
+                                </span>
+                              )}
+                            </td>
+
+                            {/* 4. Date + Time (Căn giữa + Format AM/PM) */}
+                            <td className="px-4 py-4 text-center">
+                              <span className="text-sm text-gray-600 font-medium">
+                                {format(new Date(item.createdAt), 'MMM dd, yyyy')} •{' '}
+                                <span className="text-gray-400 font-normal">
+                                  {format(new Date(item.createdAt), 'HH:mm a')}
+                                </span>
+                              </span>
+                            </td>
+
+                            {/* 5. Action (Căn giữa - Không dính phải nữa) */}
+                            <td className="px-4 py-4 text-center">
+                                <div className="flex justify-center gap-2"> {/* Flex center để nút nằm giữa ô */}
+                                    <button 
+                                      disabled={item.status != 'COMPLETED'}
+                                      onClick={() => navigate('/score-report', { state: { resultId: item.id } })}
+                                      className= {item.status === 'COMPLETED' ? "text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap"
+                                                                              : "text-gray-400 bg-gray-100 px-3 py-1.5 rounded text-xs font-medium"
+                                      }
+                                    >
+                                      View Details
+                                    </button>
+                                </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">
+                            Chưa có dữ liệu.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* PAGINATION */}
+                {history.length > itemsPerPage && (
+                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
+                    <span className="text-sm text-gray-500">
+                    Page <span className="font-semibold text-gray-900">{currentPage}</span> of <span className="font-semibold text-gray-900">{totalPages}</span>
+                    </span>
+                    
+                    <div className="flex gap-2">
+                    <button 
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                    >
+                        <ChevronLeft size={16} />
+                    </button>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
+                        // Logic ẩn bớt trang nếu quá nhiều trang (Optional simple logic)
+                        (Math.abs(currentPage - number) <= 1 || number === 1 || number === totalPages) && (
+                            <button
+                            key={number}
+                            onClick={() => handlePageChange(number)}
+                            className={`w-9 h-9 rounded-lg text-sm font-medium transition-all shadow-sm ${
+                                currentPage === number 
+                                ? "bg-indigo-600 text-white shadow-indigo-200 ring-2 ring-indigo-100" 
+                                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
+                            }`}
+                            >
+                            {number}
+                            </button>
+                        )
+                    ))}
+
+                    <button 
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                    >
+                        <ChevronRight size={16} />
+                    </button>
+                    </div>
+                </div>
+                )}
+            </>
             )}
-        </>
-        )}
-      </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 };

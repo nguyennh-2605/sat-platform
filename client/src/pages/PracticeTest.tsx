@@ -208,7 +208,7 @@ const PracticeTest = () => {
   }, []);
 
   useEffect(() => {
-    const mainContainer = document.getElementById("dashboard-main");
+    const mainContainer = document.getElementById("main-scroll");
     if (!mainContainer) {
       return;
     }
@@ -293,7 +293,7 @@ const PracticeTest = () => {
   }, [filteredTests]);
 
   const scrollToTop = () => {
-    const mainContainer = document.getElementById("dashboard-main");
+    const mainContainer = document.getElementById("main-scroll");
     if (mainContainer) {
       mainContainer.scrollTo({
         top: 0,
@@ -303,183 +303,193 @@ const PracticeTest = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      {/* 1. HEADER SECTION (Chỉ còn chữ) */}
-      <div className="mb-6">
-        <h2 className="text-3xl font-extrabold text-slate-800 mb-2">
-          Xin chào, {user.name.split(' ').pop()}! 👋
-        </h2>
-        <p className="text-slate-500 text-lg">Hôm nay bạn muốn luyện tập kỹ năng nào?</p>
-      </div>
-
-      {/* 2. ACTION TOOLBAR (Search, Filter, Add Button nằm cùng 1 dòng) */}
-      <div className="flex flex-col sm:flex-row items-center gap-3 mb-6 relative">
-        {/* Search Bar (flex-1 để tự động chiếm hết khoảng trống) */}
-        <div className="flex-1 w-full bg-white px-4 h-[52px] rounded-2xl shadow-sm 
-          border border-slate-300 flex items-center gap-2 focus-within:border-2 focus-within:border-blue-500">
-          <div className="pl-1 text-slate-400">
-            <Search size={20} />
+    <div className="flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden">
+      <header className="flex-none h-16 bg-white border-b border-gray-200 px-4 md:px-8 flex items-center justify-center z-30 shadow-sm">
+        <h1 className="text-lg font-bold text-slate-800 tracking-tight">
+          Practice Test
+        </h1>
+      </header>
+      
+      <main id="main-scroll" className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+          {/* 1. HEADER SECTION (Chỉ còn chữ) */}
+          <div className="mb-6">
+            <h2 className="text-3xl font-extrabold text-slate-800 mb-2">
+              Xin chào, {user.name.split(' ').pop()}! 👋
+            </h2>
+            <p className="text-slate-500 text-lg">Hôm nay bạn muốn luyện tập kỹ năng nào?</p>
           </div>
-          <SearchInput onSearch={setSearchQuery} />
-        </div>
 
-        {/* Nút Filter & Flyout */}
-        <div className="relative w-full sm:w-auto z-40" ref={filterRef}>
-          <button 
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className={`w-full sm:w-auto relative overflow-hidden flex items-center justify-center gap-2 px-5 h-[52px] rounded-2xl font-semibold transition-all border shadow-sm ${
-              isFilterOpen || activeCategory !== 'ALL' 
-                ? 'bg-slate-100 border-slate-300 text-slate-800' 
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Ripple color="rgba(15, 23, 42, 0.1)" />
-            <span className="relative z-10 pointer-events-none flex items-center gap-2 text-sm">
-              <Filter size={18} /> 
-              <span>Filter</span>
-            </span>
-            {activeCategory !== 'ALL' && (
-              <span className="absolute top-2.5 right-2.5 h-2.5 w-2.5 rounded-full bg-red-500 border border-slate-100 shadow-sm z-20"></span>
-            )}
-          </button>
-
-          {/* FLYOUT FILTER (Hiển thị khi isFilterOpen === true) */}
-          {isFilterOpen && (
-            <div className="absolute right-0 top-full mt-2 w-full sm:w-[420px] bg-white border border-slate-200 rounded-2xl shadow-xl p-5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-              <div className="space-y-5">
-                
-                {/* Nhóm 1: Nguồn */}
-                <div>
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Nguồn đề thi</div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <FilterChip label="Tất cả" active={activeCategory === 'ALL'} onClick={() => setActiveCategory('ALL')} />
-                    <FilterChip label="Real Tests" icon={Layers} active={activeCategory === 'REAL'} onClick={() => setActiveCategory('REAL')} />
-                    
-                    {myClasses.length > 0 && <div className="h-6 w-[1px] bg-slate-300 mx-1"></div>}
-
-                    {myClasses.map(cls => (
-                      <FilterChip 
-                        key={cls.id} label={cls.name} icon={GraduationCap} 
-                        active={activeCategory === cls.id} onClick={() => setActiveCategory(cls.id)} colorClass="slate"
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="h-[1px] w-full bg-slate-100"></div>
-
-                {/* Nhóm 2: Chi tiết (Môn & Ngày) */}
-                <div className="flex flex-col gap-4">
-                  {/* Môn thi */}
-                  <div>
-                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Môn thi</div>
-                    <div className="inline-flex bg-slate-100 p-1 rounded-xl">
-                      {['RW', 'MATH', 'ALL'].map((sub) => (
-                        <button
-                          key={sub}
-                          onClick={() => setActiveSubject(sub)}
-                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            activeSubject === sub ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                          }`}
-                        >
-                          {sub === 'ALL' ? 'ALL' : sub}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Kỳ thi (Chỉ hiện khi chọn Real Test) */}
-                  {activeCategory === 'REAL' && (
-                    <div className="animate-in fade-in slide-in-from-left-2 duration-300">
-                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                        <Calendar size={14}/> Kỳ thi
-                      </div>
-                      <select 
-                        value={activeDate}
-                        onChange={(e) => setActiveDate(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none"
-                      >
-                        {TEST_DATES.map(date => <option key={date} value={date}>{date}</option>)}
-                      </select>
-                    </div>
-                  )}
-                </div>
+          {/* 2. ACTION TOOLBAR (Search, Filter, Add Button nằm cùng 1 dòng) */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 mb-6 relative">
+            {/* Search Bar (flex-1 để tự động chiếm hết khoảng trống) */}
+            <div className="flex-1 w-full bg-white px-4 h-[52px] rounded-2xl shadow-sm 
+              border border-slate-300 flex items-center gap-2 focus-within:border-2 focus-within:border-blue-500">
+              <div className="pl-1 text-slate-400">
+                <Search size={20} />
               </div>
+              <SearchInput onSearch={setSearchQuery} />
             </div>
-          )}
-        </div>
 
-        {/* Nút Thêm đề thi */}
-        {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
-          <button 
-            onClick={() => navigate('create')}
-            className="w-full sm:w-auto relative overflow-hidden flex items-center justify-center gap-2 bg-slate-900 text-white px-5 h-[52px] rounded-2xl font-semibold hover:bg-slate-800 hover:shadow-lg transition-all"
-          >
-            <Ripple color="rgba(255, 255, 255, 0.2)" />
-            <span className="relative z-10 pointer-events-none flex items-center gap-2 text-sm">
-              <Plus size={18} /> 
-              <span>Add new</span>
-            </span>
-          </button>
-        )}
-      </div>
+            {/* Nút Filter & Flyout */}
+            <div className="relative w-full sm:w-auto z-40" ref={filterRef}>
+              <button 
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`w-full sm:w-auto relative overflow-hidden flex items-center justify-center gap-2 px-5 h-[52px] rounded-2xl font-semibold transition-all border shadow-sm ${
+                  isFilterOpen || activeCategory !== 'ALL' 
+                    ? 'bg-slate-100 border-slate-300 text-slate-800' 
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Ripple color="rgba(15, 23, 42, 0.1)" />
+                <span className="relative z-10 pointer-events-none flex items-center gap-2 text-sm">
+                  <Filter size={18} /> 
+                  <span>Filter</span>
+                </span>
+                {activeCategory !== 'ALL' && (
+                  <span className="absolute top-2.5 right-2.5 h-2.5 w-2.5 rounded-full bg-red-500 border border-slate-100 shadow-sm z-20"></span>
+                )}
+              </button>
 
-      {/* List Cards */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 opacity-60">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-slate-500 font-medium">Đang tải dữ liệu...</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-          {filteredTests.length > 0 ? (
-            <>
-              {filteredTests.slice(0, visibleCount).map((test, index) => (
-                <TestCard
-                  key={test.id}
-                  test={test}
-                  index={index}
-                  onStart={handleStartExam}
-              />
-              ))}
-              {visibleCount < filteredTests.length && (
-                <div 
-                  ref={lastElementRef} 
-                  className="col-span-full py-8 flex justify-center items-center"
-                >
-                  {/* Nút loading xoay xoay nhỏ cho đẹp mắt */}
-                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin opacity-50"></div>
+              {/* FLYOUT FILTER (Hiển thị khi isFilterOpen === true) */}
+              {isFilterOpen && (
+                <div className="absolute right-0 top-full mt-2 w-full sm:w-[420px] bg-white border border-slate-200 rounded-2xl shadow-xl p-5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                  <div className="space-y-5">
+                    
+                    {/* Nhóm 1: Nguồn */}
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Nguồn đề thi</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <FilterChip label="Tất cả" active={activeCategory === 'ALL'} onClick={() => setActiveCategory('ALL')} />
+                        <FilterChip label="Real Tests" icon={Layers} active={activeCategory === 'REAL'} onClick={() => setActiveCategory('REAL')} />
+                        
+                        {myClasses.length > 0 && <div className="h-6 w-[1px] bg-slate-300 mx-1"></div>}
+
+                        {myClasses.map(cls => (
+                          <FilterChip 
+                            key={cls.id} label={cls.name} icon={GraduationCap} 
+                            active={activeCategory === cls.id} onClick={() => setActiveCategory(cls.id)} colorClass="slate"
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="h-[1px] w-full bg-slate-100"></div>
+
+                    {/* Nhóm 2: Chi tiết (Môn & Ngày) */}
+                    <div className="flex flex-col gap-4">
+                      {/* Môn thi */}
+                      <div>
+                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Môn thi</div>
+                        <div className="inline-flex bg-slate-100 p-1 rounded-xl">
+                          {['RW', 'MATH', 'ALL'].map((sub) => (
+                            <button
+                              key={sub}
+                              onClick={() => setActiveSubject(sub)}
+                              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                activeSubject === sub ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                              }`}
+                            >
+                              {sub === 'ALL' ? 'ALL' : sub}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Kỳ thi (Chỉ hiện khi chọn Real Test) */}
+                      {activeCategory === 'REAL' && (
+                        <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                            <Calendar size={14}/> Kỳ thi
+                          </div>
+                          <select 
+                            value={activeDate}
+                            onChange={(e) => setActiveDate(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none"
+                          >
+                            {TEST_DATES.map(date => <option key={date} value={date}>{date}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
-            </>
+            </div>
+
+            {/* Nút Thêm đề thi */}
+            {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
+              <button 
+                onClick={() => navigate('create')}
+                className="w-full sm:w-auto relative overflow-hidden flex items-center justify-center gap-2 bg-slate-900 text-white px-5 h-[52px] rounded-2xl font-semibold hover:bg-slate-800 hover:shadow-lg transition-all"
+              >
+                <Ripple color="rgba(255, 255, 255, 0.2)" />
+                <span className="relative z-10 pointer-events-none flex items-center gap-2 text-sm">
+                  <Plus size={18} /> 
+                  <span>Add new</span>
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* List Cards */}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 opacity-60">
+              <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-slate-500 font-medium">Đang tải dữ liệu...</p>
+            </div>
           ) : (
-            // Empty State
-            <div className="col-span-full py-20 flex flex-col items-center justify-center text-center bg-white rounded-3xl border border-dashed border-slate-300">
-              <div className="bg-slate-50 p-4 rounded-full mb-4">
-                <Search size={32} className="text-slate-300" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-700">Không tìm thấy bài thi</h3>
-              <p className="text-slate-500 max-w-xs mx-auto mt-2">Thử thay đổi bộ lọc môn học hoặc từ khóa tìm kiếm.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+              {filteredTests.length > 0 ? (
+                <>
+                  {filteredTests.slice(0, visibleCount).map((test, index) => (
+                    <TestCard
+                      key={test.id}
+                      test={test}
+                      index={index}
+                      onStart={handleStartExam}
+                  />
+                  ))}
+                  {visibleCount < filteredTests.length && (
+                    <div 
+                      ref={lastElementRef} 
+                      className="col-span-full py-8 flex justify-center items-center"
+                    >
+                      {/* Nút loading xoay xoay nhỏ cho đẹp mắt */}
+                      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin opacity-50"></div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Empty State
+                <div className="col-span-full py-20 flex flex-col items-center justify-center text-center bg-white rounded-3xl border border-dashed border-slate-300">
+                  <div className="bg-slate-50 p-4 rounded-full mb-4">
+                    <Search size={32} className="text-slate-300" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-700">Không tìm thấy bài thi</h3>
+                  <p className="text-slate-500 max-w-xs mx-auto mt-2">Thử thay đổi bộ lọc môn học hoặc từ khóa tìm kiếm.</p>
+                </div>
+              )}
             </div>
           )}
+          {/* --- NÚT SCROLL TO TOP --- */}
+          <button
+            onClick={scrollToTop}
+            className={`
+              fixed bottom-8 right-8 p-3 rounded-full bg-slate-900 text-white 
+              shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:bg-blue-600 hover:shadow-lg hover:-translate-y-1
+              transition-all duration-300 z-50 flex items-center justify-center
+              ${showScrollTop 
+                ? 'opacity-100 translate-y-0' 
+                : 'opacity-0 translate-y-10 pointer-events-none' // Ẩn và vô hiệu hóa click khi ở trên đầu
+              }
+            `}
+            aria-label="Scroll to top"
+          >
+            <ArrowUp size={24} strokeWidth={2.5} />
+          </button>
         </div>
-      )}
-      {/* --- NÚT SCROLL TO TOP --- */}
-      <button
-        onClick={scrollToTop}
-        className={`
-          fixed bottom-8 right-8 p-3 rounded-full bg-slate-900 text-white 
-          shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:bg-blue-600 hover:shadow-lg hover:-translate-y-1
-          transition-all duration-300 z-50 flex items-center justify-center
-          ${showScrollTop 
-            ? 'opacity-100 translate-y-0' 
-            : 'opacity-0 translate-y-10 pointer-events-none' // Ẩn và vô hiệu hóa click khi ở trên đầu
-          }
-        `}
-        aria-label="Scroll to top"
-      >
-        <ArrowUp size={24} strokeWidth={2.5} />
-      </button>
+      </main>
     </div>
   );
 };

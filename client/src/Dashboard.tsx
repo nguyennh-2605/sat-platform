@@ -347,8 +347,8 @@ function Dashboard() {
       </aside>
 
       {/* --- MAIN CONTENT --- */}
-      <main id="dashboard-main" className="flex-1 overflow-y-auto relative scroll-smooth bg-white/50 z-10">
-        <div className="max-w-7xl mx-auto p-8 relative">
+      <main className="flex-1 relative bg-[#F8FAFC] z-10 h-screen overflow-hidden flex flex-col">
+        <div className="flex-1 w-full h-full relative">
           <Outlet />
         </div>
       </main>

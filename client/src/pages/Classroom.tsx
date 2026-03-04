@@ -6,7 +6,10 @@ import {
   Users, Plus, Clock, ChevronRight, Paperclip,
   X, LayoutDashboard, ArrowLeft, Link, Calendar, CheckCircle2,
   BarChart3,
-  LayoutList
+  LayoutList,
+  Settings,
+  Bell,
+  Copy
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -109,7 +112,7 @@ const Classroom = () => {
 
   // --- RENDER GIAO DIỆN MỚI ---
   return (
-    <div className="min-h-screen bg-gray-50 p-6 font-sans text-slate-800">
+    <div className="h-screen w-full bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
       {/* Logic Switching Views */}
       {currentUser.role === 'TEACHER' ? (
         <TeacherDashboard 
@@ -248,7 +251,7 @@ const TeacherDashboard = ({
   );
 
   return (
-    <div className="flex flex-col relative min-h-[600px] bg-white">
+    <div className="flex flex-col h-full w-full bg-[#F8FAFC] relative">
       
       {/* --- MODAL THÊM HỌC SINH (Giữ nguyên logic cũ) --- */}
       {isAddStudentModalOpen && (
@@ -272,7 +275,7 @@ const TeacherDashboard = ({
                     />
                 </div>
                 <button onClick={submitAddStudent} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 flex justify-center items-center gap-2">
-                    <CheckCircle2 size={20}/> Xác nhận thêm
+                  <CheckCircle2 size={20}/> Xác nhận thêm
                 </button>
             </div>
           </div>
@@ -280,144 +283,185 @@ const TeacherDashboard = ({
       )}
 
       {/* --- MAIN CONTENT --- */}
-      <div className="flex-1 w-full">
         {classDetail ? (
-            <div className="flex flex-col h-full">
-                
-                {/* 1. TOP NAVIGATION BAR (Giống Google Classroom) */}
-                <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 md:px-8 shadow-sm">
-                  <div className="max-w-5xl mx-auto flex items-center justify-start gap-2 overflow-x-auto no-scrollbar">
-                    <TabButton id="STREAM" label="Bảng tin" icon={LayoutList} />
-                    <TabButton id="MEMBERS" label="Thành viên" icon={Users} />
-                    <TabButton id="SCORES" label="Score Report" icon={BarChart3} />
-                  </div>
-                </div>
+          <>
+            <header className="flex-none h-16 bg-white border-b border-gray-200 px-4 md:px-8 flex items-center z-30 shadow-sm">
+              {/* Left: Tên lớp (Ẩn trên mobile để ưu tiên Tabs) */}
+              <div className="flex-1 hidden lg:flex items-center">
+                <h1 className="text-sm font-bold text-slate-800 truncate max-w-[200px]">
+                  {classDetail.name}
+                </h1>
+              </div>
 
-                {/* 2. TAB CONTENT AREA */}
-                <div className="flex-1 bg-gray-50/50 p-4 md:p-8 overflow-y-auto">
-                   <div className="max-w-5xl mx-auto space-y-6 animate-fade-in-up">
+              {/* Center: Tabs (Căn giữa tuyệt đối) */}
+              <div className="flex items-center justify-center gap-1 md:gap-4 overflow-x-auto no-scrollbar">
+                <TabButton id="STREAM" label="Bảng tin" icon={LayoutList} active={activeTab === 'STREAM'} />
+                <TabButton id="MEMBERS" label="Thành viên" icon={Users} active={activeTab === 'MEMBERS'} />
+                <TabButton id="SCORES" label="Score Report" icon={BarChart3} active={activeTab === 'SCORES'} />
+              </div>
 
-                      {/* --- TAB 1: BẢNG TIN (STREAM) --- */}
-                      {activeTab === 'STREAM' && (
-                        <>
-                          {/* Header Class Banner (Nằm trong Stream) */}
-                          <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 p-8 rounded-2xl shadow-lg text-white relative overflow-hidden min-h-[160px] flex flex-col justify-end">
-                              {/* Decorate circles */}
-                              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4 blur-3xl"></div>
-                              
-                              <div className="relative z-10">
-                                <h2 className="text-3xl font-bold mb-2">{classDetail.name}</h2>
-                                <div className="flex items-center gap-4 text-indigo-100 text-sm font-medium">
-                                  <span className="flex items-center gap-1"><Users size={14}/> {classDetail.students?.length || 0} học sinh</span>
-                                  <span>•</span>
-                                  <span className="flex items-center gap-1"><FileText size={14}/> {classDetail.assignments?.length || 0} bài tập</span>
-                                </div>
-                              </div>
+              {/* Right: Notification & Actions */}
+              <div className="flex-1 flex items-center justify-end gap-2">
+                <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors relative">
+                  <Bell size={20} />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                </button>
+                <button className="p-2 text-slate-400 hover:text-slate-600 rounded-full">
+                  <Settings size={20} />
+                </button>
+              </div>
+            </header>
+
+            {/* 2. TAB CONTENT AREA */}
+            <main className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50/50">
+              <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-6 animate-fade-in-up">
+
+                {/* --- TAB 1: BẢNG TIN (STREAM) --- */}
+                {activeTab === 'STREAM' && (
+                  <div className="space-y-6 animate-fade-in-up">
+                    
+                    {/* Banner ảnh bìa (Full width trong container) */}
+                    <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-indigo-700 p-8 rounded-2xl shadow-md text-white relative overflow-hidden min-h-[180px] flex flex-col justify-end">
+                      <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4 blur-3xl"></div>
+                      <div className="relative z-10">
+                        <h2 className="text-4xl font-black mb-1">{classDetail.name}</h2>
+                        <p className="text-indigo-100 font-medium opacity-90">Học kỳ Fall 2024 • SAT Master Course</p>
+                      </div>
+                    </div>
+
+                    {/* Bố cục 2 cột: Trái (Mã lớp) - Phải (Nội dung) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                      
+                      {/* CỘT TRÁI: THÔNG TIN NHANH (Mã lớp) */}
+                      <div className="lg:col-span-1 space-y-4">
+                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">Mã lớp học</h3>
+                          <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <span className="text-2xl font-black text-indigo-600 tracking-widest">
+                              {classDetail.id?.substring(0, 6).toUpperCase() || "ABCXYZ"}
+                            </span>
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(classDetail.id || "");
+                                toast.success("Đã sao chép mã lớp!");
+                              }}
+                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-all shadow-sm"
+                              title="Sao chép mã"
+                            >
+                              <Copy size={16} />
+                            </button>
                           </div>
+                          <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
+                            Gửi mã này cho học sinh để họ có thể tham gia vào lớp học ngay lập tức.
+                          </p>
+                        </div>
 
-                          {/* Action Bar & Create Form */}
-                          <div className="flex justify-end">
-                             <button 
-                                onClick={() => setShowCreateForm(!showCreateForm)} 
-                                className="px-5 py-2.5 bg-indigo-600 text-white rounded-full text-sm font-bold hover:bg-indigo-700 shadow-md flex items-center gap-2 transition-all hover:shadow-lg"
-                             >
-                                {showCreateForm ? <X size={18}/> : <Plus size={18}/>}
-                                {showCreateForm ? 'Hủy tạo' : 'Tạo bài tập mới'}
-                             </button>
+                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Sắp tới</h3>
+                          <p className="text-xs text-slate-500">Tuyệt vời! Không có bài tập nào sắp đến hạn.</p>
+                        </div>
+                      </div>
+
+                      {/* CỘT PHẢI: FEED (Nội dung chính) */}
+                      <div className="lg:col-span-3 space-y-6">
+                        {/* Thanh tạo bài tập nhanh */}
+                        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-all group" onClick={() => setShowCreateForm(true)}>
+                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                            <Plus size={20} />
                           </div>
+                          <span className="text-sm font-medium text-slate-500 group-hover:text-slate-800">Thông báo nội dung nào đó cho lớp học của bạn...</span>
+                        </div>
 
-                          {/* Form Tạo (Component ngoài) */}
-                          {showCreateForm && (
-                              <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-lg mb-6">
-                                {/* Place your CreateAssignmentSection component here */}
-                                <CreateAssignmentSection 
-                                    onClose={() => setShowCreateForm(false)}
-                                    onSubmit={handleCreateAssignment}
+                        {/* Form Tạo (Nếu mở) */}
+                        {showCreateForm && (
+                          <div className="bg-white p-6 rounded-2xl border-2 border-indigo-500 shadow-xl animate-in zoom-in-95 duration-200">
+                            <CreateAssignmentSection 
+                              onClose={() => setShowCreateForm(false)}
+                              onSubmit={handleCreateAssignment}
+                            />
+                          </div>
+                        )}
+
+                        {/* Danh sách bài tập */}
+                        <div className="space-y-4">
+                          {classDetail.assignments?.length > 0 ? (
+                            classDetail.assignments.map((assignment: any) => (
+                              <div key={assignment.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-all p-1">
+                                <AssignmentTracker 
+                                  assignment={assignment} 
+                                  classStudents={classDetail.students || []} 
                                 />
                               </div>
+                            ))
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
+                              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                                <LayoutList size={32} className="text-slate-300" />
+                              </div>
+                              <p className="text-slate-500 font-medium">Chưa có bài đăng nào trong lớp học này.</p>
+                            </div>
                           )}
-
-                          {/* Assignment List */}
-                          <div className="space-y-4">
-                            {classDetail.assignments && classDetail.assignments.length > 0 ? (
-                              classDetail.assignments.map((assignment: any) => (
-                                <div key={assignment.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all p-1">
-                                  {/* Replace with your AssignmentTracker component */}
-                                  <AssignmentTracker 
-                                    assignment={assignment} 
-                                    classStudents={classDetail.students || []} 
-                                  />
-                                </div>
-                              ))
-                            ) : (
-                              !showCreateForm && (
-                                <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl border border-dashed border-gray-300 text-gray-400">
-                                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
-                                      <LayoutList size={32} className="text-gray-300" />
-                                  </div>
-                                  <p className="text-sm font-medium text-gray-500">Chưa có bài tập nào được đăng.</p>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {/* --- TAB 2: THÀNH VIÊN (MEMBERS) --- */}
-                      {activeTab === 'MEMBERS' && (
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                                <h3 className="text-lg font-bold text-indigo-900">Danh sách học sinh</h3>
-                                <button onClick={() => setIsAddStudentModalOpen(true)} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-100 flex items-center gap-2">
-                                   <Plus size={16}/> Thêm học sinh
-                                </button>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead className="bg-gray-50 text-gray-500 text-xs font-bold uppercase">
-                                        <tr>
-                                            <th className="p-5 pl-8">Họ và tên</th>
-                                            <th className="p-5">Email</th>
-                                            <th className="p-5 text-right pr-8">Trạng thái</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                    {classDetail.students && classDetail.students.length > 0 ? (
-                                        classDetail.students.map((st: any) => (
-                                        <tr key={st.id} className="hover:bg-gray-50/80 transition">
-                                            <td className="p-5 pl-8">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
-                                                        {st.name ? st.name.charAt(0).toUpperCase() : 'S'}
-                                                    </div>
-                                                    <span className="font-semibold text-gray-700">{st.name || "Unknown"}</span>
-                                                </div>
-                                            </td>
-                                            <td className="p-5 text-gray-600 text-sm">{st.email}</td>
-                                            <td className="p-5 text-right pr-8">
-                                                <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Đã tham gia</span>
-                                            </td>
-                                        </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={3} className="py-12 text-center text-gray-400 text-sm">Chưa có thành viên nào.</td>
-                                        </tr>
-                                    )}
-                                    </tbody>
-                                </table>
-                            </div>
                         </div>
-                      )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                      {/* --- TAB 3: SCORE REPORT (NEW) --- */}
-                      {activeTab === 'SCORES' && (
-                        <StudentAnalytics classId={classId || '1'}/>
-                      )}
+                {/* --- TAB 2: THÀNH VIÊN (MEMBERS) --- */}
+                {activeTab === 'MEMBERS' && (
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                      <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                          <h3 className="text-lg font-bold text-indigo-900">Danh sách học sinh</h3>
+                          <button onClick={() => setIsAddStudentModalOpen(true)} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-100 flex items-center gap-2">
+                            <Plus size={16}/> Thêm học sinh
+                          </button>
+                      </div>
+                      <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                              <thead className="bg-gray-50 text-gray-500 text-xs font-bold uppercase">
+                                  <tr>
+                                      <th className="p-5 pl-8">Họ và tên</th>
+                                      <th className="p-5">Email</th>
+                                      <th className="p-5 text-right pr-8">Trạng thái</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                              {classDetail.students && classDetail.students.length > 0 ? (
+                                  classDetail.students.map((st: any) => (
+                                  <tr key={st.id} className="hover:bg-gray-50/80 transition">
+                                      <td className="p-5 pl-8">
+                                          <div className="flex items-center gap-3">
+                                              <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
+                                                  {st.name ? st.name.charAt(0).toUpperCase() : 'S'}
+                                              </div>
+                                              <span className="font-semibold text-gray-700">{st.name || "Unknown"}</span>
+                                          </div>
+                                      </td>
+                                      <td className="p-5 text-gray-600 text-sm">{st.email}</td>
+                                      <td className="p-5 text-right pr-8">
+                                          <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Đã tham gia</span>
+                                      </td>
+                                  </tr>
+                                  ))
+                              ) : (
+                                  <tr>
+                                      <td colSpan={3} className="py-12 text-center text-gray-400 text-sm">Chưa có thành viên nào.</td>
+                                  </tr>
+                              )}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+                )}
 
-                   </div>
-                </div>
-            </div>
+                {/* --- TAB 3: SCORE REPORT (NEW) --- */}
+                {activeTab === 'SCORES' && (
+                  <StudentAnalytics classId={classId || '1'}/>
+                )}
+
+              </div>
+            </main>
+          </>
         ) : (
             // EMPTY STATE KHI CHƯA CHỌN LỚP
             <div className="h-full flex flex-col items-center justify-center bg-gray-50 p-8 text-center min-h-[600px]">
@@ -429,7 +473,6 @@ const TeacherDashboard = ({
             </div>
         )}
       </div>
-    </div>
   );
 };
 
