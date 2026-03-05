@@ -285,7 +285,7 @@ const TeacherDashboard = ({
       {/* --- MAIN CONTENT --- */}
         {classDetail ? (
           <>
-            <header className="flex-none h-16 bg-white border-b border-gray-200 px-4 md:px-8 flex items-center z-30 shadow-sm">
+            <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center z-30 shadow-sm">
               {/* Left: Tên lớp (Ẩn trên mobile để ưu tiên Tabs) */}
               <div className="flex-1 hidden lg:flex items-center">
                 <h1 className="text-sm font-bold text-slate-800 truncate max-w-[200px]">

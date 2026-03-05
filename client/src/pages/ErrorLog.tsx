@@ -156,7 +156,7 @@ const ErrorLog = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden">
-      <header className="flex-none h-16 bg-white border-b border-gray-200 px-4 md:px-8 flex items-center justify-center z-30 shadow-sm">
+      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-center z-30 shadow-sm">
         <h1 className="text-lg font-bold text-slate-800 tracking-tight">
           Error Log
         </h1>

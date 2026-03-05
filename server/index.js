@@ -19,7 +19,6 @@ app.use(cors({
 app.use(express.json());
 
 // --- ROUTES (Đường dẫn) ---
-
 // Route xử lí đăng nhập
 app.post('/api/register', register);
 app.post('/api/login', login);
@@ -31,7 +30,8 @@ app.use("/api/error-logs", require("./src/routes/errorLogRoutes"));
 app.use("/api/results-analytics", require("./src/routes/analyticsRoutes"));
 app.use("/api/tests", require("./src/routes/practiceTestRoute"));
 app.use("/api/test", require('./src/routes/examRoomRoutes'));
-app.use("/api/ai", require("./src/routes/aiRoutes"));
+app.use("/api/ai", require("./src/routes/aiChatBotRoutes"));
+app.use("/api/ai-parser", require("./src/routes/aiParserRoutes"));
 
 // --- KHỞI ĐỘNG SERVER ---
 app.listen(PORT, () => {

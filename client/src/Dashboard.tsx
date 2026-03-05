@@ -206,22 +206,27 @@ function Dashboard() {
             setIsSidebarCollapsed(!isSidebarCollapsed);
             setIsFlyoutOpen(false); 
           }}
-          className="absolute -right-3.5 top-8 flex items-center justify-center w-6 h-6 bg-white border border-slate-400 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-50 shadow-sm z-50 transition-colors cursor-pointer">
+          className="absolute -right-3.5 top-5 flex items-center justify-center w-6 h-6 bg-white border border-slate-400 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-50 shadow-sm z-50 transition-colors cursor-pointer">
           {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
 
-        <div className={`p-6 pb-2 flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'px-6 gap-3'} cursor-pointer transition-all duration-300`} onClick={() => navigate('/')}>
-          <div className="w-10 h-10 shrink-0 min-w-[2.5rem] bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-md">
+        <div 
+          className={`h-16 shrink-0 flex items-center transition-all duration-300 cursor-pointer border-b border-gray-300 ${
+            isSidebarCollapsed ? 'justify-center px-0' : 'px-6 gap-3'
+          }`} 
+          onClick={() => navigate('/')}
+        >
+          <div className="w-10 h-10 shrink-0 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-md">
             <BookOpen size={20} strokeWidth={2.5} />
           </div>
           <div className={`overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap ${
             isSidebarCollapsed ? 'w-0 opacity-0' : 'w-[120px] opacity-100'
           }`}>
-            <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">SAT Master</h1>
+            <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">
+              SAT Master
+            </h1>
           </div>
         </div>
-
-        <div className="mt-4 border-t border-slate-200 mx-4" />
 
         <nav className={`flex-1 px-4 py-4 space-y-1.5 scrollbar-hide ${
           isSidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto overflow-x-hidden'
@@ -310,7 +315,7 @@ function Dashboard() {
         </nav>
 
         {/* --- USER PROFILE CARD --- */}
-        <div className="p-4 border-t border-slate-200 bg-white z-50">
+        <div className="p-4 border-t border-slate-300 bg-white z-50">
           <div className={`flex items-center p-2 rounded-xl transition-all duration-300 ${
             isSidebarCollapsed ? 'flex-col justify-center gap-2' : 'gap-3'
           }`}>

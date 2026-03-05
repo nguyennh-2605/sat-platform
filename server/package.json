@@ -13,15 +13,19 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@google/genai": "^1.44.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.4",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "google-auth-library": "^10.5.0",
     "jsonwebtoken": "^9.0.3",
+    "mammoth": "^1.11.0",
+    "multer": "^2.1.1",
+    "pdf-extraction": "^1.0.2",
     "prisma": "^5.22.0"
   },
   "devDependencies": {

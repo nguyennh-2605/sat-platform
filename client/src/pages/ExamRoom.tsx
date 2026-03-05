@@ -775,7 +775,7 @@ function ExamRoom() {
 
     const reportData = {
       examTitle: TestInfo.title,
-      subject: TestInfo.description,
+      subject: TestInfo.subject,
       date: new Date().toLocaleString(),
       duration: formatDuration(secondsUsed <= 0 ? TestInfo.duration * 60 : secondsUsed), // Thời gian làm bài thực tế
       questions: getResults()

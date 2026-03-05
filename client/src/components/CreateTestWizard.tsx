@@ -2,7 +2,8 @@ import { useState, memo, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Save, ArrowLeft, ImageIcon, Loader2,
   BookOpen, Clock, Layers, ShieldCheck, ShieldAlert, ArrowRight, FileType, AlignLeft,
-  Users
+  Users,
+  Sparkles
  } from 'lucide-react';
 import { parseSATInput, type SATQuestion } from '../utlis/satParser';
 import InputGuideModal from './InputGuideModal';
@@ -183,10 +184,11 @@ const CreateTestWizard = () => {
   const [parsedQuestions, setParsedQuestions] = useState<SATQuestion[]>([]);
   const [showGuide, setShowGuide] = useState(false);
   const [myClasses, setMyClasses] = useState<ClassOption[]>([]);
+  const [loadingMessage, setLoadingMessage] = useState("Đang xử lý dữ liệu...");
 
   const [isLoading, setIsLoading] = useState(false); // Trạng thái đang loading
-  const fileInputRef = useRef<HTMLInputElement>(null);   // Để kích hoạt input file
   const textareaRef = useRef<HTMLTextAreaElement>(null); // Để thao tác con trỏ trong textarea
+  const unifiedInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchClasses = async () => {
@@ -362,8 +364,66 @@ const CreateTestWizard = () => {
       toast.error("Có lỗi xảy ra khi upload");
     } finally {
       setIsLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
+      if (unifiedInputRef.current) unifiedInputRef.current.value = ''; // Reset input
     }
+  };
+
+  const handleUnifiedUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // RẼ NHÁNH 1: NẾU LÀ ẢNH
+    if (file.type.startsWith('image/')) {
+      handleImageUpload(e);
+      if (unifiedInputRef.current) unifiedInputRef.current.value = '';
+      return;
+    }
+
+    // RẼ NHÁNH 2: NẾU LÀ TÀI LIỆU (PDF, DOC, DOCX)
+    if (
+      file.type === 'application/pdf' ||
+      file.type.includes('word') ||
+      file.name.endsWith('.doc') ||
+      file.name.endsWith('.docx')
+    ) {
+      try {
+        setLoadingMessage("AI đang đọc và định dạng tài liệu...");
+        setIsLoading(true);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await axiosClient.post("/api/ai-parser", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          timeout: 300000
+        });
+
+        const result = response.data || response;
+
+        if (result.success === true) {
+          console.log("Bóc tách thành công!", result.text);
+          setRawText(result.text);
+        } else {
+          console.error("Backend trả về success: false", result);
+          alert(`Lỗi từ Backend: ${result.error || "Không rõ nguyên nhân"}`);
+        }
+
+      } catch (error: any) {
+        console.error("Lỗi khi import file:", error);
+        const errorMessage = error.response?.data?.error || "Hệ thống AI đang quá tải, vui lòng thử lại sau vài giây!";
+        alert(errorMessage);
+      } finally {
+        setIsLoading(false);
+        setLoadingMessage("Đang xử lý dữ liệu...");
+        if (unifiedInputRef.current) unifiedInputRef.current.value = '';
+      }
+      return;
+    }
+    // RẼ NHÁNH 3: FILE KHÔNG HỢP LỆ
+    alert("Vui lòng chỉ tải lên file Ảnh, PDF hoặc Word (.doc, .docx)");
+    if (unifiedInputRef.current) unifiedInputRef.current.value = '';
   };
 
   // Component con: Stepper (Thanh tiến trình)
@@ -373,10 +433,7 @@ const CreateTestWizard = () => {
         <span className={`w-10 h-10 rounded-full flex items-center justify-center border text-base ${currentStep === 1 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>1</span>
         Thông tin
       </div>
-      
-      {/* Dùng border-t thay vì div rỗng để render nhẹ hơn */}
       <div className="w-8 border-t border-gray-300"></div>
-      
       <div className={`flex items-center gap-2 transition-colors duration-300 ${currentStep === 2 ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
         <span className={`w-10 h-10 rounded-full flex items-center justify-center border text-base ${currentStep === 2 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>2</span>
         Nội dung
@@ -385,10 +442,9 @@ const CreateTestWizard = () => {
   ));
 
   return (
-    // KHUNG CONTAINER CHÍNH (Vừa vặn với Content Area bên phải Sidebar)
-    <div className="h-full flex flex-col p-4 sm:p-0 overflow-hidden relative">
+    <div className="h-full w-full flex flex-col p-4 md:p-8 overflow-hidden relative bg-[#F8FAFC]">
       {/* HEADER TRANG (Giữ cố định ở trên) */}
-      <div className="flex items-center justify-between shrink-0 mb-4 z-20">
+      <div className="flex-none flex items-center justify-between mb-4 z-20">
         <div className="flex-1 flex items-center">
           <button 
             onClick={() => {
@@ -409,17 +465,13 @@ const CreateTestWizard = () => {
         <div className="flex-1"></div>
       </div>
 
-      {/* BODY CONTENT (Thay đổi tùy theo Step) */}
-      <div className="flex-1 min-h-0 w-full max-w-6xl mx-auto flex flex-col">
-        
-        {/* ========================================== */}
+      <div className="flex-1 flex flex-col">
         {/* === BƯỚC 1: FORM NHẬP THÔNG TIN (STEP 1) === */}
-        {/* ========================================== */}
         {step === 1 && (
           <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-0">
             <form onSubmit={handleInfoSubmit} className="flex flex-col h-full">
               {/* Header của form */}
-              <div className="px-6 py-4 border-b border-gray-100 shrink-0">
+              <div className="px-6 py-4 border-b border-gray-200 shrink-0">
                 <h2 className="text-xl font-bold text-gray-800">Cấu hình bài thi</h2>
                 <p className="text-sm text-gray-500 mt-1">Vui lòng điền các thông tin cơ bản trước khi nhập nội dung.</p>
               </div>
@@ -427,7 +479,6 @@ const CreateTestWizard = () => {
               {/* Vùng chứa form (Sẽ scroll nếu màn hình QUÁ nhỏ, nhưng mặc định sẽ cố gắng vừa khít) */}
               <div className="flex-1 p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-                  
                   {/* CỘT 1: Thông tin cơ bản & Phân loại */}
                   <div className="space-y-6">
                     <div className="space-y-4">
@@ -578,11 +629,11 @@ const CreateTestWizard = () => {
               </div>
 
               {/* Footer form - Nút bấm luôn cố định ở dưới */}
-              <div className="p-4 border-t border-gray-100 bg-gray-50/50 shrink-0 flex justify-end">
+              <div className="p-4 border-t border-gray-200 bg-gray-50/50 shrink-0 flex justify-end">
                 <button 
                   disabled={userRole !== 'ADMIN' && myClasses.length === 0}
                   type="submit" 
-                  className="flex items-center gap-2 px-8 py-2.5 rounded-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                  className="flex items-center gap-2 px-8 py-2.5 rounded-full font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
                 >
                   Next
                   <ArrowRight size={18} />
@@ -592,9 +643,7 @@ const CreateTestWizard = () => {
           </div>
         )}
 
-        {/* ========================================== */}
         {/* === BƯỚC 2: EDITOR & PREVIEW (STEP 2) === */}
-        {/* ========================================== */}
         {step === 2 && (
           <div className="flex w-full overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200 h-[calc(100vh-120px)]">
             
@@ -605,14 +654,20 @@ const CreateTestWizard = () => {
               {/* Toolbar nhỏ gọn */}
               <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border border-gray-300 border-b-0 rounded-t-lg shrink-0">
                 <div className="flex items-center gap-2">
-                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                  <input 
+                    type="file" 
+                    ref={unifiedInputRef} 
+                    className="hidden" 
+                    accept="image/*,.pdf,.doc,.docx" 
+                    onChange={handleUnifiedUpload} 
+                  />
                   <button 
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => unifiedInputRef.current?.click()}
                     disabled={isLoading}
                     className="p-1.5 rounded hover:bg-white hover:text-indigo-600 text-gray-600 flex items-center gap-1.5 text-sm font-medium transition-colors"
                   >
                     {isLoading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-                    <span>Chèn ảnh</span>
+                    <span>Upload</span>
                   </button>
                 </div>
                 <button
@@ -663,8 +718,13 @@ const CreateTestWizard = () => {
       
       {isLoading && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
-          <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-          <span className="text-indigo-800 font-medium">Đang xử lý dữ liệu...</span>
+          <div className="relative w-16 h-16 mb-4">
+            <div className="absolute inset-0 border-4 border-indigo-200 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
+            <Sparkles className="absolute inset-0 m-auto text-indigo-500 animate-pulse" size={24} />
+          </div>
+          <span className="text-indigo-800 font-bold text-lg animate-pulse">{loadingMessage}</span>
+          <span className="text-slate-500 text-sm mt-2">Vui lòng không đóng trình duyệt...</span>
         </div>
       )}
       
