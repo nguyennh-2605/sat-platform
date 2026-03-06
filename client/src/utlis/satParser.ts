@@ -1,6 +1,5 @@
 import { type ContentBlock } from "../types/quiz";
 
-// --- 1. INTERFACE ---
 export interface SATQuestion {
   id?: string;
   module: number;
@@ -13,8 +12,6 @@ export interface SATQuestion {
   choices: { id: string; text: string }[];
   explanation?: string;
 }
-
-// --- 2. CÁC HÀM HELPER FORMAT ---
 
 // BƯỚC MỚI: Hàm xử lý gạch chân bằng ==...==
 const applyUnderline = (text: string): string => {
@@ -61,42 +58,96 @@ const smartFormatText = (rawText: string): string => {
 const formatSATMath = (rawText: string): string => {
   if (!rawText) return "";
   let text = rawText;
-  const wrap = (latex: string) => `$${latex}$`; 
 
-  // Bước 1: Xử lý Số mũ
-  text = text.replace(/(\w+|\([^)]+\))\^\(([^)]+)\)/g, (_, base, exp) => wrap(`${base}^{${exp}}`)); 
-  text = text.replace(/(\([^)]+\))\^(\w+)/g, (_, base, exp) => wrap(`${base}^{${exp}}`));        
-  text = text.replace(/\b([a-zA-Z0-9]+)\^([a-zA-Z0-9]+)\b/g, (_, base, exp) => wrap(`${base}^{${exp}}`)); 
+  // 🛠 BÍ QUYẾT: Đưa Bước 1, 2, 3 vào một hàm chuẩn hóa nội bộ.
+  // Hàm này CHỈ định dạng lại LaTeX (đổi dấu /, ^), KHÔNG bọc $
+  const normalizeMathSyntax = (mathStr: string): string => {
+    let m = mathStr;
+    // 1. Xử lý Số mũ
+    m = m.replace(/(\w+|\([^)]+\))\^\(([^)]+)\)/g, "$1^{$2}"); 
+    m = m.replace(/(\([^)]+\))\^(\w+)/g, "$1^{$2}");        
+    m = m.replace(/\b([a-zA-Z0-9]+)\^([a-zA-Z0-9]+)\b/g, "$1^{$2}"); 
 
-  // Bước 2: Xử lý Phân số
-  text = text.replace(/\(([^)]+)\)\s*\/\s*\(([^)]+)\)/g, (_, n, d) => wrap(`\\frac{${n}}{${d}}`)); 
-  text = text.replace(/\(([^)]+)\)\s*\/\s*(\w+)/g, (_, n, d) => wrap(`\\frac{${n}}{${d}}`));       
-  text = text.replace(/(\w+)\s*\/\s*\(([^)]+)\)/g, (_, n, d) => wrap(`\\frac{${n}}{${d}}`));       
-  text = text.replace(/(?<!http:|https:|\]\()(\b[a-zA-Z0-9]+)\s*\/\s*([a-zA-Z0-9]+)\b/g, (_, n, d) => wrap(`\\frac{${n}}{${d}}`));
+    // 2. Xử lý Phân số
+    m = m.replace(/\(([^)]+)\)\s*\/\s*\(([^)]+)\)/g, "\\frac{$1}{$2}"); 
+    m = m.replace(/\(([^)]+)\)\s*\/\s*(\w+)/g, "\\frac{$1}{$2}");       
+    m = m.replace(/(\w+)\s*\/\s*\(([^)]+)\)/g, "\\frac{$1}{$2}");       
+    m = m.replace(/(?<!http:|https:|\]\()(\b[a-zA-Z0-9]+)\s*\/\s*([a-zA-Z0-9]+)\b/g, "\\frac{$1}{$2}");
 
-  // Bước 3: Các ký hiệu khác
-  text = text.replace(/sqrt\((.*?)\)/gi, (_, inside) => wrap(`\\sqrt{${inside}}`));
-  text = text.replace(/\b(tri|tg)\s+([A-Z]{3})\b/gi, (_, _t, ABC) => wrap(`\\triangle ${ABC}`));
-  text = text.replace(/(\/_|goc\s+)([A-Z]{3})/gi, (_, _t, ABC) => wrap(`\\angle ${ABC}`));
-  text = text.replace(/(\d+)(deg|o)\b/gi, (_, num) => wrap(`${num}^{\\circ}`));
-  text = text.replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/!=/g, '≠');
-  text = text.replace(/(\d+)pi\b/gi, (_, num) => wrap(`${num}\\pi`));
-  text = text.replace(/(?<!\\)\bpi\b/gi, () => wrap(`\\pi`));
+    // 3. Các ký hiệu khác
+    m = m.replace(/sqrt\((.*?)\)/gi, "\\sqrt{$1}");
+    m = m.replace(/\b(tri|tg)\s+([A-Z]{3})\b/gi, "\\triangle $2");
+    m = m.replace(/(\/_|goc\s+)([A-Z]{3})/gi, "\\angle $2");
+    m = m.replace(/(\d+)(deg|o)\b/gi, "$1^{\\circ}");
+    m = m.replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/!=/g, '≠');
+    m = m.replace(/(\d+)pi\b/gi, "$1\\pi");
+    m = m.replace(/(?<!\\)\bpi\b/gi, "\\pi");
 
-  // Bước 4: Auto-LaTeX cho biến số đơn lẻ (Ngoại trừ A, a, I, i)
-  const segments = text.split(/(\$.*?\$)/g);
-  text = segments.map(seg => {
-    // Nếu là khối LaTeX đã wrap sẵn -> bỏ qua
-    if (seg.startsWith('$') && seg.endsWith('$')) return seg;
+    return m;
+  };
+
+  // 🛠 HÀM WRAP MỚI: Chuẩn hóa syntax XONG mới bọc $
+  const wrap = (latex: string) => {
+    // Gọi hàm chuẩn hóa trước, sau đó bọc $ một lần duy nhất
+    return `$${normalizeMathSyntax(latex)}$`;
+  };
+
+  // HÀM BẢO VỆ CHUỖI (Giữ nguyên của bạn - rất tốt)
+  const safeReplace = (
+    currentText: string, 
+    regex: RegExp, 
+    replacer: (match: string, ...args: any[]) => string
+  ): string => {
+    const latexBlockRegex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\))/g;
     
-    // Regex tìm: Chữ cái đơn lẻ (trừ a,i,A,I) HOẶC [số + chữ] HOẶC [chữ + số] (VD: 2x, x2, b)
-    return seg.replace(/(?<!')\b(\d+[a-zA-Z]|[a-zA-Z]\d+|[b-hj-zB-HJ-Z])\b/g, (match) => {
-        return wrap(match);
-    });
-  }).join('');
+    return currentText.split(latexBlockRegex).map((part: string) => {
+      if (!part) return part;
+      if (
+        (part.startsWith('$$') && part.endsWith('$$')) ||
+        (part.startsWith('$') && part.endsWith('$')) ||
+        (part.startsWith('\\[') && part.endsWith('\\]')) ||
+        (part.startsWith('\\(') && part.endsWith('\\)'))
+      ) {
+        return part;
+      }
+      return part.replace(regex, replacer);
+    }).join('');
+  };
+
+  let processedText = text;
+
+  // BƯỚC 4: AUTO-LATEX THEO THỨ TỰ ƯU TIÊN
+  // 4.1. Bắt đa thức nhân nhau: (x-2)(x+5) = 0
+  const polyRegex = /((?:\([a-zA-Z0-9+\-*/^.,\s]+\)\s*){2,})(?:([=<>]\s*[-+]?\d+))?/g;
+  processedText = safeReplace(processedText, polyRegex, (match: string) => wrap(match.trim()));
+
+  // 4.2. Bắt hàm mũ (Exponential): y = 80(1.40)^x
+  const expRegex = /(?:^|\s)((?:[a-zA-Z]{1,2}(?:\([a-zA-Z]\))?\s*=\s*)?-?\d+(?:\.\d+)?\s*(?:\*|\\times)?\s*(?:\(\s*-?\d+(?:\.\d+)?\s*\)|-?\d+(?:\.\d+)?)\s*\^\s*(?:[a-zA-Z0-9{}]+|\([^)]+\)))(?=$|\s|[.,?!])/g;
+  processedText = safeReplace(processedText, expRegex, (match: string, p1: string) => match.replace(p1, wrap(p1.trim())));
+
+  // 4.3. Bắt phương trình/biểu thức chứa ngoặc: 9 - 8(4-6x) = 3 - 9(4-6x)
+  const complexParenRegex = /(?:^|\s)((?:\d+\s*[-+*/]\s*)?\d*\s*\([^)]*[a-zA-Z]+[^)]*\)(?:\s*[-+*/=<>]\s*(?:\d+\s*[-+*/]\s*)?\d*\s*\([^)]*[a-zA-Z]+[^)]*\))*)(?=$|\s|[.,?])/g;
+  processedText = safeReplace(processedText, complexParenRegex, (match: string, p1: string) => match.replace(p1, wrap(p1.trim())));
+
+  // 4.4. Bắt phương trình & biểu thức tuyến tính ngắn
+  const mathEqRegex = /(?:^|\s)((?:\d*[a-zA-Z]{1,2}|\d+)(?:\s*[+\-*/=<>]\s*(?:\d*[a-zA-Z]{1,2}|\d+))+)(?=$|\s|[.,?])/g;
+  processedText = safeReplace(processedText, mathEqRegex, (match: string, p1: string) => match.replace(p1, wrap(p1.trim())));
+
+  // 4.5. Bắt hàm số: f(x), g(x)...
+  const funcRegex = /\b([a-zA-Z])\(([a-zA-Z0-9])\)/g;
+  processedText = safeReplace(processedText, funcRegex, (_, func: string, vr: string) => wrap(`${func}(${vr})`));
+
+  // 4.6. Vét các phân số hoặc số mũ lẻ chưa được bọc (THÊM MỚI ĐỂ TRÁNH SÓT)
+  // Vì Bước 1, 2 bị ẩn vào trong wrap, ta cần lệnh này để bắt các cụm "x/7" hay "x^2" đứng một mình
+  const fracExpRegex = /(?<!['a-zA-Z])\b([a-zA-Z0-9]+)\s*[\/^]\s*([a-zA-Z0-9{}]+|\([^)]+\))(?!['a-zA-Z])/g;
+  processedText = safeReplace(processedText, fracExpRegex, (match: string) => wrap(match.trim()));
+
+  // 4.7. Auto-LaTeX cho biến số đơn lẻ (Lưới vét cuối cùng)
+  const singleVarRegex = /(?<!['a-zA-Z])\b(\d+[a-zA-Z]|[a-zA-Z]\d+|[b-hj-zB-HJ-Z])\b(?!['a-zA-Z])/g;
+  processedText = safeReplace(processedText, singleVarRegex, (match: string) => wrap(match));
 
   // Bước 5: Áp dụng gạch chân cuối cùng (nếu có ==...==)
-  return applyUnderline(text);
+  return applyUnderline(processedText);
 };
 
 // --- 3. HÀM PARSER BLOCKS (SCAN MODE) ---

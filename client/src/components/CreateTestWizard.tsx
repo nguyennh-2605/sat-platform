@@ -102,11 +102,9 @@ const PreviewSection = memo(({ questions, onSave, isSubmitting, subject }: Previ
                   <div className="space-y-4">
                     
                     {/* 1. Câu hỏi dẫn nhập */}
-                    <div className="font-sans font-bold text-gray-900 text-[15px]">
-                      {q.questionText && (
-                        <InteractiveText content={q.questionText} isMath={isMath} />
-                      )}
-                    </div>
+                    {q.questionText && (
+                      <InteractiveText content={q.questionText} isMath={isMath} />
+                    )}
 
                     {/* 2. Các đáp án (Phân nhánh MCQ và SPR) */}
                     {q.type === 'SPR' ? (

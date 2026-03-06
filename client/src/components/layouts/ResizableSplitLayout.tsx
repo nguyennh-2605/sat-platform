@@ -13,7 +13,6 @@ const ResizableSplitLayout = ({ containerRef, leftWidth, handleMouseDown, leftCo
     <div ref={containerRef} className="flex-1 flex overflow-hidden w-full h-full relative">
             
       {/* --- CỘT TRÁI (BÀI ĐỌC) --- */}
-      {/* Thay w-1/2 bằng style width động */}
       <div 
         style={{ width: `${leftWidth}%` }} 
         className="h-full bg-white border-r border-gray-200 flex flex-col min-w-[200px]"
@@ -23,8 +22,6 @@ const ResizableSplitLayout = ({ containerRef, leftWidth, handleMouseDown, leftCo
             font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums
             font-normal text-[#1a1a1a] leading-relaxed tracking-normal
             text-[16px]           /* Set cho h3 */
-            [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
-            [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
           ">
             {leftContent}
             <div className="h-40 w-full shrink-0"></div>

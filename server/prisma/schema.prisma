@@ -22,6 +22,7 @@ model User {
   submissions         Submission[]
   createdTests        Test[]
   studyingClasses     Class[]              @relation("StudentClasses")
+  notifications       Notification[]
 }
 
 model Class {
@@ -157,6 +158,17 @@ model ErrorLog {
   updatedAt     DateTime @updatedAt
   userId        Int
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    Int      // ID của người nhận thông báo (Giáo viên hoặc Học sinh)
+  message   String   // Nội dung chi tiết
+  link      String?  // (Tùy chọn) Link để click vào thông báo bay đến trang tương ứng
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum Role {

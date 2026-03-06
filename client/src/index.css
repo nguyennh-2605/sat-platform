@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Phóng to tổng thể KaTeX lên một chút */
+.katex {
+  font-size: 1.15em !important; 
+}
+
+.katex:has(.mfrac) {
+  display: inline-block;
+  margin: 0.4em 0 !important;
+}
+
+/* LÀM ĐẬM ĐƯỜNG KẺ PHÂN SỐ */
+.katex .frac-line {
+  border-bottom-width: 1.5px !important; 
+}
+
+/* Block phương trình đứng 1 mình ($$) */
+.katex-display {
+  margin: 1.5em 0 !important;
+}

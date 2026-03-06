@@ -8,12 +8,12 @@ import {
   BarChart3,
   LayoutList,
   Settings,
-  Bell,
   Copy
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import StudentAnalytics from '../components/StudentAnalytics';
+import NotificationBell from '../components/NotificationBell';
 
 // Cấu hình URL Backend
 const API_URL = import.meta.env.VITE_API_URL;
@@ -119,6 +119,7 @@ const Classroom = () => {
           classDetail={classDetail}
           onCreateAssignment={handleCreateAssignment}
           onAddStudent={handleAddStudent}
+          teacherId={currentUser.id}
         />
       ) : (
         <StudentDashboard 
@@ -204,11 +205,9 @@ const CreateAssignmentSection = memo(({ onClose, onSubmit }: any) => {
   );
 });
 
-// ==========================================
 // A. GIAO DIỆN GIÁO VIÊN (TEACHER MODE)
-// ==========================================
 const TeacherDashboard = ({ 
-  classDetail, onCreateAssignment, onAddStudent 
+  classDetail, onCreateAssignment, onAddStudent, teacherId
 }: any) => {
   const { classId } = useParams();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -302,10 +301,7 @@ const TeacherDashboard = ({
 
               {/* Right: Notification & Actions */}
               <div className="flex-1 flex items-center justify-end gap-2">
-                <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors relative">
-                  <Bell size={20} />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                </button>
+                <NotificationBell currentUserId={teacherId} />
                 <button className="p-2 text-slate-400 hover:text-slate-600 rounded-full">
                   <Settings size={20} />
                 </button>

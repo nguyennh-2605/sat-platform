@@ -1,3 +1,4 @@
+const { sendNotificationToUser } = require('./notificationController');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
@@ -203,7 +204,8 @@ exports.submitTest = async (req, res) => {
           include: {
             questions: true 
           }
-        }
+        },
+        author: true
       }
     });
 
@@ -275,6 +277,17 @@ exports.submitTest = async (req, res) => {
 
       return updatedSubmission;
     });
+
+    if (test.mode === 'EXAM' && test.authorId) {
+      const studentInfo = await prisma.user.findUnique({
+        where: {id: userId }
+      });
+
+      await sendNotificationToUser(
+        test.authorId,
+        `Học sinh ${studentInfo?.name || studentInfo?.email} vừa hoàn thành bài thi "${test.title}" với số điểm ${correctCount}/${totalQuestions}.`,
+      );
+    }
 
     // 4. Trả kết quả về Frontend
     res.json({

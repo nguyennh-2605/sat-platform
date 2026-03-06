@@ -12,17 +12,24 @@ const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, cla
   if (!text) return null;
 
   return (
-    <div className={`font-sans text-[15px] leading-relaxed text-gray-800 markdown-body space-y-2 ${className}`}>
+    <div className={`font-serif lining-nums text-[16px] leading-relaxed text-gray-800 space-y-3 ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
-        rehypePlugins={[rehypeKatex]}
+        rehypePlugins={[
+          [rehypeKatex, { 
+            macros: {
+              "\\frac": "\\dfrac" // Ép mọi phân số thành bản to chuẩn
+            },
+            strict: false 
+          }]
+        ]}
         components={{
-          p: ({ node, ...props }) => <p className="mb-2 whitespace-pre-wrap" {...props} />,
-          ul: ({ node, ...props }) => <ul className="list-disc pl-5 space-y-1 my-2" {...props} />,
+          p: ({ node, ...props }) => <p className="whitespace-pre-wrap" {...props} />,
+          ul: ({ node, ...props }) => <ul className="list-disc pl-5 space-y-2 my-3" {...props} />,
           li: ({ node, ...props }) => <li className="pl-1" {...props} />
         }}
       >
-        {text}
+        {text.trim()}
       </ReactMarkdown>
     </div>
   );

@@ -1,3 +1,4 @@
+const { sendNotificationToUser } = require('./notificationController');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
@@ -9,8 +10,6 @@ exports.createClass = async (req, res) => {
     // Nếu bạn chưa có auth, bạn có thể hardcode: const userId = 1;
     const userId = req.user?.userId || req.user?.id; 
     const userRole = req.user?.role || req.user?.userRole;
-
-    console.log("Role thuc te trong token", userRole)
 
     // Validation: Chỉ giáo viên mới được tạo lớp
     if (userRole !== 'TEACHER' && userRole !== 'ADMIN') {
@@ -114,9 +113,7 @@ exports.getClassDetail = async (req, res) => {
   }
 };
 
-// ==========================================
 // 4. THÊM HỌC SINH VÀO LỚP (Bằng Email)
-// ==========================================
 exports.addStudentToClass = async (req, res) => {
   try {
     const { classId } = req.params;
@@ -156,6 +153,12 @@ exports.addStudentToClass = async (req, res) => {
       }
     });
 
+    await sendNotificationToUser(
+      student.id,
+      `Bạn vừa được giáo viên thêm vào lớp học "${existingClass.name}".`,
+      `/dashboard/class/${classId}`
+    )
+
     res.json({ message: "Thêm học sinh thành công", student: student });
 
   } catch (error) {
@@ -184,6 +187,25 @@ exports.createAssignment = async (req, res) => {
       }
     });
 
+    const classData = await prisma.class.findUnique({
+      where: { id: classId },
+      include: {
+        students: true,
+        teacher: true
+      }
+    });
+
+    if (classData && classData.students.length > 0) {
+      const teacherName = classData.teacher?.name || 'Giáo viên';
+      await Promise.all(classData.students.map(student =>
+        sendNotificationToUser(
+          student.id,
+          `${teacherName} vừa giao bài tập mới: "${newAssignment.title}".`,
+          // `/student/assignments/${newAssignment.id}`
+        )
+      ));
+    }
+
     res.json(newAssignment);
   } catch (error) {
     console.error(error);
@@ -202,7 +224,6 @@ exports.createSubmission = async (req, res) => {
     }
 
     // 2. Kiểm tra xem đã nộp chưa (Nếu muốn cho nộp lại thì dùng upsert, ở đây dùng create cho đơn giản)
-    // Lưu ý: assignmentId có thể cần ép kiểu về Int nếu DB để Int
     const submission = await prisma.homeworkSubmission.upsert({
       where: {
         // Tìm xem học sinh này đã nộp bài này chưa
@@ -227,7 +248,24 @@ exports.createSubmission = async (req, res) => {
       }
     });
 
-    console.log("Học sinh đã nộp bài:", submission);
+    const [assignmentInfo, studentInfo] = await Promise.all([
+      prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        include: { class: true } // Lấy class để biết teacherId
+      }),
+      prisma.user.findUnique({
+        where: { id: parseInt(studentId) }
+      })
+    ]);
+
+    if (assignmentInfo && studentInfo) {
+      await sendNotificationToUser(
+        assignmentInfo.class.teacherId, // Gửi cho ID giáo viên
+        `Học sinh ${studentInfo.name || studentInfo.email} vừa nộp bài: "${assignmentInfo.title}".`,
+        // `/teacher/classes/${assignmentInfo.classId}/assignments/${assignmentId}`
+      );
+    }
+
     res.status(201).json({ message: "Nộp bài thành công!", data: submission });
 
   } catch (error) {

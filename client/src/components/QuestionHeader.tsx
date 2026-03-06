@@ -1,7 +1,4 @@
-// file: src/components/QuestionHeader.tsx
 import React from 'react';
-
-// --- ICONS ---
 
 // 1. Icon Bookmark: Cập nhật logic màu đỏ khi active
 const BookmarkIcon = ({ filled }: { filled: boolean }) => (
@@ -43,6 +40,7 @@ interface Props {
   currentPhase: string;
   splitIndex: number;
   currentIndex: number;
+  currentType: string;
   isMarked: boolean;
   onToggleMark: () => void;
   isStrikeMode: boolean;
@@ -50,7 +48,7 @@ interface Props {
 }
 
 const QuestionHeader: React.FC<Props> = ({ 
-  currentPhase, splitIndex, currentIndex, isMarked, onToggleMark, isStrikeMode, onToggleStrikeMode }) => {
+  currentPhase, splitIndex, currentIndex, currentType, isMarked, onToggleMark, isStrikeMode, onToggleStrikeMode }) => {
   
   return (
     <div className="w-full mb-3">
@@ -77,21 +75,23 @@ const QuestionHeader: React.FC<Props> = ({
         </button>
 
         {/* 3. CÔNG CỤ (BÊN PHẢI) */}
-        <div className="ml-auto flex items-center px-3 gap-3">
-          <button 
-            onClick={onToggleStrikeMode}
-            title="Gạch bỏ đáp án"
-            className={`
-              transition-all duration-200 rounded p-0.5
-              ${isStrikeMode 
-                ? 'ring-1 ring-indigo-600 bg-indigo-100' // Bỏ scale lớn để trông gọn hơn
-                : 'opacity-70 hover:opacity-100 hover:bg-gray-200'
-              }
-            `}
-          >
-            <StrikethroughIcon />
-          </button>
-        </div>
+        {currentType === 'MCQ' && (
+          <div className="ml-auto flex items-center px-3 gap-3">
+            <button 
+              onClick={onToggleStrikeMode}
+              title="Gạch bỏ đáp án"
+              className={`
+                transition-all duration-200 rounded p-0.5
+                ${isStrikeMode 
+                  ? 'ring-1 ring-indigo-600 bg-indigo-100' // Bỏ scale lớn để trông gọn hơn
+                  : 'opacity-70 hover:opacity-100 hover:bg-gray-200'
+                }
+              `}
+            >
+              <StrikethroughIcon />
+            </button>
+          </div>
+        )}
       </div>
       <div className="w-full h-[2px] bg-[linear-gradient(90deg,#374151_90%,transparent_90%)] bg-[length:20px_2px] -mt-[15px] relative z-10"></div>
     </div>

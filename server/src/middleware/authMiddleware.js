@@ -5,9 +5,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secret123';
 
 // 1. Hàm kiểm tra đăng nhập (Xác thực Token)
 const authenticateToken = (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   // Lấy header Authorization: "Bearer <token>"
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Lấy phần token sau chữ Bearer
+  const token = authHeader && authHeader.split(' ')[1]; // Lấy phần token sau chữ Bearer  
 
   if (!token) {
     console.log("❌ Không tìm thấy token sau chữ Bearer");

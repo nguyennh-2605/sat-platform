@@ -32,6 +32,7 @@ app.use("/api/tests", require("./src/routes/practiceTestRoute"));
 app.use("/api/test", require('./src/routes/examRoomRoutes'));
 app.use("/api/ai", require("./src/routes/aiChatBotRoutes"));
 app.use("/api/ai-parser", require("./src/routes/aiParserRoutes"));
+app.use("/api/notifications", require("./src/routes/notificationRoutes"));
 
 // --- KHỞI ĐỘNG SERVER ---
 app.listen(PORT, () => {

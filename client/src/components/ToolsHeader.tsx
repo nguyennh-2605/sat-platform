@@ -24,21 +24,22 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-1">
       {currentSubject != 'MATH' && (
         <button 
           onClick={toggleHighlightMode}
           className={`
+            relative top-[3px]
             group flex flex-col items-center gap-1 focus:outline-none
             transition-colors duration-200 
-            rounded-lg px-2 py-1 -my-1 
+            rounded-lg px-2 py-1 -my-1
             hover:bg-green-50      
           `}
           title={isHighlightMode ? "Turn off Highlights & Notes" : "Turn on Highlights & Notes"}
         >
           {/* 1. ICON CUSTOM (Thấp hơn & Rộng hơn) */}
           <div className={`
-              w-6 h-6 transition-colors duration-200 
+              w-5 h-5 transition-colors duration-200 
               text-slate-700'
             `}>
               <svg 
@@ -86,23 +87,56 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
       {currentSubject === 'MATH' && (
         <button 
           onClick={toggleCalculator}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#1a1a1a] font-bold rounded-full transition-colors"
+          className={`
+            relative top-[3px]
+            group flex flex-col items-center gap-1 focus:outline-none
+            transition-colors duration-200 
+            rounded-lg px-2 py-1 -my-1 
+            hover:bg-green-50      
+          `}
           title={isCalculatorOpen ? "Turn off Calculator" : "Turn on Calculator"}
         >
-          {/* Biểu tượng máy tính (Tùy chọn, bạn có thể dùng thư viện icon hoặc SVG) */}
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
-            <line x1="8" y1="6" x2="16" y2="6"></line>
-            <line x1="16" y1="14" x2="16" y2="14.01"></line>
-            <line x1="16" y1="10" x2="16" y2="10.01"></line>
-            <line x1="16" y1="18" x2="16" y2="18.01"></line>
-            <line x1="12" y1="14" x2="12" y2="14.01"></line>
-            <line x1="12" y1="10" x2="12" y2="10.01"></line>
-            <line x1="12" y1="18" x2="12" y2="18.01"></line>
-            <line x1="8" y1="14" x2="8" y2="14.01"></line>
-            <line x1="8" y1="10" x2="8" y2="10.01"></line>
-            <line x1="8" y1="18" x2="8" y2="18.01"></line>
-          </svg>
+          {/* 1. ICON MÁY TÍNH */}
+          <div className={`
+              w-5 h-5 transition-colors duration-200 
+              text-slate-700
+            `}>
+              <svg 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                <line x1="8" y1="6" x2="16" y2="6"></line>
+                <line x1="16" y1="14" x2="16" y2="14.01"></line>
+                <line x1="16" y1="10" x2="16" y2="10.01"></line>
+                <line x1="16" y1="18" x2="16" y2="18.01"></line>
+                <line x1="12" y1="14" x2="12" y2="14.01"></line>
+                <line x1="12" y1="10" x2="12" y2="10.01"></line>
+                <line x1="12" y1="18" x2="12" y2="18.01"></line>
+                <line x1="8" y1="14" x2="8" y2="14.01"></line>
+                <line x1="8" y1="10" x2="8" y2="10.01"></line>
+                <line x1="8" y1="18" x2="8" y2="18.01"></line>
+              </svg>
+            </div>
+
+          {/* 2. TEXT & UNDERLINE */}
+          <div className="flex flex-col items-center">
+            <span className={`
+              text-sm font-sans transition-all duration-200 text-slate-700 font-bold
+            `}>
+              Calculator
+            </span>
+
+            {/* Đường gạch chân (Chỉ hiện khi isCalculatorOpen = true) */}
+            <div className={`
+              h-[2px] bg-slate-900 mt-0.5 transition-all duration-200
+              ${isCalculatorOpen ? 'w-full opacity-100' : 'w-0 opacity-0'}
+            `}></div>
+          </div>
         </button>
       )}
       {currentMode != 'EXAM' && (
@@ -110,6 +144,7 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
           onClick={handleSaveAndExit}
           disabled={isSaving}
           className={`
+            relative top-[3px]
             group flex flex-col items-center gap-1 focus:outline-none
             transition-colors duration-200 
             rounded-lg px-2 py-1 -my-1
@@ -117,7 +152,7 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
           `}
           title="Save your progress and exit"
         >
-        <div className="w-6 h-6 text-slate-700">
+        <div className="w-5 h-5 text-slate-700">
             <svg 
               viewBox="0 0 24 24" 
               fill="none" 

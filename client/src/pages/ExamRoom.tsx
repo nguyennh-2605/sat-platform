@@ -827,6 +827,7 @@ function ExamRoom() {
           currentPhase={phase}
           splitIndex={splitIndex}
           currentIndex={currentQuestionIndex}
+          currentType={currentQ.type}
           isMarked={markedQuestions.includes(currentQuestionIndex)}
           onToggleMark={toggleMarkQuestion}
           isStrikeMode={isStrikeMode}
@@ -842,11 +843,11 @@ function ExamRoom() {
             <BlockRenderer blocks={currentQ.blocks} subject={TestInfo.subject}/>
           </div>
         )}
-        <h3 className="
+        <div className="
           font-['Source_Serif_4',_'Georgia',_serif] 
           lining-nums tabular-nums 
           font-normal text-[#1a1a1a] 
-          leading-relaxed tracking-normal mb-3
+          leading-relaxed tracking-normal
           
           text-[16px]           /* Set cho h3 */
           [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
@@ -856,23 +857,23 @@ function ExamRoom() {
             ? <FormattedTextRenderer text={currentQ.questionText}/>
             : <InteractiveText content={currentQ.questionText}/>
           }
-        </h3>
+        </div>
         <div className="space-y-3 mt-6">
           {currentQ.type === 'SPR' ? (
             <div className="mt-4">
              <div className="flex flex-col items-start"> {/* Căn lề trái cho khối nhập */}
-                <div className="relative w-36 font-mono"> {/* Tăng w-36 cho rộng rãi chút */}
+                <div className="relative w-24 font-mono"> {/* Tăng w-36 cho rộng rãi chút */}
                   <input
                     type="text"
                     // 3. pb-1: Giảm padding bottom một chút để chữ nằm sát đường kẻ hơn
-                    className="w-full p-3 pb-3 text-xl border border-gray-400 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-transparent relative z-10"
+                    className="w-full p-3 pb-3 text-xl border border-gray-800 rounded-lg outline-none text-center bg-transparent relative z-10"
                     value={answers[currentQ.id] || ''}
                     onChange={(e) => handleSprChange(e.target.value)}
                     maxLength={5}
                     placeholder=" "
                   />
                   
-                  <div className="absolute bottom-3 left-4 right-4 border-b border-gray-400 z-0 pointer-events-none"></div>
+                  <div className="absolute bottom-3 left-4 right-4 border-b border-gray-800 z-0 pointer-events-none"></div>
                 </div>
               </div>
               

@@ -7,6 +7,8 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import FormattedTextRenderer from '../utlis/TextRenderer';
+import InteractiveText from './InteractiveText';
 
 interface ReviewModalProps {
   data: QuestionResult;
@@ -356,9 +358,12 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
         <div className="p-8 md:px-12 pb-4">
           <div className="max-w-3xl mx-auto">
             <div className="font-['Source_Serif_4','Georgia',serif] text-[16px] text-[#1a1a1a] leading-relaxed lining-nums tracking-normal">
-              <BlockRenderer blocks={data.blocks} subject={examSubject} />
+              <BlockRenderer blocks={data.blocks} subject={examSubject} readOnly={true}/>
               <div className="mt-5 mb-6">
-                {data.questionText}
+                {examSubject === 'MATH' 
+                  ? <FormattedTextRenderer text={data.questionText} />
+                  : <InteractiveText content={data.questionText} readOnly={true}/>
+                }
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3">
@@ -372,7 +377,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
                       {label}
                     </div>
                     <div className="font-['Source_Serif_4',_'Georgia',_serif] text-[16px] text-[#1a1a1a] lining-nums leading-relaxed">
-                        {opt.text}
+                      {examSubject === 'MATH' 
+                        ? <FormattedTextRenderer text={opt.text} />
+                        : <InteractiveText content={opt.text} readOnly={true}/>
+                      }
                     </div>
                   </div>
                 );
