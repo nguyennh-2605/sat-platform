@@ -2,6 +2,30 @@ import { useState, useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 
+const timeAgo = (dateString: string | Date | null | undefined): string => {
+  if (!dateString) return "";
+  
+  const date = new Date(dateString);
+  const now = new Date();
+
+  const seconds = Math.round((now.getTime() - date.getTime()) / 1000);
+  const minutes = Math.round(seconds / 60);
+  const hours = Math.round(minutes / 60);
+  const days = Math.round(hours / 24);
+
+  if (seconds < 60) return "Vài giây trước";
+  if (minutes < 60) return `${minutes} phút trước`;
+  if (hours < 24) return `${hours} giờ trước`;
+  if (days < 7) return `${days} ngày trước`;
+  
+  // Nếu lâu hơn 7 ngày thì hiển thị ngày tháng năm
+  return date.toLocaleDateString('vi-VN', { 
+    day: '2-digit', 
+    month: '2-digit', 
+    year: 'numeric' 
+  });
+};
+
 export default function NotificationBell({ currentUserId }: { currentUserId: number | string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -144,6 +168,9 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
                   }}
                 >
                   <p className="text-xs text-slate-600 leading-relaxed">{notif.message}</p>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    {timeAgo(notif.createdAt)}
+                  </span>
                 </div>
               ))
             ) : (

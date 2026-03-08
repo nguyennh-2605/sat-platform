@@ -40,7 +40,8 @@ model Assignment {
   id          String               @id @default(uuid())
   title       String
   content     String?
-  fileUrl     String?
+  fileUrls    String[]
+  links       String[]
   deadline    DateTime?
   createdAt   DateTime             @default(now())
   classId     String

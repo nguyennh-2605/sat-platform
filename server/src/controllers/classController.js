@@ -170,7 +170,7 @@ exports.addStudentToClass = async (req, res) => {
 
 exports.createAssignment = async (req, res) => {
   try {
-    const { title, content, deadline, fileUrl, classId } = req.body;
+    const { title, content, type, deadline, classId, driveFiles, externalLinks } = req.body;
     
     // Validate cơ bản
     if (!classId || !title) {
@@ -180,9 +180,10 @@ exports.createAssignment = async (req, res) => {
     const newAssignment = await prisma.assignment.create({
       data: {
         title,
-        content: content, // Frontend gửi là content, DB nếu lưu là description thì map lại
-        deadline: deadline,
-        fileUrl,
+        content: content,
+        deadline: (type === 'assignment' && deadline) ? new Date(deadline) : null,
+        fileUrls: driveFiles || [],
+        links: externalLinks || [],
         classId: classId
       }
     });
@@ -191,16 +192,19 @@ exports.createAssignment = async (req, res) => {
       where: { id: classId },
       include: {
         students: true,
-        teacher: true
+        teacher: true,
       }
     });
 
     if (classData && classData.students.length > 0) {
       const teacherName = classData.teacher?.name || 'Giáo viên';
+      const notifMessage = type === 'assignment'
+        ? `${teacherName} vừa giao bài tập mới: "${newAssignment.title}" cho lớp ${classData.name}.`
+        : `${teacherName} vừa đăng một thông báo: "${newAssignment.title}" trong lớp ${classData.name}.`
       await Promise.all(classData.students.map(student =>
         sendNotificationToUser(
           student.id,
-          `${teacherName} vừa giao bài tập mới: "${newAssignment.title}".`,
+          notifMessage
           // `/student/assignments/${newAssignment.id}`
         )
       ));
@@ -261,7 +265,7 @@ exports.createSubmission = async (req, res) => {
     if (assignmentInfo && studentInfo) {
       await sendNotificationToUser(
         assignmentInfo.class.teacherId, // Gửi cho ID giáo viên
-        `Học sinh ${studentInfo.name || studentInfo.email} vừa nộp bài: "${assignmentInfo.title}".`,
+        `Học sinh ${studentInfo.name || studentInfo.email} vừa nộp bài tập "${assignmentInfo.title}" của lớp ${assignmentInfo.class.name}.`,
         // `/teacher/classes/${assignmentInfo.classId}/assignments/${assignmentId}`
       );
     }

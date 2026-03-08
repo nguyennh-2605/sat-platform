@@ -1,19 +1,19 @@
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { 
   BookOpen, Upload, FileText, CheckCircle, 
   Users, Plus, Clock, ChevronRight, Paperclip,
-  X, LayoutDashboard, ArrowLeft, Link, Calendar, CheckCircle2,
+  X, LayoutDashboard, ArrowLeft,CheckCircle2,
   BarChart3,
   LayoutList,
-  Settings,
   Copy
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import StudentAnalytics from '../components/StudentAnalytics';
 import NotificationBell from '../components/NotificationBell';
+import FullScreenPostCreator from '../components/CreateAssignmentSection';
 
 // Cấu hình URL Backend
 const API_URL = import.meta.env.VITE_API_URL;
@@ -69,17 +69,24 @@ const Classroom = () => {
     fetchClassDetail();
   }, [classId]);
 
-  const handleCreateAssignment = async (assignmentData: any) => {
+  const handleCreateAssignment = async (data: any) => {
     try {
-      await axios.post(`${API_URL}/api/classes/assignments`, {
-        ...assignmentData,
-        classId: classId
-      }, getAuthHeader());
+      const payload = {
+        classId: classId as string,
+        title: data.title,
+        content: data.content,
+        type: data.type,
+        deadline: data.deadline || null,
+        driveFiles: data.driveFiles || [], 
+        externalLinks: data.externalLinks || [] 
+      };
+
+      await axios.post(`${API_URL}/api/classes/posts`, payload, getAuthHeader());
       
-      toast.success("Đã giao bài tập thành công!");
+      toast.success(data.type === 'assignment' ? "Đã giao bài tập!" : "Đã đăng thông báo!");
       fetchClassDetail();
     } catch (error) {
-      toast.error("Lỗi khi tạo bài tập");
+      toast.error("Lỗi khi đăng bài");
     }
   };
 
@@ -131,79 +138,6 @@ const Classroom = () => {
     </div>
   );
 };
-
-const CreateAssignmentSection = memo(({ onClose, onSubmit }: any) => {
-  const [form, setForm] = useState({ title: '', content: '', deadline: '', fileUrl: '' });
-
-  const handleSubmit = () => {
-    if (!form.title || !form.deadline) return toast.error("Thiếu thông tin!");
-    onSubmit({
-      ...form,
-      deadline: new Date(form.deadline).toISOString()
-    });
-    // Reset form local
-    setForm({ title: '', content: '', deadline: '', fileUrl: '' });
-  };
-
-  return (
-    <div className="bg-white p-6 rounded-3xl border border-indigo-100 shadow-xl shadow-indigo-100/50 mb-6 animate-fade-in-down">
-      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
-        <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600"><FileText size={20}/></div>
-        <div className="flex-1">
-          <h3 className="font-bold text-gray-800">Soạn bài tập mới</h3>
-          <p className="text-xs text-gray-500">Điền thông tin chi tiết bên dưới</p>
-        </div>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X size={18} className="text-gray-400"/></button>
-      </div>
-      
-      <div className="space-y-5">
-        <div className="space-y-4">
-          <input 
-            type="text" placeholder="Tiêu đề bài tập (VD: Homework #4)" 
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition font-medium text-gray-800 placeholder-gray-400" 
-            value={form.title}
-            onChange={e => setForm({...form, title: e.target.value})}
-          />
-          <textarea 
-            rows={4} placeholder="Nội dung, yêu cầu chi tiết..." 
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm text-gray-700"
-            value={form.content}
-            onChange={e => setForm({...form, content: e.target.value})}
-          ></textarea>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div>
-            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">
-              <Calendar size={14}/> Hạn nộp
-            </label>
-            <input 
-              type="datetime-local" className="w-full p-3 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
-              value={form.deadline}
-              onChange={e => setForm({...form, deadline: e.target.value})}
-            />
-          </div>
-          <div>
-            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">
-              <Link size={14}/> Link File đề
-            </label>
-            <input 
-              type="text" className="w-full p-3 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
-              placeholder="https://..."
-              value={form.fileUrl}
-              onChange={e => setForm({...form, fileUrl: e.target.value})}
-            />
-          </div>
-        </div>
-        <div className="flex justify-end pt-2 gap-2">
-            <button onClick={onClose} className="px-6 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl text-sm font-medium transition">Hủy bỏ</button>
-            <button onClick={handleSubmit} className="px-8 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition text-sm flex items-center gap-2">
-                <Plus size={18}/> Đăng bài tập
-            </button>
-        </div>
-      </div>
-    </div>
-  );
-});
 
 // A. GIAO DIỆN GIÁO VIÊN (TEACHER MODE)
 const TeacherDashboard = ({ 
@@ -302,9 +236,6 @@ const TeacherDashboard = ({
               {/* Right: Notification & Actions */}
               <div className="flex-1 flex items-center justify-end gap-2">
                 <NotificationBell currentUserId={teacherId} />
-                <button className="p-2 text-slate-400 hover:text-slate-600 rounded-full">
-                  <Settings size={20} />
-                </button>
               </div>
             </header>
 
@@ -367,16 +298,6 @@ const TeacherDashboard = ({
                           </div>
                           <span className="text-sm font-medium text-slate-500 group-hover:text-slate-800">Thông báo nội dung nào đó cho lớp học của bạn...</span>
                         </div>
-
-                        {/* Form Tạo (Nếu mở) */}
-                        {showCreateForm && (
-                          <div className="bg-white p-6 rounded-2xl border-2 border-indigo-500 shadow-xl animate-in zoom-in-95 duration-200">
-                            <CreateAssignmentSection 
-                              onClose={() => setShowCreateForm(false)}
-                              onSubmit={handleCreateAssignment}
-                            />
-                          </div>
-                        )}
 
                         {/* Danh sách bài tập */}
                         <div className="space-y-4">
@@ -454,9 +375,15 @@ const TeacherDashboard = ({
                 {activeTab === 'SCORES' && (
                   <StudentAnalytics classId={classId || '1'}/>
                 )}
-
               </div>
             </main>
+            {/* Form Tạo (Nếu mở) */}
+            {showCreateForm && (
+              <FullScreenPostCreator 
+                onClose={() => setShowCreateForm(false)}
+                onSubmit={handleCreateAssignment}
+              />
+            )}
           </>
         ) : (
             // EMPTY STATE KHI CHƯA CHỌN LỚP

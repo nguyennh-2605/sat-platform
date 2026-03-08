@@ -10,7 +10,7 @@ router.get('/:id', authenticateToken, classController.getClassDetail);
 router.get('/:testId/report', authenticateToken, classController.getTestAnalytics);
 router.post('/', authenticateToken, classController.createClass);
 router.post('/:classId/students', authenticateToken, classController.addStudentToClass);
-router.post('/assignments', authenticateToken, classController.createAssignment);
+router.post('/posts', authenticateToken, classController.createAssignment);
 router.post('/submissions', authenticateToken, classController.createSubmission);
 
 module.exports = router;

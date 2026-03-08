@@ -48,7 +48,7 @@ const sendNotificationToUser = async (userId, title, message, link = null) => {
       data: {
         userId: userId,
         message: message,
-        link: link,
+        link: link
       }
     });
 
