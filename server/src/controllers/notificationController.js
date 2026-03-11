@@ -41,8 +41,9 @@ const connectStream = (req, res) => {
 };
 
 // [2] HÀM HELPER BẮN THÔNG BÁO (Gọi hàm này ở các logic khác)
-const sendNotificationToUser = async (userId, title, message, link = null) => {
+const sendNotificationToUser = async (userId, message, link = null) => {
   try {
+    console.log("🔔 Đang gửi Notif:", { userId, message, link });
     // 1. Lưu thông báo vào Database (để lúc user F5 vẫn thấy)
     const newNotif = await prisma.notification.create({
       data: {

@@ -125,13 +125,8 @@ const formatSATMath = (rawText: string): string => {
   const expRegex = /(?:^|\s)((?:[a-zA-Z]{1,2}(?:\([a-zA-Z]\))?\s*=\s*)?-?\d+(?:\.\d+)?\s*(?:\*|\\times)?\s*(?:\(\s*-?\d+(?:\.\d+)?\s*\)|-?\d+(?:\.\d+)?)\s*\^\s*(?:[a-zA-Z0-9{}]+|\([^)]+\)))(?=$|\s|[.,?!])/g;
   processedText = safeReplace(processedText, expRegex, (match: string, p1: string) => match.replace(p1, wrap(p1.trim())));
 
-  // 4.3. Bắt phương trình/biểu thức chứa ngoặc: 9 - 8(4-6x) = 3 - 9(4-6x)
-  const complexParenRegex = /(?:^|\s)((?:\d+\s*[-+*/]\s*)?\d*\s*\([^)]*[a-zA-Z]+[^)]*\)(?:\s*[-+*/=<>]\s*(?:\d+\s*[-+*/]\s*)?\d*\s*\([^)]*[a-zA-Z]+[^)]*\))*)(?=$|\s|[.,?])/g;
-  processedText = safeReplace(processedText, complexParenRegex, (match: string, p1: string) => match.replace(p1, wrap(p1.trim())));
-
-  // 4.4. Bắt phương trình & biểu thức tuyến tính ngắn
-  const mathEqRegex = /(?:^|\s)((?:\d*[a-zA-Z]{1,2}|\d+)(?:\s*[+\-*/=<>]\s*(?:\d*[a-zA-Z]{1,2}|\d+))+)(?=$|\s|[.,?])/g;
-  processedText = safeReplace(processedText, mathEqRegex, (match: string, p1: string) => match.replace(p1, wrap(p1.trim())));
+  const generalMathEqRegex = /(?:^|\s)((?:(?:\d*[a-zA-Z]?)\([^)]+\)|[a-zA-Z0-9]+)(?:\s*[+\-*/=<>^]\s*(?:(?:\d*[a-zA-Z]?)\([^)]+\)|[a-zA-Z0-9]+))+)(?=$|\s|[.,?])/g;
+  processedText = safeReplace(processedText, generalMathEqRegex, (match: string, p1: string) => match.replace(p1, wrap(p1.trim())));
 
   // 4.5. Bắt hàm số: f(x), g(x)...
   const funcRegex = /\b([a-zA-Z])\(([a-zA-Z0-9])\)/g;

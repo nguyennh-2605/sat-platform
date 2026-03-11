@@ -1,13 +1,20 @@
-import { useState } from 'react';
-import { X, Link as CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useDrivePicker from 'react-google-drive-picker';
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/themes/light.css";
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
+import { type AssignmentProps } from '../types/quiz';
 
-const FullScreenPostCreator = ({ onClose, onSubmit }: any) => {
+interface PostCreatorProps {
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+  initialData?: AssignmentProps;
+}
+
+const FullScreenPostCreator = ({ onClose, onSubmit, initialData }: PostCreatorProps) => {
   const [links, setLinks] = useState<string[]>([]); // Mảng chứa các đường link
   const [showLinkInput, setShowLinkInput] = useState(false); // Bật/tắt ô nhập link
   const [linkUrl, setLinkUrl] = useState(''); // Lưu trữ tạm thời link đang gõ
@@ -16,6 +23,36 @@ const FullScreenPostCreator = ({ onClose, onSubmit }: any) => {
   const [openPicker, authResponse] = useDrivePicker();
 
   const [form, setForm] = useState({ title: '', content: '', deadline: '' });
+
+  const isEditMode = !!initialData;
+
+  useEffect(() => {
+    if (initialData) {
+      setForm({
+        title: initialData.title || '',
+        content: initialData.content || '',
+        deadline: initialData.deadline ? new Date(initialData.deadline).toISOString() : ''
+      });
+
+      setLinks(initialData.links || []);
+
+      if (initialData.fileUrls && initialData.fileUrls.length > 0) {
+        const recoveredFiles = initialData.fileUrls.map((urlStr: string) => {
+          try {
+            const urlObj = new URL(urlStr);
+            let filename = urlObj.searchParams.get('name');
+            return {
+              name: filename ? decodeURIComponent(filename) : 'Tệp đính kèm',
+              url: urlStr
+            };
+          } catch (e) {
+            return { name: 'Tệp đính kèm', url: urlStr };
+          }
+        });
+        setDriveFiles(recoveredFiles);
+      }
+    }
+  }, [initialData]);
 
   const handleOpenDrivePicker = () => {
     openPicker({
@@ -31,23 +68,21 @@ const FullScreenPostCreator = ({ onClose, onSubmit }: any) => {
       callbackFunction: async (data) => {
         if (data.action === 'picked') {
           const token = authResponse?.access_token;
-          for (const doc of data.docs) {
-            if (token) {
-              try {
-                await Promise.all(data.docs.map(doc => 
-                  fetch(`https://www.googleapis.com/drive/v3/files/${doc.id}/permissions`, {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${token}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
-                  })
-                ));
-                console.log("Đã mở Public cho tất cả file!");
-              } catch (error) {
-                console.error(`Lỗi khi set Public cho file ${doc.name}:`, error);
-              }
+          if (token) {
+            try {
+              await Promise.all(data.docs.map(doc => 
+                fetch(`https://www.googleapis.com/drive/v3/files/${doc.id}/permissions`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+                })
+              ));
+              console.log("Đã mở Public cho tất cả file!");
+            } catch (error) {
+              console.error(`Lỗi khi set Public cho file:`, error);
             }
           }
           // Lấy tên và link của các file vừa chọn/upload trên Drive
@@ -82,15 +117,21 @@ const FullScreenPostCreator = ({ onClose, onSubmit }: any) => {
     if (!form.title.trim()) return toast.error("Vui lòng nhập tiêu đề!");
     if (!form.content || form.content === '<p><br></p>') return toast.error("Vui lòng nhập nội dung!");
 
-    const postType = form.deadline ? 'assignment' : 'announcement';
+    const formattedFileUrls = driveFiles.map(f => {
+      try {
+        const urlObj = new URL(f.url);
+        urlObj.searchParams.set('name', f.name); // Nó sẽ tự biết chèn ? hay &
+        return urlObj.toString();
+      } catch (e) {
+        return `${f.url}${f.url.includes('?') ? '&' : '?'}name=${encodeURIComponent(f.name)}`;
+      }
+    });
 
-    // Gửi toàn bộ dữ liệu lên hàm handleCreateAssignment ở file cha
     onSubmit({
       ...form,
-      type: postType,
       deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
-      driveFiles: driveFiles.map(f => f.url),   // Đây là mảng File[]
-      externalLinks: links  // Đây là mảng string[] chứa các link
+      fileUrls: formattedFileUrls,
+      links: links  // Đây là mảng string[] chứa các link
     });
   };
 
@@ -105,15 +146,15 @@ const FullScreenPostCreator = ({ onClose, onSubmit }: any) => {
             <X size={24} className="text-gray-500" />
           </button>
           <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">
-            Tạo bài đăng mới
+            {isEditMode ? 'Chỉnh sửa bài đăng' : 'Bài đăng mới'}
           </h2>
         </div>
         
         <button 
           onClick={handleSubmit} 
-          className="px-4 py-2 md:px-6 md:py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-md transition flex items-center gap-2 text-sm md:text-base"
+          className="px-4 py-2 md:px-6 md:py-2.5 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 shadow-md transition flex items-center gap-2 text-sm md:text-base"
         >
-          <CheckCircle size={18}/> <span className="hidden sm:inline">Đăng bài</span>
+          <span className="hidden sm:inline">{isEditMode ? 'Lưu thay đổi' : 'Đăng bài'}</span>
         </button>
       </header>
 

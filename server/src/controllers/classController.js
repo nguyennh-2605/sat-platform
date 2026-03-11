@@ -205,7 +205,7 @@ exports.createAssignment = async (req, res) => {
         sendNotificationToUser(
           student.id,
           notifMessage
-          // `/student/assignments/${newAssignment.id}`
+          `/dashboard/class/${classId}/assignment/${newAssignment.id}`
         )
       ));
     }
@@ -266,7 +266,7 @@ exports.createSubmission = async (req, res) => {
       await sendNotificationToUser(
         assignmentInfo.class.teacherId, // Gửi cho ID giáo viên
         `Học sinh ${studentInfo.name || studentInfo.email} vừa nộp bài tập "${assignmentInfo.title}" của lớp ${assignmentInfo.class.name}.`,
-        // `/teacher/classes/${assignmentInfo.classId}/assignments/${assignmentId}`
+        `/dashboard/class/${classId}/assignment/${newAssignment.id}`
       );
     }
 

@@ -20,13 +20,13 @@ const TableRenderer = ({ block, isMath, readOnly }: { block: TableBlock, isMath:
       </div>
     )}
 
-    <div className="overflow-x-auto">
-      <table className="w-full text-left">
+    <div className="w-full">
+      <table className="w-full table-fixed text-left">
         {/* Header */}
         <thead className="bg-gray-50 text-gray-700 font-semibold border-b border-gray-200">
           <tr>
             {block.headers.map((header, idx) => (
-              <th key={idx} className="px-4 py-3 border-r border-gray-200 last:border-r-0 whitespace-nowrap">
+              <th key={idx} className="px-4 py-3 border-r border-gray-200 last:border-r-0 break-words">
                 <InteractiveText content={header} isMath={isMath} readOnly={readOnly} />
               </th>
             ))}
@@ -37,7 +37,7 @@ const TableRenderer = ({ block, isMath, readOnly }: { block: TableBlock, isMath:
           {block.rows.map((row, rIdx) => (
             <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
               {row.map((cell, cIdx) => (
-                <td key={cIdx} className="px-4 py-3 text-gray-700 border-r border-gray-200 last:border-r-0">
+                <td key={cIdx} className="px-4 py-3 text-gray-700 border-r border-gray-200 last:border-r-0 break-words">
                   <InteractiveText content={cell} isMath={isMath} readOnly={readOnly} />
                 </td>
               ))}

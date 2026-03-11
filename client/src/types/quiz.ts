@@ -1,5 +1,3 @@
-// src/types/quiz.ts
-
 // 1. Định nghĩa khuôn mẫu cho khối VĂN BẢN
 export interface TextBlock {
   type: 'text';
@@ -53,4 +51,14 @@ export interface QuestionData {
   }[];
   moduleIndex: number;
   type: 'MCQ' | 'SPR';
+}
+
+export interface AssignmentProps {
+  id: string;
+  title: string;
+  content: string | null;
+  fileUrls: string[];
+  links: string[];
+  deadline: string | null;
+  createdAt: string;
 }
