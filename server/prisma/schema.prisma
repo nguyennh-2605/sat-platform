@@ -23,6 +23,7 @@ model User {
   createdTests        Test[]
   studyingClasses     Class[]              @relation("StudentClasses")
   notifications       Notification[]
+  SubFolders          Folder[]
 }
 
 model Class {
@@ -65,6 +66,22 @@ model HomeworkSubmission {
   @@unique([studentId, assignmentId])
 }
 
+model Folder {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+  userId    Int      // Của giáo viên nào
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Quan hệ tự trỏ (Folder con nằm trong Folder cha)
+  parentId  Int?
+  parent    Folder?  @relation("SubFolders", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("SubFolders")
+
+  // Quan hệ với Test
+  tests     Test[]
+}
+
 model Test {
   id          Int          @id @default(autoincrement())
   description String?
@@ -80,6 +97,8 @@ model Test {
   classTests  ClassTest[]
   sections    Section[]
   submissions Submission[]
+  folderId    Int?
+  folder      Folder?      @relation(fields: [folderId], references: [id], onDelete: Cascade)
   author      User?        @relation(fields: [authorId], references: [id])
 }
 
@@ -93,6 +112,8 @@ model ClassTest {
   class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
   test       Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
 
+  submissions Submission[] 
+
   @@unique([classId, testId])
 }
 
@@ -103,7 +124,7 @@ model Section {
   order     Int
   duration  Int
   questions Question[]
-  test      Test       @relation(fields: [testId], references: [id])
+  test      Test       @relation(fields: [testId], references: [id], onDelete: Cascade)
 }
 
 model Question {
@@ -117,13 +138,15 @@ model Question {
   explanation   String?
   order         Int      @default(0)
   answers       Answer[]
-  section       Section  @relation(fields: [sectionId], references: [id])
+  section       Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 }
 
 model Submission {
   id                   Int              @id @default(autoincrement())
   userId               Int
   testId               Int
+  classTestId          Int?
+  classTest            ClassTest?       @relation(fields: [classTestId], references: [id], onDelete: Cascade)
   endTime              DateTime?
   score                Int?
   violationCount       Int              @default(0)
@@ -133,7 +156,7 @@ model Submission {
   timeRemaining        Int?
   status               SubmissionStatus @default(DOING)
   answers              Answer[]
-  test                 Test             @relation(fields: [testId], references: [id])
+  test                 Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
   user                 User             @relation(fields: [userId], references: [id])
 }
 
@@ -143,8 +166,8 @@ model Answer {
   questionId     Int
   selectedChoice String?
   isCorrect      Boolean    @default(false)
-  question       Question   @relation(fields: [questionId], references: [id])
-  submission     Submission @relation(fields: [submissionId], references: [id])
+  question       Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 }
 
 model ErrorLog {

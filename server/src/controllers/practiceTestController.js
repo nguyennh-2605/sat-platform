@@ -142,9 +142,8 @@ exports.createTest = async (req, res) => {
     const { 
       title, description, duration, 
       subject, mode, sections, 
-      assignClassId,
-      testDate,
-      category
+      assignClassId, testDate,
+      category, folderId
     } = req.body;
 
     // Validate cơ bản
@@ -176,6 +175,7 @@ exports.createTest = async (req, res) => {
         isPublic: isPublic,
         category: category,
         testDate: finalTestDate,
+        folderId: folderId,
 
         ...(assignClassId ? {
           classTests: { // Tên relation trong schema.prisma (VD: classTests hoặc classes)

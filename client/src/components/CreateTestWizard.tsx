@@ -1,5 +1,5 @@
 import { useState, memo, useRef, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Play, Save, ArrowLeft, ImageIcon, Loader2,
   BookOpen, Clock, Layers, ShieldCheck, ShieldAlert, ArrowRight, FileType, AlignLeft,
   Users,
@@ -30,6 +30,7 @@ interface FinalTestStructure {
   assignClassId?: string;
   category: string;
   testDate?: string;
+  folderId?: number;
 }
 
 interface PreviewSectionProps {
@@ -161,6 +162,9 @@ const PreviewSection = memo(({ questions, onSave, isSubmitting, subject }: Previ
 const CreateTestWizard = () => {
   // --- STATE QUẢN LÝ ---
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const folderIdParam = searchParams.get('folderId');
+  const folderId = folderIdParam ? parseInt(folderIdParam, 10) : undefined;
   const [step, setStep] = useState(1); // 1: Info, 2: Content
   
   // Dữ liệu Bước 1: Metadata
@@ -276,7 +280,8 @@ const CreateTestWizard = () => {
       sections: sections,
       assignClassId: testInfo.assignClassId === '' ? undefined : testInfo.assignClassId,
       category: finalCategory,
-      testDate: testInfo.testDate == '' ? undefined : testInfo.testDate
+      testDate: testInfo.testDate == '' ? undefined : testInfo.testDate,
+      folderId: folderId
     };
 
     // --- GỌI API ---

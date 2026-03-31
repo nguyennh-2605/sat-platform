@@ -268,7 +268,7 @@ const AssignmentDetail = () => {
                 
                 {/* 1. Phần Text nội dung */}
                 <div 
-                  className={`prose max-w-none text-slate-700 ${hasAttachments && !isStudent ? 'flex-1' : 'w-full'}`}
+                  className={`prose marker:text-black marker:font-bold max-w-none text-slate-700 ${hasAttachments && !isStudent ? 'flex-1' : 'w-full'}`}
                   dangerouslySetInnerHTML={{ __html: assignment.content || '' }} 
                 />
 

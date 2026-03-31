@@ -16,6 +16,7 @@ import ResultAnalytics from './pages/ResultAnalytics';
 import ScoreReport from './ScoreReport';
 import CreateTestWizard from './components/CreateTestWizard';
 import AssignmentDetail from './components/AssignmentDetail';
+import TestBank from './pages/TestBank';
 
 function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -32,6 +33,7 @@ function App() {
               {/* index: Khi vào /dashboard sẽ tự chuyển sang /dashboard/practice-test */}
               <Route index element={<Navigate to="practice-test" replace />} />
               {/* Các đường dẫn con */}
+              <Route path="practice-test/my-bank/:folderId?" element={<TestBank />} />
               <Route path="practice-test" element={<PracticeTest />} />
               <Route path="class/:classId" element={<Classroom />} />
               <Route path="error-log" element={<ErrorLog />} />

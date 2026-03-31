@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, Outlet, NavLink, useLocation } from 'react-router-dom';
+import { useNavigate, Outlet, NavLink, useLocation, Link } from 'react-router-dom';
 import { 
   User, LogOut, BookOpen, 
   BrainCircuit, Layout, GraduationCap, AlertCircle,
@@ -74,8 +74,10 @@ function Dashboard() {
 
   // --- UI STATES ---
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); 
-  const [isClassroomOpen, setIsClassroomOpen] = useState(true); 
-  const [isFlyoutOpen, setIsFlyoutOpen] = useState(false); 
+  const [isClassroomOpen, setIsClassroomOpen] = useState(false); 
+  const [isClassRoomFlyoutOpen, setIsClassRoomFlyoutOpen] = useState(false); 
+  const [isPracticeTestOpen, setIsPracticeTestOpen] = useState(true);
+  const [isPracticeTestFlyoutOpen, setIsPracticeTestFlyoutOpen] = useState(false);
   
   // --- DATA STATES ---
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -129,7 +131,7 @@ function Dashboard() {
       setIsModalOpen(false); 
       setNewClassName('');  
       fetchClasses(undefined, true);
-      setIsFlyoutOpen(false); 
+      setIsClassRoomFlyoutOpen(false); 
     } catch (error: any) {
       const msg = error.response?.data?.error || "Lỗi khi tạo lớp";
       alert(msg);
@@ -167,7 +169,7 @@ function Dashboard() {
     <NavLink
       key={cls.id}
       to={`/dashboard/class/${cls.id}`}
-      onClick={() => setIsFlyoutOpen(false)}
+      onClick={() => setIsClassRoomFlyoutOpen(false)}
       className={({ isActive }) => 
         `group relative flex items-center px-3 py-2 text-[13px] truncate transition-colors rounded-lg mb-1 ${
           isActive ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900'
@@ -191,8 +193,8 @@ function Dashboard() {
     <div className="flex h-screen bg-[#F8FAFC] font-sans overflow-hidden">
       
       {/* --- MÀN CHẮN ẨN --- */}
-      {isSidebarCollapsed && isFlyoutOpen && (
-        <div className="fixed inset-0 z-30" onClick={() => setIsFlyoutOpen(false)} />
+      {isSidebarCollapsed && isClassRoomFlyoutOpen && (
+        <div className="fixed inset-0 z-30" onClick={() => setIsClassRoomFlyoutOpen(false)} />
       )}
 
       {/* --- SIDEBAR --- */}
@@ -204,7 +206,7 @@ function Dashboard() {
         <button 
           onClick={() => {
             setIsSidebarCollapsed(!isSidebarCollapsed);
-            setIsFlyoutOpen(false); 
+            setIsClassRoomFlyoutOpen(false); 
           }}
           className="absolute -right-3.5 top-5 flex items-center justify-center w-6 h-6 bg-white border border-slate-400 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-50 shadow-sm z-50 transition-colors cursor-pointer">
           {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
@@ -234,21 +236,111 @@ function Dashboard() {
           <div className={`text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-2 transition-all duration-300 overflow-hidden whitespace-nowrap ${isSidebarCollapsed ? 'h-0 opacity-0 mb-0' : 'h-4 opacity-100'}`}>
             Menu
           </div>
-          
-          <SidebarItem to="/dashboard/practice-test" label="Practice Test" icon={Layout} isSidebarCollapsed={isSidebarCollapsed} />
-          <SidebarItem to="/dashboard/error-log" label="Error Log" icon={AlertCircle} isSidebarCollapsed={isSidebarCollapsed}/>
-          <SidebarItem to="/dashboard/logic-lab" label="Logic Lab" icon={BrainCircuit} isSidebarCollapsed={isSidebarCollapsed}/>
-          <SidebarItem to="/dashboard/results-analytics" label="Results & Analytics" icon={BarChart3} isSidebarCollapsed={isSidebarCollapsed}/>
-          
+
+          {(user?.role === 'TEACHER' || user?.role === 'ADMIN') ? (
+            <div className="relative pt-2 z-40">
+              <div 
+                className={`group relative overflow-hidden flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'px-3'} py-2.5 rounded-full cursor-pointer transition-all duration-300 font-medium ${
+                    location.pathname.includes('/practice-test') ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+                onClick={() => {
+                  if (isSidebarCollapsed) setIsPracticeTestFlyoutOpen(!isPracticeTestFlyoutOpen); 
+                  else setIsPracticeTestOpen(!isPracticeTestOpen); 
+                }}
+              >
+                <Ripple color={location.pathname.includes('/practice-test') ? 'rgba(255,255,255,0.2)' : 'rgba(148,163,184,0.3)'} />
+                <div className={`relative z-10 flex items-center pointer-events-none w-full h-full ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+                  <Layout size={20} className={`shrink-0 transition-colors ${location.pathname.includes('/practice-test') ? 'text-white' : 'text-slate-400'}`} />
+                  
+                  <div className={`flex items-center overflow-hidden transition-all duration-300 ease-in-out ${
+                    isSidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'flex-1 ml-3 opacity-100'
+                  }`}>
+                    <span className="flex-1 truncate">Practice Center</span>
+                    <ChevronDown size={16} className={`shrink-0 transition-transform duration-200 ${isPracticeTestOpen && !isSidebarCollapsed ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
+              </div>  
+
+              {/* 1. DẠNG ĐẦY ĐỦ: Nhánh cây */}
+              {!isSidebarCollapsed && isPracticeTestOpen && (
+                <div className="mt-1 relative ml-5 pl-2 border-l border-slate-500 space-y-0.5">
+                  
+                  {/* NavLink 1: Đề thi chung */}
+                  <NavLink 
+                    to="/dashboard/practice-test" 
+                    end // THÊM end VÀO ĐÂY ĐỂ TRÁNH BỊ SÁNG 2 NÚT CÙNG LÚC
+                    className="group flex items-center py-2 relative z-10 w-full text-left mt-1 hover:bg-slate-50"
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <div className={`w-[3px] absolute left-[-1px] rounded-r-md transition-all duration-300 ease-in-out ${
+                          isActive 
+                            ? 'h-6 bg-slate-800 opacity-100' 
+                            : 'h-0 bg-slate-300 opacity-0 group-hover:h-4 group-hover:opacity-100'
+                        }`} />
+                        <span className={`ml-4 text-[13px] truncate transition-all duration-200 ${
+                          isActive ? 'text-slate-900 font-bold' : 'text-slate-500 font-medium group-hover:text-slate-800'
+                        }`}>
+                          Đề thi chung
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+                  
+                  {/* NavLink 2: Ngân hàng đề của tôi */}
+                  <NavLink 
+                    to="/dashboard/practice-test/my-bank" 
+                    className="group flex items-center py-2 relative z-10 w-full text-left mt-1 hover:bg-slate-50"
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <div className={`w-[3px] absolute left-[-1px] rounded-r-md transition-all duration-300 ease-in-out ${
+                          isActive 
+                            ? 'h-6 bg-slate-800 opacity-100' 
+                            : 'h-0 bg-slate-300 opacity-0 group-hover:h-4 group-hover:opacity-100'
+                        }`} />
+                        <span className={`ml-4 text-[13px] truncate transition-all duration-200 ${
+                          isActive ? 'text-slate-900 font-bold' : 'text-slate-500 font-medium group-hover:text-slate-800'
+                        }`}>
+                          Ngân hàng đề thi
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+
+                </div>
+              )}
+
+              {/* 2. DẠNG THU GỌN: Flyout */}
+              {isSidebarCollapsed && isPracticeTestFlyoutOpen && (
+                <div className="absolute left-full top-0 ml-4 w-60 bg-white border border-slate-200 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] z-[100] py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-left">
+                  <div className="px-4 py-2 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-300 mb-2">
+                    Practice Center
+                  </div>
+                  
+                  <div className="px-2 space-y-1">
+                    <Link onClick={() => setIsPracticeTestFlyoutOpen(false)} to="/dashboard/practice-test" className="block px-3 py-2 w-full text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-all">
+                      Đề thi chung
+                    </Link>
+                    <Link onClick={() => setIsPracticeTestFlyoutOpen(false)} to="/dashboard/practice-test/my-bank" className="block px-3 py-2 w-full text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-all">
+                      Ngân hàng đề thi
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <SidebarItem to="/dashboard/practice-test" label="Practice Center" icon={Layout} isSidebarCollapsed={isSidebarCollapsed} />
+          )}
+
           {/* --- CLASSROOM GROUP --- */}
           <div className="relative pt-2 z-40">
-            {/* Tối ưu CSS Flexbox Grouping để không bị lệch Icon */}
             <div 
               className={`group relative overflow-hidden flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'px-3'} py-2.5 rounded-full cursor-pointer transition-all duration-300 font-medium ${
                   location.pathname.includes('/class') ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
               }`}
               onClick={() => {
-                if (isSidebarCollapsed) setIsFlyoutOpen(!isFlyoutOpen); 
+                if (isSidebarCollapsed) setIsClassRoomFlyoutOpen(!isClassRoomFlyoutOpen); 
                 else setIsClassroomOpen(!isClassroomOpen); 
               }}
             >
@@ -286,7 +378,7 @@ function Dashboard() {
             )}
 
             {/* 2. DẠNG THU GỌN: Flyout */}
-            {isSidebarCollapsed && isFlyoutOpen && (
+            {isSidebarCollapsed && isClassRoomFlyoutOpen && (
               <div className="absolute left-full top-0 ml-4 w-60 bg-white border border-slate-200 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] z-[100] py-2 animate-in fade-in zoom-in-95 duration-200 origin-top-left">
                 <div className="px-4 py-2 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-300 mb-2">
                   Classroom
@@ -301,7 +393,7 @@ function Dashboard() {
                     <button 
                       onClick={() => {
                         setIsModalOpen(true);
-                        setIsFlyoutOpen(false); 
+                        setIsClassRoomFlyoutOpen(false); 
                       }}
                       className="flex items-center justify-center px-3 py-2 w-full text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-all"
                     >
@@ -312,6 +404,10 @@ function Dashboard() {
               </div>
             )}
           </div>
+          
+          <SidebarItem to="/dashboard/error-log" label="Error Log" icon={AlertCircle} isSidebarCollapsed={isSidebarCollapsed}/>
+          <SidebarItem to="/dashboard/logic-lab" label="Logic Lab" icon={BrainCircuit} isSidebarCollapsed={isSidebarCollapsed}/>
+          <SidebarItem to="/dashboard/results-analytics" label="Results & Analytics" icon={BarChart3} isSidebarCollapsed={isSidebarCollapsed}/>
         </nav>
 
         {/* --- USER PROFILE CARD --- */}
