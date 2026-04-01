@@ -8,9 +8,9 @@ exports.createFolder = async (req, res) => {
 
     // 1. Validate dữ liệu đầu vào
     if (!name || name.trim() === '') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Tên thư mục không được để trống' 
+      return res.status(400).json({
+        success: false,
+        message: 'Tên thư mục không được để trống'
       });
     }
 
@@ -32,9 +32,9 @@ exports.createFolder = async (req, res) => {
 
   } catch (error) {
     console.error('Lỗi khi tạo thư mục:', error);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Lỗi server khi tạo thư mục' 
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi tạo thư mục'
     });
   }
 };
@@ -53,12 +53,32 @@ exports.getFolderContent = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    const tests = await prisma.test.findMany({
+    const rawTests = await prisma.test.findMany({
       where: {
         authorId: userId,
         folderId: parsedFolderId,
       },
+      include: {
+        sections: {
+          select: {
+            _count: {
+              select: { questions: true }
+            }
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' }
+    });
+
+    const tests = rawTests.map(test => {
+      const totalQuestions = test.sections.reduce((sum, currentSection) => {
+        return sum + currentSection._count.questions;
+      }, 0);
+      const { sections, ...rest } = test;
+      return {
+        ...rest,
+        questionCount: totalQuestions
+      };
     });
 
     return res.status(200).json({
@@ -70,7 +90,7 @@ exports.getFolderContent = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Lỗi khi lấy dữ liệu Folder" ,error);
+    console.error("Lỗi khi lấy dữ liệu Folder", error);
     return res.status(500).json({
       success: false,
       message: "Lỗi server khi lấy dữ liệu"
@@ -115,7 +135,7 @@ exports.deleteItems = async (req, res) => {
 
     if (testIds.length > 0) {
       await prisma.test.deleteMany({
-        where: { 
+        where: {
           id: { in: testIds },
           authorId: userId
         }
@@ -124,7 +144,7 @@ exports.deleteItems = async (req, res) => {
 
     if (folderIds.length > 0) {
       await prisma.folder.deleteMany({
-        where: { 
+        where: {
           id: { in: folderIds },
           userId: userId
         }

@@ -34,31 +34,31 @@ function HomePage() {
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col justify-center items-center p-6 font-sans">
-      
+
       {/* --- HEADER GÓC PHẢI TRÊN --- */}
       <div className="absolute top-0 right-0 p-6 flex items-center gap-4">
         {isLoggedIn ? (
           // Giao diện khi ĐÃ đăng nhập
           <div className="flex items-center gap-4">
-             <span className="text-slate-600 font-medium">Hello, {userName}</span>
-             <button 
-                onClick={handleLogout}
-                className="text-sm text-red-600 hover:text-red-700 font-semibold"
-             >
-               Log out 
-             </button>
+            <span className="text-slate-600 font-medium">Hello, {userName}</span>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-red-600 hover:text-red-700 font-semibold"
+            >
+              Log out
+            </button>
           </div>
         ) : (
           // Giao diện khi CHƯA đăng nhập
           <>
-            <button 
-              onClick={() => navigate('/auth')} 
+            <button
+              onClick={() => navigate('/auth')}
               className="text-slate-600 font-semibold hover:text-blue-600 px-3 py-2"
             >
               Log in
             </button>
-            <button 
-              onClick={() => navigate('/auth?mode=register')} 
+            <button
+              onClick={() => navigate('/auth?mode=register')}
               className="bg-white text-blue-600 font-semibold px-5 py-2 rounded-full shadow-sm border border-blue-100 hover:shadow-md transition-all"
             >
               Register

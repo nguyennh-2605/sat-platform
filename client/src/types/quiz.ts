@@ -1,10 +1,8 @@
-// 1. Định nghĩa khuôn mẫu cho khối VĂN BẢN
 export interface TextBlock {
   type: 'text';
   content: string; // Chứa nội dung câu hỏi hoặc HTML
 }
 
-// 2. Định nghĩa khuôn mẫu cho khối HÌNH ẢNH
 export interface ImageBlock {
   type: 'image';
   src: string;      // Đường dẫn ảnh
@@ -38,19 +36,25 @@ export type ContentBlock = TextBlock | ImageBlock | TableBlock | PoemBlock | Not
 // 4. Định nghĩa khuôn mẫu cho một CÂU HỎI hoàn chỉnh
 export interface QuestionData {
   id: number;
-  
-  // QUAN TRỌNG NHẤT: Bắt buộc blocks phải là mảng các ContentBlock
-  blocks: ContentBlock[]; 
-  // Các trường khác khớp với Database của bạn
+  blocks: ContentBlock[];
   questionText: string;
   correctAnswer: string;
-  // Định nghĩa cho choices (vì choices trong DB cũng là JSON)
   choices: {
     id: string;
     text: string;
   }[];
   moduleIndex: number;
   type: 'MCQ' | 'SPR';
+}
+
+export interface TestItem {
+  id: number;
+  title: string;
+  subject: string;
+  mode: 'PRACTICE' | 'EXAM';
+  duration: number;
+  questionCount: number;
+  folderId: number | null;
 }
 
 export interface AssignmentProps {
@@ -61,4 +65,5 @@ export interface AssignmentProps {
   links: string[];
   deadline: string | null;
   createdAt: string;
+  selectedTests?: TestItem[];
 }

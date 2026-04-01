@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 exports.deleteAssignment = async (req, res) => {
   try {
     const assignmentId = req.params.id;
-    const userId = req.user.userId || req.user.id; 
+    const userId = req.user.userId || req.user.id;
 
     // 1. Kiểm tra bài tập có tồn tại và lấy thông tin lớp học
     const assignment = await prisma.assignment.findUnique({
@@ -27,9 +27,9 @@ exports.deleteAssignment = async (req, res) => {
       where: { id: assignmentId }
     });
 
-    return res.status(200).json({ 
-      success: true, 
-      message: "Xóa bài tập thành công!" 
+    return res.status(200).json({
+      success: true,
+      message: "Xóa bài tập thành công!"
     });
 
   } catch (error) {
@@ -42,7 +42,7 @@ exports.deleteAssignment = async (req, res) => {
 exports.updateAssignment = async (req, res) => {
   try {
     const assignmentId = req.params.id;
-    const userId = req.user.userId || req.user.id; 
+    const userId = req.user.userId || req.user.id;
     const { title, content, fileUrls, links, deadline } = req.body;
 
     // 1. Kiểm tra tồn tại và phân quyền
@@ -77,10 +77,10 @@ exports.updateAssignment = async (req, res) => {
       }
     });
 
-    return res.status(200).json({ 
-      success: true, 
-      message: "Cập nhật bài tập thành công!", 
-      data: updatedAssignment 
+    return res.status(200).json({
+      success: true,
+      message: "Cập nhật bài tập thành công!",
+      data: updatedAssignment
     });
 
   } catch (error) {
@@ -99,9 +99,10 @@ exports.getAssignmentById = async (req, res) => {
     if (!assignment) {
       return res.status(404).json({ message: "Không tìm thấy bài tập" });
     }
-    return res.status(200).json({ success:true, data: assignment });
+    return res.status(200).json({ success: true, data: assignment });
   } catch (error) {
-    console.log("Lỗi khi lấy assignment" ,error);
+    console.log("Lỗi khi lấy assignment", error);
     return res.status(500).json({ message: "Lỗi server" });
   }
 };
+
