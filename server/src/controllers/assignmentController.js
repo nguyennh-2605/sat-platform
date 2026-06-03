@@ -43,7 +43,7 @@ exports.updateAssignment = async (req, res) => {
   try {
     const assignmentId = req.params.id;
     const userId = req.user.userId || req.user.id;
-    const { title, content, fileUrls, links, deadline } = req.body;
+    const { title, content, fileUrls, links, deadline, testIds } = req.body;
 
     // 1. Kiểm tra tồn tại và phân quyền
     const assignment = await prisma.assignment.findUnique({
@@ -73,6 +73,7 @@ exports.updateAssignment = async (req, res) => {
         content: content !== undefined ? content : undefined,
         fileUrls: fileUrls !== undefined ? fileUrls : undefined,
         links: links !== undefined ? links : undefined,
+        testIds: testIds !== undefined ? testIds : undefined,
         deadline: formattedDeadline
       }
     });
@@ -99,7 +100,41 @@ exports.getAssignmentById = async (req, res) => {
     if (!assignment) {
       return res.status(404).json({ message: "Không tìm thấy bài tập" });
     }
-    return res.status(200).json({ success: true, data: assignment });
+
+    const selectedTests = assignment.testIds.length > 0
+      ? await prisma.test.findMany({
+          where: { id: { in: assignment.testIds } },
+          include: {
+            sections: {
+              select: {
+                _count: {
+                  select: { questions: true }
+                }
+              }
+            }
+          }
+        })
+      : [];
+
+    const formattedSelectedTests = selectedTests.map(test => ({
+      id: test.id,
+      title: test.title,
+      subject: test.subject,
+      mode: test.mode,
+      duration: test.duration,
+      folderId: test.folderId,
+      questionCount: test.sections.reduce((sum, section) => {
+        return sum + section._count.questions;
+      }, 0)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...assignment,
+        selectedTests: formattedSelectedTests
+      }
+    });
   } catch (error) {
     console.log("Lỗi khi lấy assignment", error);
     return res.status(500).json({ message: "Lỗi server" });

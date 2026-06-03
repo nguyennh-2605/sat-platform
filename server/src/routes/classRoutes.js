@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/authMiddleware'); // Middle
 // API lấy danh sách lớp (cho Sidebar)
 router.get('/', authenticateToken, classController.getMyClasses);
 router.get('/list', authenticateToken, classController.getExamTests);
+router.get('/:id/score-report', authenticateToken, classController.getScoreReportAssignments);
 router.get('/:id', authenticateToken, classController.getClassDetail);
 router.get('/:testId/report', authenticateToken, classController.getTestAnalytics);
 router.post('/', authenticateToken, classController.createClass);

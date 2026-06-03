@@ -8,6 +8,8 @@ exports.startOrResumeTest = async (req, res) => {
   try {
     const testId = parseInt(req.params.id);
     const userId = req.user.userId;
+    const assignmentId = req.query.assignmentId ? String(req.query.assignmentId) : null;
+    const classId = req.query.classId ? String(req.query.classId) : null;
 
     if (!userId || isNaN(userId)) {
       return res.status(400).json({ error: "Thiếu thông tin User ID (userId is missing or invalid)" });
@@ -43,10 +45,29 @@ exports.startOrResumeTest = async (req, res) => {
       return res.status(404).json({ error: "Đề thi này chưa có câu hỏi nào (Data rỗng)" });
     }
 
+    let selectedClassTestId = null;
+    if (!assignmentId && classId) {
+      const classTest = await prisma.classTest.findFirst({
+        where: {
+          classId: classId,
+          testId: testId
+        },
+        select: { id: true }
+      });
+
+      if (!classTest) {
+        return res.status(400).json({ error: "Bài test này không thuộc lớp đã chọn" });
+      }
+
+      selectedClassTestId = classTest.id;
+    }
+
     let submission = await prisma.submission.findFirst({
       where: {
         userId: userId,
         testId: testId,
+        assignmentId: assignmentId,
+        classTestId: selectedClassTestId,
         status: 'DOING'
       },
       // Để luôn lấy bài mới nhất (phòng trường hợp DB lỗi có 2 bài active)
@@ -60,6 +81,8 @@ exports.startOrResumeTest = async (req, res) => {
         where: {
           userId: userId,
           testId: testId,
+          assignmentId: assignmentId,
+          classTestId: selectedClassTestId,
           startedAt: {
             gte: new Date(Date.now() - 5000) // Lấy bài tạo trong 5s gần nhất
           }
@@ -100,6 +123,8 @@ exports.startOrResumeTest = async (req, res) => {
         data: {
           userId: userId,
           testId: testId,
+          assignmentId: assignmentId,
+          classTestId: selectedClassTestId,
           status: "DOING", // Đánh dấu là đang làm
           startedAt: new Date(), // Bắt đầu tính giờ từ BÂY GIỜ,
           timeRemaining: test.duration * 60,
@@ -172,6 +197,8 @@ exports.submitTest = async (req, res) => {
     const userId = req.user.userId;
     const { submissionId, answers, violationCount } = req.body; 
     const testId = parseInt(req.params.id);
+    const assignmentId = req.query.assignmentId ? String(req.query.assignmentId) : null;
+    const classId = req.query.classId ? String(req.query.classId) : null;
 
     console.log(`📥 Đang chấm bài Test ID: ${testId} cho User ID: ${userId}`);
 
@@ -183,7 +210,8 @@ exports.submitTest = async (req, res) => {
       where: { 
         id: Number(submissionId),
         userId: userId,
-        testId: testId
+        testId: testId,
+        assignmentId: assignmentId
       }
     });
 
@@ -263,6 +291,76 @@ exports.submitTest = async (req, res) => {
           savedAnswers: answers 
         }
       });
+
+      // Nếu học sinh làm từ Practice Center theo lớp, tự động cập nhật các assignment chưa có dữ liệu
+      if (!assignmentId && classId) {
+        const classAssignments = await prisma.assignment.findMany({
+          where: {
+            classId: classId
+          },
+          select: {
+            id: true,
+            testIds: true
+          }
+        });
+
+        const assignmentIdsToSync = classAssignments
+          .filter(item => (item.testIds || []).includes(testId))
+          .map(item => item.id);
+
+        if (assignmentIdsToSync.length > 0) {
+          const existedSubmissions = await prisma.submission.findMany({
+            where: {
+              userId: userId,
+              testId: testId,
+              assignmentId: {
+                in: assignmentIdsToSync
+              }
+            },
+            select: {
+              assignmentId: true
+            }
+          });
+
+          const existedAssignmentIds = new Set(
+            existedSubmissions
+              .map(item => item.assignmentId)
+              .filter(id => !!id)
+          );
+
+          const pendingAssignmentIds = assignmentIdsToSync.filter(id => !existedAssignmentIds.has(id));
+
+          for (const pendingAssignmentId of pendingAssignmentIds) {
+            const clonedSubmission = await prisma.submission.create({
+              data: {
+                userId: userId,
+                testId: testId,
+                assignmentId: pendingAssignmentId,
+                classTestId: submission.classTestId,
+                endTime: new Date(),
+                score: correctCount,
+                violationCount: Number(violationCount),
+                startedAt: submission.startedAt,
+                currentQuestionIndex: submission.currentQuestionIndex,
+                savedAnswers: answers,
+                timeRemaining: submission.timeRemaining,
+                status: "COMPLETED"
+              }
+            });
+
+            if (answersToSave.length > 0) {
+              await prisma.answer.createMany({
+                data: answersToSave.map(item => ({
+                  submissionId: clonedSubmission.id,
+                  questionId: item.questionId,
+                  selectedChoice: item.selectedChoice
+                }))
+              });
+            }
+          }
+        }
+      }
+
       // B. Lưu chi tiết từng câu trả lời vào bảng Answer
       // createMany nhanh hơn create từng cái
       if (answersToSave.length > 0) {

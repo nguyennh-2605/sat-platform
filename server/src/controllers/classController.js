@@ -170,7 +170,7 @@ exports.addStudentToClass = async (req, res) => {
 
 exports.createAssignment = async (req, res) => {
   try {
-    const { title, content, type, deadline, classId, driveFiles, externalLinks } = req.body;
+    const { title, content, type, deadline, classId, driveFiles, externalLinks, testIds } = req.body;
     
     // Validate cơ bản
     if (!classId || !title) {
@@ -184,6 +184,7 @@ exports.createAssignment = async (req, res) => {
         deadline: (type === 'assignment' && deadline) ? new Date(deadline) : null,
         fileUrls: driveFiles || [],
         links: externalLinks || [],
+        testIds: Array.isArray(testIds) ? testIds : [],
         classId: classId
       }
     });
@@ -319,9 +320,104 @@ exports.getExamTests = async (req, res) => {
   }
 };
 
+exports.getScoreReportAssignments = async (req, res) => {
+  try {
+    const { id: classId } = req.params;
+
+    if (!classId) {
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu classId",
+        data: null
+      });
+    }
+
+    const classroom = await prisma.class.findUnique({
+      where: { id: classId },
+      select: {
+        assignments: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            createdAt: true,
+            testIds: true
+          }
+        }
+      }
+    });
+
+    if (!classroom) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy lớp học",
+        data: null
+      });
+    }
+
+    const allTestIds = [...new Set(
+      classroom.assignments.flatMap(assignment => assignment.testIds || [])
+    )];
+
+    const examTests = allTestIds.length > 0
+      ? await prisma.test.findMany({
+          where: {
+            id: { in: allTestIds },
+            mode: 'EXAM'
+          },
+          select: {
+            id: true,
+            title: true,
+            mode: true,
+            subject: true,
+            duration: true,
+            createdAt: true
+          }
+        })
+      : [];
+
+    const testsMap = new Map(examTests.map(test => [test.id, test]));
+
+    const assignments = classroom.assignments.map(assignment => {
+      const examItems = (assignment.testIds || [])
+        .map(testId => testsMap.get(testId))
+        .filter(test => !!test)
+        .map(test => ({
+          id: test.id,
+          title: test.title,
+          mode: test.mode,
+          subject: test.subject,
+          duration: test.duration,
+          date: new Date(test.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        }));
+
+      return {
+        id: assignment.id,
+        title: assignment.title,
+        createdAt: assignment.createdAt,
+        tests: examItems
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Lấy dữ liệu score report thành công",
+      data: assignments
+    });
+  } catch (error) {
+    console.error("Lỗi lấy score report theo assignment:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy score report",
+      data: null
+    });
+  }
+};
+
 exports.getTestAnalytics = async (req, res) => {
   try {
     const { testId } = req.params;
+    const assignmentId = req.query.assignmentId ? String(req.query.assignmentId) : null;
 
     if (!testId) return res.status(400).json({ error: "Thiếu testId" });
 
@@ -366,6 +462,7 @@ exports.getTestAnalytics = async (req, res) => {
     const submissions = await prisma.submission.findMany({
       where: {
         testId: id,
+        assignmentId: assignmentId,
         status: 'COMPLETED'
       },
       select: {
@@ -373,11 +470,22 @@ exports.getTestAnalytics = async (req, res) => {
         user: { select: { id: true, name: true, email: true } },
         answers: { select: { questionId: true, selectedChoice: true } }
       },
-      orderBy: { score: 'desc' }
+      orderBy: [
+        { startedAt: 'asc' },
+        { id: 'asc' }
+      ]
     });
 
-    // A. Tạo Leaderboard (Giữ nguyên logic của bạn - Tốt)
-    const leaderboard = submissions.map(sub => {
+    // A. Leaderboard chỉ lấy submission đầu tiên của mỗi học sinh
+    const firstSubmissionMap = new Map();
+    submissions.forEach(sub => {
+      if (!firstSubmissionMap.has(sub.user.id)) {
+        firstSubmissionMap.set(sub.user.id, sub);
+      }
+    });
+
+    const firstSubmissions = Array.from(firstSubmissionMap.values());
+    const leaderboard = firstSubmissions.map(sub => {
       let timeString = "--";
       if (sub.startedAt && sub.endTime) {
         const diffMs = new Date(sub.endTime) - new Date(sub.startedAt);
@@ -390,7 +498,7 @@ exports.getTestAnalytics = async (req, res) => {
         score: sub.score || 0,
         time: timeString
       };
-    });
+    }).sort((a, b) => b.score - a.score);
 
     // --- TỐI ƯU HIỆU NĂNG TÍNH TOÁN ---
     // Thay vì loop lồng nhau (Questions x Submissions), 
@@ -426,9 +534,9 @@ exports.getTestAnalytics = async (req, res) => {
 
       // Phân loại vào A, B, C, D
       studentAnswers.forEach(({ choice, student }) => {
-          if (statsMap[choice]) {
-              statsMap[choice].push(student);
-          }
+        if (statsMap[choice]) {
+            statsMap[choice].push(student);
+        }
       });
 
       // Format kết quả

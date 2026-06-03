@@ -69,8 +69,9 @@ const Classroom = () => {
         content: data.content,
         type: data.type,
         deadline: data.deadline || null,
-        driveFiles: data.driveFiles || [], 
-        externalLinks: data.externalLinks || [] 
+        driveFiles: data.driveFiles || data.fileUrls || [],
+        externalLinks: data.externalLinks || data.links || [],
+        testIds: data.testIds || []
       };
 
       await axios.post(`${API_URL}/api/classes/posts`, payload, getAuthHeader());
@@ -300,7 +301,7 @@ const StudentAndTeacherDashBoard = ({
                                 <div className="text-gray-300 group-hover:text-indigo-500 px-2 transition-colors">
                                   <ChevronRight size={20} />
                                 </div>
-                              </div>
+                              </div>  
                             ))
                           ) : (
                             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">

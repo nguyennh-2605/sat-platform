@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileText, Clock, Link as LinkIcon, ArrowLeft, Send, Github, Globe, YoutubeIcon, Edit, MoreVertical, Trash2 } from 'lucide-react';
+import { FileText, Clock, Link as LinkIcon, ArrowLeft, Send, Github, Globe, YoutubeIcon, Edit, MoreVertical, Trash2, ClipboardList, ChevronRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import axiosClient from '../api/axiosClient';
 import FullScreenPostCreator from './CreateAssignmentSection';
 import { type AssignmentProps } from '../types/quiz';
-
+  
 const getLinkIcon = (url: string) => {
   const lowerUrl = url.toLowerCase();
   if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) 
@@ -48,6 +48,7 @@ const AssignmentDetail = () => {
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showTestsModal, setShowTestsModal] = useState(false);
   const [submissionType, setSubmissionType] = useState<'TEXT' | 'FILE'>('TEXT');
   const [submissionContent, setSubmissionContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -353,6 +354,30 @@ const AssignmentDetail = () => {
               </div>
             );
           })()}
+
+          {assignment.selectedTests && assignment.selectedTests.length > 0 && (
+            <div className="mb-8">
+              <button
+                onClick={() => setShowTestsModal(true)}
+                className="w-full flex items-center justify-between p-4 md:p-5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100/70 transition text-left"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                    <ClipboardList size={18} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-indigo-900">
+                      Bài kiểm tra đính kèm ({assignment.selectedTests.length})
+                    </p>
+                    <p className="text-sm text-indigo-700/90">
+                      Nhấn để xem toàn bộ danh sách bài kiểm tra
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-indigo-500" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ============ CỘT PHẢI: KHU VỰC NỘP BÀI (Chỉ dành cho Học sinh) ============ */}
@@ -451,6 +476,52 @@ const AssignmentDetail = () => {
           onSubmit={handleUpdateAssignment}
           initialData={assignment}
         />
+      )}
+      {showTestsModal && assignment.selectedTests && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-800">
+                Danh sách bài kiểm tra đính kèm
+              </h3>
+              <button
+                onClick={() => setShowTestsModal(false)}
+                className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto max-h-[calc(80vh-72px)] space-y-3">
+              {assignment.selectedTests.map((test) => (
+                <div
+                  key={test.id}
+                  className="border border-slate-200 rounded-xl p-4 bg-white hover:border-indigo-200 transition"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h4 className="font-semibold text-slate-800">{test.title}</h4>
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${test.mode === 'EXAM' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                      {test.mode}
+                    </span>
+                  </div>
+                  <div className="text-sm text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
+                    <span>Môn: {test.subject}</span>
+                    <span>Thời lượng: {test.duration} phút</span>
+                    <span>Số câu: {test.questionCount}</span>
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      onClick={() => navigate(`/test/${test.id}?assignmentId=${assignment.id}`)}
+                      className="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition"
+                    >
+                      Làm bài kiểm tra này
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

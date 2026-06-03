@@ -3,6 +3,12 @@ generator client {
   binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "../db-erd.svg"
+  theme    = "forest"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -43,11 +49,13 @@ model Assignment {
   content     String?
   fileUrls    String[]
   links       String[]
+  testIds     Int[]                @default([])
   deadline    DateTime?
   createdAt   DateTime             @default(now())
   classId     String
   class       Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
   submissions HomeworkSubmission[]
+  testSubmissions Submission[]
 }
 
 model HomeworkSubmission {
@@ -145,6 +153,8 @@ model Submission {
   id                   Int              @id @default(autoincrement())
   userId               Int
   testId               Int
+  assignmentId         String?
+  assignment           Assignment?      @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   classTestId          Int?
   classTest            ClassTest?       @relation(fields: [classTestId], references: [id], onDelete: Cascade)
   endTime              DateTime?

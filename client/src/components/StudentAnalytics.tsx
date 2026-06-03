@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { 
   ClipboardList, ArrowLeft, 
   ChevronLeft, ChevronRight, Users, 
-  Eye, EyeOff
+  Eye, EyeOff, FileText
 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 
@@ -11,7 +11,22 @@ interface ExamItem {
   id: number;
   title: string;
   date: string;
-  submissionCount: number;
+  mode: 'EXAM';
+  subject: string;
+  duration: number;
+}
+
+interface AssignmentScoreItem {
+  id: string;
+  title: string;
+  createdAt: string;
+  tests: ExamItem[];
+}
+
+interface ScoreReportAssignmentsResponse {
+  success: boolean;
+  message: string;
+  data: AssignmentScoreItem[];
 }
 
 interface StudentStat {
@@ -39,34 +54,76 @@ interface ReportResponse {
 }
 
 const StudentAnalytics = ({ classId }: { classId?: string }) => {
+  const [selectedAssignment, setSelectedAssignment] = useState<AssignmentScoreItem | null>(null);
   const [selectedTestId, setSelectedTestId] = useState<number | null>(null);
-  const [examList, setExamList] = useState<ExamItem[]>([]);
+  const [assignmentList, setAssignmentList] = useState<AssignmentScoreItem[]>([]);
 
   useEffect(() => {
-    const fetchExams = async () => {
+    const fetchScoreReportAssignments = async () => {
       if (!classId) return;
       try {
-        const data = await axiosClient.get<ExamItem[], ExamItem[]>('/api/classes/list', {
-          params: { classId }
-        });
-        setExamList(data);
+        const response = await axiosClient.get<ScoreReportAssignmentsResponse, ScoreReportAssignmentsResponse>(`/api/classes/${classId}/score-report`);
+        setAssignmentList(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
-        console.error("Lỗi tải danh sách bài thi:", error);
+        console.error("Lỗi tải danh sách assignment score report:", error);
       }
     };
-    fetchExams();
+    fetchScoreReportAssignments();
   }, [classId]);
 
-  // VIEW 1: DANH SÁCH BÀI THI
+  // VIEW 1: DANH SÁCH ASSIGNMENT
+  if (!selectedAssignment) {
+    return (
+      <div className="max-w-4xl mx-auto pt-4">
+        <h2 className="text-xl font-bold text-gray-800 mb-6 px-2">Score Report theo Assignment</h2>
+        <div className="space-y-4">
+          {assignmentList.length === 0 ? (
+             <div className="text-center text-gray-500 py-8">Chưa có assignment nào.</div>
+          ) : (
+            assignmentList.map((assignment) => (
+              <div
+                key={assignment.id}
+                onClick={() => setSelectedAssignment(assignment)}
+                className="group flex items-center gap-4 bg-[#F0F2F5] hover:bg-[#E4E6E9] p-4 rounded-xl cursor-pointer transition-colors"
+              >
+                <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-sm shrink-0">
+                  <FileText size={20} strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-900 truncate text-[15px]">{assignment.title}</div>
+                  <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
+                    {assignment.tests.length} bài test EXAM đính kèm
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // VIEW 2: DANH SÁCH TEST EXAM CỦA ASSIGNMENT ĐÃ CHỌN
   if (!selectedTestId) {
     return (
       <div className="max-w-4xl mx-auto pt-4">
-        <h2 className="text-xl font-bold text-gray-800 mb-6 px-2">Bài tập & Kiểm tra</h2>
+        <div className="flex items-center gap-3 mb-6 px-2">
+          <button
+            onClick={() => setSelectedAssignment(null)}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">{selectedAssignment.title}</h2>
+            <p className="text-sm text-gray-500">Danh sách test EXAM đính kèm</p>
+          </div>
+        </div>
         <div className="space-y-4">
-          {examList.length === 0 ? (
-             <div className="text-center text-gray-500 py-8">Chưa có bài kiểm tra nào.</div>
+          {selectedAssignment.tests.length === 0 ? (
+             <div className="text-center text-gray-500 py-8">Assignment này chưa có test EXAM.</div>
           ) : (
-            examList.map((exam) => (
+            selectedAssignment.tests.map((exam) => (
               <div 
                 key={exam.id} onClick={() => setSelectedTestId(exam.id)}
                 className="group flex items-center gap-4 bg-[#F0F2F5] hover:bg-[#E4E6E9] p-4 rounded-xl cursor-pointer transition-colors"
@@ -76,7 +133,9 @@ const StudentAnalytics = ({ classId }: { classId?: string }) => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-900 truncate text-[15px]">{exam.title}</div>
-                  <div className="text-[13px] text-gray-500 mt-0.5 font-medium">{exam.date}</div>
+                  <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
+                    {exam.subject} • {exam.duration} phút • {exam.date}
+                  </div>
                 </div>
               </div>
             ))
@@ -91,21 +150,22 @@ const StudentAnalytics = ({ classId }: { classId?: string }) => {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full flex flex-col">
       <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-100">
         <button 
-            onClick={() => setSelectedTestId(null)} 
+            onClick={() => setSelectedTestId(null)}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
         >
           <ArrowLeft size={24}/>
         </button>
         <div>
           <h2 className="text-xl font-bold text-gray-800">Chi tiết thống kê</h2>
+          <p className="text-sm text-gray-500">{selectedAssignment.title}</p>
         </div>
       </div>
-      <DetailedScoreReport testId={selectedTestId} />
+      <DetailedScoreReport testId={selectedTestId} assignmentId={selectedAssignment.id} />
     </div>
   );
 };
 
-const DetailedScoreReport = ({ testId }: { testId: number }) => {
+const DetailedScoreReport = ({ testId, assignmentId }: { testId: number; assignmentId?: string }) => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [questions, setQuestions] = useState<QuestionReport[]>([]);
   
@@ -115,7 +175,11 @@ const DetailedScoreReport = ({ testId }: { testId: number }) => {
   useEffect(() => {
     const fetchReport = async () => {
       try {
-        const data = await axiosClient.get<ReportResponse, ReportResponse>(`/api/classes/${testId}/report`);
+        const data = await axiosClient.get<ReportResponse, ReportResponse>(`/api/classes/${testId}/report`, {
+          params: {
+            assignmentId
+          }
+        });
         
         // Đảm bảo dữ liệu là mảng để tránh lỗi map
         setLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
@@ -126,7 +190,7 @@ const DetailedScoreReport = ({ testId }: { testId: number }) => {
       }
     };
     if (testId) fetchReport();
-  }, [testId]);
+  }, [testId, assignmentId]);
 
   const totalPages = Math.max(1, Math.ceil(questions.length / itemsPerPage));
   

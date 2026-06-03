@@ -23,6 +23,15 @@ import Calculator from '../components/Calculator';
 function ExamRoom() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const assignmentId = useMemo(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get('assignmentId');
+  }, []);
+  const classId = useMemo(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get('classId');
+  }, []);
+  const contextKey = assignmentId ? `assignment-${assignmentId}` : (classId ? `class-${classId}` : 'no-assignment');
 
   // --- STATE QUẢN LÝ ---
   const [questions, setQuestions] = useState<QuestionData[]>([]);
@@ -147,7 +156,7 @@ function ExamRoom() {
       try {
         setIsLoading(true);
 
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/test/${id}?userId=${userId}`, getAuthHeader());
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/test/${id}?userId=${userId}${assignmentId ? `&assignmentId=${assignmentId}` : ''}${classId ? `&classId=${classId}` : ''}`, getAuthHeader());
 
         if (!response) throw new Error("Không có dữ liệu");
 
@@ -272,7 +281,7 @@ function ExamRoom() {
             setAnswers(dbSavedAnswers)
           } else {
             // KHÔI PHỤC ĐÁP ÁN TỪ LOCAL STORAGE (Nếu user refresh trang)
-            const localSavedAnswers = localStorage.getItem(`answers_${userId}_${id}`);
+            const localSavedAnswers = localStorage.getItem(`answers_${userId}_${id}_${contextKey}`);
             if (localSavedAnswers) {
               const parsedAnswers = JSON.parse(localSavedAnswers);
               setAnswers(parsedAnswers);
@@ -282,7 +291,7 @@ function ExamRoom() {
             if (dbViolationCount > 0) {
               setViolationCount(dbViolationCount);
             } else {
-              const savedViolations = localStorage.getItem(`violations_${userId}_${id}`);
+              const savedViolations = localStorage.getItem(`violations_${userId}_${id}_${contextKey}`);
               if (savedViolations) {
                 setViolationCount(parseInt(savedViolations, 10));
               } else {
@@ -342,14 +351,14 @@ function ExamRoom() {
           return { headers: { Authorization: `Bearer ${token}` } };
         };
 
-        const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/test/${id}/submit`, {
+        const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/test/${id}/submit${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`, {
           submissionId: idToSubmit,
           answers,
           violationCount
         }, getAuthHeader());
 
-        localStorage.removeItem(`answers_${userId}_${id}`);
-        localStorage.removeItem(`violations_${userId}_${id}`);
+        localStorage.removeItem(`answers_${userId}_${id}_${contextKey}`);
+        localStorage.removeItem(`violations_${userId}_${id}_${contextKey}`);
         setApiResult(response.data);
         setIsSubmitted(true);
         toast.success("Nộp bài thành công!");
@@ -462,7 +471,7 @@ function ExamRoom() {
     if (userId && id) {
       // Chỉ lưu nếu có vi phạm (để tránh ghi số 0 liên tục lúc mới vào)
       // Hoặc cứ lưu luôn cũng được để đảm bảo đồng bộ
-      localStorage.setItem(`violations_${userId}_${id}`, violationCount.toString());
+      localStorage.setItem(`violations_${userId}_${id}_${contextKey}`, violationCount.toString());
       console.log("Đã lưu Violation vào LocalStorage", violationCount);
     }
   }, [violationCount, id, isLoading]); // Chạy lại mỗi khi violationCount thay đổi
@@ -492,7 +501,7 @@ function ExamRoom() {
         
         // Lưu ngay vào localStorage
         const userId = localStorage.getItem('userId');
-        localStorage.setItem(`answers_${userId}_${id}`, JSON.stringify(newAnswers));
+        localStorage.setItem(`answers_${userId}_${id}_${contextKey}`, JSON.stringify(newAnswers));
         
         return newAnswers;
     });
@@ -531,7 +540,7 @@ function ExamRoom() {
     const now  = Date.now();
     const mod1UsedSecond = Math.max(0, examConfig.mod1Duration * 60 - timeLeft);
     const userId = localStorage.getItem('userId');
-    localStorage.setItem(`mod1TimeUsed_${userId}_${id}`, mod1UsedSecond.toString());
+    localStorage.setItem(`mod1TimeUsed_${userId}_${id}_${contextKey}`, mod1UsedSecond.toString());
     // Tính toán lại endTime mới
     const mod2Duration = examConfig.mod2Duration * 60;
     const newEndTime = now + mod2Duration * 1000;
@@ -671,14 +680,14 @@ function ExamRoom() {
     setIsLoading(true);
 
     try {
-      localStorage.setItem(`answers_${userId}_${id}`, JSON.stringify(answers));
+      localStorage.setItem(`answers_${userId}_${id}_${contextKey}`, JSON.stringify(answers));
       if (violationCount > 0) {
-        localStorage.setItem(`violations_${userId}_${id}`, violationCount.toString());
+        localStorage.setItem(`violations_${userId}_${id}_${contextKey}`, violationCount.toString());
       }
-      localStorage.setItem(`lastQuestionIndex_${userId}_${id}`, currentQuestionIndex.toString());
+      localStorage.setItem(`lastQuestionIndex_${userId}_${id}_${contextKey}`, currentQuestionIndex.toString());
       // URL API save (Thường là POST hoặc PUT)
       // Dựa trên URL fetch của bạn: `${import.meta.env.VITE_API_URL}/api/test/${id}`
-      const saveUrl = `${import.meta.env.VITE_API_URL}/api/test/${id}/save-progress`; 
+      const saveUrl = `${import.meta.env.VITE_API_URL}/api/test/${id}/save-progress${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`; 
 
       const payload = {
         submissionId: Number(submissionId), // Lấy từ state (đã set trong useEffect)
@@ -763,10 +772,10 @@ function ExamRoom() {
     };
 
     const userId = localStorage.getItem('userId');
-    const savedMod1TimeUsed = localStorage.getItem(`mod1TimeUsed_${userId}_${id}`);
+    const savedMod1TimeUsed = localStorage.getItem(`mod1TimeUsed_${userId}_${id}_${contextKey}`);
     const mod1TimeUsed = parseInt(savedMod1TimeUsed || "0", 10);
     console.log("Tong thoi gian lam bai mod 1", mod1TimeUsed);
-    const savedMod2Start = localStorage.getItem(`mod2Start_${userId}_${id}`);
+    const savedMod2Start = localStorage.getItem(`mod2Start_${userId}_${id}_${contextKey}`);
     let mod2TimeUsed = 0
     if (savedMod2Start) {
       mod2TimeUsed = Math.max(0, examConfig.mod2Duration - timeLeft);
@@ -785,8 +794,8 @@ function ExamRoom() {
       <ScoreReport 
         initialData={reportData}
         onBackToHome={() => {
-          localStorage.removeItem(`mod2Start_${userId}_${id}`);
-          localStorage.removeItem(`mod1TimeUsed_${userId}_${id}`);
+          localStorage.removeItem(`mod2Start_${userId}_${id}_${contextKey}`);
+          localStorage.removeItem(`mod1TimeUsed_${userId}_${id}_${contextKey}`);
           localStorage.removeItem('current_exam_info');
           window.location.href = '/dashboard';
         }}

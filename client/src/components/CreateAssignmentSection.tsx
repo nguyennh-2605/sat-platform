@@ -87,14 +87,15 @@ const FullScreenPostCreator = ({ onClose, onSubmit, initialData }: PostCreatorPr
 
       setIsLoading(true);
       try {
+        console.log("currentFolderId", currentFolderId);
         const res = await axiosClient.get('/api/bank', {
           params: {
             folderId: currentFolderId || null
           }
         }) as any;
-        console.log("Du lieu nhan duoc", res);
         if (res.success) {
           const { folders, tests } = res.data;
+          // console.log("folders", folders);
           const formattedFolders: FolderItem[] = folders.map((f: any) => ({
             id: f.id,
             name: f.name,
@@ -250,8 +251,14 @@ const FullScreenPostCreator = ({ onClose, onSubmit, initialData }: PostCreatorPr
   };
 
   const saveTestSelection = () => {
-    // Lọc ra các object test từ MOCK_TESTS (Sau này thay bằng biến chứa data get từ API)
-    const newSelected = tests.filter(t => tempSelectedTestIds.includes(t.id));
+    // Giữ lại cả test đã chọn từ trước ở thư mục khác, tránh mất khi chưa load về folder hiện tại
+    const knownTestsMap = new Map<number, TestItem>(
+      [...selectedTests, ...tests].map(test => [test.id, test])
+    );
+    const newSelected = tempSelectedTestIds
+      .map(testId => knownTestsMap.get(testId))
+      .filter((test): test is TestItem => !!test);
+
     setSelectedTests(newSelected);
     setIsTestModalOpen(false);
   };
@@ -613,7 +620,11 @@ const FullScreenPostCreator = ({ onClose, onSubmit, initialData }: PostCreatorPr
                 Đang chọn <span className="text-indigo-600 font-bold text-base px-1">{tempSelectedTestIds.length}</span> bài test
               </span>
               <div className="flex gap-3">
-                <button onClick={() => setIsTestModalOpen(false)} className="px-6 py-2 rounded-full font-medium text-gray-600 hover:bg-gray-100 transition">Hủy</button>
+                <button onClick={() => {
+                  setTempSelectedTestIds([]);
+                  setFolderPath([{ id: null, name: 'Tất cả tài liệu' }]);
+                  setIsTestModalOpen(false);
+                }} className="px-6 py-2 rounded-full font-medium text-gray-600 hover:bg-gray-100 transition">Hủy</button>
                 <button onClick={saveTestSelection} className="px-8 py-2 rounded-full font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-md">Xác nhận</button>
               </div>
             </div>

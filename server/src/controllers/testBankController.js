@@ -41,7 +41,7 @@ exports.createFolder = async (req, res) => {
 
 exports.getFolderContent = async (req, res) => {
   try {
-    const { folderId } = req.params;
+    const folderId = req.params.folderId || req.query.folderId;
     const userId = req.user.userId;
     const parsedFolderId = folderId ? parseInt(folderId, 10) : null;
 

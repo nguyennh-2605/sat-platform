@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef, memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Clock, ChevronRight, Filter, Layers, Calendar, GraduationCap, ArrowUp } from 'lucide-react';
+import { Search, Clock, ChevronRight, Filter, Layers, Calendar, GraduationCap, ArrowUp, X } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
@@ -165,6 +165,8 @@ const PracticeTest = () => {
   const [visibleCount, setVisibleCount] = useState(12);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const observer = useRef<IntersectionObserver | null>(null);
+  const [isClassSelectOpen, setIsClassSelectOpen] = useState(false);
+  const [selectedTestForClassModal, setSelectedTestForClassModal] = useState<Test | null>(null);
 
   useEffect(() => {
     // 1. Setup User
@@ -277,7 +279,7 @@ const PracticeTest = () => {
     });
   }, [tests, activeCategory, activeDate, activeSubject, searchQuery]);
 
-  const handleStartExam = useCallback((exam: Test) => {
+  const navigateToTestRoom = useCallback((exam: Test, classId?: string) => {
     const examInfo = {
       id: exam.id,
       title: exam.title,
@@ -285,8 +287,25 @@ const PracticeTest = () => {
       duration: exam.duration
     };
     localStorage.setItem('current_exam_info', JSON.stringify(examInfo));
-    navigate(`/test/${exam.id}`);
+    navigate(`/test/${exam.id}${classId ? `?classId=${classId}` : ''}`);
   }, [navigate]);
+
+  const handleStartExam = useCallback((exam: Test) => {
+    const classIds = Array.from(new Set((exam.classTests || []).map(ct => ct.classId).filter(Boolean)));
+
+    if (classIds.length > 1) {
+      setSelectedTestForClassModal(exam);
+      setIsClassSelectOpen(true);
+      return;
+    }
+
+    if (classIds.length === 1) {
+      navigateToTestRoom(exam, classIds[0]);
+      return;
+    }
+
+    navigateToTestRoom(exam);
+  }, [navigateToTestRoom]);
 
   useEffect(() => {
     setVisibleCount(12);
@@ -417,19 +436,6 @@ const PracticeTest = () => {
               )}
             </div>
 
-            {/* Nút Thêm đề thi */}
-            {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
-              <button 
-                onClick={() => navigate('create')}
-                className="w-full sm:w-auto relative overflow-hidden flex items-center justify-center gap-2 bg-slate-900 text-white px-5 h-[52px] rounded-2xl font-semibold hover:bg-slate-800 hover:shadow-lg transition-all"
-              >
-                <Ripple color="rgba(255, 255, 255, 0.2)" />
-                <span className="relative z-10 pointer-events-none flex items-center gap-2 text-sm">
-                  <Plus size={18} /> 
-                  <span>Add new</span>
-                </span>
-              </button>
-            )}
           </div>
 
           {/* List Cards */}
@@ -490,6 +496,49 @@ const PracticeTest = () => {
           </button>
         </div>
       </main>
+
+      {isClassSelectOpen && selectedTestForClassModal && (
+        <div className="fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Chọn lớp để làm bài</h3>
+                <p className="text-xs text-slate-500 mt-1 truncate">{selectedTestForClassModal.title}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsClassSelectOpen(false);
+                  setSelectedTestForClassModal(null);
+                }}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-2 max-h-[340px] overflow-y-auto custom-scrollbar">
+              {Array.from(new Set((selectedTestForClassModal.classTests || []).map(ct => ct.classId)))
+                .map((classId) => {
+                  const classInfo = myClasses.find(cls => cls.id === classId);
+                  return (
+                    <button
+                      key={classId}
+                      onClick={() => {
+                        navigateToTestRoom(selectedTestForClassModal, classId);
+                        setIsClassSelectOpen(false);
+                        setSelectedTestForClassModal(null);
+                      }}
+                      className="w-full text-left px-4 py-3 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition"
+                    >
+                      <p className="font-semibold text-slate-700">{classInfo?.name || classId}</p>
+                      <p className="text-xs text-slate-500 mt-1">Hệ thống sẽ đồng bộ kết quả cho các assignment chưa có dữ liệu trong lớp này.</p>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
