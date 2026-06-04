@@ -105,7 +105,7 @@ const TestBank = () => {
   const [newFolderName, setNewFolderName] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('date');
+  const [_sortBy, setSortBy] = useState('date');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [items, setItems] = useState<BankItem[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);

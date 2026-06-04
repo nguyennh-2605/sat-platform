@@ -2,19 +2,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { 
-  FileText, 
+import {
+  FileText,
   Users, Plus, ChevronRight,
   X, LayoutDashboard,CheckCircle2,
   BarChart3,
   LayoutList,
-  Copy
+  Copy,
+  Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import StudentAnalytics from '../components/StudentAnalytics';
 import NotificationBell from '../components/NotificationBell';
-import FullScreenPostCreator from '../components/CreateAssignmentSection';
+import AnnouncementCreator from '../components/AnnouncementCreator';
+import WeeklyProgress from '../components/WeeklyProgress';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -61,22 +63,22 @@ const Classroom = () => {
     fetchClassDetail();
   }, [classId]);
 
-  const handleCreateAssignment = async (data: any) => {
+  const handleCreateAnnouncement = async (data: any) => {
     try {
       const payload = {
         classId: classId as string,
         title: data.title,
         content: data.content,
-        type: data.type,
+        type: 'announcement',
         deadline: data.deadline || null,
         driveFiles: data.driveFiles || data.fileUrls || [],
         externalLinks: data.externalLinks || data.links || [],
-        testIds: data.testIds || []
+        testIds: []
       };
 
       await axios.post(`${API_URL}/api/classes/posts`, payload, getAuthHeader());
-      
-      toast.success(data.type === 'assignment' ? "Đã giao bài tập!" : "Đã đăng thông báo!");
+
+      toast.success("Đã đăng thông báo!");
       fetchClassDetail();
     } catch (error) {
       toast.error("Lỗi khi đăng bài");
@@ -98,9 +100,9 @@ const Classroom = () => {
   // --- RENDER GIAO DIỆN MỚI ---
   return (
     <div className="h-screen w-full bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
-      <StudentAndTeacherDashBoard 
+      <StudentAndTeacherDashBoard
         classDetail={classDetail}
-        onCreateAssignment={handleCreateAssignment}
+        onCreateAnnouncement={handleCreateAnnouncement}
         onAddStudent={handleAddStudent}
         currentUser={currentUser}
       />
@@ -109,13 +111,13 @@ const Classroom = () => {
 };
 
 // A. GIAO DIỆN GIÁO VIÊN (TEACHER MODE)
-const StudentAndTeacherDashBoard = ({ 
-  classDetail, onCreateAssignment, onAddStudent, currentUser
+const StudentAndTeacherDashBoard = ({
+  classDetail, onCreateAnnouncement, onAddStudent, currentUser
 }: any) => {
   const { classId } = useParams();
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
-  
+
   const [studentEmail, setStudentEmail] = useState("");
   const [activeTab, setActiveTab] = useState('STREAM'); // Mặc định là 'STREAM' (Bảng tin)
 
@@ -123,7 +125,7 @@ const StudentAndTeacherDashBoard = ({
 
   useEffect(() => {
     setActiveTab('STREAM');
-    setShowCreateForm(false);
+    setShowAnnouncementForm(false);
     setIsAddStudentModalOpen(false);
   }, [classId]);
 
@@ -134,10 +136,10 @@ const StudentAndTeacherDashBoard = ({
       setIsAddStudentModalOpen(false);
   }
 
-  const handleCreateAssignment = useCallback((data: any) => {
-    onCreateAssignment(data);
-    setShowCreateForm(false);
-  }, [onCreateAssignment]);
+  const handleCreateAnnouncement = useCallback((data: any) => {
+    onCreateAnnouncement(data);
+    setShowAnnouncementForm(false);
+  }, [onCreateAnnouncement]);
 
   // 1. Tab Button Component (để code gọn hơn)
   const TabButton = ({ id, label, icon: Icon }: any) => (
@@ -204,7 +206,10 @@ const StudentAndTeacherDashBoard = ({
                 <TabButton id="STREAM" label="Bảng tin" icon={LayoutList} active={activeTab === 'STREAM'} />
                 <TabButton id="MEMBERS" label="Thành viên" icon={Users} active={activeTab === 'MEMBERS'} />
                 {currentUser.role === 'TEACHER' && (
-                  <TabButton id="SCORES" label="Score Report" icon={BarChart3} active={activeTab === 'SCORES'} />
+                  <>
+                    <TabButton id="PROGRESS" label="Tiến độ" icon={Calendar} active={activeTab === 'PROGRESS'} />
+                    <TabButton id="SCORES" label="Score Report" icon={BarChart3} active={activeTab === 'SCORES'} />
+                  </>
                 )}
               </div>
 
@@ -268,7 +273,7 @@ const StudentAndTeacherDashBoard = ({
                       <div className="lg:col-span-3 space-y-6">
                         {/* Thanh tạo bài tập nhanh */}
                         {currentUser.role === 'TEACHER' && (
-                          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-all group" onClick={() => setShowCreateForm(true)}>
+                          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-all group" onClick={() => setShowAnnouncementForm(true)}>
                             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
                               <Plus size={20} />
                             </div>
@@ -364,17 +369,22 @@ const StudentAndTeacherDashBoard = ({
                   </div>
                 )}
 
-                {/* --- TAB 3: SCORE REPORT (NEW) --- */}
+                {/* --- TAB 3: TIẾN ĐỘ (PROGRESS) --- */}
+                {activeTab === 'PROGRESS' && currentUser.role === 'TEACHER' && (
+                  <WeeklyProgress />
+                )}
+
+                {/* --- TAB 4: SCORE REPORT --- */}
                 {activeTab === 'SCORES' && currentUser.role === 'TEACHER' && (
                   <StudentAnalytics classId={classId || '1'}/>
                 )}
               </div>
             </main>
-            {/* Form Tạo (Nếu mở) */}
-            {showCreateForm && (
-              <FullScreenPostCreator 
-                onClose={() => setShowCreateForm(false)}
-                onSubmit={handleCreateAssignment}
+            {/* Announcement Form */}
+            {showAnnouncementForm && (
+              <AnnouncementCreator
+                onClose={() => setShowAnnouncementForm(false)}
+                onSubmit={handleCreateAnnouncement}
               />
             )}
           </>

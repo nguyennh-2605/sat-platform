@@ -35,6 +35,7 @@ app.use("/api/ai-parser", require("./src/routes/aiParserRoutes"));
 app.use("/api/notifications", require("./src/routes/notificationRoutes"));
 app.use("/api/assignments", require("./src/routes/assignmentRoutes"));
 app.use("/api/bank", require("./src/routes/testBankRoutes"));
+app.use("/api/progress", require("./src/routes/progressRoutes"));
 
 // --- KHỞI ĐỘNG SERVER ---
 app.listen(PORT, () => {

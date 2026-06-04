@@ -4,7 +4,7 @@ import { FileText, Clock, Link as LinkIcon, ArrowLeft, Send, Github, Globe, Yout
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import axiosClient from '../api/axiosClient';
-import FullScreenPostCreator from './CreateAssignmentSection';
+import AnnouncementCreator from './AnnouncementCreator';
 import { type AssignmentProps } from '../types/quiz';
   
 const getLinkIcon = (url: string) => {
@@ -471,7 +471,7 @@ const AssignmentDetail = () => {
         </div>
       )}
       {showEditModal && (
-        <FullScreenPostCreator
+        <AnnouncementCreator
           onClose={() => setShowEditModal(false)}
           onSubmit={handleUpdateAssignment}
           initialData={assignment}

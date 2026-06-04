@@ -41,6 +41,7 @@ model Class {
   teacher     User         @relation("TeacherClasses", fields: [teacherId], references: [id])
   classTests  ClassTest[]
   students    User[]       @relation("StudentClasses")
+  weeks       Week[]
 }
 
 model Assignment {
@@ -235,4 +236,46 @@ enum SubmissionStatus {
 enum QuestionType {
   MCQ      // Trắc nghiệm
   SPR      // Tự luận điền số (Grid-in)
+}
+
+model Week {
+  id         String   @id @default(uuid())
+  title      String
+  order      Int      @default(0)
+  isExpanded Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  classId    String
+  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  lessons    Lesson[]
+}
+
+model Lesson {
+  id          String             @id @default(uuid())
+  title       String
+  order       Int                @default(0)
+  createdAt   DateTime           @default(now())
+  weekId      String
+  week        Week               @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  files       LessonFile[]
+  assignments LessonAssignment[]
+}
+
+model LessonFile {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  createdAt DateTime @default(now())
+  lessonId  String
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model LessonAssignment {
+  id        String    @id @default(uuid())
+  title     String
+  content   String?
+  dueDate   DateTime?
+  testIds   Int[]     @default([])
+  createdAt DateTime  @default(now())
+  lessonId  String    @unique
+  lesson    Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 }
