@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import axiosClient from '../../lib/axios';
 import toast from 'react-hot-toast';
 
 // --- TYPES ---
@@ -48,8 +48,8 @@ const LogicLab = () => {
     setUserExplanations({ A: "", B: "", C: "", D: "" }); // Reset input
     
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/challenge/generate`, config);
-      setQuestionData(res.data);
+      const res = await axiosClient.post('/api/challenge/generate', config);
+      setQuestionData(res);
       setStep('DOING');
     } catch (error) {
       toast.error("Lỗi server: " + error);
@@ -67,12 +67,12 @@ const LogicLab = () => {
 
     setIsLoading(true);
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/challenge/evaluate`, {
+      const res = await axiosClient.post('/api/challenge/evaluate', {
         questionData,
         userChoice,
         userExplanations // Gửi cả cục object đi
       });
-      setResult(res.data);
+      setResult(res);
       setStep('RESULT');
     } catch (error) {
       toast.error("Lỗi chấm bài: " + error);

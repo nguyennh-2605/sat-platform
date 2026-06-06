@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import axiosClient from '../../lib/axios';
 import {
   FileText,
   Users, Plus, ChevronRight,
@@ -17,8 +17,6 @@ import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import NotificationBell from '../../features/notifications/NotificationBell';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 const Classroom = () => {
   const { classId } = useParams();
@@ -42,16 +40,12 @@ const Classroom = () => {
     }
   }, []);
 
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('token');
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
 
   const fetchClassDetail =  useCallback(async () => {
     if (!classId) return;
     try {
-      const res = await axios.get(`${API_URL}/api/classes/${classId}`, getAuthHeader());
-      setClassDetail(res.data);
+      const res = await axiosClient.get(`/api/classes/${classId}`);
+      setClassDetail(res);
     } catch (error) {
       console.error("Lỗi tải chi tiết lớp:", error);
       toast.error("Không thể tải thông tin lớp học");
@@ -76,7 +70,7 @@ const Classroom = () => {
         testIds: []
       };
 
-      await axios.post(`${API_URL}/api/classes/posts`, payload, getAuthHeader());
+      await axiosClient.post('/api/classes/posts', payload);
 
       toast.success("Đã đăng thông báo!");
       fetchClassDetail();
@@ -87,7 +81,7 @@ const Classroom = () => {
 
   const handleAddStudent = async (email: string) => {
     try {
-      await axios.post(`${API_URL}/api/classes/${classId}/students`, { email }, getAuthHeader());
+      await axiosClient.post(`/api/classes/${classId}/students`, { email });
       toast.success("Thêm học sinh thành công!");
       fetchClassDetail();
     } catch (error: any) {

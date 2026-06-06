@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, Maximize } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import axiosClient from '../../lib/axios';
 // import cac component
 import QuestionHeader from '../../features/quiz/QuestionHeader';
 import AnswerOption from '../../features/quiz/AnswerOption';
@@ -147,20 +147,13 @@ function ExamRoom() {
     }
     hasFetched.current = true;
 
-    const getAuthHeader = () => {
-      const token = localStorage.getItem('token');
-      return { headers: { Authorization: `Bearer ${token}` } };
-    };
-
     const fetchExamData = async () => {
       try {
         setIsLoading(true);
 
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/test/${id}?userId=${userId}${assignmentId ? `&assignmentId=${assignmentId}` : ''}${classId ? `&classId=${classId}` : ''}`, getAuthHeader());
+        const data = await axiosClient.get(`/api/test/${id}?userId=${userId}${assignmentId ? `&assignmentId=${assignmentId}` : ''}${classId ? `&classId=${classId}` : ''}`);
 
-        if (!response) throw new Error("Không có dữ liệu");
-
-        const data = response.data;
+        if (!data) throw new Error("Không có dữ liệu");
 
         if (data.sections) {
           let allQuestions: QuestionData[] = [];
@@ -346,20 +339,15 @@ function ExamRoom() {
              return;
         }
 
-        const getAuthHeader = () => {
-          const token = localStorage.getItem('token');
-          return { headers: { Authorization: `Bearer ${token}` } };
-        };
-
-        const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/test/${id}/submit${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`, {
+        const response = await axiosClient.post(`/api/test/${id}/submit${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`, {
           submissionId: idToSubmit,
           answers,
           violationCount
-        }, getAuthHeader());
+        });
 
         localStorage.removeItem(`answers_${userId}_${id}_${contextKey}`);
         localStorage.removeItem(`violations_${userId}_${id}_${contextKey}`);
-        setApiResult(response.data);
+        setApiResult(response);
         setIsSubmitted(true);
         toast.success("Nộp bài thành công!");
     } catch (error) {
@@ -685,26 +673,18 @@ function ExamRoom() {
         localStorage.setItem(`violations_${userId}_${id}_${contextKey}`, violationCount.toString());
       }
       localStorage.setItem(`lastQuestionIndex_${userId}_${id}_${contextKey}`, currentQuestionIndex.toString());
-      // URL API save (Thường là POST hoặc PUT)
-      // Dựa trên URL fetch của bạn: `${import.meta.env.VITE_API_URL}/api/test/${id}`
-      const saveUrl = `${import.meta.env.VITE_API_URL}/api/test/${id}/save-progress${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`; 
 
       const payload = {
-        submissionId: Number(submissionId), // Lấy từ state (đã set trong useEffect)
-        answers: answers,           // Object đáp án hiện tại
-        timeLeft: timeLeft,         // Thời gian còn lại  
-        violationCount: violationCount,
-        currentQuestionIndex: currentQuestionIndex
+        submissionId: Number(submissionId),
+        answers,
+        timeLeft,
+        violationCount,
+        currentQuestionIndex
       };
 
       console.log("payload gui ve backend", payload);
 
-      const getAuthHeader = () => {
-        const token = localStorage.getItem('token');
-        return { headers: { Authorization: `Bearer ${token}` } };
-      };
-
-      await axios.post(saveUrl, payload, getAuthHeader());
+      await axiosClient.post(`/api/test/${id}/save-progress${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`, payload);
 
       console.log("Đã đồng bộ dữ liệu lên Server thành công");
       toast.success("Lưu bài làm thành công!");
