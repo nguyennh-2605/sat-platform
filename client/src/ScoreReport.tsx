@@ -3,38 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { type ContentBlock } from './types/quiz';
 import { CheckCircle2, BookmarkPlus, Loader2 } from 'lucide-react';
 import ReviewModal from './components/ReviewModal';
-import axios from 'axios';
+import axiosClient from './api/axiosClient';
 import toast from 'react-hot-toast';
-
-const API_URL = import.meta.env.VITE_API_URL;
-
-// 1. Cập nhật Interface dữ liệu đầu vào
-export interface QuestionResult {
-  id: number | string;
-  module: string;           // VD: "Module 1"
-  questionNumber: number;   // VD: 5 (Số thứ tự trong module đó)
-  blocks: ContentBlock[];
-  questionText: string;
-  choices: {
-    id: string;
-    text: string;
-    label?: string
-  }[];
-  correctAnswer: string;
-  userAnswer: string | null;
-  isCorrect: boolean;
-}
-
-interface ScoreReportProps {
-  initialData?: {
-    examTitle: string;
-    subject: string;
-    date: string;
-    duration: string;
-    questions: QuestionResult[];
-  }
-  onBackToHome?: () => void;
-}
 
 const ScoreReport: React.FC<ScoreReportProps> = ({ initialData, onBackToHome }) => {
   const navigate = useNavigate();
@@ -58,18 +28,15 @@ const ScoreReport: React.FC<ScoreReportProps> = ({ initialData, onBackToHome }) 
 
       try {
         setLoading(true);
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/results-analytics/submission/${resultIdFromState}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await axiosClient.get(`/api/results-analytics/submission/${resultIdFromState}`);
         
         // Map dữ liệu API vào state
         setData({
-          examTitle: res.data.examTitle,
-          subject: res.data.subject,
-          date: res.data.date, // Nhớ format ngày
-          duration: res.data.duration,
-          questions: res.data.questions
+          examTitle: res.examTitle,
+          subject: res.subject,
+          date: res.date, // Nhớ format ngày
+          duration: res.duration,
+          questions: res.questions
         });
       } catch (error) {
         console.error("Lỗi:", error);
@@ -96,8 +63,6 @@ const ScoreReport: React.FC<ScoreReportProps> = ({ initialData, onBackToHome }) 
     if (addedQuestions.has(q.id)) return;
 
     try {
-      const token = localStorage.getItem('token');
-      
       const payload = {
         source: `${data.examTitle}`, 
         userAnswer: q.userAnswer || 'Omitted',
@@ -107,16 +72,10 @@ const ScoreReport: React.FC<ScoreReportProps> = ({ initialData, onBackToHome }) 
         whyRight: ''
       };
 
-      const response = await axios.post(
-        `${API_URL}/api/error-logs`, 
-        payload, 
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axiosClient.post('/api/error-logs', payload);
 
-      if (response.status === 201 || response.status === 200) {
-        toast.success(`Đã thêm Câu ${q.questionNumber} vào Error Log!`);
-        setAddedQuestions(prev => new Set(prev).add(q.id));
-      }
+      toast.success(`Đã thêm Câu ${q.questionNumber} vào Error Log!`);
+      setAddedQuestions(prev => new Set(prev).add(q.id));
     } catch (error) {
       console.error("Error adding to log:", error);
       toast.error("Không thể thêm vào Error Log!");
