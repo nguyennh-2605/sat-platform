@@ -1,13 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { PrismaClient } = require('@prisma/client'); 
 
 // Login
 const { register, login, googleLogin } = require('./src/controllers/authController');
 
 const app = express();
-const prisma = new PrismaClient(); // Khởi tạo kết nối DB
 const PORT = process.env.PORT || 5000;
 
 // --- MIDDLEWARE ---

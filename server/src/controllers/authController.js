@@ -1,9 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db');
 const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library'); // [MỚI] Thư viện Google
 const jwt = require('jsonwebtoken'); // [MỚI] Thư viện tạo Token
-
-const prisma = new PrismaClient();
 
 // Khởi tạo Client Google với ID lấy từ biến môi trường
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);

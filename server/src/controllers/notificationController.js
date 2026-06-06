@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // Map lưu trữ kết nối: Key là userId, Value là một Set chứa các response (để hỗ trợ 1 user mở nhiều tab)
 const clients = new Map();

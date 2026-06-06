@@ -1,6 +1,5 @@
 // controllers/analyticsController.js
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 exports.getData = async (req, res) => {
   try {

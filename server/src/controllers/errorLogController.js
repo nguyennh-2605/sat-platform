@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // 1. Lấy danh sách Error Log của User đang đăng nhập
 exports.getErrorLogs = async (req, res) => {

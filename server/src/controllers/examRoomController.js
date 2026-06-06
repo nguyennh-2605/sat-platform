@@ -1,6 +1,5 @@
 const { sendNotificationToUser } = require('./notificationController');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // 3. API LẤY CHI TIẾT ĐỀ THI & CÂU HỎI (Cho ExamRoom)
 // app.get('/api/test/:id', 

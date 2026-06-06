@@ -1,6 +1,5 @@
 const { sendNotificationToUser } = require('./notificationController');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 exports.createClass = async (req, res) => {
   try {
