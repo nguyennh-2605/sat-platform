@@ -3,8 +3,6 @@ const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library'); // [MỚI] Thư viện Google
 const jwt = require('jsonwebtoken'); // [MỚI] Thư viện tạo Token
 
-
-
 // Khởi tạo Client Google với ID lấy từ biến môi trường
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const JWT_SECRET = process.env.JWT_SECRET || 'secret123'; 

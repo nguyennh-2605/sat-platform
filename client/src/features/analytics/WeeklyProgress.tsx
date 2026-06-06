@@ -5,14 +5,7 @@ import toast from 'react-hot-toast';
 import TestAssignmentManager from '../assignment/TestAssignmentManager';
 import { format } from 'date-fns';
 import useDrivePicker from 'react-google-drive-picker';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
-  return { headers: { Authorization: `Bearer ${token}` } };
-};
+import axiosClient from '../../lib/axios';
 
 interface Assignment {
   id: string;
@@ -63,9 +56,9 @@ const WeeklyProgress = () => {
   const fetchWeeks = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/progress/class/${classId}/weeks`, getAuthHeader());
-      if (response.data.success) {
-        setWeeks(response.data.data);
+      const response = await axiosClient.get(`/api/progress/class/${classId}/weeks`);
+      if (response.success) {
+        setWeeks(response.data);
       }
     } catch (error) {
       console.error('Error fetching weeks:', error);
@@ -87,9 +80,8 @@ const WeeklyProgress = () => {
     ));
 
     try {
-      await axios.put(`${API_URL}/api/progress/weeks/${weekId}`,
-        { isExpanded: newExpandedState },
-        getAuthHeader()
+      await axiosClient.put(`/api/progress/weeks/${weekId}`,
+        { isExpanded: newExpandedState }
       );
     } catch (error) {
       console.error('Error updating week:', error);
@@ -122,12 +114,11 @@ const WeeklyProgress = () => {
     try {
       if (editingWeek) {
         // Edit existing week
-        const response = await axios.put(
-          `${API_URL}/api/progress/weeks/${editingWeek.id}`,
-          { title: newWeekTitle },
-          getAuthHeader()
+        const response = await axiosClient.put(
+          `/api/progress/weeks/${editingWeek.id}`,
+          { title: newWeekTitle }
         );
-        if (response.data.success) {
+        if (response.success) {
           setWeeks(weeks.map(week =>
             week.id === editingWeek.id ? { ...week, title: newWeekTitle } : week
           ));
@@ -135,14 +126,13 @@ const WeeklyProgress = () => {
         }
       } else {
         // Add new week
-        const response = await axios.post(
-          `${API_URL}/api/progress/class/${classId}/weeks`,
-          { title: newWeekTitle },
-          getAuthHeader()
+        const response = await axiosClient.post(
+          `/api/progress/class/${classId}/weeks`,
+          { title: newWeekTitle }
         );
-        if (response.data.success) {
+        if (response.success) {
           const newWeek: Week = {
-            ...response.data.data,
+            ...response.data,
             lessons: [],
             isExpanded: true
           };
@@ -161,11 +151,10 @@ const WeeklyProgress = () => {
   const handleDeleteWeek = async (weekId: string) => {
     if (window.confirm('Bạn có chắc muốn xóa tuần học này? Tất cả buổi học trong tuần cũng sẽ bị xóa.')) {
       try {
-        const response = await axios.delete(
-          `${API_URL}/api/progress/weeks/${weekId}`,
-          getAuthHeader()
+        const response = await axiosClient.delete(
+          `/api/progress/weeks/${weekId}`
         );
-        if (response.data.success) {
+        if (response.success) {
           setWeeks(weeks.filter(week => week.id !== weekId));
           toast.success('Đã xóa tuần học!');
         }
@@ -192,15 +181,14 @@ const WeeklyProgress = () => {
     if (!selectedWeekForLesson) return;
 
     try {
-      const response = await axios.post(
-        `${API_URL}/api/progress/weeks/${selectedWeekForLesson}/lessons`,
-        { title: newLessonTitle },
-        getAuthHeader()
+      const response = await axiosClient.post(
+        `/api/progress/weeks/${selectedWeekForLesson}/lessons`,
+        { title: newLessonTitle }
       );
 
-      if (response.data.success) {
+      if (response.success) {
         const newLesson: Lesson = {
-          ...response.data.data,
+          ...response.data,
           files: [],
           assignments: []
         };
@@ -226,12 +214,11 @@ const WeeklyProgress = () => {
   const handleDeleteLesson = async (weekId: string, lessonId: string) => {
     if (window.confirm('Bạn có chắc muốn xóa buổi học này?')) {
       try {
-        const response = await axios.delete(
-          `${API_URL}/api/progress/lessons/${lessonId}`,
-          getAuthHeader()
+        const response = await axiosClient.delete(
+          `/api/progress/lessons/${lessonId}`
         );
 
-        if (response.data.success) {
+        if (response.success) {
           setWeeks(weeks.map(week =>
             week.id === weekId
               ? { ...week, lessons: week.lessons.filter(lesson => lesson.id !== lessonId) }
@@ -262,23 +249,22 @@ const WeeklyProgress = () => {
     const { weekId, lessonId } = currentLessonForAssignment;
 
     try {
-      const response = await axios.post(
-        `${API_URL}/api/progress/lessons/${lessonId}/assignment`,
+      const response = await axiosClient.post(
+        `/api/progress/lessons/${lessonId}/assignment`,
         {
           title: data.title,
           content: data.content,
           dueDate: data.deadline,
           testIds: data.testIds
-        },
-        getAuthHeader()
+        }
       );
 
-      if (response.data.success) {
+      if (response.success) {
         const newAssignment: Assignment = {
-          id: response.data.data.id,
-          title: response.data.data.title,
-          dueDate: response.data.data.dueDate,
-          testIds: response.data.data.testIds
+          id: response.data.id,
+          title: response.data.title,
+          dueDate: response.data.dueDate,
+          testIds: response.data.testIds
         };
 
         setWeeks(weeks.map(week =>
@@ -347,20 +333,19 @@ const WeeklyProgress = () => {
             const { weekId, lessonId } = currentLessonForFile;
 
             try {
-              const response = await axios.post(
-                `${API_URL}/api/progress/lessons/${lessonId}/files`,
-                { files: pickedFiles },
-                getAuthHeader()
+              const response = await axiosClient.post(
+                `/api/progress/lessons/${lessonId}/files`,
+                { files: pickedFiles }
               );
 
-              if (response.data.success) {
+              if (response.success) {
                 setWeeks(weeks.map(week =>
                   week.id === weekId
                     ? {
                         ...week,
                         lessons: week.lessons.map(lesson =>
                           lesson.id === lessonId
-                            ? { ...lesson, files: [...lesson.files, ...response.data.data] }
+                            ? { ...lesson, files: [...lesson.files, ...response.data] }
                             : lesson
                         )
                       }
@@ -380,12 +365,11 @@ const WeeklyProgress = () => {
 
   const handleRemoveFile = async (weekId: string, lessonId: string, fileId: string) => {
     try {
-      const response = await axios.delete(
-        `${API_URL}/api/progress/files/${fileId}`,
-        getAuthHeader()
+      const response = await axiosClient.delete(
+        `/api/progress/files/${fileId}`
       );
 
-      if (response.data.success) {
+      if (response.success) {
         setWeeks(weeks.map(week =>
           week.id === weekId
             ? {

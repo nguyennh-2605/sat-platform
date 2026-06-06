@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import axios from 'axios';
+import axiosClient from '../../lib/axios';
 import { useNavigate } from 'react-router-dom';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine 
@@ -9,8 +9,6 @@ import {
   BarChart3, Calendar, CheckCircle2, Clock, ChevronRight, ChevronLeft, History 
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-
-const API_URL = import.meta.env.VITE_API_URL; 
 
 const ResultAnalytics = () => {
   const navigate = useNavigate();
@@ -23,19 +21,14 @@ const ResultAnalytics = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('token');
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
-
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await axios.get(`${API_URL}/api/results-analytics?days=${timeRange}`, getAuthHeader());
+        const response = await axiosClient.get(`/api/results-analytics?days=${timeRange}`);
         
-        setRawData(response.data.chartData || []);
-        setHistory(response.data.historyData || []);
+        setRawData(response.chartData || []);
+        setHistory(response.historyData || []);
       } catch (error) {
         console.error("Failed to load analytics:", error);
         toast.error("Không thể tải dữ liệu thống kê");

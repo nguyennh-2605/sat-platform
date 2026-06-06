@@ -1,8 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 const path = require('path');
 
-const prisma = new PrismaClient();
+const prisma = require('../src/db');
 
 async function main() {
   console.log('🌱 Đang khởi tạo dữ liệu...');
