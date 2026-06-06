@@ -1,16 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { type ContentBlock } from './types/quiz';
+import type { ContentBlock } from './types/quiz';
 import { CheckCircle2, BookmarkPlus, Loader2 } from 'lucide-react';
 import ReviewModal from './components/ReviewModal';
 import axiosClient from './api/axiosClient';
 import toast from 'react-hot-toast';
 
+export interface QuestionResult {
+  id: number | string;
+  questionNumber: number;
+  module: string;
+  correctAnswer: string;
+  userAnswer?: string | null;
+  isCorrect: boolean;
+  blocks: ContentBlock[];
+  questionText: string;
+  choices: { id: string; text: string }[];
+}
+
+interface ScoreReportData {
+  examTitle: string;
+  subject: string;
+  date: string;
+  duration: string;
+  questions: QuestionResult[];
+}
+
+interface ScoreReportProps {
+  initialData?: ScoreReportData;
+  onBackToHome?: () => void;
+}
+
 const ScoreReport: React.FC<ScoreReportProps> = ({ initialData, onBackToHome }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [data, setData] = useState(initialData || null);
+  const [data, setData] = useState<ScoreReportData | null>(initialData || null);
   const [loading, setLoading] = useState(!initialData);
   const [reviewingQuestion, setReviewingQuestion] = useState<QuestionResult | null>(null);
   const [addedQuestions, setAddedQuestions] = useState<Set<number | string>>(new Set());
