@@ -12,20 +12,27 @@ const getLessonWithClass = (lessonId) =>
 // WEEK MANAGEMENT
 // ==========================================
 
-exports.getWeeks = ({ classId }) =>
-  prisma.week.findMany({
-    where: { classId },
-    orderBy: { order: 'asc' },
-    include: {
-      lessons: {
-        orderBy: { order: 'asc' },
-        include: {
-          files: { orderBy: { createdAt: 'asc' } },
-          assignments: true
+exports.getWeeks = async ({ classId }) => {
+  try {
+    const weeks = await prisma.week.findMany({
+      where: { classId },
+      orderBy: { order: 'asc' },
+      include: {
+        lessons: {
+          orderBy: { order: 'asc' },
+          include: {
+            files: { orderBy: { createdAt: 'asc' } },
+            assignments: true
+          }
         }
       }
-    }
-  });
+    });
+    return weeks;
+  } catch (error) {
+    console.error('Database error in getWeeks:', error);
+    throw error;
+  }
+};
 
 exports.createWeek = async ({ classId, title, userId }) => {
   if (!title) {
