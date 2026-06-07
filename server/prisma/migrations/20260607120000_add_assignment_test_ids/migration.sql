@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Assignment" ADD COLUMN "testIds" INTEGER[] NOT NULL DEFAULT ARRAY[]::INTEGER[];
