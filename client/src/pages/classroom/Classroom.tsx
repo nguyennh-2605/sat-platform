@@ -6,14 +6,12 @@ import {
   FileText,
   Users, Plus, ChevronRight,
   X, LayoutDashboard,CheckCircle2,
-  BarChart3,
   LayoutList,
   Copy,
   Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import NotificationBell from '../../features/notifications/NotificationBell';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
@@ -200,10 +198,7 @@ const StudentAndTeacherDashBoard = ({
                 <TabButton id="STREAM" label="Bảng tin" icon={LayoutList} active={activeTab === 'STREAM'} />
                 <TabButton id="MEMBERS" label="Thành viên" icon={Users} active={activeTab === 'MEMBERS'} />
                 {currentUser.role === 'TEACHER' && (
-                  <>
-                    <TabButton id="PROGRESS" label="Tiến độ" icon={Calendar} active={activeTab === 'PROGRESS'} />
-                    <TabButton id="SCORES" label="Score Report" icon={BarChart3} active={activeTab === 'SCORES'} />
-                  </>
+                  <TabButton id="PROGRESS" label="Tiến độ" icon={Calendar} active={activeTab === 'PROGRESS'} />
                 )}
               </div>
 
@@ -366,11 +361,6 @@ const StudentAndTeacherDashBoard = ({
                 {/* --- TAB 3: TIẾN ĐỘ (PROGRESS) --- */}
                 {activeTab === 'PROGRESS' && currentUser.role === 'TEACHER' && (
                   <WeeklyProgress />
-                )}
-
-                {/* --- TAB 4: SCORE REPORT --- */}
-                {activeTab === 'SCORES' && currentUser.role === 'TEACHER' && (
-                  <StudentAnalytics classId={classId || '1'}/>
                 )}
               </div>
             </main>
