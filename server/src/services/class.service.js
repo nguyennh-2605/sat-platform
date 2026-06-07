@@ -2,6 +2,63 @@ const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
 
+const parseUserId = (userId) => parseInt(userId, 10);
+
+const assertClassMember = async ({ classId, userId, userRole }) => {
+  const currentUserId = parseUserId(userId);
+
+  if (!currentUserId) {
+    throw new ApiError(401, { error: "Không tìm thấy thông tin người dùng." });
+  }
+
+  const classroom = await prisma.class.findUnique({
+    where: { id: classId },
+    include: {
+      teacher: { select: { id: true, name: true, email: true } },
+      students: { select: { id: true } }
+    }
+  });
+
+  if (!classroom) {
+    throw new ApiError(404, { error: "Không tìm thấy lớp học" });
+  }
+
+  const isTeacher = classroom.teacherId === currentUserId;
+  const isStudent = classroom.students.some(student => student.id === currentUserId);
+
+  if (userRole !== 'ADMIN' && !isTeacher && !isStudent) {
+    throw new ApiError(403, { error: "Bạn không có quyền truy cập lớp học này." });
+  }
+
+  return classroom;
+};
+
+const assertClassTeacher = async ({ classId, userId, userRole }) => {
+  const currentUserId = parseUserId(userId);
+
+  if (!currentUserId) {
+    throw new ApiError(401, { error: "Không tìm thấy thông tin người dùng." });
+  }
+
+  const classroom = await prisma.class.findUnique({
+    where: { id: classId },
+    include: {
+      teacher: { select: { id: true, name: true, email: true } },
+      students: { select: { id: true } }
+    }
+  });
+
+  if (!classroom) {
+    throw new ApiError(404, { error: "Không tìm thấy lớp học" });
+  }
+
+  if (userRole !== 'ADMIN' && classroom.teacherId !== currentUserId) {
+    throw new ApiError(403, { error: "Bạn không phải giáo viên của lớp này" });
+  }
+
+  return classroom;
+};
+
 exports.createClass = async ({ name, userId, userRole }) => {
   // Validation: Chỉ giáo viên mới được tạo lớp
   if (userRole !== 'TEACHER' && userRole !== 'ADMIN') {
@@ -50,7 +107,10 @@ exports.getMyClasses = async ({ userId, userRole }) => {
   });
 };
 
-exports.getClassDetail = async ({ id }) => {
+exports.getClassDetail = async ({ id, userId, userRole }) => {
+  await assertClassMember({ classId: id, userId, userRole });
+
+  const currentUserId = parseUserId(userId);
   const classDetail = await prisma.class.findUnique({
     where: { id: id },
     include: {
@@ -63,7 +123,9 @@ exports.getClassDetail = async ({ id }) => {
       assignments: {
         orderBy: { createdAt: 'desc' }, // Lấy bài tập mới nhất lên đầu
         include: {
-          submissions: true
+          submissions: userRole === 'STUDENT'
+            ? { where: { studentId: currentUserId } }
+            : true
         }
       }
     }
@@ -119,11 +181,13 @@ exports.addStudentToClass = async ({ classId, email, currentUserId }) => {
   return { message: "Thêm học sinh thành công", student: student };
 };
 
-exports.createAssignment = async ({ title, content, type, deadline, classId, driveFiles, externalLinks, testIds }) => {
+exports.createAssignment = async ({ title, content, type, deadline, classId, driveFiles, externalLinks, testIds, currentUserId, userRole }) => {
   // Validate cơ bản
   if (!classId || !title) {
     throw new ApiError(400, { error: "Thiếu thông tin classId hoặc title" });
   }
+
+  const classData = await assertClassTeacher({ classId, userId: currentUserId, userRole });
 
   const newAssignment = await prisma.assignment.create({
     data: {
@@ -134,14 +198,6 @@ exports.createAssignment = async ({ title, content, type, deadline, classId, dri
       links: externalLinks || [],
       testIds: Array.isArray(testIds) ? testIds : [],
       classId: classId
-    }
-  });
-
-  const classData = await prisma.class.findUnique({
-    where: { id: classId },
-    include: {
-      students: true,
-      teacher: true,
     }
   });
 
@@ -167,11 +223,38 @@ exports.createSubmission = async ({ assignmentId, textResponse, fileUrl, student
     throw new ApiError(400, { error: "Thiếu thông tin bài tập (assignmentId)" });
   }
 
+  const currentStudentId = parseUserId(studentId);
+
+  if (!currentStudentId) {
+    throw new ApiError(401, { error: "Không tìm thấy thông tin học sinh." });
+  }
+
+  const assignmentInfo = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    include: {
+      class: {
+        include: {
+          students: { select: { id: true } }
+        }
+      }
+    }
+  });
+
+  if (!assignmentInfo) {
+    throw new ApiError(404, { error: "Không tìm thấy bài tập" });
+  }
+
+  const isEnrolledStudent = assignmentInfo.class.students.some(student => student.id === currentStudentId);
+
+  if (!isEnrolledStudent) {
+    throw new ApiError(403, { error: "Bạn không có quyền nộp bài tập này." });
+  }
+
   // Kiểm tra xem đã nộp chưa (dùng upsert để hỗ trợ nộp lại)
   const submission = await prisma.homeworkSubmission.upsert({
     where: {
       studentId_assignmentId: {
-        studentId: parseInt(studentId),
+        studentId: currentStudentId,
         assignmentId: assignmentId
       }
     },
@@ -182,22 +265,16 @@ exports.createSubmission = async ({ assignmentId, textResponse, fileUrl, student
       status: 'SUBMITTED'
     },
     create: {
-      studentId: parseInt(studentId),
+      studentId: currentStudentId,
       assignmentId: assignmentId,
       textResponse: textResponse || null,
       fileUrl: fileUrl || null,
     }
   });
 
-  const [assignmentInfo, studentInfo] = await Promise.all([
-    prisma.assignment.findUnique({
-      where: { id: assignmentId },
-      include: { class: true } // Lấy class để biết teacherId
-    }),
-    prisma.user.findUnique({
-      where: { id: parseInt(studentId) }
-    })
-  ]);
+  const studentInfo = await prisma.user.findUnique({
+    where: { id: currentStudentId }
+  });
 
   if (assignmentInfo && studentInfo) {
     await sendNotificationToUser(
@@ -210,10 +287,12 @@ exports.createSubmission = async ({ assignmentId, textResponse, fileUrl, student
   return submission;
 };
 
-exports.getExamTests = async ({ classId }) => {
+exports.getExamTests = async ({ classId, userId, userRole }) => {
   if (!classId) {
     throw new ApiError(400, { error: "Thiếu thông tin classId" });
   }
+
+  await assertClassMember({ classId, userId, userRole });
 
   const tests = await prisma.test.findMany({
     where: {
@@ -244,10 +323,12 @@ exports.getExamTests = async ({ classId }) => {
   }));
 };
 
-exports.getScoreReportAssignments = async ({ classId }) => {
+exports.getScoreReportAssignments = async ({ classId, userId, userRole }) => {
   if (!classId) {
     throw new ApiError(400, { success: false, message: "Thiếu classId", data: null });
   }
+
+  await assertClassTeacher({ classId, userId, userRole });
 
   const classroom = await prisma.class.findUnique({
     where: { id: classId },
@@ -313,10 +394,43 @@ exports.getScoreReportAssignments = async ({ classId }) => {
   });
 };
 
-exports.getTestAnalytics = async ({ testId, assignmentId }) => {
+exports.getTestAnalytics = async ({ testId, assignmentId, userId, userRole }) => {
   if (!testId) throw new ApiError(400, { error: "Thiếu testId" });
 
   const id = parseInt(testId);
+
+  if (Number.isNaN(id)) {
+    throw new ApiError(400, { error: "testId không hợp lệ" });
+  }
+
+  if (assignmentId) {
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { classId: true, testIds: true }
+    });
+
+    if (!assignment) {
+      throw new ApiError(404, { error: "Không tìm thấy bài tập" });
+    }
+
+    if (!assignment.testIds.includes(id)) {
+      throw new ApiError(403, { error: "Bài thi không thuộc bài tập này." });
+    }
+
+    await assertClassTeacher({ classId: assignment.classId, userId, userRole });
+  } else if (userRole !== 'ADMIN') {
+    const currentUserId = parseUserId(userId);
+    const classTest = await prisma.classTest.findFirst({
+      where: {
+        testId: id,
+        class: { teacherId: currentUserId }
+      }
+    });
+
+    if (!classTest) {
+      throw new ApiError(403, { error: "Bạn không có quyền xem báo cáo bài thi này." });
+    }
+  }
 
   // 1. Lấy cấu trúc đề thi
   const testStructure = await prisma.test.findUnique({

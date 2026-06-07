@@ -99,6 +99,21 @@ exports.createTest = async ({ title, description, duration, subject, mode, secti
     finalTestDate = new Date(testDate);
   }
 
+  if (assignClassId && userRole !== 'ADMIN') {
+    const classroom = await prisma.class.findUnique({
+      where: { id: assignClassId },
+      select: { teacherId: true }
+    });
+
+    if (!classroom) {
+      throw new ApiError(404, { error: 'Không tìm thấy lớp học' });
+    }
+
+    if (classroom.teacherId !== parseInt(userId, 10)) {
+      throw new ApiError(403, { error: 'Bạn không có quyền giao bài thi cho lớp này' });
+    }
+  }
+
   // Nested Write vào Database
   const newTest = await prisma.test.create({
     data: {

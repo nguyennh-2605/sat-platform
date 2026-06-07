@@ -117,6 +117,7 @@ function Dashboard() {
   }, [fetchClasses]);
 
   const handleLogout = () => {
+    globalClassesCache = null; 
     localStorage.clear();
     navigate('/');
   };
