@@ -1,3 +1,6 @@
+-- AlterTable
+ALTER TABLE "Submission" ADD COLUMN "assignmentId" TEXT;
+
 -- CreateTable
 CREATE TABLE "Week" (
     "id" TEXT NOT NULL,
@@ -47,6 +50,9 @@ CREATE TABLE "LessonAssignment" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "LessonAssignment_lessonId_key" ON "LessonAssignment"("lessonId");
+
+-- AddForeignKey
+ALTER TABLE "Submission" ADD CONSTRAINT "Submission_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "Assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Week" ADD CONSTRAINT "Week_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
