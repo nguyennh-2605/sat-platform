@@ -32,7 +32,11 @@ exports.getMyClasses = async (req, res) => {
 
 exports.getClassDetail = async (req, res) => {
   try {
-    const classDetail = await classService.getClassDetail({ id: req.params.id });
+    const classDetail = await classService.getClassDetail({
+      id: req.params.id,
+      userId: req.user?.id || req.user?.userId,
+      userRole: req.user?.role,
+    });
     res.json(classDetail);
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
@@ -58,7 +62,11 @@ exports.addStudentToClass = async (req, res) => {
 
 exports.createAssignment = async (req, res) => {
   try {
-    const newAssignment = await classService.createAssignment(req.body);
+    const newAssignment = await classService.createAssignment({
+      ...req.body,
+      currentUserId: req.user?.id || req.user?.userId,
+      userRole: req.user?.role,
+    });
     res.json(newAssignment);
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
@@ -85,7 +93,11 @@ exports.createSubmission = async (req, res) => {
 
 exports.getExamTests = async (req, res) => {
   try {
-    const tests = await classService.getExamTests({ classId: req.query.classId });
+    const tests = await classService.getExamTests({
+      classId: req.query.classId,
+      userId: req.user?.id || req.user?.userId,
+      userRole: req.user?.role,
+    });
     res.json(tests);
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
@@ -96,7 +108,11 @@ exports.getExamTests = async (req, res) => {
 
 exports.getScoreReportAssignments = async (req, res) => {
   try {
-    const assignments = await classService.getScoreReportAssignments({ classId: req.params.id });
+    const assignments = await classService.getScoreReportAssignments({
+      classId: req.params.id,
+      userId: req.user?.id || req.user?.userId,
+      userRole: req.user?.role,
+    });
     return res.status(200).json({
       success: true,
       message: "Lấy dữ liệu score report thành công",
@@ -118,6 +134,8 @@ exports.getTestAnalytics = async (req, res) => {
     const result = await classService.getTestAnalytics({
       testId: req.params.testId,
       assignmentId: req.query.assignmentId ? String(req.query.assignmentId) : null,
+      userId: req.user?.id || req.user?.userId,
+      userRole: req.user?.role,
     });
     res.json(result);
   } catch (error) {

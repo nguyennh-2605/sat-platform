@@ -13,8 +13,8 @@ function AuthPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   
-  // [MỚI 1] State cho Role, mặc định là STUDENT
-  const [role, setRole] = useState('STUDENT'); 
+  type RegisterRole = 'STUDENT' | 'TEACHER';
+  const [role, setRole] = useState<RegisterRole>('STUDENT');
   
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
@@ -103,6 +103,7 @@ function AuthPage() {
               onClick={() => {
                 setIsLoginMode(!isLoginMode);
                 setEmail(''); setPassword(''); setName('');
+                setRole('STUDENT');
               }}
               className="text-blue-600 font-semibold hover:underline"
             >
@@ -142,7 +143,7 @@ function AuthPage() {
                                 name="role"
                                 value="STUDENT"
                                 checked={role === 'STUDENT'}
-                                onChange={(e) => setRole(e.target.value)}
+                                onChange={() => setRole('STUDENT')}
                                 className="hidden"
                             />
                             <User className="h-4 w-4 mr-2" />
@@ -155,7 +156,7 @@ function AuthPage() {
                                 name="role"
                                 value="TEACHER"
                                 checked={role === 'TEACHER'}
-                                onChange={(e) => setRole(e.target.value)}
+                                onChange={() => setRole('TEACHER')}
                                 className="hidden"
                             />
                             <GraduationCap className="h-4 w-4 mr-2" />

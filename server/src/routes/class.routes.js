@@ -1,17 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const classController = require('../controllers/class.controller')
-const { authenticateToken } = require('../middleware/auth.middleware'); // Middleware check login
+const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware'); // Middleware check login
 
 // API lấy danh sách lớp (cho Sidebar)
 router.get('/', authenticateToken, classController.getMyClasses);
 router.get('/list', authenticateToken, classController.getExamTests);
-router.get('/:id/score-report', authenticateToken, classController.getScoreReportAssignments);
+router.get('/:id/score-report', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.getScoreReportAssignments);
+router.get('/:testId/report', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.getTestAnalytics);
 router.get('/:id', authenticateToken, classController.getClassDetail);
-router.get('/:testId/report', authenticateToken, classController.getTestAnalytics);
-router.post('/', authenticateToken, classController.createClass);
-router.post('/:classId/students', authenticateToken, classController.addStudentToClass);
-router.post('/posts', authenticateToken, classController.createAssignment);
+router.post('/', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.createClass);
+router.post('/:classId/students', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.addStudentToClass);
+router.post('/posts', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.createAssignment);
 router.post('/submissions', authenticateToken, classController.createSubmission);
 
 module.exports = router;

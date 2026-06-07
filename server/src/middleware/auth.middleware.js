@@ -1,7 +1,5 @@
 const jwt = require('jsonwebtoken');
-
-// Đảm bảo secret key khớp với file .env hoặc file login
-const JWT_SECRET = process.env.JWT_SECRET || 'secret123'; 
+const { JWT_SECRET } = require('../config/jwt');
 
 // 1. Hàm kiểm tra đăng nhập (Xác thực Token)
 const authenticateToken = (req, res, next) => {
@@ -21,7 +19,7 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       console.log("Lỗi Verify:", err.message); // <--- Xem nó báo lỗi gì ở đây
-      return res.status(403).json({ error: 'Token không hợp lệ hoặc đã hết hạn.' });
+      return res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn.' });
     }
     
     // Nếu OK, lưu thông tin user (id, email, role) vào biến req.user

@@ -3,15 +3,21 @@ const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 const ApiError = require('../utils/ApiError');
+const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/jwt');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const JWT_SECRET = process.env.JWT_SECRET || 'secret123';
+const ALLOWED_REGISTER_ROLES = ['STUDENT', 'TEACHER'];
 
 exports.register = async ({ email, password, name, role }) => {
   const existingUser = await prisma.user.findUnique({ where: { email: email } });
 
   if (existingUser) {
     throw new ApiError(400, { message: "Email này đã được sử dụng!" });
+  }
+
+  const requestedRole = role || 'STUDENT';
+  if (!ALLOWED_REGISTER_ROLES.includes(requestedRole)) {
+    throw new ApiError(400, { message: "Vai trò không hợp lệ. Chỉ được chọn Học sinh hoặc Giáo viên." });
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -21,12 +27,16 @@ exports.register = async ({ email, password, name, role }) => {
       email,
       password: hashedPassword,
       name,
-      role: role || 'STUDENT'
+      role: requestedRole
     },
   });
 
   // Tạo Token ngay khi đăng ký để user tự đăng nhập luôn
-  const token = jwt.sign({ userId: newUser.id, role: newUser.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign(
+    { userId: newUser.id, email: newUser.email, role: newUser.role },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
 
   return {
     message: "Đăng ký thành công!",
@@ -56,7 +66,7 @@ exports.login = async ({ email, password }) => {
   const token = jwt.sign(
     { userId: user.id, email: user.email, role: user.role },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: JWT_EXPIRES_IN }
   );
 
   return {
@@ -94,8 +104,8 @@ exports.googleLogin = async ({ token }) => {
   // 4. Tạo JWT Token của web
   const jwtToken = jwt.sign(
     { userId: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
   );
 
   return {

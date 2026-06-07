@@ -56,12 +56,34 @@ exports.updateAssignment = async ({ assignmentId, userId, title, content, fileUr
   });
 };
 
-exports.getAssignmentById = async ({ id }) => {
+exports.getAssignmentById = async ({ id, userId, userRole }) => {
+  const currentUserId = parseInt(userId, 10);
+
+  if (!currentUserId) {
+    throw new ApiError(401, { message: "Không tìm thấy thông tin người dùng." });
+  }
+
   const assignment = await prisma.assignment.findUnique({
-    where: { id: id }
+    where: { id: id },
+    include: {
+      class: {
+        select: {
+          teacherId: true,
+          students: { select: { id: true } }
+        }
+      }
+    }
   });
+
   if (!assignment) {
     throw new ApiError(404, { message: "Không tìm thấy bài tập" });
+  }
+
+  const isTeacher = assignment.class.teacherId === currentUserId;
+  const isStudent = assignment.class.students.some(student => student.id === currentUserId);
+
+  if (userRole !== 'ADMIN' && !isTeacher && !isStudent) {
+    throw new ApiError(403, { message: "Bạn không có quyền xem bài tập này!" });
   }
 
   const selectedTests = assignment.testIds.length > 0
@@ -87,8 +109,11 @@ exports.getAssignmentById = async ({ id }) => {
     }, 0)
   }));
 
+  const assignmentData = { ...assignment };
+  delete assignmentData.class;
+
   return {
-    ...assignment,
+    ...assignmentData,
     selectedTests: formattedSelectedTests
   };
 };
