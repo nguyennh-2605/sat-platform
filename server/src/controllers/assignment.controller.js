@@ -43,7 +43,11 @@ exports.updateAssignment = async (req, res) => {
 
 exports.getAssignmentById = async (req, res) => {
   try {
-    const data = await assignmentService.getAssignmentById({ id: req.params.id });
+    const data = await assignmentService.getAssignmentById({
+      id: req.params.id,
+      userId: req.user.userId || req.user.id,
+      userRole: req.user.role,
+    });
     return res.status(200).json({ success: true, data });
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
