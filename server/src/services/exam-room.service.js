@@ -287,7 +287,8 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
               data: answersToSave.map(item => ({
                 submissionId: clonedSubmission.id,
                 questionId: item.questionId,
-                selectedChoice: item.selectedChoice
+                selectedChoice: item.selectedChoice,
+                isCorrect: item.isCorrect
               }))
             });
           }
@@ -301,7 +302,8 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
         data: answersToSave.map(item => ({
           submissionId: submission.id,
           questionId: item.questionId,
-          selectedChoice: item.selectedChoice
+          selectedChoice: item.selectedChoice,
+          isCorrect: item.isCorrect
         }))
       });
     }
