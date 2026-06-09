@@ -9,11 +9,14 @@ const getUserId = (req) => req.user?.userId || req.user?.id;
 
 exports.getWeeks = async (req, res) => {
   try {
+    console.log('Getting weeks for classId:', req.params.classId);
     const weeks = await progressService.getWeeks({ classId: req.params.classId });
+    console.log('Successfully fetched weeks:', weeks.length);
     res.json({ success: true, data: weeks });
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
     console.error('Get Weeks Error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ success: false, error: 'Lỗi khi lấy danh sách tuần học' });
   }
 };

@@ -1,19 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import axiosClient from '../../lib/axios';
 import {
   FileText,
   Users, Plus, ChevronRight,
   X, LayoutDashboard,CheckCircle2,
-  BarChart3,
   LayoutList,
   Copy,
   Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import NotificationBell from '../../features/notifications/NotificationBell';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
@@ -109,19 +107,29 @@ const StudentAndTeacherDashBoard = ({
   classDetail, onCreateAnnouncement, onAddStudent, currentUser
 }: any) => {
   const { classId } = useParams();
-  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
-
-  const [studentEmail, setStudentEmail] = useState("");
-  const [activeTab, setActiveTab] = useState('STREAM'); // Mặc định là 'STREAM' (Bảng tin)
-
+  const location = useLocation();
   const navigate = useNavigate();
 
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
+  const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
+  const [studentEmail, setStudentEmail] = useState("");
+
+  // Derive active tab from URL path
+  const pathParts = location.pathname.split('/');
+  const lastPart = pathParts[pathParts.length - 1];
+  const activeTab = ['STREAM', 'MEMBERS', 'PROGRESS'].includes(lastPart.toUpperCase())
+    ? lastPart.toUpperCase()
+    : 'STREAM';
+
   useEffect(() => {
-    setActiveTab('STREAM');
     setShowAnnouncementForm(false);
     setIsAddStudentModalOpen(false);
-  }, [classId]);
+
+    // Redirect to stream tab if no tab is specified in URL
+    if (classId && !['stream', 'members', 'progress'].includes(lastPart.toLowerCase())) {
+      navigate(`/dashboard/class/${classId}/stream`, { replace: true });
+    }
+  }, [classId, lastPart, navigate]);
 
   const submitAddStudent = () => {
       if(!studentEmail.trim()) return;
@@ -137,11 +145,11 @@ const StudentAndTeacherDashBoard = ({
 
   // 1. Tab Button Component (để code gọn hơn)
   const TabButton = ({ id, label, icon: Icon }: any) => (
-    <button 
-      onClick={() => setActiveTab(id)}
+    <button
+      onClick={() => navigate(`/dashboard/class/${classId}/${id.toLowerCase()}`)}
       className={`relative py-4 px-6 text-sm font-bold flex items-center gap-2 transition-colors ${
-        activeTab === id 
-        ? 'text-indigo-700' 
+        activeTab === id
+        ? 'text-indigo-700'
         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
       }`}
     >
@@ -200,10 +208,7 @@ const StudentAndTeacherDashBoard = ({
                 <TabButton id="STREAM" label="Bảng tin" icon={LayoutList} active={activeTab === 'STREAM'} />
                 <TabButton id="MEMBERS" label="Thành viên" icon={Users} active={activeTab === 'MEMBERS'} />
                 {currentUser.role === 'TEACHER' && (
-                  <>
-                    <TabButton id="PROGRESS" label="Tiến độ" icon={Calendar} active={activeTab === 'PROGRESS'} />
-                    <TabButton id="SCORES" label="Score Report" icon={BarChart3} active={activeTab === 'SCORES'} />
-                  </>
+                  <TabButton id="PROGRESS" label="Tiến độ" icon={Calendar} active={activeTab === 'PROGRESS'} />
                 )}
               </div>
 
@@ -366,11 +371,6 @@ const StudentAndTeacherDashBoard = ({
                 {/* --- TAB 3: TIẾN ĐỘ (PROGRESS) --- */}
                 {activeTab === 'PROGRESS' && currentUser.role === 'TEACHER' && (
                   <WeeklyProgress />
-                )}
-
-                {/* --- TAB 4: SCORE REPORT --- */}
-                {activeTab === 'SCORES' && currentUser.role === 'TEACHER' && (
-                  <StudentAnalytics classId={classId || '1'}/>
                 )}
               </div>
             </main>
