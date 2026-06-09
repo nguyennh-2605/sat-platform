@@ -115,12 +115,21 @@ const StudentAndTeacherDashBoard = ({
   const [studentEmail, setStudentEmail] = useState("");
 
   // Derive active tab from URL path
-  const activeTab = location.pathname.split('/').pop()?.toUpperCase() || 'STREAM';
+  const pathParts = location.pathname.split('/');
+  const lastPart = pathParts[pathParts.length - 1];
+  const activeTab = ['STREAM', 'MEMBERS', 'PROGRESS'].includes(lastPart.toUpperCase())
+    ? lastPart.toUpperCase()
+    : 'STREAM';
 
   useEffect(() => {
     setShowAnnouncementForm(false);
     setIsAddStudentModalOpen(false);
-  }, [classId]);
+
+    // Redirect to stream tab if no tab is specified in URL
+    if (classId && !['stream', 'members', 'progress'].includes(lastPart.toLowerCase())) {
+      navigate(`/dashboard/class/${classId}/stream`, { replace: true });
+    }
+  }, [classId, lastPart, navigate]);
 
   const submitAddStudent = () => {
       if(!studentEmail.trim()) return;
