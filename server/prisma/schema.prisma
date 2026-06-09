@@ -27,7 +27,7 @@ model User {
   homeworkSubmissions HomeworkSubmission[]
   submissions         Submission[]
   createdTests        Test[]
-  studyingClasses     Class[]              @relation("StudentClasses")
+  studyingClasses     Class[]              @relation("StudentClasses")  
   notifications       Notification[]
   SubFolders          Folder[]
 }

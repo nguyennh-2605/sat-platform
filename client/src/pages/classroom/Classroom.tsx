@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import axiosClient from '../../lib/axios';
 import {
@@ -107,16 +107,17 @@ const StudentAndTeacherDashBoard = ({
   classDetail, onCreateAnnouncement, onAddStudent, currentUser
 }: any) => {
   const { classId } = useParams();
-  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
-
-  const [studentEmail, setStudentEmail] = useState("");
-  const [activeTab, setActiveTab] = useState('STREAM'); // Mặc định là 'STREAM' (Bảng tin)
-
+  const location = useLocation();
   const navigate = useNavigate();
 
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
+  const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
+  const [studentEmail, setStudentEmail] = useState("");
+
+  // Derive active tab from URL path
+  const activeTab = location.pathname.split('/').pop()?.toUpperCase() || 'STREAM';
+
   useEffect(() => {
-    setActiveTab('STREAM');
     setShowAnnouncementForm(false);
     setIsAddStudentModalOpen(false);
   }, [classId]);
@@ -135,11 +136,11 @@ const StudentAndTeacherDashBoard = ({
 
   // 1. Tab Button Component (để code gọn hơn)
   const TabButton = ({ id, label, icon: Icon }: any) => (
-    <button 
-      onClick={() => setActiveTab(id)}
+    <button
+      onClick={() => navigate(`/dashboard/class/${classId}/${id.toLowerCase()}`)}
       className={`relative py-4 px-6 text-sm font-bold flex items-center gap-2 transition-colors ${
-        activeTab === id 
-        ? 'text-indigo-700' 
+        activeTab === id
+        ? 'text-indigo-700'
         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
       }`}
     >

@@ -35,7 +35,13 @@ function App() {
               {/* Các đường dẫn con */}
               <Route path="practice-test/my-bank/:folderId?" element={<TestBank />} />
               <Route path="practice-test" element={<PracticeTest />} />
-              <Route path="class/:classId" element={<Classroom />} />
+              <Route path="class/:classId" element={<Classroom />}>
+                {/* Nested routes for classroom tabs */}
+                <Route index element={<Navigate to="stream" replace />} />
+                <Route path="stream" element={null} />
+                <Route path="members" element={null} />
+                <Route path="progress" element={null} />
+              </Route>
               <Route path="error-log" element={<ErrorLog />} />
               <Route path="logic-lab" element={<LogicLab />} />
               <Route path='results-analytics' element = {<ResultAnalytics />} />
