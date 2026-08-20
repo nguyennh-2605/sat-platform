@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test test/*.test.js",
+    "test:deploy": "node scripts/deploy-smoke-test.js",
+    "db:migrate:deploy": "prisma migrate deploy",
     "start": "node index.js",
     "postinstall": "prisma generate"
   },

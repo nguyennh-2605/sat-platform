@@ -36,6 +36,21 @@ exports.saveProgress = async (req, res) => {
   }
 };
 
+exports.beginTest = async (req, res) => {
+  try {
+    const result = await examRoomService.beginTest({
+      userId: req.user.userId,
+      submissionId: req.body.submissionId,
+      testId: parseInt(req.params.id)
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error(error);
+    res.status(500).json({ error: 'Lỗi bắt đầu bài thi' });
+  }
+};
+
 exports.submitTest = async (req, res) => {
   try {
     const result = await examRoomService.submitTest({

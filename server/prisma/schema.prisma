@@ -162,6 +162,7 @@ model Submission {
   score                Int?
   violationCount       Int              @default(0)
   startedAt            DateTime         @default(now())
+  beganAt              DateTime?
   currentQuestionIndex Int              @default(0)
   savedAnswers         Json?
   timeRemaining        Int?
@@ -179,6 +180,8 @@ model Answer {
   isCorrect      Boolean    @default(false)
   question       Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
   submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, questionId])
 }
 
 model ErrorLog {

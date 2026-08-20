@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
+const { gradeQuestions } = require('../utils/grading');
 
 exports.startOrResumeTest = async ({ testId, userId, assignmentId, classId }) => {
   if (!userId || isNaN(userId)) {
@@ -49,63 +50,29 @@ exports.startOrResumeTest = async ({ testId, userId, assignmentId, classId }) =>
     selectedClassTestId = classTest.id;
   }
 
-  let submission = await prisma.submission.findFirst({
-    where: {
-      userId: userId,
-      testId: testId,
-      assignmentId: assignmentId,
-      classTestId: selectedClassTestId,
-      status: 'DOING'
-    },
-    orderBy: { startedAt: 'desc' }
-  });
+  // Serverless deployments can issue the same GET concurrently. A PostgreSQL
+  // transaction-scoped advisory lock makes find-or-create atomic per user/test.
+  const submission = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(${Number(userId)}::integer, ${Number(testId)}::integer)`;
 
-  if (!submission) {
-    const justCreatedSubmission = await prisma.submission.findFirst({
+    const activeSubmission = await tx.submission.findFirst({
       where: {
-        userId: userId,
-        testId: testId,
-        assignmentId: assignmentId,
+        userId,
+        testId,
+        assignmentId,
         classTestId: selectedClassTestId,
-        startedAt: {
-          gte: new Date(Date.now() - 5000) // Lấy bài tạo trong 5s gần nhất
-        }
-      }
+        status: 'DOING'
+      },
+      orderBy: { startedAt: 'desc' }
     });
 
-    if (justCreatedSubmission) {
-      submission = justCreatedSubmission;
-      console.log("Phát hiện Duplicate Request: Dùng lại bài vừa tạo.");
-    }
-  }
+    if (activeSubmission) return activeSubmission;
 
-  if (submission && test.mode === 'EXAM') {
-    const now = new Date();
-    const startedAt = new Date(submission.startedAt);
-    const durationMs = test.duration * 60 * 1000;
-    const expireTime = new Date(startedAt.getTime() + durationMs + (5 * 60 * 1000));
-
-    if (now > expireTime) {
-      console.log(`Bài thi ID ${submission.id} đã quá hạn nhưng chưa nộp. Đang đóng lại để tạo bài mới...`);
-      await prisma.submission.update({
-        where: { id: submission.id },
-        data: {
-          endTime: new Date(),
-          score: 0,
-          status: "COMPLETED"
-        }
-      });
-      submission = null
-    }
-  }
-
-  // Nếu chưa có bài làm tạo mới ngay lập tức
-  if (!submission) {
-    submission = await prisma.submission.create({
+    return tx.submission.create({
       data: {
-        userId: userId,
-        testId: testId,
-        assignmentId: assignmentId,
+        userId,
+        testId,
+        assignmentId,
         classTestId: selectedClassTestId,
         status: "DOING",
         startedAt: new Date(),
@@ -114,7 +81,7 @@ exports.startOrResumeTest = async ({ testId, userId, assignmentId, classId }) =>
         savedAnswers: {}
       }
     });
-  }
+  });
 
   // Trả về đề thi + Thông tin phiên làm bài
   return {
@@ -126,27 +93,96 @@ exports.startOrResumeTest = async ({ testId, userId, assignmentId, classId }) =>
       savedAnswers: submission.savedAnswers,
       timeLeft: submission.timeRemaining,
       currentQuestionIndex: submission.currentQuestionIndex,
-      violationCount: submission.violationCount
+      violationCount: submission.violationCount,
+      // ISO timestamps are timezone-independent. Returning the server clock lets
+      // the browser compensate when a student's device clock is fast or slow.
+      serverTime: new Date(),
+      beganAt: submission.beganAt,
+      module1ExpiresAt: test.mode === 'EXAM' && submission.beganAt
+        ? new Date(new Date(submission.beganAt).getTime() + test.sections[0].duration * 60 * 1000)
+        : null,
+      expiresAt: test.mode === 'EXAM' && submission.beganAt
+        ? new Date(new Date(submission.beganAt).getTime() + test.duration * 60 * 1000)
+        : null
     }
+  };
+};
+
+exports.beginTest = async ({ userId, submissionId, testId }) => {
+  const submission = await prisma.submission.findFirst({
+    where: { id: Number(submissionId), userId, testId, status: 'DOING' },
+    include: {
+      test: {
+        select: {
+          mode: true,
+          duration: true,
+          sections: { orderBy: { order: 'asc' }, select: { duration: true } }
+        }
+      }
+    }
+  });
+
+  if (!submission) throw new ApiError(404, { error: 'Không tìm thấy phiên làm bài đang hoạt động' });
+
+  let beganAt = submission.beganAt;
+  if (submission.test.mode === 'EXAM' && !beganAt) {
+    const now = new Date();
+    // updateMany makes this one-shot even when the start button/request is retried.
+    await prisma.submission.updateMany({
+      where: { id: submission.id, beganAt: null, status: 'DOING' },
+      data: {
+        beganAt: now,
+        startedAt: now,
+        timeRemaining: submission.test.duration * 60
+      }
+    });
+    const current = await prisma.submission.findUnique({
+      where: { id: submission.id }, select: { beganAt: true }
+    });
+    beganAt = current.beganAt;
+  }
+
+  const serverTime = new Date();
+  return {
+    serverTime,
+    beganAt,
+    module1ExpiresAt: beganAt
+      ? new Date(new Date(beganAt).getTime() + (submission.test.sections[0]?.duration || 0) * 60 * 1000)
+      : null,
+    expiresAt: beganAt
+      ? new Date(new Date(beganAt).getTime() + submission.test.duration * 60 * 1000)
+      : null
   };
 };
 
 exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, currentQuestionIndex, violationCount }) => {
   // Validate sở hữu: Có đúng user này đang làm bài này không?
   const submission = await prisma.submission.findFirst({
-    where: { id: parseInt(submissionId), userId: userId }
+    where: { id: parseInt(submissionId), userId: userId },
+    include: { test: { select: { mode: true, duration: true } } }
   });
 
   if (!submission) throw new ApiError(403, { message: "Không có quyền truy cập" });
   if (submission.status === 'COMPLETED') throw new ApiError(400, { message: "Bài đã nộp rồi" });
 
-  await prisma.submission.update({
-    where: { id: parseInt(submissionId) },
+  const clientTimeLeft = Number(timeLeft);
+  const authoritativeTimeLeft = submission.test.mode === 'EXAM' && submission.beganAt
+    ? Math.max(0, Math.ceil(
+        (new Date(submission.beganAt).getTime() + submission.test.duration * 60 * 1000 - Date.now()) / 1000
+      ))
+    : (Number.isFinite(clientTimeLeft) ? Math.max(0, Math.floor(clientTimeLeft)) : submission.timeRemaining);
+
+  await prisma.submission.updateMany({
+    where: { id: parseInt(submissionId), userId, status: 'DOING' },
     data: {
-      savedAnswers: answers,
-      timeRemaining: timeLeft,
-      currentQuestionIndex: currentQuestionIndex,
-      violationCount: violationCount,
+      savedAnswers: answers && typeof answers === 'object' && !Array.isArray(answers) ? answers : {},
+      timeRemaining: authoritativeTimeLeft,
+      currentQuestionIndex: Number.isInteger(Number(currentQuestionIndex))
+        ? Math.max(0, Number(currentQuestionIndex))
+        : submission.currentQuestionIndex,
+      violationCount: Number.isFinite(Number(violationCount))
+        ? Math.max(0, Number(violationCount))
+        : submission.violationCount,
     }
   });
 };
@@ -158,21 +194,28 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
     throw new ApiError(400, { error: "Thiếu thông tin User ID (Bạn chưa đăng nhập?)" });
   }
 
+  let expectedClassTestId;
+  if (!assignmentId && classId) {
+    const classTest = await prisma.classTest.findFirst({
+      where: { classId, testId },
+      select: { id: true }
+    });
+    if (!classTest) throw new ApiError(400, { error: "Bài test này không thuộc lớp đã chọn" });
+    expectedClassTestId = classTest.id;
+  }
+
   const submission = await prisma.submission.findFirst({
     where: {
       id: Number(submissionId),
       userId: userId,
       testId: testId,
-      assignmentId: assignmentId
+      assignmentId: assignmentId,
+      ...(expectedClassTestId !== undefined ? { classTestId: expectedClassTestId } : {})
     }
   });
 
   if (!submission) {
     throw new ApiError(400, { error: "Không tìm thấy phiên làm bài hoặc bạn không có quyền nộp bài này" });
-  }
-
-  if (submission.status == 'COMPLETED') {
-    throw new ApiError(400, { error: "Bài thi này đã nộp!" });
   }
 
   // 1. Lấy đề thi từ DB để so sánh đáp án
@@ -186,58 +229,54 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
 
   if (!test) throw new ApiError(404, { error: "Không tìm thấy đề thi" });
 
-  // 2. Tính điểm & Chuẩn bị dữ liệu chi tiết từng câu trả lời
-  let correctCount = 0;
-  let totalQuestions = 0;
-
-  const answersToSave = [];
-  const responseDetails = [];
-
-  test.sections.forEach(section => {
-    section.questions.forEach(question => {
-      totalQuestions++;
-
-      const userChoiceId = answers[String(question.id)];
-      const correctChoiceId = question.correctAnswer;
-
-      const isCorrect = userChoiceId === correctChoiceId;
-
-      if (isCorrect) {
-        correctCount++;
-      }
-
-      answersToSave.push({
-        questionId: question.id,
-        selectedChoice: userChoiceId || null,
-        isCorrect: isCorrect
-      });
-      responseDetails.push({
-        questionId: question.id,
-        isCorrect: isCorrect,
-        userSelected: userChoiceId || null,
-        correctOption: correctChoiceId
-      });
-    });
-  });
+  // If Vercel/the browser retries a completed request, grade from the answers
+  // already committed instead of rejecting the retry or overwriting the result.
+  const submittedAnswers = submission.status === 'COMPLETED'
+    ? submission.savedAnswers
+    : answers;
+  const allQuestions = test.sections.flatMap(section => section.questions);
+  let {
+    correctCount,
+    totalQuestions,
+    answerRows: answersToSave,
+    details: responseDetails
+  } = gradeQuestions(allQuestions, submittedAnswers);
 
   console.log(`Kết quả: ${correctCount}/${totalQuestions}`);
 
-  const result = await prisma.$transaction(async (prisma) => {
-    // A. Cập nhật Submission
-    const updatedSubmission = await prisma.submission.update({
-      where: { id: submission.id },
+  const safeViolationCount = Number.isFinite(Number(violationCount))
+    ? Math.max(0, Number(violationCount))
+    : submission.violationCount;
+  const safeAnswers = submittedAnswers && typeof submittedAnswers === 'object' && !Array.isArray(submittedAnswers)
+    ? submittedAnswers
+    : {};
+
+  const transactionResult = await prisma.$transaction(async (tx) => {
+    // Claim the submission atomically. Concurrent double-clicks/retries can no
+    // longer insert a second set of Answer rows or change an existing score.
+    const claim = await tx.submission.updateMany({
+      where: { id: submission.id, userId, status: 'DOING' },
       data: {
         status: "COMPLETED",
         score: correctCount,
-        violationCount: Number(violationCount),
+        violationCount: safeViolationCount,
         endTime: new Date(),
-        savedAnswers: answers
+        savedAnswers: safeAnswers
       }
     });
 
+    if (claim.count === 0) {
+      return {
+        submission: await tx.submission.findUnique({ where: { id: submission.id } }),
+        didSubmit: false
+      };
+    }
+
+    const updatedSubmission = await tx.submission.findUnique({ where: { id: submission.id } });
+
     // Nếu học sinh làm từ Practice Center theo lớp, tự động cập nhật các assignment chưa có dữ liệu
     if (!assignmentId && classId) {
-      const classAssignments = await prisma.assignment.findMany({
+      const classAssignments = await tx.assignment.findMany({
         where: { classId: classId },
         select: { id: true, testIds: true }
       });
@@ -247,7 +286,7 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
         .map(item => item.id);
 
       if (assignmentIdsToSync.length > 0) {
-        const existedSubmissions = await prisma.submission.findMany({
+        const existedSubmissions = await tx.submission.findMany({
           where: {
             userId: userId,
             testId: testId,
@@ -265,7 +304,7 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
         const pendingAssignmentIds = assignmentIdsToSync.filter(id => !existedAssignmentIds.has(id));
 
         for (const pendingAssignmentId of pendingAssignmentIds) {
-          const clonedSubmission = await prisma.submission.create({
+          const clonedSubmission = await tx.submission.create({
             data: {
               userId: userId,
               testId: testId,
@@ -273,17 +312,17 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
               classTestId: submission.classTestId,
               endTime: new Date(),
               score: correctCount,
-              violationCount: Number(violationCount),
+              violationCount: safeViolationCount,
               startedAt: submission.startedAt,
               currentQuestionIndex: submission.currentQuestionIndex,
-              savedAnswers: answers,
+              savedAnswers: safeAnswers,
               timeRemaining: submission.timeRemaining,
               status: "COMPLETED"
             }
           });
 
           if (answersToSave.length > 0) {
-            await prisma.answer.createMany({
+            await tx.answer.createMany({
               data: answersToSave.map(item => ({
                 submissionId: clonedSubmission.id,
                 questionId: item.questionId,
@@ -298,7 +337,8 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
 
     // B. Lưu chi tiết từng câu trả lời vào bảng Answer
     if (answersToSave.length > 0) {
-      await prisma.answer.createMany({
+      await tx.answer.deleteMany({ where: { submissionId: submission.id } });
+      await tx.answer.createMany({
         data: answersToSave.map(item => ({
           submissionId: submission.id,
           questionId: item.questionId,
@@ -308,22 +348,35 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
       });
     }
 
-    return updatedSubmission;
+    return { submission: updatedSubmission, didSubmit: true };
   });
 
-  if (test.mode === 'EXAM' && test.authorId) {
-    const studentInfo = await prisma.user.findUnique({ where: { id: userId } });
+  if (!transactionResult.didSubmit) {
+    const committedGrade = gradeQuestions(allQuestions, transactionResult.submission?.savedAnswers);
+    correctCount = committedGrade.correctCount;
+    totalQuestions = committedGrade.totalQuestions;
+    responseDetails = committedGrade.details;
+  }
 
-    await sendNotificationToUser(
-      test.authorId,
-      `Học sinh ${studentInfo?.name || studentInfo?.email} vừa hoàn thành bài thi "${test.title}" với số điểm ${correctCount}/${totalQuestions}.`,
-    );
+  if (transactionResult.didSubmit && test.mode === 'EXAM' && test.authorId) {
+    try {
+      const studentInfo = await prisma.user.findUnique({ where: { id: userId } });
+      await sendNotificationToUser(
+        test.authorId,
+        `Học sinh ${studentInfo?.name || studentInfo?.email} vừa hoàn thành bài thi "${test.title}" với số điểm ${correctCount}/${totalQuestions}.`,
+      );
+    } catch (error) {
+      // The grade is already committed. A notification outage must not turn a
+      // successful submission into a 500 response that encourages resubmits.
+      console.error('Không thể gửi thông báo sau khi nộp bài:', error);
+    }
   }
 
   return {
     score: correctCount,
     total: totalQuestions,
-    submissionId: result.id,
+    totalQuestions,
+    submissionId: transactionResult.submission.id,
     details: responseDetails,
     message: "Nộp bài và lưu kết quả thành công"
   };

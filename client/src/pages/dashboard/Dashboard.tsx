@@ -216,7 +216,7 @@ function Dashboard() {
         <div 
           className={`h-16 shrink-0 flex items-center transition-all duration-300 cursor-pointer border-b border-gray-300 ${
             isSidebarCollapsed ? 'justify-center px-0' : 'px-6 gap-3'
-          }`} 
+          }`}
           onClick={() => navigate('/')}
         >
           <div className="w-10 h-10 shrink-0 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-md">

@@ -61,6 +61,7 @@ function ExamRoom() {
 
   // State lưu thời điểm bài thi kết thúc
   const [endTime, setEndTime] = useState<number | null>(null);
+  const [examEndTime, setExamEndTime] = useState<number | null>(null);
 
   // 1. State quản lý giai đoạn hiện tại
   type ExamPhase = 'MODULE_1' | 'REVIEW_1' | 'MODULE_2' | 'REVIEW_2';
@@ -113,6 +114,16 @@ function ExamRoom() {
   const isDragging = useRef(false);
 
   const hasFetched = useRef(false);
+  const answersRef = useRef<{ [key: string]: string }>({});
+  const violationCountRef = useRef(0);
+  const submitInFlightRef = useRef(false);
+  const timeLeftRef = useRef(timeLeft);
+
+  // Timer callbacks live for a long time; refs ensure an automatic submit uses
+  // the newest answers instead of the empty object captured when the timer began.
+  answersRef.current = answers;
+  violationCountRef.current = violationCount;
+  timeLeftRef.current = timeLeft;
 
   // State quan li calculator
   const { isCalculatorOpen, toggleCalculator } = useQuizTool();
@@ -210,7 +221,9 @@ function ExamRoom() {
         if (data.session) {
           const {
             submissionId, 
-            startedAt, 
+            serverTime,
+            module1ExpiresAt,
+            expiresAt,
             timeLeft: dbTimeLeft, 
             savedAnswers: dbSavedAnswers, 
             currentQuestionIndex: dbCurrentQuestionIndex,
@@ -227,7 +240,6 @@ function ExamRoom() {
             setPhase('MODULE_1');
           }
 
-          const mod1DurationMinutes = data.sections[0].duration;
           const totalDurationMinutes = data.duration; 
 
           let targetEndTime = 0;
@@ -238,61 +250,75 @@ function ExamRoom() {
             targetEndTime = Date.now() + (totalTimeLeft * 1000);
             secondsRemaining = totalTimeLeft;
           } else {
-              // Thời gian trôi không ngừng nghỉ
-              const startMs = new Date(startedAt).getTime();
-
-              if (currentPhase === 'MODULE_1') {
-                  // Deadline Mod 1 = Bắt đầu + Duration Mod 1
-                  targetEndTime = startMs + (mod1DurationMinutes * 60 * 1000);
-              } else {
-                  // Deadline Mod 2 = Bắt đầu + Tổng thời gian (Vì Mod 2 nối đuôi Mod 1)
-                  targetEndTime = startMs + (totalDurationMinutes * 60 * 1000);
-              }
-              
-              secondsRemaining = Math.max(0, Math.floor((targetEndTime - Date.now()) / 1000));
+              // Convert a server deadline to the local monotonic countdown.
+              // This compensates for a student's device clock being fast/slow.
+              const serverNowMs = serverTime ? new Date(serverTime).getTime() : Date.now();
+              const toLocalDeadline = (value: string | null) => value
+                ? Date.now() + Math.max(0, new Date(value).getTime() - serverNowMs)
+                : 0;
+              const localExamEnd = toLocalDeadline(expiresAt);
+              const localModule1End = toLocalDeadline(module1ExpiresAt);
+              setExamEndTime(localExamEnd || null);
+              targetEndTime = currentPhase === 'MODULE_1' ? localModule1End : localExamEnd;
+              secondsRemaining = targetEndTime
+                ? Math.max(0, Math.floor((targetEndTime - Date.now()) / 1000))
+                : 0;
           }
 
           setEndTime(targetEndTime);
           setTimeLeft(secondsRemaining);
 
-          // Logic chạy timer
-          if (secondsRemaining <= 0) {
-              if (currentPhase === 'MODULE_1') {
-                  // Nếu vừa load trang mà đã thấy hết giờ Mod 1 -> Tự chuyển
-                  startModule2(); 
-              } else {
-                  finishTest(submissionId);
-              }
-          } else {
-              setIsTimerRunning(true);
-          }
-
-          setCurrentQuestionIndex(dbCurrentQuestionIndex);
-
-          // Uu tien khoi phuc dap an tu db hon
+          let restoredAnswers: { [key: string]: string } = {};
           if (dbSavedAnswers && Object.keys(dbSavedAnswers).length > 0) {
-            setAnswers(dbSavedAnswers)
+            restoredAnswers = dbSavedAnswers;
           } else {
-            // KHÔI PHỤC ĐÁP ÁN TỪ LOCAL STORAGE (Nếu user refresh trang)
             const localSavedAnswers = localStorage.getItem(`answers_${userId}_${id}_${contextKey}`);
             if (localSavedAnswers) {
-              const parsedAnswers = JSON.parse(localSavedAnswers);
-              setAnswers(parsedAnswers);
-            }
-          }
-          if (data.mode === 'EXAM') {
-            if (dbViolationCount > 0) {
-              setViolationCount(dbViolationCount);
-            } else {
-              const savedViolations = localStorage.getItem(`violations_${userId}_${id}_${contextKey}`);
-              if (savedViolations) {
-                setViolationCount(parseInt(savedViolations, 10));
-              } else {
-                setViolationCount(0);
+              try {
+                restoredAnswers = JSON.parse(localSavedAnswers);
+              } catch {
+                localStorage.removeItem(`answers_${userId}_${id}_${contextKey}`);
               }
             }
+          }
+          answersRef.current = restoredAnswers;
+          setAnswers(restoredAnswers);
+
+          let restoredViolations = dbViolationCount || 0;
+          if (data.mode === 'EXAM' && !restoredViolations) {
+            const savedViolations = localStorage.getItem(`violations_${userId}_${id}_${contextKey}`);
+            restoredViolations = savedViolations ? parseInt(savedViolations, 10) || 0 : 0;
+          }
+          violationCountRef.current = data.mode === 'EXAM' ? restoredViolations : 0;
+          setViolationCount(data.mode === 'EXAM' ? restoredViolations : 0);
+          setCurrentQuestionIndex(dbCurrentQuestionIndex);
+
+          // Logic chạy timer
+          if (mode === 'EXAM' && !expiresAt) {
+              // The server starts the clock only after the explicit Begin call.
+              setIsTimerRunning(false);
+          } else if (secondsRemaining <= 0) {
+              if (currentPhase === 'MODULE_1') {
+                  // Module 1 expired while the page was closed. Continue with
+                  // the authoritative total-test deadline, without granting a
+                  // fresh full Module 2 duration.
+                  const serverNowMs = serverTime ? new Date(serverTime).getTime() : Date.now();
+                  const localExamEnd = expiresAt
+                    ? Date.now() + Math.max(0, new Date(expiresAt).getTime() - serverNowMs)
+                    : 0;
+                  if (!localExamEnd || localExamEnd <= Date.now()) {
+                    finishTest(submissionId, restoredAnswers);
+                  } else {
+                    setPhase('MODULE_2');
+                    setCurrentQuestionIndex(data.sections[0].questions.length);
+                    setEndTime(localExamEnd);
+                    setTimeLeft(Math.max(0, Math.floor((localExamEnd - Date.now()) / 1000)));
+                  }
+              } else {
+                  finishTest(submissionId, restoredAnswers);
+              }
           } else {
-            setViolationCount(0);
+              setIsTimerRunning(mode === 'PRACTICE');
           }
         }
       } catch (error) {
@@ -316,7 +342,12 @@ function ExamRoom() {
   };
 
   // --- 2. LOGIC NỘP BÀI ---
-  const finishTest = useCallback(async (passedSubmissionId?: number) => {
+  const finishTest = useCallback(async (
+    passedSubmissionId?: number,
+    answersOverride?: { [key: string]: string }
+  ) => {
+    if (submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
     setIsTimerRunning(false);
     setIsReviewOpen(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -341,8 +372,8 @@ function ExamRoom() {
 
         const response = await axiosClient.post(`/api/test/${id}/submit${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`, {
           submissionId: idToSubmit,
-          answers,
-          violationCount
+          answers: answersOverride || answersRef.current,
+          violationCount: violationCountRef.current
         });
 
         localStorage.removeItem(`answers_${userId}_${id}_${contextKey}`);
@@ -354,9 +385,10 @@ function ExamRoom() {
         console.error("Lỗi mạng:", error);
         toast.error("Không thể kết nối đến server để nộp bài!");
     } finally {
+        submitInFlightRef.current = false;
         setIsSubmitting(false);
     }
-  }, [answers, id, submissionId, violationCount]);
+  }, [assignmentId, classId, contextKey, id, submissionId]);
 
   // --- LOGIC TIMER ---
   useEffect(() => {
@@ -391,6 +423,28 @@ function ExamRoom() {
       finishTest();
     }
   }, [violationCount, isSubmitted, finishTest]);
+
+  // Debounced server autosave makes refreshes/device failures recoverable. The
+  // server update is conditional on DOING, so it cannot overwrite a completed
+  // submission if autosave and submit arrive concurrently.
+  useEffect(() => {
+    if (!id || !submissionId || isSubmitted || Object.keys(answers).length === 0) return;
+
+    const timeout = window.setTimeout(() => {
+      axiosClient.post(`/api/test/${id}/save-progress`, {
+        submissionId,
+        answers,
+        timeLeft: timeLeftRef.current,
+        currentQuestionIndex,
+        violationCount: violationCountRef.current
+      }).catch((error) => {
+        // localStorage remains the offline fallback; avoid interrupting the exam.
+        console.error('Autosave chưa đồng bộ được:', error);
+      });
+    }, 800);
+
+    return () => window.clearTimeout(timeout);
+  }, [answers, currentQuestionIndex, id, isSubmitted, submissionId]);
 
   // --- LOGIC ANTICHEAT ---
   useEffect(() => {    
@@ -475,9 +529,31 @@ function ExamRoom() {
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const handleStartTest = () => {
+  const handleStartTest = async () => {
     if (testMode === 'EXAM') {
       enterFullscreen();
+      if (!submissionId || !id) {
+        toast.error('Không tìm thấy phiên làm bài. Vui lòng tải lại trang.');
+        return;
+      }
+      try {
+        const timing = await axiosClient.post(`/api/test/${id}/begin`, { submissionId });
+        const serverNowMs = new Date(timing.serverTime).getTime();
+        const toLocalDeadline = (value: string | null) => value
+          ? Date.now() + Math.max(0, new Date(value).getTime() - serverNowMs)
+          : 0;
+        const localExamEnd = toLocalDeadline(timing.expiresAt);
+        const localModule1End = toLocalDeadline(timing.module1ExpiresAt);
+        setExamEndTime(localExamEnd || null);
+        setEndTime(phase === 'MODULE_1' ? localModule1End : localExamEnd);
+        setTimeLeft(Math.max(0, Math.floor(
+          ((phase === 'MODULE_1' ? localModule1End : localExamEnd) - Date.now()) / 1000
+        )));
+      } catch (error) {
+        console.error('Lỗi bắt đầu bài thi:', error);
+        toast.error('Không thể bắt đầu bài thi. Vui lòng thử lại.');
+        return;
+      }
     }
     setShowStartModal(false);
     setIsTimerRunning(true);
@@ -501,10 +577,12 @@ function ExamRoom() {
 
     // Cập nhật vào state answers chung (Giả sử bạn đang dùng setAnswers)
     // Thay setAnswers bằng hàm update state thực tế của bạn nếu tên khác nhé
-    setAnswers((prevAnswers: any) => ({
-      ...prevAnswers,
-      [currentQ.id]: sanitizedValue // Lưu chuỗi học sinh vừa nhập theo ID câu hỏi
-    }));
+    setAnswers((prevAnswers: any) => {
+      const newAnswers = { ...prevAnswers, [currentQ.id]: sanitizedValue };
+      const userId = localStorage.getItem('userId');
+      localStorage.setItem(`answers_${userId}_${id}_${contextKey}`, JSON.stringify(newAnswers));
+      return newAnswers;
+    });
   };
 
   const splitIndex = useMemo(() => {
@@ -531,9 +609,11 @@ function ExamRoom() {
     localStorage.setItem(`mod1TimeUsed_${userId}_${id}_${contextKey}`, mod1UsedSecond.toString());
     // Tính toán lại endTime mới
     const mod2Duration = examConfig.mod2Duration * 60;
-    const newEndTime = now + mod2Duration * 1000;
+    const newEndTime = testMode === 'EXAM' && examEndTime
+      ? examEndTime
+      : now + mod2Duration * 1000;
     setEndTime(newEndTime);
-    setTimeLeft(mod2Duration);
+    setTimeLeft(Math.max(0, Math.floor((newEndTime - now) / 1000)));
     setCurrentQuestionIndex(splitIndex);
     window.scrollTo(0, 0);
     setTimeout(() => {
