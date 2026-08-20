@@ -11,6 +11,8 @@ Tài liệu này là nguồn quy tắc giao diện mặc định cho mọi thay 
 - Toàn bộ nội dung hiển thị cho người dùng phải bằng tiếng Anh. Tiếng Việt chỉ được dùng trong comment nội bộ khi thật sự cần thiết.
 - Không dùng logo trong Figma.
 - Giữ giao diện gọn, chuyên nghiệp, tránh card quá cao, button quá lớn và khoảng trắng dư thừa.
+- Ưu tiên sự rõ ràng trước tính trang trí: control, đường viền, vùng nhập liệu và vùng nội dung phải nhận biết được ngay mà không cần người dùng đoán.
+- Mặc định dùng contrast đủ rõ và trọng lượng thị giác nhất quán. Chỉ tạo mức đậm–nhạt khi cần thể hiện UI hierarchy cụ thể; không làm mờ thành phần chỉ để giao diện trông “nhẹ”.
 
 ## 2. Design tokens
 
@@ -28,7 +30,8 @@ Sử dụng các token đã định nghĩa trong `client/src/index.css` và comp
 | Accent gold | `#E8C040` |
 | Main text | `#1A1A1A` |
 | Muted text | `#6B7280` |
-| Border | `#E2EDE9` |
+| Border | `#D2DED9` |
+| Strong divider | `#C9D8D2` |
 | Font | `Inter`, sau đó dùng system sans-serif |
 | Card radius | `rounded-xl` |
 | Button/input radius | `rounded-lg` |
@@ -37,6 +40,7 @@ Không dùng indigo/purple làm màu primary. Màu đỏ, amber và emerald ch�
 
 ### Contrast
 
+- Clarity là mặc định; hierarchy là một quyết định có chủ đích. Trước tiên mọi thành phần phải đọc và phân biệt rõ, sau đó mới giảm độ nổi của metadata hoặc vùng phụ.
 - Ưu tiên độ tương phản rõ giữa background, text, border và action; không chọn màu chỉ vì “nhẹ mắt” nếu làm nội dung khó đọc.
 - Text chính phải dùng màu đậm trên nền sáng. Text trắng chỉ đặt trên background đủ đậm và phải kiểm tra class nền không bị component mặc định ghi đè.
 - KPI hoặc card cần nhấn mạnh nên dùng nền đậm, chữ sáng và border rõ; tránh nền pastel quá nhạt cho thông tin quan trọng.
@@ -73,7 +77,7 @@ Không tạo lại button, modal hoặc card bằng một bộ class mới nếu
 - Nội dung trang dùng chiều rộng tối đa khoảng `1200px` và căn giữa.
 - Khoảng đệm mặc định: `p-6`; desktop có thể dùng `lg:p-8`.
 - Page background luôn dùng `#F2F8F5`.
-- Card dùng nền trắng, border `#E2EDE9`, `rounded-xl`, shadow nhẹ.
+- Card dùng nền trắng, border mặc định `#D2DED9`, `rounded-xl`, shadow nhẹ. Dùng strong divider `#C9D8D2` cho split view, panel header hoặc ranh giới cần nhận biết rõ.
 - Tránh `rounded-2xl`, shadow quá đậm và gradient không có trong Figma.
 
 ## 5. Typography

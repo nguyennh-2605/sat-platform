@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
+const { CLASS_COLORS, normalizeClassName, resolveAssignmentType, isAllowedClassColor, canManageClass } = require('../utils/classroom');
 
 const parseUserId = (userId) => parseInt(userId, 10);
 
@@ -8,7 +9,7 @@ const assertClassMember = async ({ classId, userId, userRole }) => {
   const currentUserId = parseUserId(userId);
 
   if (!currentUserId) {
-    throw new ApiError(401, { error: "Không tìm thấy thông tin người dùng." });
+    throw new ApiError(401, { error: 'User information is unavailable.' });
   }
 
   const classroom = await prisma.class.findUnique({
@@ -20,14 +21,14 @@ const assertClassMember = async ({ classId, userId, userRole }) => {
   });
 
   if (!classroom) {
-    throw new ApiError(404, { error: "Không tìm thấy lớp học" });
+    throw new ApiError(404, { error: 'Class not found.' });
   }
 
   const isTeacher = classroom.teacherId === currentUserId;
   const isStudent = classroom.students.some(student => student.id === currentUserId);
 
   if (userRole !== 'ADMIN' && !isTeacher && !isStudent) {
-    throw new ApiError(403, { error: "Bạn không có quyền truy cập lớp học này." });
+    throw new ApiError(403, { error: 'You do not have permission to access this class.' });
   }
 
   return classroom;
@@ -37,7 +38,7 @@ const assertClassTeacher = async ({ classId, userId, userRole }) => {
   const currentUserId = parseUserId(userId);
 
   if (!currentUserId) {
-    throw new ApiError(401, { error: "Không tìm thấy thông tin người dùng." });
+    throw new ApiError(401, { error: 'User information is unavailable.' });
   }
 
   const classroom = await prisma.class.findUnique({
@@ -49,62 +50,99 @@ const assertClassTeacher = async ({ classId, userId, userRole }) => {
   });
 
   if (!classroom) {
-    throw new ApiError(404, { error: "Không tìm thấy lớp học" });
+    throw new ApiError(404, { error: 'Class not found.' });
   }
 
-  if (userRole !== 'ADMIN' && classroom.teacherId !== currentUserId) {
-    throw new ApiError(403, { error: "Bạn không phải giáo viên của lớp này" });
+  if (!canManageClass({ teacherId: classroom.teacherId, userId: currentUserId, userRole })) {
+    throw new ApiError(403, { error: 'You do not have permission to manage this class.' });
   }
 
   return classroom;
 };
 
-exports.createClass = async ({ name, userId, userRole }) => {
+const classSummarySelect = {
+  id: true,
+  name: true,
+  color: true,
+  createdAt: true,
+  teacherId: true,
+  teacher: { select: { id: true, name: true, email: true } },
+  _count: { select: { students: true } },
+};
+
+const toClassSummary = (classroom, currentUserId, userRole) => ({
+  id: classroom.id,
+  name: classroom.name,
+  color: classroom.color,
+  createdAt: classroom.createdAt,
+  teacher: classroom.teacher,
+  studentCount: classroom._count.students,
+  canManage: canManageClass({ teacherId: classroom.teacherId, userId: currentUserId, userRole }),
+});
+
+exports.createClass = async ({ name, color, userId, userRole }) => {
   // Validation: Chỉ giáo viên mới được tạo lớp
   if (userRole !== 'TEACHER' && userRole !== 'ADMIN') {
-    throw new ApiError(403, { error: "Bạn không có quyền tạo lớp học." });
+    throw new ApiError(403, { error: 'You do not have permission to create classes.' });
   }
 
-  if (!name) {
-    throw new ApiError(400, { error: "Tên lớp không được để trống" });
-  }
+  const normalizedName = normalizeClassName(name);
+  const normalizedColor = String(color || CLASS_COLORS[0]).toUpperCase();
+  if (!normalizedName) throw new ApiError(400, { error: 'Class name is required.' });
+  if (normalizedName.length > 100) throw new ApiError(400, { error: 'Class name must be 100 characters or fewer.' });
+  if (!isAllowedClassColor(normalizedColor)) throw new ApiError(400, { error: 'Choose a valid class color.' });
 
   return prisma.class.create({
     data: {
-      name: name,
-      teacherId: userId, // Link lớp này với ID của giáo viên đang đăng nhập
+      name: normalizedName,
+      color: normalizedColor,
+      teacherId: parseUserId(userId),
     }
   });
 };
 
 exports.getMyClasses = async ({ userId, userRole }) => {
   if (!userId) {
-    throw new ApiError(401, { error: "Chưa đăng nhập" });
+    throw new ApiError(401, { error: 'Sign in to view your classes.' });
   }
 
-  if (userRole === 'TEACHER') {
-    // Nếu là GV: Lấy danh sách lớp mình dạy
-    return prisma.class.findMany({
-      where: { teacherId: userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: { select: { students: true } } // Đếm số học sinh trong lớp
-      }
-    });
-  }
-
-  // Nếu là HS: Lấy danh sách lớp mình tham gia
-  return prisma.class.findMany({
-    where: {
-      students: {
-        some: { id: userId } // Tìm lớp có chứa userId này trong danh sách students
-      }
-    },
+  const currentUserId = parseUserId(userId);
+  const canOwnClasses = userRole === 'TEACHER' || userRole === 'ADMIN';
+  const classes = await prisma.class.findMany({
+    where: canOwnClasses
+      ? { teacherId: currentUserId }
+      : { students: { some: { id: currentUserId } } },
     orderBy: { createdAt: 'desc' },
-    include: {
-      teacher: { select: { name: true, email: true } } // Lấy thêm info giáo viên
-    }
+    select: classSummarySelect,
   });
+  return classes.map(classroom => toClassSummary(classroom, currentUserId, userRole));
+};
+
+exports.updateClass = async ({ classId, name, color, userId, userRole }) => {
+  await assertClassTeacher({ classId, userId, userRole });
+  const data = {};
+
+  if (name !== undefined) {
+    const normalizedName = normalizeClassName(name);
+    if (!normalizedName) throw new ApiError(400, { error: 'Class name is required.' });
+    if (normalizedName.length > 100) throw new ApiError(400, { error: 'Class name must be 100 characters or fewer.' });
+    data.name = normalizedName;
+  }
+  if (color !== undefined) {
+    const normalizedColor = String(color).toUpperCase();
+    if (!isAllowedClassColor(normalizedColor)) throw new ApiError(400, { error: 'Choose a valid class color.' });
+    data.color = normalizedColor;
+  }
+  if (Object.keys(data).length === 0) throw new ApiError(400, { error: 'There are no changes to save.' });
+
+  const classroom = await prisma.class.update({ where: { id: classId }, data, select: classSummarySelect });
+  return toClassSummary(classroom, parseUserId(userId), userRole);
+};
+
+exports.deleteClass = async ({ classId, userId, userRole }) => {
+  await assertClassTeacher({ classId, userId, userRole });
+  await prisma.class.delete({ where: { id: classId } });
+  return { message: 'Class deleted successfully.' };
 };
 
 exports.getClassDetail = async ({ id, userId, userRole }) => {
@@ -115,10 +153,10 @@ exports.getClassDetail = async ({ id, userId, userRole }) => {
     where: { id: id },
     include: {
       teacher: {
-        select: { id: true, name: true, email: true }
+        select: { id: true, name: true, email: true, createdAt: true }
       },
       students: {
-        select: { id: true, name: true, email: true, avatar: true }
+        select: { id: true, name: true, email: true, avatar: true, createdAt: true }
       },
       assignments: {
         orderBy: { createdAt: 'desc' }, // Lấy bài tập mới nhất lên đầu
@@ -181,6 +219,29 @@ exports.addStudentToClass = async ({ classId, email, currentUserId }) => {
   return { message: "Thêm học sinh thành công", student: student };
 };
 
+exports.removeStudentFromClass = async ({ classId, studentId, currentUserId, userRole }) => {
+  await assertClassTeacher({ classId, userId: currentUserId, userRole });
+
+  const student = await prisma.user.findFirst({
+    where: {
+      id: parseUserId(studentId),
+      studyingClasses: { some: { id: classId } },
+    },
+    select: { id: true, name: true, email: true },
+  });
+
+  if (!student) {
+    throw new ApiError(404, { error: 'This student is not enrolled in the class.' });
+  }
+
+  await prisma.class.update({
+    where: { id: classId },
+    data: { students: { disconnect: { id: student.id } } },
+  });
+
+  return { message: 'Student removed from class.', student };
+};
+
 exports.createAssignment = async ({ title, content, type, deadline, classId, driveFiles, externalLinks, testIds, currentUserId, userRole }) => {
   // Validate cơ bản
   if (!classId || !title) {
@@ -188,12 +249,16 @@ exports.createAssignment = async ({ title, content, type, deadline, classId, dri
   }
 
   const classData = await assertClassTeacher({ classId, userId: currentUserId, userRole });
+  // A post with a due date is always actionable coursework, even if an older
+  // client still sends the default announcement type.
+  const assignmentType = resolveAssignmentType({ type, deadline });
 
   const newAssignment = await prisma.assignment.create({
     data: {
       title,
+      type: assignmentType,
       content: content,
-      deadline: (type === 'assignment' && deadline) ? new Date(deadline) : null,
+      deadline: (assignmentType === 'assignment' && deadline) ? new Date(deadline) : null,
       fileUrls: driveFiles || [],
       links: externalLinks || [],
       testIds: Array.isArray(testIds) ? testIds : [],
@@ -203,7 +268,7 @@ exports.createAssignment = async ({ title, content, type, deadline, classId, dri
 
   if (classData && classData.students.length > 0) {
     const teacherName = classData.teacher?.name || 'Giáo viên';
-    const notifMessage = type === 'assignment'
+    const notifMessage = assignmentType === 'assignment'
       ? `${teacherName} vừa giao bài tập mới: "${newAssignment.title}" cho lớp ${classData.name}.`
       : `${teacherName} vừa đăng một thông báo: "${newAssignment.title}" trong lớp ${classData.name}.`
     await Promise.all(classData.students.map(student =>

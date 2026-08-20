@@ -1,399 +1,267 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useParams } from 'react-router-dom';
-import axiosClient from '../../lib/axios';
-import {
-  FileText,
-  Users, Plus, ChevronRight,
-  X, LayoutDashboard,CheckCircle2,
-  BarChart3,
-  LayoutList,
-  Copy,
-  Calendar
-} from 'lucide-react';
-import { format } from 'date-fns';
+import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react';
+import { AlertTriangle, ArrowLeft, BarChart3, Bell, Calendar, Check, ClipboardList, Clock, Copy, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
+import { compareAsc, format, formatDistanceToNow, isPast, isToday, isTomorrow } from 'date-fns';
+import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import axiosClient from '../../lib/axios';
+import { AppHeader, Button, Card, Input, Modal, TableShell } from '../../components/ui/AppUI';
+import { ui } from '../../components/ui/styles';
 import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import NotificationBell from '../../features/notifications/NotificationBell';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
 
-const Classroom = () => {
+type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
+type ClassroomTab = 'NOTIFICATIONS' | 'MEMBERS' | 'PROGRESS' | 'SCORES';
+type NotificationFilter = 'all' | 'assignment' | 'announcement';
+
+interface CurrentUser { id: string; name: string; role: UserRole }
+interface ClassMember { id: number; name: string | null; email: string; createdAt: string }
+interface ClassAssignment {
+  id: string;
+  title: string;
+  type?: 'assignment' | 'announcement';
+  content?: string | null;
+  deadline?: string | null;
+  createdAt: string;
+  testIds?: number[];
+}
+interface ClassDetail {
+  id: string;
+  name: string;
+  color?: string;
+  teacher: ClassMember;
+  students: ClassMember[];
+  assignments: ClassAssignment[];
+}
+interface AnnouncementData { title: string; content?: string; deadline?: string | null; fileUrls?: string[]; links?: string[] }
+
+const AVATAR_COLORS = ['#1B7A5A', '#0F4D38', '#2563EB', '#A16207', '#8B3A62', '#475569'];
+const requestErrorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
+const plainText = (value?: string | null) => String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+const notificationType = (item: ClassAssignment): 'assignment' | 'announcement' => item.type || (item.deadline || item.testIds?.length ? 'assignment' : 'announcement');
+
+export default function Classroom() {
   const { classId } = useParams();
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [classDetail, setClassDetail] = useState(null);
+  const navigate = useNavigate();
+  const [currentUser] = useState<CurrentUser | null>(() => {
+    const id = localStorage.getItem('userId');
+    if (!id) return null;
+    return { id, name: localStorage.getItem('userName') || 'User', role: (localStorage.getItem('userRole') || 'STUDENT') as UserRole };
+  });
+  const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [activeTab, setActiveTab] = useState<ClassroomTab>('NOTIFICATIONS');
+  const [announcementOpen, setAnnouncementOpen] = useState(false);
+  const [addStudentOpen, setAddStudentOpen] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<ClassMember | null>(null);
 
-  // Auth & Init Logic
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    const userId = localStorage.getItem('userId');
-    const userName = localStorage.getItem('userName');
-    const userRole = localStorage.getItem('userRole'); // Lấy role từ login
-
-    if (userId) {
-      setCurrentUser({
-        id: userId,
-        name: userName || 'Người dùng',
-        role: userRole || 'STUDENT'
-      });
+  const fetchClassDetail = useCallback(async () => {
+    if (!classId) return;
+    setLoading(true);
+    setLoadError('');
+    try {
+      const result = await axiosClient.get<ClassDetail, ClassDetail>(`/api/classes/${classId}`);
+      setClassDetail(result);
+    } catch (error) {
+      console.error(error);
+      setLoadError(requestErrorMessage(error, 'Unable to load class details.'));
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [classId]);
 
+  useEffect(() => {
+    void fetchClassDetail();
+  }, [fetchClassDetail]);
 
-  const fetchClassDetail =  useCallback(async () => {
+  const canManage = currentUser?.role === 'TEACHER' || currentUser?.role === 'ADMIN';
+
+  const createAnnouncement = async (data: AnnouncementData) => {
     if (!classId) return;
     try {
-      const res = await axiosClient.get(`/api/classes/${classId}`);
-      setClassDetail(res);
+      const type = data.deadline ? 'assignment' : 'announcement';
+      await axiosClient.post('/api/classes/posts', { classId, title: data.title, content: data.content, type, deadline: data.deadline || null, driveFiles: data.fileUrls || [], externalLinks: data.links || [], testIds: [] });
+      toast.success(type === 'assignment' ? 'Assignment posted' : 'Announcement posted');
+      setAnnouncementOpen(false);
+      await fetchClassDetail();
     } catch (error) {
-      console.error("Failed to load class details:", error);
-      toast.error("Unable to load class details");
-    } finally {
-    }
-  }, [classId]);
-
-  useEffect(() => {
-    fetchClassDetail();
-  }, [classId]);
-
-  const handleCreateAnnouncement = async (data: any) => {
-    try {
-      const payload = {
-        classId: classId as string,
-        title: data.title,
-        content: data.content,
-        type: 'announcement',
-        deadline: data.deadline || null,
-        driveFiles: data.driveFiles || data.fileUrls || [],
-        externalLinks: data.externalLinks || data.links || [],
-        testIds: []
-      };
-
-      await axiosClient.post('/api/classes/posts', payload);
-
-      toast.success("Announcement posted");
-      fetchClassDetail();
-    } catch (error) {
-      toast.error("Unable to publish post");
+      toast.error(requestErrorMessage(error, 'Unable to publish announcement.'));
     }
   };
 
-  const handleAddStudent = async (email: string) => {
-    try {
-      await axiosClient.post(`/api/classes/${classId}/students`, { email });
-      toast.success("Student added");
-      fetchClassDetail();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "This email could not be found");
-    }
+  const addStudent = async (email: string) => {
+    if (!classId) return;
+    await axiosClient.post(`/api/classes/${classId}/students`, { email });
+    await fetchClassDetail();
   };
 
-  if (!currentUser) return <div className="min-h-screen flex items-center justify-center bg-[#F2F8F5] text-[#6B7280]">Loading class…</div>;
+  const removeStudent = async () => {
+    if (!classId || !studentToRemove) return;
+    await axiosClient.delete(`/api/classes/${classId}/students/${studentToRemove.id}`);
+    setStudentToRemove(null);
+    await fetchClassDetail();
+  };
 
-  // --- RENDER GIAO DIỆN MỚI ---
-  return (
-    <div className="h-screen w-full bg-[#F2F8F5] font-sans text-[#1A1A1A] overflow-hidden">
-      <StudentAndTeacherDashBoard
-        classDetail={classDetail}
-        onCreateAnnouncement={handleCreateAnnouncement}
-        onAddStudent={handleAddStudent}
-        currentUser={currentUser}
-      />
-    </div>
-  );
-};
+  if (!currentUser || loading) return <ClassroomLoading />;
+  if (!classDetail || loadError) return <ClassroomError message={loadError} onBack={() => navigate('/dashboard/classes')} onRetry={() => void fetchClassDetail()} />;
 
-// A. GIAO DIỆN GIÁO VIÊN (TEACHER MODE)
-const StudentAndTeacherDashBoard = ({
-  classDetail, onCreateAnnouncement, onAddStudent, currentUser
-}: any) => {
-  const { classId } = useParams();
-  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
+  const tabs: Array<{ id: ClassroomTab; label: string; icon: ElementType }> = [
+    { id: 'NOTIFICATIONS', label: 'Notifications', icon: Bell },
+    { id: 'MEMBERS', label: 'Members', icon: Users },
+    ...(canManage ? [{ id: 'PROGRESS' as ClassroomTab, label: 'Progress Timeline', icon: GitBranch }, { id: 'SCORES' as ClassroomTab, label: 'Score Report', icon: BarChart3 }] : []),
+  ];
 
-  const [studentEmail, setStudentEmail] = useState("");
-  const [activeTab, setActiveTab] = useState('STREAM'); // Mặc định là 'STREAM' (Bảng tin)
+  return <div className={ui.page}>
+    <ClassroomHeader
+      className={classDetail.name}
+      tabs={tabs}
+      activeTab={activeTab}
+      onSelectTab={setActiveTab}
+      onBack={() => navigate('/dashboard/classes')}
+      currentUser={currentUser}
+    />
 
-  const navigate = useNavigate();
+    <main className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto w-full max-w-[1200px]">
+      {activeTab === 'NOTIFICATIONS' && <NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} />}
+      {activeTab === 'MEMBERS' && <MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} />}
+      {activeTab === 'PROGRESS' && canManage && <div className="p-6 lg:p-8"><WeeklyProgress /></div>}
+      {activeTab === 'SCORES' && canManage && <div className="p-6 lg:p-8"><StudentAnalytics classId={classId} /></div>}
+    </div></main>
 
-  useEffect(() => {
-    setActiveTab('STREAM');
-    setShowAnnouncementForm(false);
-    setIsAddStudentModalOpen(false);
-  }, [classId]);
+    {announcementOpen && <AnnouncementCreator onClose={() => setAnnouncementOpen(false)} onSubmit={data => void createAnnouncement(data)} />}
+    <AddStudentModal open={addStudentOpen} onClose={() => setAddStudentOpen(false)} onAdd={addStudent} />
+    <RemoveStudentModal student={studentToRemove} onClose={() => setStudentToRemove(null)} onRemove={removeStudent} />
+  </div>;
+}
 
-  const submitAddStudent = () => {
-      if(!studentEmail.trim()) return;
-      onAddStudent(studentEmail);
-      setStudentEmail("");
-      setIsAddStudentModalOpen(false);
-  }
-
-  const handleCreateAnnouncement = useCallback((data: any) => {
-    onCreateAnnouncement(data);
-    setShowAnnouncementForm(false);
-  }, [onCreateAnnouncement]);
-
-  // 1. Tab Button Component (để code gọn hơn)
-  const TabButton = ({ id, label, icon: Icon }: any) => (
-    <button 
-      onClick={() => setActiveTab(id)}
-      className={`relative py-4 px-6 text-sm font-bold flex items-center gap-2 transition-colors ${
-        activeTab === id 
-        ? 'text-[#1B7A5A]'
-        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-      }`}
-    >
-      <Icon size={18} />
-      {label}
-      {/* Active Indicator (Gạch chân) */}
-      {activeTab === id && (
-        <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#1B7A5A] rounded-t-full" />
-      )}
-    </button>
-  );
-
-  return (
-    <div className="flex flex-col h-full w-full bg-[#F2F8F5] relative">
-      {isAddStudentModalOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-gray-900/60 transition-opacity">
-          <div className="bg-white rounded-xl border border-[#E2EDE9] shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-800">Add student</h3>
-              <button onClick={() => setIsAddStudentModalOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition"><X size={18}/></button>
-            </div>
-            <div className="space-y-4">
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
-                    <div className="bg-blue-100 p-1 rounded-full"><Users size={16} className="text-blue-600"/></div>
-                    <p className="text-sm text-blue-800 leading-tight pt-0.5">The student will be added to this class immediately.</p>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Student email</label>
-                    <input 
-                      autoFocus type="email" value={studentEmail} onChange={(e) => setStudentEmail(e.target.value)}
-                      placeholder="student@example.com" 
-                      className="app-input w-full"
-                    />
-                </div>
-                <button onClick={submitAddStudent} className="app-button app-button-primary w-full">
-                  <CheckCircle2 size={18}/> Add student
-                </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MAIN CONTENT --- */}
-        {classDetail ? (
-          <>
-            <header className="flex-none h-[60px] bg-white border-b border-[#E2EDE9] px-4 md:px-6 flex items-center z-30">
-              {/* Left: Tên lớp (Ẩn trên mobile để ưu tiên Tabs) */}
-              <div className="flex-1 hidden lg:flex items-center">
-                <h1 className="text-sm font-bold text-slate-800 truncate max-w-[200px]">
-                  {classDetail.name}
-                </h1>
-              </div>
-
-              {/* Center: Tabs (Căn giữa tuyệt đối) */}
-              <div className="flex items-center justify-center gap-1 md:gap-4 overflow-x-auto no-scrollbar">
-                <TabButton id="STREAM" label="Stream" icon={LayoutList} active={activeTab === 'STREAM'} />
-                <TabButton id="MEMBERS" label="Members" icon={Users} active={activeTab === 'MEMBERS'} />
-                {currentUser.role === 'TEACHER' && (
-                  <>
-                    <TabButton id="PROGRESS" label="Progress" icon={Calendar} active={activeTab === 'PROGRESS'} />
-                    <TabButton id="SCORES" label="Score Report" icon={BarChart3} active={activeTab === 'SCORES'} />
-                  </>
-                )}
-              </div>
-
-              {/* Right: Notification & Actions */}
-              <div className="flex-1 flex items-center justify-end gap-2">
-                <NotificationBell currentUserId={currentUser.id} />
-              </div>
-            </header>
-
-            {/* 2. TAB CONTENT AREA */}
-            <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#F2F8F5]">
-              <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-6 animate-fade-in-up">
-
-                {/* --- TAB 1: BẢNG TIN (STREAM) --- */}
-                {activeTab === 'STREAM' && (
-                  <div className="space-y-6 animate-fade-in-up">
-                    
-                    {/* Banner ảnh bìa (Full width trong container) */}
-                    <div className="bg-gradient-to-r from-[#0F4D38] via-[#145F47] to-[#1B7A5A] p-8 rounded-xl shadow-md text-white relative overflow-hidden min-h-[180px] flex flex-col justify-end">
-                      <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4 blur-3xl"></div>
-                      <div className="relative z-10">
-                        <h2 className="text-4xl font-black mb-1">{classDetail.name}</h2>
-                        <p className="text-[#D6EDE4] font-medium opacity-90">Fall 2024 · SAT Master Course</p>
-                      </div>
-                    </div>
-
-                    {/* Bố cục 2 cột: Trái (Mã lớp) - Phải (Nội dung) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                      
-                      {/* CỘT TRÁI: THÔNG TIN NHANH (Mã lớp) */}
-                      <div className="lg:col-span-1 space-y-4">
-                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                          <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Class code</h3>
-                          <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <span className="text-2xl font-black text-[#1B7A5A] tracking-widest">
-                              {classDetail.id?.substring(0, 6).toUpperCase() || "ABCXYZ"}
-                            </span>
-                            <button 
-                              onClick={() => {
-                                navigator.clipboard.writeText(classDetail.id || "");
-                                toast.success("Class code copied");
-                              }}
-                              className="p-2 text-slate-400 hover:text-[#1B7A5A] hover:bg-white rounded-md transition-all shadow-sm"
-                              title="Copy class code"
-                            >
-                              <Copy size={16} />
-                            </button>
-                          </div>
-                          <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
-                            Share this code with students so they can join the class.
-                          </p>
-                        </div>
-
-                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                          <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Upcoming</h3>
-                          <p className="text-xs text-slate-500">No assignments are due soon.</p>
-                        </div>
-                      </div>
-
-                      {/* CỘT PHẢI: FEED (Nội dung chính) */}
-                      <div className="lg:col-span-3 space-y-6">
-                        {/* Thanh tạo bài tập nhanh */}
-                        {currentUser.role === 'TEACHER' && (
-                          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-all group" onClick={() => setShowAnnouncementForm(true)}>
-                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-[#E8F5EF] group-hover:text-[#1B7A5A] transition-colors">
-                              <Plus size={20} />
-                            </div>
-                            <span className="text-sm font-medium text-slate-500 group-hover:text-slate-800">Share an announcement with your class…</span>
-                          </div>
-                        )}
-
-                        {/* Danh sách bài tập */}
-                        <div className="flex flex-col gap-4">
-                          {classDetail.assignments?.length > 0 ? (
-                            classDetail.assignments.map((assignment: any) => (
-                              <div 
-                                key={assignment.id} 
-                                onClick={() => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} 
-                                className="group bg-white p-4 rounded-xl border border-gray-200 hover:border-[#A9CFC1] hover:shadow-md cursor-pointer flex items-center gap-4"
-                              >
-                                <div className="w-12 h-12 rounded-full bg-[#E8F5EF] text-[#1B7A5A] flex items-center justify-center flex-shrink-0 group-hover:bg-[#1B7A5A] group-hover:text-white transition-colors duration-300">
-                                  <FileText size={24} />
-                                </div>  
-                                <div className="flex-1">
-                                  <h4 className="font-medium text-gray-800 text-base mb-1 group-hover:text-[#1B7A5A] transition">
-                                    New assignment: <span className="font-semibold">{assignment.title}</span>
-                                  </h4>
-                                  <div className="text-xs text-gray-400 font-medium">
-                                    {assignment.createdAt 
-                                      ? format(new Date(assignment.createdAt), 'dd/MM/yyyy') 
-                                      : format(new Date(), 'dd/MM/yyyy')}
-                                  </div>
-                                </div>
-                                <div className="text-gray-300 group-hover:text-[#1B7A5A] px-2 transition-colors">
-                                  <ChevronRight size={20} />
-                                </div>
-                              </div>  
-                            ))
-                          ) : (
-                            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
-                              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                <LayoutList size={32} className="text-slate-300" />
-                              </div>
-                              <p className="text-slate-500 font-medium">There are no posts in this class yet.</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* --- TAB 2: THÀNH VIÊN (MEMBERS) --- */}
-                {activeTab === 'MEMBERS' && (
-                  <div className="bg-white rounded-xl shadow-sm border border-[#E2EDE9] overflow-hidden">
-                      <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                          <h3 className="text-lg font-semibold text-[#1A1A1A]">Students</h3>
-                          <button onClick={() => setIsAddStudentModalOpen(true)} className="app-button app-button-primary">
-                            <Plus size={16}/> Add student
-                          </button>
-                      </div>
-                      <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse">
-                              <thead className="bg-gray-50 text-gray-500 text-xs font-bold uppercase">
-                                  <tr>
-                                      <th className="p-5 pl-8">Name</th>
-                                      <th className="p-5">Email</th>
-                                      <th className="p-5 text-right pr-8">Status</th>
-                                  </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100">
-                              {classDetail.students && classDetail.students.length > 0 ? (
-                                  classDetail.students.map((st: any) => (
-                                  <tr key={st.id} className="hover:bg-gray-50/80 transition">
-                                      <td className="p-5 pl-8">
-                                          <div className="flex items-center gap-3">
-                                              <div className="w-9 h-9 rounded-full bg-[#C2DDD4] text-[#1B7A5A] flex items-center justify-center font-bold text-sm">
-                                                  {st.name ? st.name.charAt(0).toUpperCase() : 'S'}
-                                              </div>
-                                              <span className="font-semibold text-gray-700">{st.name || "Unknown"}</span>
-                                          </div>
-                                      </td>
-                                      <td className="p-5 text-gray-600 text-sm">{st.email}</td>
-                                      <td className="p-5 text-right pr-8">
-                                          <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">Joined</span>
-                                      </td>
-                                  </tr>
-                                  ))
-                              ) : (
-                                  <tr>
-                                      <td colSpan={3} className="py-12 text-center text-gray-400 text-sm">No students have joined yet.</td>
-                                  </tr>
-                              )}
-                              </tbody>
-                          </table>
-                      </div>
-                  </div>
-                )}
-
-                {/* --- TAB 3: TIẾN ĐỘ (PROGRESS) --- */}
-                {activeTab === 'PROGRESS' && currentUser.role === 'TEACHER' && (
-                  <WeeklyProgress />
-                )}
-
-                {/* --- TAB 4: SCORE REPORT --- */}
-                {activeTab === 'SCORES' && currentUser.role === 'TEACHER' && (
-                  <StudentAnalytics classId={classId || '1'}/>
-                )}
-              </div>
-            </main>
-            {/* Announcement Form */}
-            {showAnnouncementForm && (
-              <AnnouncementCreator
-                onClose={() => setShowAnnouncementForm(false)}
-                onSubmit={handleCreateAnnouncement}
-              />
-            )}
-          </>
-        ) : (
-            // EMPTY STATE KHI CHƯA CHỌN LỚP
-            <div className="h-full flex flex-col items-center justify-center bg-gray-50 p-8 text-center min-h-[600px]">
-                <div className="w-40 h-40 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm relative">
-                     <LayoutDashboard size={64} className="text-indigo-300"/>
-                </div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">No class selected</h2>
-                <p className="text-gray-500 text-sm">Select a class from the sidebar.</p>
-            </div>
-        )}
+function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack, currentUser }: { className: string; tabs: Array<{ id: ClassroomTab; label: string; icon: ElementType }>; activeTab: ClassroomTab; onSelectTab: (tab: ClassroomTab) => void; onBack: () => void; currentUser: CurrentUser }) {
+  const profileInitials = initials(currentUser.name);
+  return <header className="sticky top-0 z-30 grid h-[68px] shrink-0 grid-cols-[minmax(180px,1fr)_auto_minmax(88px,1fr)] items-center border-b border-[#B9CBC4] bg-white px-4 lg:px-6">
+    <div className="flex min-w-0 items-center gap-2.5">
+      <button type="button" onClick={onBack} className="app-icon-button h-8 w-8 shrink-0" aria-label="Back to classes"><ArrowLeft size={17} /></button>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold leading-5 text-[#1A1A1A]">Classroom</p>
+        <p className="truncate text-xs leading-4 text-[#6B7280]">{className}</p>
       </div>
-  );
-};
+    </div>
+    <nav className="flex h-full min-w-0 overflow-x-auto" aria-label="Classroom sections">{tabs.map(tab => <ClassTabButton key={tab.id} {...tab} active={activeTab === tab.id} onSelect={onSelectTab} />)}</nav>
+    <div className="flex items-center justify-end gap-4">
+      <NotificationBell currentUserId={currentUser.id} />
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white" title={currentUser.name}>{profileInitials}</div>
+    </div>
+  </header>;
+}
 
-export default Classroom;
+function ClassTabButton({ id, label, icon: Icon, active, onSelect }: { id: ClassroomTab; label: string; icon: ElementType; active: boolean; onSelect: (tab: ClassroomTab) => void }) {
+  return <button type="button" onClick={() => onSelect(id)} className={`relative flex h-full shrink-0 items-center gap-1.5 border-0 px-4 text-sm transition-colors ${active ? 'font-medium text-[#1B7A5A]' : 'text-[#6B7280] hover:text-[#1A1A1A]'}`}><Icon size={14} />{label}{active && <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 bg-[#1B7A5A]" />}</button>;
+}
+
+function NotificationsTab({ classroom, canManage, onNewAnnouncement, onOpenAssignment }: { classroom: ClassDetail; canManage: boolean; onNewAnnouncement: () => void; onOpenAssignment: (assignmentId: string) => void }) {
+  const [filter, setFilter] = useState<NotificationFilter>('all');
+  const assignments = useMemo(() => classroom.assignments || [], [classroom.assignments]);
+  const counts = useMemo(() => ({ all: assignments.length, assignment: assignments.filter(item => notificationType(item) === 'assignment').length, announcement: assignments.filter(item => notificationType(item) === 'announcement').length }), [assignments]);
+  const filtered = assignments.filter(item => filter === 'all' || notificationType(item) === filter);
+  const attention = assignments.filter(item => notificationType(item) === 'assignment' && item.deadline).sort((a, b) => compareAsc(new Date(a.deadline as string), new Date(b.deadline as string))).slice(0, 2);
+
+  return <div className="p-5 md:p-6 lg:p-8"><div className="flex min-w-0 flex-col gap-6">
+    {canManage && <div className="flex flex-wrap items-center justify-between gap-4"><InviteCodeWidget classId={classroom.id} /><Button size="sm" onClick={onNewAnnouncement}><Plus size={14} />New announcement</Button></div>}
+    <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)] lg:gap-8">
+      <aside className="flex min-w-0 flex-col gap-5">
+        <Card className="flex flex-col gap-1 p-3"><FilterButton active={filter === 'all'} icon={Bell} label="All Notifications" count={counts.all} onClick={() => setFilter('all')} /><FilterButton active={filter === 'assignment'} icon={ClipboardList} label="Assignments" count={counts.assignment} onClick={() => setFilter('assignment')} /><FilterButton active={filter === 'announcement'} icon={Megaphone} label="Announcements" count={counts.announcement} onClick={() => setFilter('announcement')} /></Card>
+        <Card className="relative overflow-hidden p-5"><div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-bl-full bg-[#E8F5EF] opacity-60" /><h3 className="relative z-10 mb-4 text-sm font-bold text-[#1A1A1A]">Needs Attention</h3><div className="relative z-10 flex flex-col gap-4">{attention.length === 0 ? <p className="text-xs leading-5 text-[#6B7280]">You're all caught up.</p> : attention.map(item => { const urgent = Boolean(item.deadline && (isPast(new Date(item.deadline)) || isToday(new Date(item.deadline)))); return <button key={item.id} type="button" onClick={() => onOpenAssignment(item.id)} className="relative flex gap-3 border-0 py-0 pl-3 text-left"><span aria-hidden className={`absolute inset-y-0 left-0 w-0.5 ${urgent ? 'bg-rose-500' : 'bg-amber-500'}`} /><div className="flex min-w-0 flex-col gap-0.5"><p className="line-clamp-1 text-xs font-semibold text-[#1A1A1A]">{item.title}</p><span className={`flex items-center gap-1 text-[11px] font-medium ${urgent ? 'text-rose-600' : 'text-[#6B7280]'}`}>{urgent ? <AlertTriangle size={11} /> : <Clock size={11} />}{formatAttentionDueDate(item.deadline)}</span></div></button>; })}</div></Card>
+      </aside>
+      <section className="flex min-w-0 flex-col gap-4">{filtered.length === 0 ? <Card className="flex min-h-56 flex-col items-center justify-center p-8 text-center"><Bell size={22} className="text-[#1B7A5A]" /><h3 className="mt-3 text-sm font-semibold text-[#1A1A1A]">No notifications</h3><p className="mt-1 text-xs text-[#6B7280]">New announcements and assignments will appear here.</p></Card> : filtered.map(item => <NotificationCard key={item.id} item={item} onOpen={() => onOpenAssignment(item.id)} />)}</section>
+    </div>
+  </div></div>;
+}
+
+function FilterButton({ active, icon: Icon, label, count, onClick }: { active: boolean; icon: ElementType; label: string; count: number; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-xs font-medium transition-colors ${active ? 'bg-[#E8F5EF] text-[#145F47]' : 'text-[#5E6B66] hover:bg-[#F2F8F5] hover:text-[#1A1A1A]'}`}><span className="flex items-center gap-2.5"><Icon size={14} />{label}</span><span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-semibold">{count}</span></button>;
+}
+
+function NotificationCard({ item, onOpen }: { item: ClassAssignment; onOpen: () => void }) {
+  const type = notificationType(item);
+  const assignment = type === 'assignment';
+  const body = plainText(item.content);
+  return <Card className={`flex min-w-0 gap-4 overflow-hidden border-l-4 p-4 sm:p-5 ${assignment ? 'border-l-[#1B7A5A]' : 'border-l-[#E8C040]'}`}><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${assignment ? 'bg-[#E8F5EF] text-[#1B7A5A]' : 'bg-[#FEF9E7] text-[#92640A]'}`}>{assignment ? <ClipboardList size={16} /> : <Megaphone size={16} />}</span><div className="min-w-0 flex-1"><div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1"><span className={`text-[10px] font-semibold tracking-[0.1em] ${assignment ? 'text-[#1B7A5A]' : 'text-[#92640A]'}`}>{assignment ? 'ASSIGNMENT' : 'ANNOUNCEMENT'}</span><span className="text-xs text-[#6B7280]">{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}</span></div><h3 className="mt-1 break-words text-sm font-semibold leading-5 text-[#1A1A1A]">{item.title}</h3>{body && <p className="mt-1.5 line-clamp-2 break-words text-xs leading-5 text-[#5E6B66]">{body}</p>}<div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#D2DED9] pt-3">{item.deadline ? <span className={`flex items-center gap-1.5 text-xs font-medium ${isPast(new Date(item.deadline)) ? 'text-red-700' : 'text-[#7A5600]'}`}><Calendar size={13} />{formatDueDate(item.deadline)}</span> : <span />}<button type="button" onClick={onOpen} className="flex items-center gap-1 text-xs font-semibold text-[#1B7A5A] hover:underline">{assignment ? 'View assignment' : 'Read more'}<span aria-hidden>→</span></button></div></div></Card>;
+}
+
+function InviteCodeWidget({ classId }: { classId: string }) {
+  const [copied, setCopied] = useState(false);
+  const code = classId.slice(0, 8).toUpperCase();
+  const copy = async () => { await navigator.clipboard.writeText(classId); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
+  return <div className="flex max-w-[280px] items-center justify-between gap-3 rounded-xl border border-[#C2DDD4] bg-[#E8F5EF] px-3 py-2"><div><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#1B7A5A]/80">Class invite code</p><p className="mt-0.5 font-mono text-sm font-semibold tracking-[0.14em] text-[#145F47]">{code}</p></div><button type="button" onClick={() => void copy()} className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1B7A5A]/10 text-[#1B7A5A] hover:bg-[#1B7A5A]/20" aria-label="Copy class code">{copied ? <Check size={14} /> : <Copy size={14} />}</button></div>;
+}
+
+function MembersTab({ classroom, canManage, onInvite, onRemove }: { classroom: ClassDetail; canManage: boolean; onInvite: () => void; onRemove: (student: ClassMember) => void }) {
+  return <div className="flex flex-col gap-8 p-5 md:p-6 lg:p-8">
+    <MemberSection title="Teachers" count={1}>
+      <MemberTable label="Teacher" members={[classroom.teacher]} canManage={false} />
+    </MemberSection>
+
+    <MemberSection
+      title="Students"
+      count={classroom.students.length}
+      action={canManage ? <Button size="sm" onClick={onInvite}><Plus size={14} />Invite student</Button> : undefined}
+    >
+      <MemberTable label="Student" members={classroom.students} canManage={canManage} onRemove={onRemove} />
+    </MemberSection>
+  </div>;
+}
+
+function MemberSection({ title, count, action, children }: { title: string; count: number; action?: ReactNode; children: ReactNode }) {
+  return <section>
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="flex items-baseline gap-2"><h2 className="text-base font-semibold text-[#1A1A1A]">{title}</h2><span className="text-xs text-[#6B7280]">{count}</span></div>
+      {action}
+    </div>
+    {children}
+  </section>;
+}
+
+function MemberTable({ label, members, canManage, onRemove }: { label: 'Teacher' | 'Student'; members: ClassMember[]; canManage: boolean; onRemove?: (student: ClassMember) => void }) {
+  return <TableShell className="!border-[#C9D8D2] !shadow-none"><div className="overflow-x-auto"><table className="w-full min-w-[680px] table-fixed text-sm">
+    <thead><tr className="border-b border-[#C9D8D2] bg-[#F5FAF7]"><th className="w-[30%] px-5 py-3 text-left text-xs font-medium text-[#5E6B66]">{label}</th><th className="w-[34%] px-4 py-3 text-left text-xs font-medium text-[#5E6B66]">Email</th><th className="w-[24%] px-4 py-3 text-left text-xs font-medium text-[#5E6B66]">Joined</th><th className="w-[12%] px-5 py-3 text-right text-xs font-medium text-[#5E6B66]">Actions</th></tr></thead>
+    <tbody>{members.length === 0 ? <tr><td colSpan={4} className="px-5 py-14 text-center text-sm text-[#6B7280]">No students have joined this class yet.</td></tr> : members.map((member, index) => <tr key={member.id} className={`${index < members.length - 1 ? 'border-b border-[#D2DED9]' : ''} transition-colors hover:bg-[#F9FCFA]`}>
+      <td className="px-5 py-3"><div className="flex min-w-0 items-center gap-2.5"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white" style={{ backgroundColor: AVATAR_COLORS[index % AVATAR_COLORS.length] }}>{initials(member.name)}</span><span className="truncate font-medium text-[#1A1A1A]">{member.name || `Unknown ${label.toLowerCase()}`}</span></div></td>
+      <td className="truncate px-4 py-3 text-[#4B5563]" title={member.email}>{member.email}</td>
+      <td className="px-4 py-3 text-[#5E6B66]">{formatMemberSince(member.createdAt)}</td>
+      <td className="px-5 py-3 text-right">{canManage && onRemove ? <button type="button" onClick={() => onRemove(member)} className="app-icon-button ml-auto h-8 w-8 text-[#6B7280] hover:bg-red-50 hover:text-red-700" aria-label={`Remove ${member.name || 'student'}`} title="Remove student"><Trash2 size={15} /></button> : <span className="text-[#9CA3AF]">—</span>}</td>
+    </tr>)}</tbody>
+  </table></div></TableShell>;
+}
+
+function AddStudentModal({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (email: string) => Promise<void> }) {
+  const [email, setEmail] = useState('');
+  const [saving, setSaving] = useState(false);
+  const submit = async (event: React.FormEvent) => { event.preventDefault(); if (!email.trim()) return; setSaving(true); try { await onAdd(email.trim()); toast.success('Student added'); setEmail(''); onClose(); } catch (error) { toast.error(requestErrorMessage(error, 'This student could not be added.')); } finally { setSaving(false); } };
+  return <Modal open={open} onClose={onClose} closeOnBackdrop title="Invite a student" subtitle="Add a student to this class using their account email." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !email.trim()} onClick={submit}>{saving ? 'Adding…' : 'Add student'}</Button></>}><form onSubmit={submit}><label className="block"><span className="mb-2 block text-sm font-medium text-[#1A1A1A]">Student email</span><Input autoFocus type="email" className="w-full" value={email} onChange={event => setEmail(event.target.value)} placeholder="student@example.com" /></label></form></Modal>;
+}
+
+function RemoveStudentModal({ student, onClose, onRemove }: { student: ClassMember | null; onClose: () => void; onRemove: () => Promise<void> }) {
+  const [removing, setRemoving] = useState(false);
+  const submit = async () => { setRemoving(true); try { await onRemove(); toast.success('Student removed'); } catch (error) { toast.error(requestErrorMessage(error, 'Unable to remove this student.')); } finally { setRemoving(false); } };
+  return <Modal open={Boolean(student)} onClose={onClose} closeOnBackdrop title="Remove student" subtitle="This student will lose access to the class and its assigned tests." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="destructive" disabled={removing} onClick={() => void submit()}>{removing ? 'Removing…' : 'Remove student'}</Button></>}><p className="text-sm leading-6 text-[#4B5563]">Remove <span className="font-semibold text-[#1A1A1A]">{student?.name || student?.email}</span> from this class?</p></Modal>;
+}
+
+function ClassroomLoading() {
+  return <div className={ui.page}><div className="h-[60px] animate-pulse border-b border-[#C9D8D2] bg-white" /><div className="mx-auto grid w-full max-w-[1200px] gap-8 p-8 lg:grid-cols-12"><div className="h-56 animate-pulse rounded-xl bg-[#DDE9E4] lg:col-span-4" /><div className="h-80 animate-pulse rounded-xl bg-[#DDE9E4] lg:col-span-8" /></div></div>;
+}
+
+function ClassroomError({ message, onBack, onRetry }: { message: string; onBack: () => void; onRetry: () => void }) {
+  return <div className={ui.page}><AppHeader title="Classroom" showProfile={false} /><main className="flex flex-1 items-center justify-center p-6"><Card className="w-full max-w-md p-8 text-center"><h2 className="text-base font-semibold text-[#1A1A1A]">Class could not be loaded</h2><p className="mt-2 text-sm text-[#6B7280]">{message}</p><div className="mt-5 flex justify-center gap-2"><Button variant="ghost" onClick={onBack}>Back</Button><Button variant="outline" onClick={onRetry}>Try again</Button></div></Card></main></div>;
+}
+
+const initials = (name: string | null) => String(name || 'Student').split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase();
+const formatDueDate = (value?: string | null) => value ? `${isPast(new Date(value)) ? 'Overdue' : 'Due'} ${format(new Date(value), 'MMM d')}` : '';
+const formatAttentionDueDate = (value?: string | null) => {
+  if (!value) return '';
+  const dueDate = new Date(value);
+  if (isToday(dueDate)) return 'Due Today';
+  if (isTomorrow(dueDate)) return 'Due Tomorrow';
+  if (isPast(dueDate)) return `Overdue ${format(dueDate, 'MMM d')}`;
+  return `Due ${format(dueDate, 'MMM d')}`;
+};
+const formatMemberSince = (value?: string | null) => value ? format(new Date(value), 'MMM d, yyyy') : '—';

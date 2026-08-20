@@ -5,6 +5,7 @@ exports.createClass = async (req, res) => {
   try {
     const newClass = await classService.createClass({
       name: req.body.name,
+      color: req.body.color,
       userId: req.user?.userId || req.user?.id,
       userRole: req.user?.role || req.user?.userRole,
     });
@@ -16,11 +17,43 @@ exports.createClass = async (req, res) => {
   }
 };
 
+exports.updateClass = async (req, res) => {
+  try {
+    const classroom = await classService.updateClass({
+      classId: req.params.id,
+      name: req.body.name,
+      color: req.body.color,
+      userId: req.user?.userId || req.user?.id,
+      userRole: req.user?.role || req.user?.userRole,
+    });
+    res.json(classroom);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Update Class Error:', error);
+    res.status(500).json({ error: 'Unable to update class.' });
+  }
+};
+
+exports.deleteClass = async (req, res) => {
+  try {
+    const result = await classService.deleteClass({
+      classId: req.params.id,
+      userId: req.user?.userId || req.user?.id,
+      userRole: req.user?.role || req.user?.userRole,
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Delete Class Error:', error);
+    res.status(500).json({ error: 'Unable to delete class.' });
+  }
+};
+
 exports.getMyClasses = async (req, res) => {
   try {
     const classes = await classService.getMyClasses({
       userId: req.user?.id || req.user?.userId,
-      userRole: req.user?.role,
+      userRole: req.user?.role || req.user?.userRole,
     });
     res.json(classes);
   } catch (error) {
@@ -57,6 +90,22 @@ exports.addStudentToClass = async (req, res) => {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
     console.error("Add Student Error:", error);
     res.status(500).json({ error: "Lỗi khi thêm học sinh" });
+  }
+};
+
+exports.removeStudentFromClass = async (req, res) => {
+  try {
+    const result = await classService.removeStudentFromClass({
+      classId: req.params.classId,
+      studentId: req.params.studentId,
+      currentUserId: req.user?.id || req.user?.userId,
+      userRole: req.user?.role || req.user?.userRole,
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Remove Student Error:', error);
+    res.status(500).json({ error: 'Unable to remove student from class.' });
   }
 };
 

@@ -95,7 +95,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({
                 {idx + 1}
                 {isMarked && (
                   <div className="absolute -top-1.5 -right-1.5 z-20 pointer-events-none">
-                    <svg className="w-4 h-4 text-red-700 fill-current drop-shadow-md" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-red-700 fill-current" viewBox="0 0 24 24">
                       <path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
                     </svg>
                   </div>

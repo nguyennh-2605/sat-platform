@@ -215,4 +215,12 @@ exports.previewImport = async ({ file, subject, moduleCount }) => {
   return { fileName: file.originalname, ...preview };
 };
 
+exports.extractImportFile = async ({ file }) => {
+  if (!file) throw new ApiError(400, { error: 'Choose a PDF, DOCX, or TXT file.' });
+  return {
+    fileName: file.originalname,
+    text: await extractText(file),
+  };
+};
+
 exports.previewText = ({ text, subject, moduleCount }) => parseText({ text, subject, expectedModuleCount: moduleCount });

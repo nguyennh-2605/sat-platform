@@ -10,6 +10,7 @@ const upload = multer({
 });
 
 router.post('/preview', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), upload.single('file'), controller.previewFile);
+router.post('/extract', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), upload.single('file'), controller.extractFile);
 router.post('/preview-text', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), controller.previewText);
 
 module.exports = router;

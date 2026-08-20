@@ -10,7 +10,10 @@ router.get('/:id/score-report', authenticateToken, authorizeRole(['TEACHER', 'AD
 router.get('/:testId/report', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.getTestAnalytics);
 router.get('/:id', authenticateToken, classController.getClassDetail);
 router.post('/', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.createClass);
+router.patch('/:id', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.updateClass);
+router.delete('/:id', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.deleteClass);
 router.post('/:classId/students', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.addStudentToClass);
+router.delete('/:classId/students/:studentId', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.removeStudentFromClass);
 router.post('/posts', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), classController.createAssignment);
 router.post('/submissions', authenticateToken, classController.createSubmission);
 

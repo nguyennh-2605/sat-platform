@@ -16,6 +16,17 @@ exports.previewFile = async (req, res) => {
   }
 };
 
+exports.extractFile = async (req, res) => {
+  try {
+    const result = await testImportService.extractImportFile({ file: req.file });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Document text extraction error:', error);
+    res.status(500).json({ error: 'Unable to read this document. Try a searchable PDF or DOCX file.' });
+  }
+};
+
 exports.previewText = async (req, res) => {
   try {
     const preview = testImportService.previewText({

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { previewText } = require('../src/services/test-import.service');
+const { extractImportFile, previewText } = require('../src/services/test-import.service');
 
 const source = `=== MODULE 1 ===
 
@@ -50,4 +50,18 @@ test('deterministic import leaves missing taxonomy for review instead of guessin
   assert.equal(second.skillCode, '');
   assert.equal(second.issues.some(item => item.code === 'MISSING_DOMAIN'), true);
   assert.equal(second.issues.some(item => item.code === 'MISSING_SKILL'), true);
+});
+
+test('document extraction returns editable text for TXT uploads', async () => {
+  const result = await extractImportFile({
+    file: {
+      originalname: 'practice-test.txt',
+      mimetype: 'text/plain',
+      size: Buffer.byteLength(source),
+      buffer: Buffer.from(source),
+    },
+  });
+
+  assert.equal(result.fileName, 'practice-test.txt');
+  assert.equal(result.text, source);
 });

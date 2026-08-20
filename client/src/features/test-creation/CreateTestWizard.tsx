@@ -7,8 +7,10 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
-  ClipboardPaste,
+  CircleHelp,
+  Eye,
   FileText,
+  ImagePlus,
   LoaderCircle,
   Save,
   ShieldCheck,
@@ -17,7 +19,7 @@ import {
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import BlockRenderer from '../../components/content/BlockRenderer';
-import { AppHeader, Badge, Button, Card, Input, Select } from '../../components/ui/AppUI';
+import { AppHeader, Badge, Button, Card, Input, Modal, Select } from '../../components/ui/AppUI';
 import { ui } from '../../components/ui/styles';
 import type { ContentBlock } from '../../types/quiz';
 
@@ -51,6 +53,7 @@ interface ImportPreview {
   summary: { questionCount: number; classifiedCount: number; errorCount: number; warningCount: number };
   issues: ImportIssue[];
 }
+interface ExtractedDocument { fileName: string; text: string }
 
 const steps: Array<{ key: Step; label: string }> = [
   { key: 'SETUP', label: 'Setup' },
@@ -63,6 +66,35 @@ const emptyPreview = (): ImportPreview => ({
   summary: { questionCount: 0, classifiedCount: 0, errorCount: 0, warningCount: 0 },
   issues: [],
 });
+
+const importTemplate = `=== MODULE 1 ===
+
+QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[TEXT]
+Paste the passage or stimulus here.
+
+[TABLE]
+Year\tGroup A\tGroup B
+2023\t42\t51
+2024\t48\t57
+
+Write the question here.
+A. First choice
+B. Second choice
+C. Third choice
+D. Fourth choice
+Answer: B
+Explanation: Optional explanation
+
+QUESTION 2
+Domain: Information and Ideas
+Skill: Command of Evidence
+
+Write a student-produced response question here.
+Answer: 12.5`;
 
 const fileTitle = (fileName: string) => fileName
   .replace(/\.[^/.]+$/, '')
@@ -117,6 +149,8 @@ const CreateTestWizard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
   const [step, setStep] = useState<Step>('SETUP');
   const [form, setForm] = useState({
     title: '',
@@ -131,8 +165,9 @@ const CreateTestWizard = () => {
   const [preview, setPreview] = useState<ImportPreview>(emptyPreview);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
   const [rawText, setRawText] = useState('');
-  const [pasteOpen, setPasteOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [importError, setImportError] = useState('');
   const userRole = localStorage.getItem('userRole') || 'TEACHER';
@@ -188,22 +223,46 @@ const CreateTestWizard = () => {
     setStep('IMPORT');
   };
 
+  const previewText = async (text = rawText) => {
+    if (!text.trim()) return toast.error('Enter or upload test content before previewing it');
+    setIsParsing(true);
+    setImportError('');
+    try {
+      const response = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview-text', {
+        text,
+        subject: form.subject,
+        moduleCount: form.moduleCount,
+      });
+      applyPreview(response);
+      toast.success('Preview updated');
+    } catch (error: unknown) {
+      const message = requestErrorMessage(error, 'Unable to parse the supplied text.');
+      setImportError(message);
+      toast.error(message);
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
   const parseFile = async (file: File) => {
     setIsParsing(true);
     setImportError('');
     try {
       const body = new FormData();
       body.append('file', file);
-      body.append('subject', form.subject);
-      body.append('moduleCount', String(form.moduleCount));
-      const response = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview', body, { headers: { 'Content-Type': 'multipart/form-data' } });
-      if (!form.title.trim()) setForm(current => ({ ...current, title: fileTitle(file.name) }));
-      applyPreview(response);
-      setStep('REVIEW');
-      toast.success('Document parsed. Review the questions before saving.');
+      const extracted = await axiosClient.post<ExtractedDocument, ExtractedDocument>('/api/test-imports/extract', body, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setRawText(extracted.text);
+      if (!form.title.trim()) setForm(current => ({ ...current, title: fileTitle(extracted.fileName) }));
+      const response = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview-text', {
+        text: extracted.text,
+        subject: form.subject,
+        moduleCount: form.moduleCount,
+      });
+      applyPreview({ ...response, fileName: extracted.fileName });
+      toast.success('Document loaded into the editor');
     } catch (error: unknown) {
       console.error(error);
-      const message = requestErrorMessage(error, 'Unable to parse this document.');
+      const message = requestErrorMessage(error, 'Unable to read this document.');
       setImportError(message);
       toast.error(message);
     } finally {
@@ -212,25 +271,42 @@ const CreateTestWizard = () => {
     }
   };
 
-  const parsePastedText = async () => {
-    if (!rawText.trim()) return toast.error('Paste test content before previewing it');
-    setIsParsing(true);
-    setImportError('');
+  const insertAtCursor = (text: string) => {
+    const editor = editorRef.current;
+    const start = editor?.selectionStart ?? rawText.length;
+    const end = editor?.selectionEnd ?? rawText.length;
+    const separator = start > 0 && rawText[start - 1] !== '\n' ? '\n\n' : '';
+    const insertion = `${separator}[IMG]\n${text}\n`;
+    setRawText(current => `${current.slice(0, start)}${insertion}${current.slice(end)}`);
+    requestAnimationFrame(() => {
+      editor?.focus();
+      const cursor = start + insertion.length;
+      editor?.setSelectionRange(cursor, cursor);
+    });
+  };
+
+  const uploadImage = async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) return toast.error('Choose an image smaller than 5 MB');
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_PRESET;
+    if (!cloudName || !uploadPreset) return toast.error('Cloudinary upload is not configured');
+    setIsUploadingImage(true);
     try {
-      const response = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview-text', {
-        text: rawText,
-        subject: form.subject,
-        moduleCount: form.moduleCount,
-      });
-      applyPreview(response);
-      setStep('REVIEW');
-      toast.success('Text parsed. Review the questions before saving.');
-    } catch (error: unknown) {
-      const message = requestErrorMessage(error, 'Unable to parse the supplied text.');
-      setImportError(message);
-      toast.error(message);
+      const body = new FormData();
+      body.append('file', file);
+      body.append('upload_preset', uploadPreset);
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body });
+      if (!response.ok) throw new Error('Image upload failed');
+      const data = await response.json() as { secure_url?: string };
+      if (!data.secure_url) throw new Error('Image URL is missing');
+      insertAtCursor(data.secure_url);
+      toast.success('Image URL inserted');
+    } catch (error) {
+      console.error(error);
+      toast.error('Unable to upload this image');
     } finally {
-      setIsParsing(false);
+      setIsUploadingImage(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
     }
   };
 
@@ -284,21 +360,18 @@ const CreateTestWizard = () => {
       <AppHeader
         title="Create Exam"
         subtitle="Import, review, and organize SAT questions"
-        rightContent={step === 'REVIEW' ? <Button size="sm" disabled={blockingErrors || isSaving} onClick={saveTest}><Save size={15} />{isSaving ? 'Creating…' : 'Create exam'}</Button> : undefined}
+        centerContent={<WizardStepper step={step} />}
+        rightContent={step === 'IMPORT'
+          ? <Button variant="outline" size="sm" onClick={() => setGuideOpen(true)}><CircleHelp size={15} />Formatting guide</Button>
+          : step === 'REVIEW'
+            ? <Button size="sm" disabled={blockingErrors || isSaving} onClick={saveTest}><Save size={15} />{isSaving ? 'Creating…' : 'Create exam'}</Button>
+            : undefined}
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className={`${ui.content} flex min-h-full flex-col gap-6`}>
-          <div className="flex items-center gap-2" aria-label="Create exam progress">
-            {steps.map((item, index) => {
-              const active = item.key === step;
-              const complete = steps.findIndex(stepItem => stepItem.key === step) > index;
-              return <div key={item.key} className="flex items-center gap-2"><span className={`flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-semibold ${active || complete ? 'border-[#1B7A5A] bg-[#E8F5EF] text-[#145F47]' : 'border-[#E2EDE9] bg-white text-[#6B7280]'}`}>{complete ? <CheckCircle2 size={15} /> : index + 1}</span><span className={`text-xs font-medium ${active ? 'text-[#1A1A1A]' : 'text-[#6B7280]'}`}>{item.label}</span>{index < steps.length - 1 && <span className="h-px w-7 bg-[#C2DDD4]" />}</div>;
-            })}
-          </div>
-
           {step === 'SETUP' && (
-            <Card className="mx-auto w-full max-w-3xl p-6 lg:p-8">
+            <Card className="wizard-step-enter mx-auto w-full max-w-3xl p-6 lg:p-8">
               <div className="mb-6"><h2 className="text-lg font-semibold text-[#1A1A1A]">Test details</h2><p className="mt-1 text-sm text-[#6B7280]">Set up the exam before importing its questions.</p></div>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <Field label="Test name" className="md:col-span-2"><Input className="w-full" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder="e.g. SAT Reading Practice Test 1" autoFocus /></Field>
@@ -313,29 +386,43 @@ const CreateTestWizard = () => {
           )}
 
           {step === 'IMPORT' && (
-            <div className="mx-auto w-full max-w-3xl space-y-4">
-              <Card className="p-6 lg:p-8">
-                <div className="flex flex-col items-center rounded-xl border border-dashed border-[#C2DDD4] bg-[#F2F8F5] px-6 py-12 text-center">
-                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-[#1B7A5A] text-white"><UploadCloud size={21} /></div>
-                  <h2 className="text-lg font-semibold text-[#1A1A1A]">Upload test file</h2>
-                  <p className="mt-2 max-w-md text-sm leading-6 text-[#6B7280]">Import a searchable PDF, DOCX, or TXT file. The parser runs on our server and does not use AI.</p>
-                  <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void parseFile(file); }} />
-                  <Button className="mt-5" disabled={isParsing} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoaderCircle size={16} className="animate-spin" /> : <UploadCloud size={16} />}{isParsing ? 'Parsing document…' : 'Choose file'}</Button>
-                  <p className="mt-3 text-xs text-[#6B7280]">Maximum 15 MB · Scanned PDFs must be converted to searchable PDFs first.</p>
+            <div className="wizard-step-enter flex min-h-0 flex-1 flex-col gap-4">
+              <Card className="flex min-h-[620px] flex-1 flex-col overflow-hidden !border-[#C9D8D2]">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#C9D8D2] px-4 py-3">
+                  <div><h2 className="text-sm font-semibold text-[#1A1A1A]">Import workspace</h2><p className="mt-0.5 text-xs text-[#6B7280]">Edit structured text and check the parsed result side by side.</p></div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void parseFile(file); }} />
+                    <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadImage(file); }} />
+                    <Button variant="outline" size="sm" disabled={isParsing} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoaderCircle size={15} className="animate-spin" /> : <UploadCloud size={15} />}Upload file</Button>
+                    <Button variant="outline" size="sm" disabled={isUploadingImage} onClick={() => imageInputRef.current?.click()}>{isUploadingImage ? <LoaderCircle size={15} className="animate-spin" /> : <ImagePlus size={15} />}Upload image</Button>
+                    <Button size="sm" disabled={isParsing || !rawText.trim()} onClick={() => void previewText()}>{isParsing ? <LoaderCircle size={15} className="animate-spin" /> : <Eye size={15} />}Update preview</Button>
+                  </div>
                 </div>
-                {importError && <ImportNotice tone="error" message={importError} />}
-              </Card>
 
-              <Card className="p-5">
-                <button onClick={() => setPasteOpen(open => !open)} className="flex w-full items-center justify-between text-left"><span><span className="flex items-center gap-2 text-sm font-semibold text-[#1A1A1A]"><ClipboardPaste size={17} className="text-[#1B7A5A]" />Paste structured text</span><span className="mt-1 block text-xs text-[#6B7280]">Use MODULE, QUESTION, Domain, Skill, and Answer labels for the most accurate import.</span></span><ChevronRight size={17} className={`text-[#6B7280] transition-transform ${pasteOpen ? 'rotate-90' : ''}`} /></button>
-                {pasteOpen && <div className="mt-4 border-t border-[#E2EDE9] pt-4"><textarea value={rawText} onChange={event => setRawText(event.target.value)} className="min-h-56 w-full rounded-lg border border-[#E2EDE9] bg-white p-3 font-mono text-sm text-[#1A1A1A] outline-none focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20" placeholder="=== MODULE 1 ===&#10;&#10;QUESTION 1&#10;Domain: Information and Ideas&#10;Skill: Inferences&#10;…" /><div className="mt-3 flex justify-end"><Button disabled={isParsing} onClick={() => void parsePastedText()}>{isParsing ? <LoaderCircle size={16} className="animate-spin" /> : <ClipboardPaste size={16} />}Preview text</Button></div></div>}
+                <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
+                  <section className="flex min-h-[520px] min-w-0 flex-col border-b border-[#C9D8D2] lg:border-b-0 lg:border-r">
+                    <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#C9D8D2] bg-[#F5FAF7] px-4"><span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#145F47]">Structured text</span><span className="text-[11px] text-[#5E6B66]">{rawText.length.toLocaleString()} characters</span></div>
+                    <textarea ref={editorRef} value={rawText} onChange={event => setRawText(event.target.value)} spellCheck={false} className="min-h-0 flex-1 resize-none bg-white p-4 font-mono text-xs leading-6 text-[#1A1A1A] outline-none placeholder:text-[#9CA3AF] focus:bg-[#FCFEFD]" placeholder={importTemplate} />
+                  </section>
+
+                  <section className="flex min-h-[520px] min-w-0 flex-col bg-[#F9FCFA]">
+                    <div className="flex h-11 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#C9D8D2] bg-[#F5FAF7] px-4">
+                      <div className="flex items-center gap-3 text-[11px] text-[#6B7280]"><span className="font-semibold uppercase tracking-[0.08em] text-[#145F47]">Preview</span>{preview.summary.questionCount > 0 && <><span>{preview.summary.questionCount} questions</span><span className={preview.summary.errorCount ? 'font-semibold text-red-700' : 'text-[#1B7A5A]'}>{preview.summary.errorCount} errors</span></>}</div>
+                      {selectedQuestion && <div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveQuestion(-1)} disabled={selectedIndex <= 0} aria-label="Previous question"><ChevronLeft size={15} /></Button><span className="min-w-16 text-center text-[11px] font-medium text-[#4B5563]">{selectedIndex + 1} / {questions.length}</span><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveQuestion(1)} disabled={selectedIndex >= questions.length - 1} aria-label="Next question"><ChevronRight size={15} /></Button></div>}
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                      {selectedQuestion ? <QuestionPreview question={selectedQuestion} subject={form.subject} /> : <div className="flex h-full min-h-72 flex-col items-center justify-center text-center"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E8F5EF] text-[#145F47]"><Eye size={19} /></span><p className="mt-3 text-sm font-medium text-[#1A1A1A]">No preview yet</p><p className="mt-1 max-w-xs text-xs leading-5 text-[#6B7280]">Enter structured text or upload a document, then select Update preview.</p></div>}
+                    </div>
+                  </section>
+                </div>
               </Card>
-              <div className="flex"><Button variant="ghost" onClick={() => setStep('SETUP')}><ArrowLeft size={16} />Back</Button></div>
+              {importError && <ImportNotice tone="error" message={importError} />}
+              <div className="flex items-center justify-between"><Button variant="ghost" onClick={() => setStep('SETUP')}><ArrowLeft size={16} />Back</Button><Button disabled={preview.summary.questionCount === 0} onClick={() => setStep('REVIEW')}>Continue to review<ArrowRight size={16} /></Button></div>
             </div>
           )}
 
           {step === 'REVIEW' && (
-            <div className="flex min-h-0 flex-1 flex-col gap-4">
+            <div className="wizard-step-enter flex min-h-0 flex-1 flex-col gap-4">
               <Card className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3 text-xs text-[#6B7280]"><span className="font-medium text-[#1A1A1A]">{preview.fileName || 'Pasted content'}</span><span>{preview.summary.questionCount} questions</span><span>{preview.summary.classifiedCount} classified</span><span className={preview.summary.errorCount ? 'font-semibold text-red-700' : 'text-[#1B7A5A]'}>{preview.summary.errorCount} errors</span><span className={preview.summary.warningCount ? 'font-medium text-amber-700' : ''}>{preview.summary.warningCount} warnings</span></Card>
               {preview.issues.map((item, index) => <ImportNotice key={`${item.code}-${index}`} tone={item.severity} message={item.message} />)}
               <div className="grid min-h-[620px] grid-cols-1 overflow-hidden rounded-xl border border-[#E2EDE9] bg-white lg:grid-cols-[220px_minmax(0,1fr)_280px]">
@@ -348,9 +435,48 @@ const CreateTestWizard = () => {
           )}
         </div>
       </main>
+      <Modal open={guideOpen} onClose={() => setGuideOpen(false)} closeOnBackdrop title="Test formatting guide" subtitle="Use the same structure for pasted text and uploaded documents." className="!max-w-6xl !shadow-none">
+        <FormattingGuide />
+      </Modal>
     </div>
   );
 };
+
+function WizardStepper({ step }: { step: Step }) {
+  const activeIndex = steps.findIndex(item => item.key === step);
+  return <div className="flex items-center gap-1.5" aria-label="Create exam progress">{steps.map((item, index) => {
+    const active = item.key === step;
+    const complete = activeIndex > index;
+    return <div key={item.key} className="flex items-center gap-1.5"><span className={`flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-semibold transition-colors duration-200 ${active || complete ? 'border-[#1B7A5A] bg-[#E8F5EF] text-[#145F47]' : 'border-[#E2EDE9] bg-white text-[#6B7280]'}`}>{complete ? <CheckCircle2 size={14} /> : index + 1}</span><span className={`hidden text-xs font-medium transition-colors duration-200 sm:inline ${active ? 'text-[#1A1A1A]' : 'text-[#6B7280]'}`}>{item.label}</span>{index < steps.length - 1 && <span className={`h-px w-5 transition-colors duration-200 lg:w-8 ${complete ? 'bg-[#1B7A5A]' : 'bg-[#C2DDD4]'}`} />}</div>;
+  })}</div>;
+}
+
+function FormattingGuide() {
+  return <div className="grid max-h-[65vh] gap-6 overflow-y-auto pr-1 md:grid-cols-[0.85fr_1.15fr]">
+    <div>
+      <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[#145F47]">Required structure</h3>
+      <ol className="mt-3 space-y-2.5 text-xs leading-5 text-[#4B5563]">
+        <li><strong className="font-semibold text-[#1A1A1A]">1. Modules:</strong> start with <code className="rounded bg-[#E8F5EF] px-1 py-0.5 text-[#145F47]">=== MODULE 1 ===</code>.</li>
+        <li><strong className="font-semibold text-[#1A1A1A]">2. Questions:</strong> start each one with <code className="rounded bg-[#E8F5EF] px-1 py-0.5 text-[#145F47]">QUESTION 1</code>.</li>
+        <li><strong className="font-semibold text-[#1A1A1A]">3. Classification:</strong> add one <code className="rounded bg-[#E8F5EF] px-1 py-0.5 text-[#145F47]">Domain:</code> and <code className="rounded bg-[#E8F5EF] px-1 py-0.5 text-[#145F47]">Skill:</code> line.</li>
+        <li><strong className="font-semibold text-[#1A1A1A]">4. Answers:</strong> use choices A–D for multiple choice, then add <code className="rounded bg-[#E8F5EF] px-1 py-0.5 text-[#145F47]">Answer: B</code>. For student-produced responses, omit choices and enter the value.</li>
+      </ol>
+      <h3 className="mt-5 text-xs font-semibold uppercase tracking-[0.08em] text-[#145F47]">Optional content blocks</h3>
+      <div className="mt-3 space-y-2 text-xs leading-5 text-[#4B5563]">
+        <p><code className="rounded bg-[#E8F5EF] px-1 py-0.5 font-semibold text-[#145F47]">[TEXT]</code> A passage or stimulus. Plain untagged passage text is also accepted.</p>
+        <p><code className="rounded bg-[#E8F5EF] px-1 py-0.5 font-semibold text-[#145F47]">[TABLE]</code> Put each row on a new line, separate cells with the <strong className="font-semibold text-[#1A1A1A]">Tab key</strong>, and use the first row as the header.</p>
+        <p><code className="rounded bg-[#E8F5EF] px-1 py-0.5 font-semibold text-[#145F47]">[POEM]</code> Put each verse line on its own line.</p>
+        <p><code className="rounded bg-[#E8F5EF] px-1 py-0.5 font-semibold text-[#145F47]">[NOTE]</code> Put each supporting fact on a new line, optionally beginning with <code>-</code> or <code>•</code>.</p>
+        <p><code className="rounded bg-[#E8F5EF] px-1 py-0.5 font-semibold text-[#145F47]">[IMG]</code> Put a publicly accessible image URL on the following line. The Upload image button inserts this block automatically.</p>
+      </div>
+      <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900"><strong className="font-semibold">Uploaded documents:</strong> use selectable text in PDF, DOCX, or TXT format. Scanned image-only PDFs cannot be read.</div>
+    </div>
+    <div className="min-w-0">
+      <div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[#145F47]">Example template</h3><button type="button" onClick={() => void navigator.clipboard.writeText(importTemplate).then(() => toast.success('Template copied'))} className="text-xs font-semibold text-[#1B7A5A] hover:text-[#145F47]">Copy template</button></div>
+      <pre className="max-h-[56vh] overflow-auto whitespace-pre-wrap rounded-lg border border-[#D5E5DF] bg-[#F9FCFA] p-4 font-mono text-[11px] leading-5 text-[#374151]">{importTemplate}</pre>
+    </div>
+  </div>;
+}
 
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`block ${className}`}><span className="mb-2 block text-sm font-medium text-[#1A1A1A]">{label}</span>{children}</label>;

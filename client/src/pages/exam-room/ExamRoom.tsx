@@ -1174,7 +1174,7 @@ function ExamRoom() {
                       <div className="relative w-8 h-8">
                         {isCurrent && (
                           <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-                            <svg className="w-5 h-5 text-gray-800 fill-current drop-shadow-sm" viewBox="0 0 24 24">
+                            <svg className="w-5 h-5 text-gray-800 fill-current" viewBox="0 0 24 24">
                               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                             </svg>
                           </div>
@@ -1182,7 +1182,7 @@ function ExamRoom() {
 
                         {isMarked && (
                           <div className="absolute -top-1.5 -right-1.5 z-20 pointer-events-none">
-                            <svg className="w-4 h-4 text-red-700 fill-current drop-shadow-md" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-red-700 fill-current" viewBox="0 0 24 24">
                               <path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
                             </svg>
                           </div>

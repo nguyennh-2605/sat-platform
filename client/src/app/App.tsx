@@ -11,6 +11,7 @@ import ExamRoom from '../pages/exam-room/ExamRoom';
 import PracticeTest from '../pages/practice-test/PracticeTest';
 import ErrorLog from '../pages/error-log/ErrorLog';
 import Classroom from '../pages/classroom/Classroom';
+import ClassroomList from '../pages/classroom/ClassroomList';
 import ResultAnalytics from '../pages/result-analytics/ResultAnalytics';
 import ScoreReport from '../pages/score-report/ScoreReport';
 import CreateTestWizard from '../features/test-creation/CreateTestWizard';
@@ -32,6 +33,7 @@ function App() {
               <Route index element={<Navigate to="practice-test" replace />} />
               {/* Các đường dẫn con */}
               <Route path="practice-test" element={<PracticeTest />} />
+              <Route path="classes" element={<ClassroomList />} />
               <Route path="class/:classId" element={<Classroom />} />
               <Route path="error-log" element={<ErrorLog />} />
               <Route path='results-analytics' element = {<ResultAnalytics />} />

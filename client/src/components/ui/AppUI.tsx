@@ -14,6 +14,7 @@ interface AppHeaderProps {
   centerContent?: ReactNode;
   rightContent?: ReactNode;
   showProfile?: boolean;
+  showNotifications?: boolean;
 }
 
 export function AppHeader({
@@ -22,6 +23,7 @@ export function AppHeader({
   centerContent,
   rightContent,
   showProfile = true,
+  showNotifications = true,
 }: AppHeaderProps) {
   const userName = localStorage.getItem('userName') || 'Student';
   const initials = userName
@@ -33,7 +35,7 @@ export function AppHeader({
     .toUpperCase() || 'ST';
 
   return (
-    <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center justify-between border-b border-[#E2EDE9] bg-white px-6">
+    <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center justify-between border-b border-[#C9D8D2] bg-white px-6">
       <div className="flex w-[280px] min-w-0 flex-col justify-center">
         <h1 className="truncate text-base font-semibold leading-tight text-[#1A1A1A]">{title}</h1>
         {subtitle && <p className="mt-0.5 truncate text-xs leading-tight text-[#6B7280]">{subtitle}</p>}
@@ -45,10 +47,10 @@ export function AppHeader({
         {rightContent}
         {showProfile && (
           <>
-            <button className="relative text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
+            {showNotifications && <button className="relative text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
               <Bell size={20} />
               <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
-            </button>
+            </button>}
             <div
               className="flex h-8 w-8 select-none items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-white transition-all hover:ring-[#1B7A5A]/30"
               title={userName}
@@ -157,16 +159,17 @@ interface ModalProps {
   title: ReactNode;
   subtitle?: ReactNode;
   onClose: () => void;
+  closeOnBackdrop?: boolean;
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
 }
 
-export function Modal({ open, title, subtitle, onClose, children, footer, className }: ModalProps) {
+export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false, children, footer, className }: ModalProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0A1F16]/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0A1F16]/50 p-4" onMouseDown={event => { if (closeOnBackdrop && event.target === event.currentTarget) onClose(); }}>
       <div className={cx('w-full max-w-lg overflow-hidden rounded-xl border border-[#E2EDE9] bg-white shadow-2xl', className)}>
         <div className="flex items-start justify-between border-b border-[#E2EDE9] px-6 py-5">
           <div>
