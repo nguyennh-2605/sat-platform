@@ -3,7 +3,7 @@ const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
 const { gradeQuestions } = require('../utils/grading');
 
-exports.startOrResumeTest = async ({ testId, userId, assignmentId, classId }) => {
+exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, classId }) => {
   if (!userId || isNaN(userId)) {
     throw new ApiError(400, { error: "Thiếu thông tin User ID (userId is missing or invalid)" });
   }
@@ -12,6 +12,7 @@ exports.startOrResumeTest = async ({ testId, userId, assignmentId, classId }) =>
   const test = await prisma.test.findUnique({
     where: { id: Number(testId) },
     include: {
+      author: { select: { role: true } },
       sections: {
         orderBy: { order: 'asc' }, // Sắp xếp Module 1 trước, Module 2 sau
         include: {
@@ -36,10 +37,53 @@ exports.startOrResumeTest = async ({ testId, userId, assignmentId, classId }) =>
     throw new ApiError(404, { error: "Đề thi này chưa có câu hỏi nào (Data rỗng)" });
   }
 
+  if (userRole === 'TEACHER' && test.authorId !== userId) {
+    throw new ApiError(403, { error: 'Bạn không có quyền truy cập đề thi này' });
+  }
+
+  if (userRole === 'STUDENT') {
+    const isAdminPublicTest = test.isPublic && test.author?.role === 'ADMIN';
+    let hasClassAccess = false;
+
+    if (assignmentId) {
+      const assignment = await prisma.assignment.findFirst({
+        where: {
+          id: assignmentId,
+          testIds: { has: testId },
+          class: { students: { some: { id: userId } } }
+        },
+        select: { id: true }
+      });
+      hasClassAccess = !!assignment;
+    } else if (classId) {
+      const classTestAccess = await prisma.classTest.findFirst({
+        where: {
+          classId,
+          testId,
+          isHidden: false,
+          class: { students: { some: { id: userId } } }
+        },
+        select: { id: true }
+      });
+      hasClassAccess = !!classTestAccess;
+    }
+
+    if (!isAdminPublicTest && !hasClassAccess) {
+      throw new ApiError(403, { error: 'Đề thi này chưa được giao cho lớp của bạn' });
+    }
+  }
+
   let selectedClassTestId = null;
   if (!assignmentId && classId) {
     const classTest = await prisma.classTest.findFirst({
-      where: { classId: classId, testId: testId },
+      where: {
+        classId: classId,
+        testId: testId,
+        ...(userRole === 'STUDENT' ? {
+          isHidden: false,
+          class: { students: { some: { id: userId } } }
+        } : {})
+      },
       select: { id: true }
     });
 
@@ -53,7 +97,10 @@ exports.startOrResumeTest = async ({ testId, userId, assignmentId, classId }) =>
   // Serverless deployments can issue the same GET concurrently. A PostgreSQL
   // transaction-scoped advisory lock makes find-or-create atomic per user/test.
   const submission = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(${Number(userId)}::integer, ${Number(testId)}::integer)`;
+    // pg_advisory_xact_lock returns PostgreSQL's `void` type. Use executeRaw
+    // because this statement is only for synchronization and has no result set
+    // for Prisma to deserialize.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${Number(userId)}::integer, ${Number(testId)}::integer)`;
 
     const activeSubmission = await tx.submission.findFirst({
       where: {

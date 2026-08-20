@@ -1,5 +1,7 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const { buildAttemptSummary } = require('../utils/practice-test-progress');
+const { getTaxonomy, validateClassification } = require('../utils/question-taxonomy');
 
 exports.getClasses = ({ userId, userRole }) => {
   let whereCondition = {};
@@ -23,31 +25,32 @@ exports.getClasses = ({ userId, userRole }) => {
   });
 };
 
-exports.getTests = async ({ userId }) => {
+exports.getTests = async ({ userId, userRole }) => {
   const hasUser = !isNaN(userId);
 
-  // Xây dựng điều kiện lọc
-  const whereCondition = hasUser
-    ? {
-        OR: [
-          // A. Đề thi thật & Public (Ai cũng thấy)
-          { category: 'REAL', isPublic: true },
-          // B. Đề thi được giao riêng cho lớp mà user này đang học
-          {
-            classTests: {
-              some: {
-                isHidden: false,
-                OR: [
-                  { class: { students: { some: { id: userId } } } },
-                  { class: { teacherId: userId } }
-                ]
-              }
+  let whereCondition;
+  if (!hasUser) {
+    whereCondition = { isPublic: true, author: { role: 'ADMIN' } };
+  } else if (userRole === 'STUDENT') {
+    whereCondition = {
+      OR: [
+        // Học sinh luôn thấy đề do admin công khai.
+        { isPublic: true, author: { role: 'ADMIN' } },
+        // Đề của giáo viên chỉ hiện khi đã giao vào lớp mà học sinh tham gia.
+        {
+          classTests: {
+            some: {
+              isHidden: false,
+              class: { students: { some: { id: userId } } }
             }
-          },
-          { authorId: userId }
-        ]
-      }
-    : { category: 'REAL', isPublic: true }; // Nếu không có user, chỉ trả về đề Public
+          }
+        }
+      ]
+    };
+  } else {
+    // Giáo viên/Admin quản lý đúng kho đề họ đã tải lên.
+    whereCondition = { authorId: userId };
+  }
 
   const tests = await prisma.test.findMany({
     where: whereCondition,
@@ -62,13 +65,35 @@ exports.getTests = async ({ userId }) => {
       testDate: true,
       mode: true,
       authorId: true,
-      classTests: { select: { classId: true } },
-      // Sub-query để check xem user có đang làm bài này không
+      author: { select: { id: true, name: true, role: true } },
+      sections: {
+        select: { _count: { select: { questions: true } } }
+      },
+      classTests: {
+        ...(userRole === 'STUDENT' ? {
+          where: {
+            isHidden: false,
+            class: { students: { some: { id: userId } } }
+          }
+        } : {}),
+        select: { classId: true, class: { select: { name: true } } }
+      },
+      // Lấy lần làm gần nhất để dựng trạng thái và tiến trình thật trên card.
       ...(hasUser && {
         submissions: {
-          where: { userId: userId, status: 'DOING' },
+          where: { userId: userId },
+          orderBy: { startedAt: 'desc' },
           take: 1,
-          select: { id: true }
+          select: {
+            id: true,
+            status: true,
+            score: true,
+            startedAt: true,
+            beganAt: true,
+            endTime: true,
+            currentQuestionIndex: true,
+            savedAnswers: true
+          }
         }
       })
     }
@@ -76,76 +101,202 @@ exports.getTests = async ({ userId }) => {
 
   // Map dữ liệu để trả về format gọn gàng cho Frontend
   return tests.map(test => {
-    const { submissions, ...rest } = test;
+    const { submissions, sections, ...rest } = test;
+    const questionCount = sections.reduce(
+      (total, section) => total + section._count.questions,
+      0
+    );
+    const latestSubmission = submissions?.[0] || null;
+    const attemptSummary = buildAttemptSummary({ questionCount, submission: latestSubmission });
+
     return {
       ...rest,
-      isDoing: submissions && submissions.length > 0
+      questionCount,
+      ...attemptSummary
     };
   });
 };
 
-exports.createTest = async ({ title, description, duration, subject, mode, sections, assignClassId, testDate, category, folderId, userId, userRole }) => {
-  // Validate cơ bản
-  if (!title || !sections) {
-    throw new ApiError(400, { error: 'Thiếu thông tin (Title hoặc Sections)' });
+exports.assignTestsToClasses = async ({ testIds, classIds, userId, userRole }) => {
+  const normalizedTestIds = [...new Set((Array.isArray(testIds) ? testIds : [])
+    .map(Number)
+    .filter(Number.isInteger))];
+  const normalizedClassIds = [...new Set((Array.isArray(classIds) ? classIds : [])
+    .map(String)
+    .filter(Boolean))];
+
+  if (normalizedTestIds.length === 0 || normalizedClassIds.length === 0) {
+    throw new ApiError(400, { error: 'Vui lòng chọn ít nhất một đề thi và một lớp học' });
   }
 
-  console.log(`📝 Đang tạo đề thi: ${title} - ${sections.length} modules`);
+  const [ownedTests, ownedClasses] = await Promise.all([
+    prisma.test.findMany({
+      where: {
+        id: { in: normalizedTestIds },
+        authorId: userId
+      },
+      select: { id: true }
+    }),
+    prisma.class.findMany({
+      where: {
+        id: { in: normalizedClassIds },
+        ...(userRole === 'ADMIN' ? {} : { teacherId: userId })
+      },
+      select: { id: true }
+    })
+  ]);
 
-  const isPublic = userRole === 'ADMIN';
-
-  let finalTestDate = null;
-  if (userRole === 'ADMIN' && testDate) {
-    finalTestDate = new Date(testDate);
+  if (ownedTests.length !== normalizedTestIds.length) {
+    throw new ApiError(403, { error: 'Bạn chỉ có thể giao những đề thi do mình tải lên' });
+  }
+  if (ownedClasses.length !== normalizedClassIds.length) {
+    throw new ApiError(403, { error: 'Bạn không có quyền giao bài cho một hoặc nhiều lớp đã chọn' });
   }
 
-  if (assignClassId && userRole !== 'ADMIN') {
-    const classroom = await prisma.class.findUnique({
-      where: { id: assignClassId },
-      select: { teacherId: true }
+  const assignments = normalizedTestIds.flatMap(testId =>
+    normalizedClassIds.map(classId => ({ testId, classId, isHidden: false }))
+  );
+
+  await prisma.$transaction(async tx => {
+    await tx.classTest.updateMany({
+      where: {
+        testId: { in: normalizedTestIds },
+        classId: { in: normalizedClassIds }
+      },
+      data: { isHidden: false }
     });
+    await tx.classTest.createMany({ data: assignments, skipDuplicates: true });
+  });
 
-    if (!classroom) {
-      throw new ApiError(404, { error: 'Không tìm thấy lớp học' });
-    }
+  return { assignedTests: normalizedTestIds.length, assignedClasses: normalizedClassIds.length };
+};
 
-    if (classroom.teacherId !== parseInt(userId, 10)) {
-      throw new ApiError(403, { error: 'Bạn không có quyền giao bài thi cho lớp này' });
-    }
+exports.getTaxonomy = ({ subject }) => {
+  if (subject && !['RW', 'MATH'].includes(subject)) {
+    throw new ApiError(400, { error: 'Subject must be RW or MATH.' });
+  }
+  return getTaxonomy(subject);
+};
+
+const normalizeChoices = (choices) => (Array.isArray(choices) ? choices : [])
+  .map(choice => ({ id: String(choice?.id || '').trim().toUpperCase(), text: String(choice?.text || '').trim() }))
+  .filter(choice => choice.id && choice.text);
+
+const validateSections = ({ sections, subject }) => {
+  if (!Array.isArray(sections) || sections.length === 0) {
+    throw new ApiError(400, { error: 'Add at least one module with questions.' });
   }
 
-  // Nested Write vào Database
+  const seenOrders = new Set();
+  return sections.map((section, sectionIndex) => {
+    const order = Number(section?.order || sectionIndex + 1);
+    if (!Number.isInteger(order) || order < 1 || seenOrders.has(order)) {
+      throw new ApiError(422, { error: `Module ${sectionIndex + 1} has an invalid order.` });
+    }
+    seenOrders.add(order);
+
+    if (!Array.isArray(section.questions) || section.questions.length === 0) {
+      throw new ApiError(422, { error: `Module ${order} does not contain any questions.` });
+    }
+
+    return {
+      name: String(section.name || `Module ${order}`).trim() || `Module ${order}`,
+      order,
+      duration: Math.max(1, Number.parseInt(section.duration, 10) || 1),
+      questions: section.questions.map((question, questionIndex) => {
+        const questionText = String(question?.questionText || '').trim();
+        const type = question?.type === 'SPR' ? 'SPR' : 'MCQ';
+        const choices = normalizeChoices(question?.choices);
+        const correctAnswer = String(question?.correctAnswer || '').trim().toUpperCase();
+        const classification = validateClassification({
+          subject,
+          domainCode: question?.domainCode,
+          skillCode: question?.skillCode,
+        });
+
+        if (!questionText) {
+          throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} is missing question text.` });
+        }
+        if (!classification.valid) {
+          throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order}: ${classification.error}` });
+        }
+        if (!correctAnswer) {
+          throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} is missing the correct answer.` });
+        }
+        if (type === 'MCQ') {
+          if (choices.length < 2) {
+            throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} needs answer choices.` });
+          }
+          if (!choices.some(choice => choice.id === correctAnswer)) {
+            throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} has an answer that does not match its choices.` });
+          }
+        }
+
+        return {
+          order: questionIndex + 1,
+          questionText,
+          correctAnswer,
+          type,
+          explanation: String(question?.explanation || '').trim() || null,
+          blocks: Array.isArray(question?.blocks) ? question.blocks : [],
+          choices: type === 'MCQ' ? choices : [],
+          domainCode: classification.domain.code,
+          skillCode: classification.skill.code,
+        };
+      }),
+    };
+  });
+};
+
+exports.createTest = async ({ title, duration, subject, mode, sections, testDate, category, folderId, userId, userRole }) => {
+  const normalizedTitle = String(title || '').trim();
+  if (!normalizedTitle) {
+    throw new ApiError(400, { error: 'Enter a test name.' });
+  }
+  if (!['RW', 'MATH'].includes(subject)) {
+    throw new ApiError(400, { error: 'Choose Reading & Writing or Math.' });
+  }
+
+  const normalizedDuration = Number.parseInt(duration, 10);
+  if (!Number.isInteger(normalizedDuration) || normalizedDuration < 1) {
+    throw new ApiError(400, { error: 'Enter a valid test duration.' });
+  }
+
+  const normalizedSections = validateSections({ sections, subject });
+  const isPublic = userRole === 'ADMIN';
+  const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
+  const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' && testDate ? String(testDate) : null;
+
+  console.log(`Creating test: ${normalizedTitle} (${normalizedSections.length} modules)`);
+
   const newTest = await prisma.test.create({
     data: {
-      title: title,
-      description: description,
-      duration: duration,
-      subject: subject, // "RW" hoặc "MATH"
-      mode: mode || 'PRACTICE',
-      authorId: userId,
-      isPublic: isPublic,
-      category: category,
+      title: normalizedTitle,
+      description: null,
+      duration: normalizedDuration,
+      subject,
+      mode: mode === 'EXAM' ? 'EXAM' : 'PRACTICE',
+      authorId: Number(userId),
+      isPublic,
+      category: finalCategory,
       testDate: finalTestDate,
-      folderId: folderId,
-      ...(assignClassId ? {
-        classTests: {
-          create: { classId: assignClassId }
-        }
-      } : {}),
+      folderId: Number.isInteger(Number(folderId)) ? Number(folderId) : null,
       sections: {
-        create: sections.map((section) => ({
+        create: normalizedSections.map((section) => ({
           name: section.name,
           order: section.order,
           duration: section.duration,
           questions: {
-            create: section.questions.map((q, index) => ({
-              order: index + 1,
+            create: section.questions.map((q) => ({
+              order: q.order,
               questionText: q.questionText,
               correctAnswer: q.correctAnswer,
               type: q.type,
-              explanation: q.explanation || null,
+              explanation: q.explanation,
               blocks: q.blocks,
-              choices: q.choices.map(c => ({ id: c.id, text: c.text }))
+              choices: q.choices,
+              domainCode: q.domainCode,
+              skillCode: q.skillCode,
             }))
           }
         }))
@@ -158,6 +309,6 @@ exports.createTest = async ({ title, description, duration, subject, mode, secti
     }
   });
 
-  console.log(`✅ Tạo thành công Test ID: ${newTest.id}`);
+  console.log(`Created test ID: ${newTest.id}`);
   return newTest;
 };

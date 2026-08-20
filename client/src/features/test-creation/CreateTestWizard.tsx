@@ -1,739 +1,386 @@
-import { useState, memo, useRef, useCallback, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Play, Save, ArrowLeft, ImageIcon, Loader2,
-  BookOpen, Clock, Layers, ShieldCheck, ShieldAlert, ArrowRight, FileType, AlignLeft,
-  Users,
-  Sparkles
- } from 'lucide-react';
-import { parseSATInput, type SATQuestion } from '../../utils/satParser';
-import InputGuideModal from './InputGuideModal';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  ClipboardPaste,
+  FileText,
+  LoaderCircle,
+  Save,
+  ShieldCheck,
+  UploadCloud,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
-import { Virtuoso } from 'react-virtuoso';
 import BlockRenderer from '../../components/content/BlockRenderer';
-import InteractiveText from '../quiz/InteractiveText';
+import { AppHeader, Badge, Button, Card, Input, Select } from '../../components/ui/AppUI';
+import { ui } from '../../components/ui/styles';
+import type { ContentBlock } from '../../types/quiz';
 
-interface Section {
-  name: string;      // Vd: "Reading and Writing - Module 1"
-  order: number;     // Vd: 1
-  duration: number;  // Vd: 27 (phút)
-  questions: any[];  // Mảng câu hỏi đã parse
+type Subject = 'RW' | 'MATH';
+type TestMode = 'PRACTICE' | 'EXAM';
+type Step = 'SETUP' | 'IMPORT' | 'REVIEW';
+type IssueSeverity = 'error' | 'warning';
+
+interface TaxonomySkill { code: string; name: string; sortOrder: number }
+interface TaxonomyDomain { code: string; name: string; subject: Subject; sortOrder: number; skills: TaxonomySkill[] }
+interface ImportIssue { severity: IssueSeverity; code: string; message: string }
+interface ImportChoice { id: string; text: string }
+interface ImportQuestion {
+  clientId: string;
+  module: number;
+  order: number;
+  type: 'MCQ' | 'SPR';
+  blocks: ContentBlock[];
+  questionText: string;
+  choices: ImportChoice[];
+  correctAnswer: string;
+  explanation?: string;
+  domainCode: string;
+  skillCode: string;
+  issues: ImportIssue[];
+}
+interface ImportModule { order: number; name: string; questions: ImportQuestion[] }
+interface ImportPreview {
+  fileName?: string;
+  modules: ImportModule[];
+  summary: { questionCount: number; classifiedCount: number; errorCount: number; warningCount: number };
+  issues: ImportIssue[];
 }
 
-interface FinalTestStructure {
-  title: string;
-  description: string;
-  subject: string;
-  duration: number; // Tổng thời gian (vd: 64)
-  mode: string;
-  sections: Section[];
-  assignClassId?: string;
-  category: string;
-  testDate?: string;
-  folderId?: number;
-}
+const steps: Array<{ key: Step; label: string }> = [
+  { key: 'SETUP', label: 'Setup' },
+  { key: 'IMPORT', label: 'Import' },
+  { key: 'REVIEW', label: 'Review' },
+];
 
-interface PreviewSectionProps {
-  questions: SATQuestion[];
-  onSave: () => void;
-  isSubmitting: boolean;
-  subject: string;
-}
-
-interface ClassOption {
-  id: string; // Hoặc string, tùy vào database bạn dùng Int hay UUID
-  name: string;
-}
-
-const PreviewSection = memo(({ questions, onSave, isSubmitting, subject }: PreviewSectionProps) => {
-  return (
-    <div className="flex flex-col h-full p-4 overflow-hidden relative">
-      
-      {/* 1. HEADER CỐ ĐỊNH (shrink-0 để không bao giờ bị bóp nhỏ) */}
-      <div className="flex justify-between items-center mb-4 shrink-0 bg-gray-50 z-10 pb-2 border-b border-gray-200/50">
-        <span className="font-bold text-gray-700 text-lg">
-          Kết quả ({questions.length} câu)
-        </span>
-        <button
-          onClick={onSave}
-          disabled={questions.length === 0 || isSubmitting}
-          className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-emerald-700 shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
-        >
-          <Save size={18} /> {isSubmitting ? "Saving..." : "Save"}
-        </button>
-      </div>
-
-      {/* 2. KHU VỰC CUỘN (Scrollable Area) */}
-      <div className="flex-1 min-h-0">
-        {/* TRẠNG THÁI TRỐNG */}
-        {questions.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-gray-400">
-            <svg className="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p>Paste nội dung và nhấn "Phân tích" để xem trước.</p>
-          </div>
-        )}
-
-        {/* DANH SÁCH CÂU HỎI */}
-        <Virtuoso 
-          style={{ height: '100%' }}
-          className='scrollbar-thin scrollbar-thumb-gray-300 pr-2'
-          data={questions}
-          itemContent={(idx, q) => {
-            const isMath = subject === 'MATH';
-            return (
-              <div className="pb-6"> 
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 text-sm hover:shadow-md transition-shadow">
-                  {/* Header câu hỏi */}
-                  <div className="flex justify-between items-center mb-4 border-b pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white bg-indigo-600 px-2 py-0.5 rounded text-xs">Câu {idx + 1}</span>
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Module {q.module}</span>
-                    </div>
-                    <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-mono">ID: {idx + 1}</span>
-                  </div>
-
-                  {/* KHUNG TRÁI/TRÊN CỦA SAT (PASSAGE) */}
-                  <div className="bg-[#fcfcfc] p-4 rounded border border-gray-100 text-gray-800 mb-4">
-                    <BlockRenderer blocks={q.blocks} subject={subject} readOnly={true} />
-                  </div>
-
-                  {/* KHUNG DƯỚI/PHẢI CỦA SAT (QUESTION & CHOICES) */}
-                  <div className="space-y-4">
-                    
-                    {/* 1. Câu hỏi dẫn nhập */}
-                    {q.questionText && (
-                      <InteractiveText content={q.questionText} isMath={isMath} />
-                    )}
-
-                    {/* 2. Các đáp án (Phân nhánh MCQ và SPR) */}
-                    {q.type === 'SPR' ? (
-                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
-                        <span className="font-semibold text-amber-800">Đáp án điền (SPR):</span>
-                        <span className="bg-white border border-amber-300 font-mono font-bold text-amber-900 px-3 py-1.5 rounded shadow-sm">
-                          {q.correctAnswer}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-2.5">
-                        {q.choices.map((choice) => (
-                          <div
-                            key={choice.id}
-                            className={`p-3 border rounded-lg text-sm transition-all flex items-start gap-3 ${
-                              choice.id === q.correctAnswer
-                                ? 'bg-emerald-50 border-emerald-500 shadow-sm'
-                                : 'bg-white border-gray-200'
-                            }`}
-                          >
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border mt-0.5 ${
-                              choice.id === q.correctAnswer
-                                ? 'bg-emerald-600 text-white border-emerald-600'
-                                : 'bg-white text-gray-500 border-gray-300'
-                            }`}>
-                              {choice.id}
-                            </div>
-                            <div className={`flex-1 pt-0.5 ${choice.id === q.correctAnswer ? 'text-emerald-800 font-medium' : 'text-gray-700'}`}>
-                              <InteractiveText content={choice.text} isMath={isMath}/>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 3. Hiển thị Giải thích (Explanation) nếu có */}
-                    {q.explanation && (
-                      <div className="mt-4 p-3 bg-gray-50 border-l-4 border-indigo-400 rounded-r-lg text-sm text-gray-600">
-                        <span className="font-bold text-indigo-600 block mb-1">Giải thích:</span>
-                        <InteractiveText content={q.explanation} isMath={isMath}/>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          }}  
-        />
-      </div>
-    </div>
-  );
+const emptyPreview = (): ImportPreview => ({
+  modules: [],
+  summary: { questionCount: 0, classifiedCount: 0, errorCount: 0, warningCount: 0 },
+  issues: [],
 });
 
+const fileTitle = (fileName: string) => fileName
+  .replace(/\.[^/.]+$/, '')
+  .replace(/[._-]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .replace(/^./, character => character.toLocaleUpperCase());
+
+const requestErrorMessage = (error: unknown, fallback: string) => {
+  const response = (error as { response?: { data?: { error?: string } } })?.response;
+  return response?.data?.error || fallback;
+};
+
+const reviewIssues = (question: ImportQuestion, taxonomy: TaxonomyDomain[]): ImportIssue[] => {
+  const issues = question.issues.filter(item => ![
+    'MISSING_QUESTION_TEXT', 'MISSING_ANSWER', 'MISSING_DOMAIN', 'MISSING_SKILL', 'MISSING_CHOICES', 'ANSWER_NOT_IN_CHOICES',
+  ].includes(item.code));
+  const domain = taxonomy.find(item => item.code === question.domainCode);
+  const skill = domain?.skills.find(item => item.code === question.skillCode);
+
+  if (!question.questionText.trim()) issues.push({ severity: 'error', code: 'MISSING_QUESTION_TEXT', message: 'Question text is missing.' });
+  if (!question.correctAnswer.trim()) issues.push({ severity: 'error', code: 'MISSING_ANSWER', message: 'Correct answer is missing.' });
+  if (!domain) issues.push({ severity: 'error', code: 'MISSING_DOMAIN', message: 'Choose a content domain.' });
+  if (!skill) issues.push({ severity: 'error', code: 'MISSING_SKILL', message: 'Choose a skill that belongs to the content domain.' });
+  if (question.type === 'MCQ' && question.choices.length < 2) issues.push({ severity: 'error', code: 'MISSING_CHOICES', message: 'Multiple-choice questions need answer choices.' });
+  if (question.type === 'MCQ' && question.correctAnswer && !question.choices.some(choice => choice.id === question.correctAnswer.toUpperCase())) {
+    issues.push({ severity: 'error', code: 'ANSWER_NOT_IN_CHOICES', message: 'Correct answer does not match any answer choice.' });
+  }
+  return issues;
+};
+
+const reviewPreview = (preview: ImportPreview, taxonomy: TaxonomyDomain[]): ImportPreview => {
+  const modules = preview.modules.map(module => ({
+    ...module,
+    questions: module.questions.map(question => ({ ...question, issues: reviewIssues(question, taxonomy) })),
+  }));
+  const allIssues = [...preview.issues, ...modules.flatMap(module => module.questions.flatMap(question => question.issues))];
+  const questions = modules.flatMap(module => module.questions);
+  return {
+    ...preview,
+    modules,
+    summary: {
+      questionCount: questions.length,
+      classifiedCount: questions.filter(question => question.domainCode && question.skillCode).length,
+      errorCount: allIssues.filter(item => item.severity === 'error').length,
+      warningCount: allIssues.filter(item => item.severity === 'warning').length,
+    },
+  };
+};
+
 const CreateTestWizard = () => {
-  // --- STATE QUẢN LÝ ---
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const folderIdParam = searchParams.get('folderId');
-  const folderId = folderIdParam ? parseInt(folderIdParam, 10) : undefined;
-  const [step, setStep] = useState(1); // 1: Info, 2: Content
-  
-  // Dữ liệu Bước 1: Metadata
-  const [testInfo, setTestInfo] = useState({
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [step, setStep] = useState<Step>('SETUP');
+  const [form, setForm] = useState({
     title: '',
-    description: '',
-    subject: 'RW', // RW (Reading Writing) hoặc MATH
-    moduleCount: 2, // 1 hoặc 2
-    duration: 64, // Phút
-    mode: 'PRACTICE',
-    assignClassId: '',
+    subject: 'RW' as Subject,
+    duration: 64,
+    moduleCount: 2,
+    mode: 'PRACTICE' as TestMode,
     category: 'PRACTICE',
-    testDate: ''
+    testDate: '',
   });
-  const userRole = localStorage.getItem('userRole');
-
-  // Dữ liệu Bước 2: Nội dung raw và json parsed
+  const [taxonomy, setTaxonomy] = useState<TaxonomyDomain[]>([]);
+  const [preview, setPreview] = useState<ImportPreview>(emptyPreview);
+  const [selectedQuestionId, setSelectedQuestionId] = useState('');
   const [rawText, setRawText] = useState('');
-  const [parsedQuestions, setParsedQuestions] = useState<SATQuestion[]>([]);
-  const [showGuide, setShowGuide] = useState(false);
-  const [myClasses, setMyClasses] = useState<ClassOption[]>([]);
-  const [loadingMessage, setLoadingMessage] = useState("Đang xử lý dữ liệu...");
-
-  const [isLoading, setIsLoading] = useState(false); // Trạng thái đang loading
-  const textareaRef = useRef<HTMLTextAreaElement>(null); // Để thao tác con trỏ trong textarea
-  const unifiedInputRef = useRef<HTMLInputElement>(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [importError, setImportError] = useState('');
+  const userRole = localStorage.getItem('userRole') || 'TEACHER';
+  const folderIdParam = searchParams.get('folderId');
+  const folderId = folderIdParam ? Number(folderIdParam) : undefined;
 
   useEffect(() => {
-    const fetchClasses = async () => {
+    const loadTaxonomy = async () => {
       try {
-        const data = await axiosClient.get<ClassOption[], ClassOption[]>(`/api/tests/classes`);
-        setMyClasses(data);
+        const response = await axiosClient.get<TaxonomyDomain[], TaxonomyDomain[]>(`/api/tests/taxonomy?subject=${form.subject}`);
+        setTaxonomy(response);
       } catch (error) {
-        console.error("Lỗi tải lớp:", error);
-      } finally {
+        console.error(error);
+        toast.error('Unable to load the SAT content taxonomy');
       }
     };
-    fetchClasses();
-  }, []);
+    void loadTaxonomy();
+  }, [form.subject]);
 
   useEffect(() => {
-    if (myClasses.length > 0 && !testInfo.assignClassId) {
-      setTestInfo(prev => ({
-        ...prev,
-        assignClassId: myClasses[0].id
-      }));
-    }
-  }, [myClasses]);
+    if (taxonomy.length > 0) setPreview(current => current.modules.length ? reviewPreview(current, taxonomy) : current);
+  }, [taxonomy]);
 
+  const questions = useMemo(() => preview.modules.flatMap(module => module.questions), [preview]);
+  const selectedQuestion = questions.find(question => question.clientId === selectedQuestionId) || questions[0] || null;
+  const selectedDomain = taxonomy.find(domain => domain.code === selectedQuestion?.domainCode);
+  const blockingErrors = preview.summary.errorCount > 0 || preview.summary.questionCount === 0;
 
-  // --- XỬ LÝ BƯỚC 1 ---
-  const handleInfoSubmit = (e: any) => {
-    e.preventDefault();
-    if (!testInfo.title) return toast.error("Vui lòng nhập tên bài test");
-    setStep(2); // Chuyển sang bước nhập liệu
+  useEffect(() => {
+    if (selectedQuestion && selectedQuestion.clientId !== selectedQuestionId) setSelectedQuestionId(selectedQuestion.clientId);
+  }, [selectedQuestion, selectedQuestionId]);
+
+  const applyPreview = (nextPreview: ImportPreview) => {
+    const reviewed = reviewPreview(nextPreview, taxonomy);
+    setPreview(reviewed);
+    const firstQuestion = reviewed.modules[0]?.questions[0];
+    if (firstQuestion) setSelectedQuestionId(firstQuestion.clientId);
   };
 
-  // --- XỬ LÝ BƯỚC 2 ---
-  const handleParse = () => {
-    const data = parseSATInput(rawText);
-    
-    // Validate số lượng module
-    const modulesFound = new Set(data.map((q: any) => q.module)).size;
-    if (modulesFound > testInfo.moduleCount) {
-        toast.error(`Cảnh báo: Bạn chọn ${testInfo.moduleCount} module nhưng nội dung lại có ${modulesFound} module.`);
-    }
-
-    setParsedQuestions(data);
+  const updateQuestion = (clientId: string, updater: (question: ImportQuestion) => ImportQuestion) => {
+    setPreview(current => reviewPreview({
+      ...current,
+      modules: current.modules.map(module => ({
+        ...module,
+        questions: module.questions.map(question => question.clientId === clientId ? updater(question) : question),
+      })),
+    }, taxonomy));
   };
 
-  // --- BƯỚC CUỐI: GỬI API ---
-  const handleCreateTest = useCallback(async () => {
-    setIsLoading(true);
-    const modulesMap = new Map<number, any[]>();
+  const handleSetupNext = () => {
+    if (!form.title.trim()) return toast.error('Enter a test name');
+    if (!Number.isFinite(form.duration) || form.duration < 1) return toast.error('Enter a valid duration');
+    setStep('IMPORT');
+  };
 
-    parsedQuestions.forEach((q) => {
-      const modNum = q.module || 1; // Mặc định module 1 nếu ko tìm thấy
-      if (!modulesMap.has(modNum)) {
-        modulesMap.set(modNum, []);
-      }
-      // Xóa trường module thừa đi vì đã gom vào section rồi (tuỳ bạn)
-      const { module, ...cleanQuestion } = q; 
-      modulesMap.get(modNum)?.push(cleanQuestion);
-    });
-
-    const durationPerModule = Math.floor(testInfo.duration / (modulesMap.size || 1));
-
-    // 2. Tạo mảng sections theo đúng cấu trúc JSON
-    const sections: Section[] = Array.from(modulesMap.keys()).sort().map((modNum) => ({
-      name: `Module ${modNum}`, // Tự sinh tên
-      order: modNum,
-      duration: durationPerModule, // (Ví dụ: chia đều hoặc hardcode 32 phút/module chuẩn SAT)
-      questions: (modulesMap.get(modNum) || []).map(q => ({
-        ...q,
-        choices: Array.isArray(q.choices) ? q.choices : Object.values(q.choices || {})
-      }))
-    }));
-
-    let finalCategory = 'PRACTICE';
-    if (userRole === 'ADMIN') {
-      finalCategory = testInfo.category;
-    } else {
-      finalCategory = 'CLASS';
-    }
-
-    // 3. Tạo Object cuối cùng
-    const finalPayload: FinalTestStructure = {
-      title: testInfo.title,
-      description: testInfo.description || "Reading and Writing - Full Test",
-      duration: parseInt(testInfo.duration.toString()),
-      mode: testInfo.mode,
-      subject: testInfo.subject,
-      sections: sections,
-      assignClassId: testInfo.assignClassId === '' ? undefined : testInfo.assignClassId,
-      category: finalCategory,
-      testDate: testInfo.testDate == '' ? undefined : testInfo.testDate,
-      folderId: folderId
-    };
-
-    // --- GỌI API ---
+  const parseFile = async (file: File) => {
+    setIsParsing(true);
+    setImportError('');
     try {
-      await axiosClient.post('/api/tests/create', finalPayload);
-      navigate(-1);
-    } catch (error) {
-      toast.error("❌ Lỗi khi lưu vào Database");
+      const body = new FormData();
+      body.append('file', file);
+      body.append('subject', form.subject);
+      body.append('moduleCount', String(form.moduleCount));
+      const response = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview', body, { headers: { 'Content-Type': 'multipart/form-data' } });
+      if (!form.title.trim()) setForm(current => ({ ...current, title: fileTitle(file.name) }));
+      applyPreview(response);
+      setStep('REVIEW');
+      toast.success('Document parsed. Review the questions before saving.');
+    } catch (error: unknown) {
       console.error(error);
+      const message = requestErrorMessage(error, 'Unable to parse this document.');
+      setImportError(message);
+      toast.error(message);
     } finally {
-      setIsLoading(false);
+      setIsParsing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [parsedQuestions]);
-
-  // === 2. HÀM CHÈN TEXT VÀO VỊ TRÍ CON TRỎ ===
-  const insertAtCursor = (textToInsert: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const originalText = textarea.value;
-    
-    // Chèn text vào giữa
-    const newText = originalText.substring(0, start) + textToInsert + originalText.substring(end);
-    setRawText(newText);
-    
-    // Focus lại và đưa con trỏ ra sau đoạn vừa chèn
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
-    }, 0);
   };
 
-  // === 3. HÀM UPLOAD LÊN CLOUDINARY ===
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) { // Giới hạn 5MB
-      toast.error("File quá lớn! Vui lòng chọn ảnh dưới 5MB");
-      return;
-    }
-
-    setIsLoading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    // --- CẤU HÌNH CLOUDINARY ---
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME; 
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_PRESET;
-    // ------------------------------------
-
-    if (!cloudName || !uploadPreset) {
-        toast.error("Thiếu cấu hình Cloudinary trong .env");
-        setIsLoading(false);
-        return;
-    }
-
-    formData.append('upload_preset', uploadPreset);
-
+  const parsePastedText = async () => {
+    if (!rawText.trim()) return toast.error('Paste test content before previewing it');
+    setIsParsing(true);
+    setImportError('');
     try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
-        body: formData
+      const response = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview-text', {
+        text: rawText,
+        subject: form.subject,
+        moduleCount: form.moduleCount,
       });
-
-      if (!res.ok) {
-        throw new Error("Upload failed");
-      }
-
-      const data = await res.json();
-
-      if (data.secure_url) {
-        // Tạo cú pháp Markdown ảnh
-        const markdown = `![Image](${data.secure_url})\n`;
-        insertAtCursor(markdown);
-      } else {
-        toast.error("Lỗi upload ảnh (Sai cấu hình Cloudinary?)");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Có lỗi xảy ra khi upload");
+      applyPreview(response);
+      setStep('REVIEW');
+      toast.success('Text parsed. Review the questions before saving.');
+    } catch (error: unknown) {
+      const message = requestErrorMessage(error, 'Unable to parse the supplied text.');
+      setImportError(message);
+      toast.error(message);
     } finally {
-      setIsLoading(false);
-      if (unifiedInputRef.current) unifiedInputRef.current.value = ''; // Reset input
+      setIsParsing(false);
     }
   };
 
-  const handleUnifiedUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // RẼ NHÁNH 1: NẾU LÀ ẢNH
-    if (file.type.startsWith('image/')) {
-      handleImageUpload(e);
-      if (unifiedInputRef.current) unifiedInputRef.current.value = '';
-      return;
+  const saveTest = async () => {
+    if (blockingErrors) return toast.error('Resolve all errors before creating the exam');
+    setIsSaving(true);
+    try {
+      const moduleDuration = Math.max(1, Math.floor(form.duration / Math.max(1, preview.modules.length)));
+      await axiosClient.post('/api/tests/create', {
+        title: form.title.trim(),
+        subject: form.subject,
+        duration: Number(form.duration),
+        mode: form.mode,
+        category: userRole === 'ADMIN' ? form.category : 'CLASS',
+        testDate: userRole === 'ADMIN' && form.category === 'REAL' ? form.testDate || undefined : undefined,
+        folderId,
+        sections: preview.modules.map(module => ({
+          name: module.name,
+          order: module.order,
+          duration: moduleDuration,
+          questions: module.questions.map(question => ({
+            type: question.type,
+            blocks: question.blocks,
+            questionText: question.questionText,
+            choices: question.choices,
+            correctAnswer: question.correctAnswer,
+            explanation: question.explanation,
+            domainCode: question.domainCode,
+            skillCode: question.skillCode,
+          })),
+        })),
+      });
+      toast.success('Exam created. Assign it from Practice Center when you are ready.');
+      navigate('/dashboard/practice-test');
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error(requestErrorMessage(error, 'Unable to create the exam'));
+    } finally {
+      setIsSaving(false);
     }
-
-    // RẼ NHÁNH 2: NẾU LÀ TÀI LIỆU (PDF, DOC, DOCX)
-    if (
-      file.type === 'application/pdf' ||
-      file.type.includes('word') ||
-      file.name.endsWith('.doc') ||
-      file.name.endsWith('.docx')
-    ) {
-      try {
-        setLoadingMessage("AI đang đọc và định dạng tài liệu...");
-        setIsLoading(true);
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await axiosClient.post("/api/ai-parser", formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-          timeout: 300000
-        });
-
-        const result = response.data || response;
-
-        if (result.success === true) {
-          console.log("Bóc tách thành công!", result.text);
-          setRawText(result.text);
-        } else {
-          console.error("Backend trả về success: false", result);
-          alert(`Lỗi từ Backend: ${result.error || "Không rõ nguyên nhân"}`);
-        }
-
-      } catch (error: any) {
-        console.error("Lỗi khi import file:", error);
-        const errorMessage = error.response?.data?.error || "Hệ thống AI đang quá tải, vui lòng thử lại sau vài giây!";
-        alert(errorMessage);
-      } finally {
-        setIsLoading(false);
-        setLoadingMessage("Đang xử lý dữ liệu...");
-        if (unifiedInputRef.current) unifiedInputRef.current.value = '';
-      }
-      return;
-    }
-    // RẼ NHÁNH 3: FILE KHÔNG HỢP LỆ
-    alert("Vui lòng chỉ tải lên file Ảnh, PDF hoặc Word (.doc, .docx)");
-    if (unifiedInputRef.current) unifiedInputRef.current.value = '';
   };
 
-  // Component con: Stepper (Thanh tiến trình)
-  const Stepper = memo(({ currentStep }: { currentStep: number }) => (
-    <div className="flex items-center gap-2 text-sm select-none"> {/* Thêm select-none để ko bị bôi đen nhầm */}
-      <div className={`flex items-center gap-2 transition-colors duration-300 ${currentStep === 1 ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
-        <span className={`w-10 h-10 rounded-full flex items-center justify-center border text-base ${currentStep === 1 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>1</span>
-        Thông tin
-      </div>
-      <div className="w-8 border-t border-gray-300"></div>
-      <div className={`flex items-center gap-2 transition-colors duration-300 ${currentStep === 2 ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
-        <span className={`w-10 h-10 rounded-full flex items-center justify-center border text-base ${currentStep === 2 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>2</span>
-        Nội dung
-      </div>
-    </div>
-  ));
+  const selectedIndex = questions.findIndex(question => question.clientId === selectedQuestion?.clientId);
+  const moveQuestion = (direction: -1 | 1) => {
+    const next = questions[selectedIndex + direction];
+    if (next) setSelectedQuestionId(next.clientId);
+  };
 
   return (
-    <div className="h-full w-full flex flex-col p-4 md:p-8 overflow-hidden relative bg-[#F8FAFC]">
-      {/* HEADER TRANG (Giữ cố định ở trên) */}
-      <div className="flex-none flex items-center justify-between mb-4 z-20">
-        <div className="flex-1 flex items-center">
-          <button 
-            onClick={() => {
-              if (step === 2) setStep(1);
-              else navigate(-1);
-            }} 
-            className="flex items-center gap-2 px-3 py-1.5 text-slate-500 hover:bg-slate-100 font-medium rounded-full"
-            title="Go back"
-          >
-            <ArrowLeft size={20} />
-          </button>
-        </div>
-        
-        <div className="shrink-0">
-          <Stepper currentStep={step} />
-        </div>
+    <div className={ui.page}>
+      <AppHeader
+        title="Create Exam"
+        subtitle="Import, review, and organize SAT questions"
+        rightContent={step === 'REVIEW' ? <Button size="sm" disabled={blockingErrors || isSaving} onClick={saveTest}><Save size={15} />{isSaving ? 'Creating…' : 'Create exam'}</Button> : undefined}
+      />
 
-        <div className="flex-1"></div>
-      </div>
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className={`${ui.content} flex min-h-full flex-col gap-6`}>
+          <div className="flex items-center gap-2" aria-label="Create exam progress">
+            {steps.map((item, index) => {
+              const active = item.key === step;
+              const complete = steps.findIndex(stepItem => stepItem.key === step) > index;
+              return <div key={item.key} className="flex items-center gap-2"><span className={`flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-semibold ${active || complete ? 'border-[#1B7A5A] bg-[#E8F5EF] text-[#145F47]' : 'border-[#E2EDE9] bg-white text-[#6B7280]'}`}>{complete ? <CheckCircle2 size={15} /> : index + 1}</span><span className={`text-xs font-medium ${active ? 'text-[#1A1A1A]' : 'text-[#6B7280]'}`}>{item.label}</span>{index < steps.length - 1 && <span className="h-px w-7 bg-[#C2DDD4]" />}</div>;
+            })}
+          </div>
 
-      <div className="flex-1 flex flex-col">
-        {/* === BƯỚC 1: FORM NHẬP THÔNG TIN (STEP 1) === */}
-        {step === 1 && (
-          <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-0">
-            <form onSubmit={handleInfoSubmit} className="flex flex-col h-full">
-              {/* Header của form */}
-              <div className="px-6 py-4 border-b border-gray-200 shrink-0">
-                <h2 className="text-xl font-bold text-gray-800">Cấu hình bài thi</h2>
-                <p className="text-sm text-gray-500 mt-1">Vui lòng điền các thông tin cơ bản trước khi nhập nội dung.</p>
+          {step === 'SETUP' && (
+            <Card className="mx-auto w-full max-w-3xl p-6 lg:p-8">
+              <div className="mb-6"><h2 className="text-lg font-semibold text-[#1A1A1A]">Test details</h2><p className="mt-1 text-sm text-[#6B7280]">Set up the exam before importing its questions.</p></div>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field label="Test name" className="md:col-span-2"><Input className="w-full" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder="e.g. SAT Reading Practice Test 1" autoFocus /></Field>
+                <Field label="Subject"><Select className="w-full" value={form.subject} onChange={event => setForm(current => ({ ...current, subject: event.target.value as Subject }))}><option value="RW">Reading & Writing</option><option value="MATH">Math</option></Select></Field>
+                <Field label="Duration (minutes)"><Input className="w-full" type="number" min={1} value={form.duration} onChange={event => setForm(current => ({ ...current, duration: Number(event.target.value) }))} /></Field>
+                <Field label="Modules"><Select className="w-full" value={form.moduleCount} onChange={event => setForm(current => ({ ...current, moduleCount: Number(event.target.value) }))}><option value={1}>1 module</option><option value={2}>2 modules</option></Select></Field>
+                <Field label="Test mode"><div className="grid grid-cols-2 gap-2"><ModeButton active={form.mode === 'PRACTICE'} icon={<FileText size={16} />} title="Practice" text="Flexible practice" onClick={() => setForm(current => ({ ...current, mode: 'PRACTICE' }))} /><ModeButton active={form.mode === 'EXAM'} icon={<ShieldCheck size={16} />} title="Secure exam" text="Timed exam rules" onClick={() => setForm(current => ({ ...current, mode: 'EXAM' }))} /></div></Field>
+                {userRole === 'ADMIN' && <Field label="Publication" className="md:col-span-2"><div className="flex flex-wrap items-center gap-3"><Select value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value, testDate: event.target.value === 'REAL' ? current.testDate : '' }))}><option value="PRACTICE">Practice</option><option value="REAL">Official</option></Select>{form.category === 'REAL' && <Input type="date" value={form.testDate} onChange={event => setForm(current => ({ ...current, testDate: event.target.value }))} />}</div></Field>}
               </div>
+              <div className="mt-8 flex justify-end"><Button onClick={handleSetupNext}>Continue <ArrowRight size={16} /></Button></div>
+            </Card>
+          )}
 
-              {/* Vùng chứa form (Sẽ scroll nếu màn hình QUÁ nhỏ, nhưng mặc định sẽ cố gắng vừa khít) */}
-              <div className="flex-1 p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-                  {/* CỘT 1: Thông tin cơ bản & Phân loại */}
-                  <div className="space-y-6">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
-                          <BookOpen size={16} className="text-indigo-600"/> Tên bài kiểm tra
-                        </label>
-                        <input 
-                          type="text" 
-                          className="w-full border-gray-300 border bg-gray-50/50 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-sm"
-                          placeholder="Ví dụ: SAT Practice Test #1"
-                          value={testInfo.title}
-                          onChange={e => setTestInfo({...testInfo, title: e.target.value})}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
-                          <AlignLeft size={16} className="text-indigo-600"/> Mô tả ngắn
-                        </label>
-                        <textarea
-                          rows={2}
-                          className="w-full border-gray-300 border bg-gray-50/50 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-sm resize-none"
-                          value={testInfo.description}
-                          onChange={(e) => setTestInfo({ ...testInfo, description: e.target.value })}
-                          placeholder="Ví dụ: Bài thi thử kỹ năng Reading & Writing..."
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-2">
-                          <FileType size={14} className="text-indigo-600"/> Môn thi
-                        </label>
-                        <select 
-                          className="w-full border-gray-300 border bg-white p-2 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm text-sm"
-                          value={testInfo.subject}
-                          onChange={e => setTestInfo({...testInfo, subject: e.target.value})}
-                        >
-                          <option value="RW">Reading & Writing</option>
-                          <option value="MATH">Mathematics</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-2">
-                          <Clock size={14} className="text-indigo-600"/> Thời gian (phút)
-                        </label>
-                        <input 
-                          type="number" 
-                          className="w-full border-gray-300 border p-2 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm text-sm"
-                          value={testInfo.duration}
-                          onChange={e => setTestInfo({...testInfo, duration: parseInt(e.target.value)})}
-                        />
-                      </div>
-
-                      <div className="col-span-2">
-                        <label className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-2">
-                          <Layers size={14} className="text-indigo-600"/> Số lượng Modules
-                        </label>
-                        <div className="flex bg-gray-200/60 p-1 rounded-lg">
-                          {[1, 2].map((num) => (
-                            <button
-                              key={num}
-                              type="button"
-                              onClick={() => setTestInfo({...testInfo, moduleCount: num})}
-                              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                                testInfo.moduleCount === num 
-                                ? 'bg-white text-indigo-600 shadow-sm' 
-                                : 'text-gray-500 hover:text-gray-700'
-                              }`}
-                            >
-                              {num} Module
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CỘT 2: Phân quyền & Chế độ thi */}
-                  <div className="space-y-6">
-                    {userRole === 'ADMIN' ? (
-                      <div className="p-4 bg-blue-50/80 border border-blue-100 rounded-xl space-y-3">
-                        <label className="text-sm font-bold text-blue-900 flex items-center gap-2">
-                          Phân loại đề thi
-                        </label>
-                        <div className="flex items-center gap-3">
-                          <label className="flex-1 flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-lg border border-blue-100 shadow-sm hover:border-blue-300">
-                            <input type="radio" name="category" value="PRACTICE" checked={testInfo.category !== 'REAL'} onChange={() => setTestInfo({ ...testInfo, category: 'PRACTICE', testDate: '' })} className="text-blue-600" />
-                            <span className="text-sm font-medium">Luyện tập</span>
-                          </label>
-                          <label className="flex-1 flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-lg border border-blue-100 shadow-sm hover:border-blue-300">
-                            <input type="radio" name="category" value="REAL" checked={testInfo.category === 'REAL'} onChange={() => setTestInfo({ ...testInfo, category: 'REAL' })} className="text-blue-600" />
-                            <span className="text-sm font-medium">Thi thật</span>
-                          </label>
-                        </div>
-                        {testInfo.category === 'REAL' && (
-                          <div className="mt-2">
-                            <input type="date" className="w-full border-gray-300 border p-2 rounded-lg text-sm" value={testInfo.testDate || ''} onChange={(e) => setTestInfo({ ...testInfo, testDate: e.target.value })}/>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                            <Users size={16} className="text-indigo-600"/> Giao cho lớp (Tùy chọn)
-                          </label>
-                          {isLoading ? (
-                            <div className="text-sm text-gray-500">Đang tải...</div>
-                          ) : myClasses.length > 0 ? (
-                            <select className="w-full border-gray-300 border bg-white p-2.5 rounded-lg text-sm" value={testInfo.assignClassId} onChange={e => setTestInfo({...testInfo, assignClassId: e.target.value})}>
-                              {myClasses.map((cls) => (<option key={cls.id} value={cls.id}>{cls.name}</option>))}
-                            </select>
-                          ) : (
-                            <div className="text-xs bg-amber-50 text-amber-800 p-3 rounded-lg border border-amber-200">
-                              Chưa có lớp nào. Hãy tạo lớp trước.
-                            </div>
-                          )}
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <ShieldCheck size={16} className="text-indigo-600"/> Chế độ bảo mật
-                      </label>
-                      <div className="grid grid-cols-1 gap-3">
-                        <div onClick={() => setTestInfo({...testInfo, mode: 'PRACTICE'})} className={`cursor-pointer border rounded-xl p-3 flex gap-3 ${testInfo.mode === 'PRACTICE' ? 'border-emerald-500 bg-emerald-50/30 ring-1 ring-emerald-500' : 'border-gray-200'}`}>
-                          <div className={`shrink-0 p-2 rounded-lg h-fit ${testInfo.mode === 'PRACTICE' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}><BookOpen size={18} /></div>
-                          <div>
-                            <div className={`font-bold text-sm ${testInfo.mode === 'PRACTICE' ? 'text-emerald-800' : 'text-gray-700'}`}>Luyện tập tự do</div>
-                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">Cho phép rời tab, copy/paste, xem đáp án.</p>
-                          </div>
-                        </div>
-                        <div onClick={() => setTestInfo({...testInfo, mode: 'EXAM'})} className={`cursor-pointer border rounded-xl p-3 flex gap-3 ${testInfo.mode === 'EXAM' ? 'border-rose-500 bg-rose-50/30 ring-1 ring-rose-500' : 'border-gray-200'}`}>
-                          <div className={`shrink-0 p-2 rounded-lg h-fit ${testInfo.mode === 'EXAM' ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-500'}`}><ShieldAlert size={18} /></div>
-                          <div>
-                            <div className={`font-bold text-sm ${testInfo.mode === 'EXAM' ? 'text-rose-800' : 'text-gray-700'}`}>Kiểm tra nghiêm ngặt</div>
-                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">Chống gian lận: Khóa copy, bắt buộc toàn màn hình.</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
+          {step === 'IMPORT' && (
+            <div className="mx-auto w-full max-w-3xl space-y-4">
+              <Card className="p-6 lg:p-8">
+                <div className="flex flex-col items-center rounded-xl border border-dashed border-[#C2DDD4] bg-[#F2F8F5] px-6 py-12 text-center">
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-[#1B7A5A] text-white"><UploadCloud size={21} /></div>
+                  <h2 className="text-lg font-semibold text-[#1A1A1A]">Upload test file</h2>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-[#6B7280]">Import a searchable PDF, DOCX, or TXT file. The parser runs on our server and does not use AI.</p>
+                  <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void parseFile(file); }} />
+                  <Button className="mt-5" disabled={isParsing} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoaderCircle size={16} className="animate-spin" /> : <UploadCloud size={16} />}{isParsing ? 'Parsing document…' : 'Choose file'}</Button>
+                  <p className="mt-3 text-xs text-[#6B7280]">Maximum 15 MB · Scanned PDFs must be converted to searchable PDFs first.</p>
                 </div>
-              </div>
+                {importError && <ImportNotice tone="error" message={importError} />}
+              </Card>
 
-              {/* Footer form - Nút bấm luôn cố định ở dưới */}
-              <div className="p-4 border-t border-gray-200 bg-gray-50/50 shrink-0 flex justify-end">
-                <button 
-                  disabled={userRole !== 'ADMIN' && myClasses.length === 0}
-                  type="submit" 
-                  className="flex items-center gap-2 px-8 py-2.5 rounded-full font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
-                >
-                  Next
-                  <ArrowRight size={18} />
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* === BƯỚC 2: EDITOR & PREVIEW (STEP 2) === */}
-        {step === 2 && (
-          <div className="flex w-full overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200 h-[calc(100vh-120px)]">
-            
-            {/* CỘT TRÁI: EDITOR */}
-            {/* Thêm flex-1, min-w-0 và min-h-0 cực kỳ quan trọng */}
-            <div className="flex-1 min-w-0 flex flex-col border-r border-gray-200 bg-white min-h-0 p-4">
-              
-              {/* Toolbar nhỏ gọn */}
-              <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border border-gray-300 border-b-0 rounded-t-lg shrink-0">
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="file" 
-                    ref={unifiedInputRef} 
-                    className="hidden" 
-                    accept="image/*,.pdf,.doc,.docx" 
-                    onChange={handleUnifiedUpload} 
-                  />
-                  <button 
-                    onClick={() => unifiedInputRef.current?.click()}
-                    disabled={isLoading}
-                    className="p-1.5 rounded hover:bg-white hover:text-indigo-600 text-gray-600 flex items-center gap-1.5 text-sm font-medium transition-colors"
-                  >
-                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
-                    <span>Upload</span>
-                  </button>
-                </div>
-                <button
-                  onClick={() => setShowGuide(true)}
-                  className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded transition-colors"
-                >
-                  Hướng dẫn cú pháp
-                </button>
-              </div>
-
-              {/* Vùng Textarea chiếm toàn bộ không gian còn lại */}
-              <div className="flex-1 min-h-0 relative overflow-hidden">
-                <textarea
-                  ref={textareaRef}
-                  value={rawText}
-                  onChange={(e) => setRawText(e.target.value)}
-                  className="w-full h-full p-6 border-none focus:ring-0 outline-none font-mono text-sm leading-relaxed custom-scrollbar overflow-y-auto resize-none shadow-inner bg-white"
-                  placeholder="Nhập nội dung đề thi vào đây..."
-                />
-              </div>
-
-              {/* Cụm nút được cố định ở đáy cột trái */}
-              <div className="mt-4 shrink-0 flex">
-                <button onClick={handleParse} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 transition-all shadow-sm active:scale-[0.98]">
-                  <Play size={18} /> Phân tích & Xem trước
-                </button>
-              </div>
+              <Card className="p-5">
+                <button onClick={() => setPasteOpen(open => !open)} className="flex w-full items-center justify-between text-left"><span><span className="flex items-center gap-2 text-sm font-semibold text-[#1A1A1A]"><ClipboardPaste size={17} className="text-[#1B7A5A]" />Paste structured text</span><span className="mt-1 block text-xs text-[#6B7280]">Use MODULE, QUESTION, Domain, Skill, and Answer labels for the most accurate import.</span></span><ChevronRight size={17} className={`text-[#6B7280] transition-transform ${pasteOpen ? 'rotate-90' : ''}`} /></button>
+                {pasteOpen && <div className="mt-4 border-t border-[#E2EDE9] pt-4"><textarea value={rawText} onChange={event => setRawText(event.target.value)} className="min-h-56 w-full rounded-lg border border-[#E2EDE9] bg-white p-3 font-mono text-sm text-[#1A1A1A] outline-none focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20" placeholder="=== MODULE 1 ===&#10;&#10;QUESTION 1&#10;Domain: Information and Ideas&#10;Skill: Inferences&#10;…" /><div className="mt-3 flex justify-end"><Button disabled={isParsing} onClick={() => void parsePastedText()}>{isParsing ? <LoaderCircle size={16} className="animate-spin" /> : <ClipboardPaste size={16} />}Preview text</Button></div></div>}
+              </Card>
+              <div className="flex"><Button variant="ghost" onClick={() => setStep('SETUP')}><ArrowLeft size={16} />Back</Button></div>
             </div>
+          )}
 
-            {/* CỘT PHẢI: PREVIEW SECTION */}
-            <div className="flex-1 min-w-0 min-h-0 bg-gray-50 flex flex-col relative">
-              <div className="absolute inset-0">
-                <PreviewSection
-                  questions={parsedQuestions}
-                  onSave={handleCreateTest}
-                  isSubmitting={isLoading}
-                  subject={testInfo.subject}
-                />
+          {step === 'REVIEW' && (
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
+              <Card className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3 text-xs text-[#6B7280]"><span className="font-medium text-[#1A1A1A]">{preview.fileName || 'Pasted content'}</span><span>{preview.summary.questionCount} questions</span><span>{preview.summary.classifiedCount} classified</span><span className={preview.summary.errorCount ? 'font-semibold text-red-700' : 'text-[#1B7A5A]'}>{preview.summary.errorCount} errors</span><span className={preview.summary.warningCount ? 'font-medium text-amber-700' : ''}>{preview.summary.warningCount} warnings</span></Card>
+              {preview.issues.map((item, index) => <ImportNotice key={`${item.code}-${index}`} tone={item.severity} message={item.message} />)}
+              <div className="grid min-h-[620px] grid-cols-1 overflow-hidden rounded-xl border border-[#E2EDE9] bg-white lg:grid-cols-[220px_minmax(0,1fr)_280px]">
+                <aside className="border-b border-[#E2EDE9] bg-[#F9FCFA] p-3 lg:border-b-0 lg:border-r"><p className="mb-3 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B7280]">Questions</p><div className="flex max-h-44 gap-1 overflow-x-auto lg:max-h-none lg:flex-col lg:overflow-y-auto">{preview.modules.map(module => <div key={module.order}><p className="mb-1 mt-2 px-2 text-[10px] font-medium text-[#6B7280]">{module.name}</p>{module.questions.map(question => <button key={question.clientId} onClick={() => setSelectedQuestionId(question.clientId)} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${selectedQuestion?.clientId === question.clientId ? 'bg-[#E8F5EF] font-medium text-[#145F47]' : 'text-[#4B5563] hover:bg-[#EAF2EE]'}`}><StatusIcon issues={question.issues} /><span className="whitespace-nowrap">Q{question.order}</span><span className="hidden truncate lg:block">{question.domainCode ? 'Classified' : 'Needs review'}</span></button>)}</div>)}</div></aside>
+                <section className="min-w-0 border-b border-[#E2E9ED] p-5 lg:border-b-0 lg:border-r lg:p-6">{selectedQuestion ? <QuestionPreview question={selectedQuestion} subject={form.subject} /> : <div className="flex h-full items-center justify-center text-sm text-[#6B7280]">Select a question to review.</div>}</section>
+                <aside className="min-w-0 bg-[#F9FCFA] p-5">{selectedQuestion ? <QuestionEditor question={selectedQuestion} domain={selectedDomain} taxonomy={taxonomy} onChange={updateQuestion} /> : null}</aside>
               </div>
+              <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={() => moveQuestion(-1)} disabled={selectedIndex <= 0}><ChevronLeft size={16} />Previous</Button><Button variant="ghost" size="sm" onClick={() => moveQuestion(1)} disabled={selectedIndex < 0 || selectedIndex >= questions.length - 1}>Next<ChevronRight size={16} /></Button></div><div className="flex items-center justify-end gap-2"><Button variant="outline" onClick={() => setStep('IMPORT')}>Replace import</Button><Button disabled={blockingErrors || isSaving} onClick={saveTest}><Save size={16} />{isSaving ? 'Creating…' : 'Create exam'}</Button></div></Card>
             </div>
-          </div>
-        )}
-      </div>
-    
-      {showGuide && (
-        <InputGuideModal isOpen={showGuide} onClose={() => setShowGuide(false)} />
-      )}
-      
-      {isLoading && (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
-          <div className="relative w-16 h-16 mb-4">
-            <div className="absolute inset-0 border-4 border-indigo-200 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
-            <Sparkles className="absolute inset-0 m-auto text-indigo-500 animate-pulse" size={24} />
-          </div>
-          <span className="text-indigo-800 font-bold text-lg animate-pulse">{loadingMessage}</span>
-          <span className="text-slate-500 text-sm mt-2">Vui lòng không đóng trình duyệt...</span>
+          )}
         </div>
-      )}
-      
+      </main>
     </div>
   );
 };
 
-export default CreateTestWizard;
+function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
+  return <label className={`block ${className}`}><span className="mb-2 block text-sm font-medium text-[#1A1A1A]">{label}</span>{children}</label>;
+}
 
+function ModeButton({ active, icon, title, text, onClick }: { active: boolean; icon: ReactNode; title: string; text: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`flex min-h-20 items-start gap-2 rounded-lg border p-3 text-left transition-colors ${active ? 'border-[#1B7A5A] bg-[#E8F5EF] text-[#145F47]' : 'border-[#E2EDE9] bg-white text-[#6B7280] hover:bg-[#F2F8F5]'}`}><span className="mt-0.5">{icon}</span><span><span className="block text-xs font-semibold">{title}</span><span className="mt-1 block text-[11px] leading-4">{text}</span></span></button>;
+}
+
+function ImportNotice({ tone, message }: { tone: IssueSeverity; message: string }) {
+  const warning = tone === 'warning';
+  return <div className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${warning ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-800'}`}><CircleAlert size={17} className="mt-0.5 shrink-0" /><span>{message}</span></div>;
+}
+
+function StatusIcon({ issues }: { issues: ImportIssue[] }) {
+  const hasError = issues.some(item => item.severity === 'error');
+  const hasWarning = issues.some(item => item.severity === 'warning');
+  if (hasError) return <CircleAlert size={14} className="shrink-0 text-red-600" aria-label="Has errors" />;
+  if (hasWarning) return <CircleAlert size={14} className="shrink-0 text-amber-600" aria-label="Has warnings" />;
+  return <CheckCircle2 size={14} className="shrink-0 text-[#1B7A5A]" aria-label="Ready" />;
+}
+
+function QuestionPreview({ question, subject }: { question: ImportQuestion; subject: Subject }) {
+  const usableBlocks = question.blocks.filter(block => block.type !== 'image' || block.src);
+  return <div><div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-xs font-medium text-[#6B7280]">Module {question.module} · Question {question.order}</p><h2 className="mt-1 text-lg font-semibold text-[#1A1A1A]">Question preview</h2></div><Badge tone={question.type === 'SPR' ? 'gold' : 'green'}>{question.type === 'SPR' ? 'Student-produced response' : 'Multiple choice'}</Badge></div>{usableBlocks.length > 0 && <div className="mb-5"><BlockRenderer blocks={usableBlocks} subject={subject} readOnly /></div>}<p className="whitespace-pre-wrap text-sm leading-7 text-[#1A1A1A]">{question.questionText || 'Question text is missing.'}</p>{question.type === 'MCQ' && <div className="mt-6 space-y-2">{question.choices.map(choice => <div key={choice.id} className="flex gap-3 rounded-lg border border-[#E2EDE9] px-3 py-2.5 text-sm text-[#374151]"><span className="font-semibold text-[#145F47]">{choice.id}</span><span className="whitespace-pre-wrap">{choice.text}</span></div>)}</div>}{question.type === 'SPR' && <div className="mt-6 rounded-lg border border-dashed border-[#C2DDD4] bg-[#F2F8F5] p-3 text-sm text-[#6B7280]">Student-produced response</div>}</div>;
+}
+
+function QuestionEditor({ question, domain, taxonomy, onChange }: { question: ImportQuestion; domain?: TaxonomyDomain; taxonomy: TaxonomyDomain[]; onChange: (id: string, updater: (question: ImportQuestion) => ImportQuestion) => void }) {
+  const update = (patch: Partial<ImportQuestion>) => onChange(question.clientId, current => ({ ...current, ...patch }));
+  return <div className="space-y-5"><div><h2 className="text-sm font-semibold text-[#1A1A1A]">Classification</h2><p className="mt-1 text-xs leading-5 text-[#6B7280]">Required for SAT performance analytics.</p></div><Field label="Content domain"><Select className="w-full" value={question.domainCode} onChange={event => update({ domainCode: event.target.value, skillCode: '' })}><option value="">Choose domain</option>{taxonomy.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</Select></Field><Field label="Skill"><Select className="w-full" value={question.skillCode} disabled={!domain} onChange={event => update({ skillCode: event.target.value })}><option value="">Choose skill</option>{domain?.skills.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</Select></Field><div className="border-t border-[#E2EDE9] pt-5"><h2 className="text-sm font-semibold text-[#1A1A1A]">Question details</h2><label className="mt-3 block text-xs font-medium text-[#1A1A1A]">Correct answer</label><Input className="mt-1 w-full" value={question.correctAnswer} onChange={event => update({ correctAnswer: event.target.value.toUpperCase() })} placeholder={question.type === 'MCQ' ? 'A' : 'Answer'} /><label className="mt-4 block text-xs font-medium text-[#1A1A1A]">Explanation <span className="font-normal text-[#6B7280]">(optional)</span></label><textarea className="mt-1 min-h-24 w-full rounded-lg border border-[#E2EDE9] bg-white p-3 text-sm text-[#1A1A1A] outline-none focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20" value={question.explanation || ''} onChange={event => update({ explanation: event.target.value })} /></div>{question.issues.length > 0 && <div className="border-t border-[#E2EDE9] pt-4"><p className="mb-2 text-xs font-semibold text-[#1A1A1A]">Validation</p><div className="space-y-2">{question.issues.map(item => <ImportNotice key={item.code} tone={item.severity} message={item.message} />)}</div></div>}</div>;
+}
+
+export default CreateTestWizard;

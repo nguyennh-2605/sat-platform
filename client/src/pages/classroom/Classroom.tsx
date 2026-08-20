@@ -47,8 +47,8 @@ const Classroom = () => {
       const res = await axiosClient.get(`/api/classes/${classId}`);
       setClassDetail(res);
     } catch (error) {
-      console.error("Lỗi tải chi tiết lớp:", error);
-      toast.error("Không thể tải thông tin lớp học");
+      console.error("Failed to load class details:", error);
+      toast.error("Unable to load class details");
     } finally {
     }
   }, [classId]);
@@ -72,28 +72,28 @@ const Classroom = () => {
 
       await axiosClient.post('/api/classes/posts', payload);
 
-      toast.success("Đã đăng thông báo!");
+      toast.success("Announcement posted");
       fetchClassDetail();
     } catch (error) {
-      toast.error("Lỗi khi đăng bài");
+      toast.error("Unable to publish post");
     }
   };
 
   const handleAddStudent = async (email: string) => {
     try {
       await axiosClient.post(`/api/classes/${classId}/students`, { email });
-      toast.success("Thêm học sinh thành công!");
+      toast.success("Student added");
       fetchClassDetail();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || "Không tìm thấy email này!");
+      toast.error(error.response?.data?.error || "This email could not be found");
     }
   };
 
-  if (!currentUser) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">Đang tải thông tin...</div>;
+  if (!currentUser) return <div className="min-h-screen flex items-center justify-center bg-[#F2F8F5] text-[#6B7280]">Loading class…</div>;
 
   // --- RENDER GIAO DIỆN MỚI ---
   return (
-    <div className="h-screen w-full bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
+    <div className="h-screen w-full bg-[#F2F8F5] font-sans text-[#1A1A1A] overflow-hidden">
       <StudentAndTeacherDashBoard
         classDetail={classDetail}
         onCreateAnnouncement={handleCreateAnnouncement}
@@ -141,7 +141,7 @@ const StudentAndTeacherDashBoard = ({
       onClick={() => setActiveTab(id)}
       className={`relative py-4 px-6 text-sm font-bold flex items-center gap-2 transition-colors ${
         activeTab === id 
-        ? 'text-indigo-700' 
+        ? 'text-[#1B7A5A]'
         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
       }`}
     >
@@ -149,35 +149,35 @@ const StudentAndTeacherDashBoard = ({
       {label}
       {/* Active Indicator (Gạch chân) */}
       {activeTab === id && (
-        <div className="absolute bottom-0 left-0 w-full h-[3px] bg-indigo-700 rounded-t-full" />
+        <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#1B7A5A] rounded-t-full" />
       )}
     </button>
   );
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#F8FAFC] relative">
+    <div className="flex flex-col h-full w-full bg-[#F2F8F5] relative">
       {isAddStudentModalOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-gray-900/60 transition-opacity">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
+          <div className="bg-white rounded-xl border border-[#E2EDE9] shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-800">Thêm học sinh</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Add student</h3>
               <button onClick={() => setIsAddStudentModalOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition"><X size={18}/></button>
             </div>
             <div className="space-y-4">
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
                     <div className="bg-blue-100 p-1 rounded-full"><Users size={16} className="text-blue-600"/></div>
-                    <p className="text-sm text-blue-800 leading-tight pt-0.5">Học sinh sẽ được thêm ngay lập tức vào danh sách lớp.</p>
+                    <p className="text-sm text-blue-800 leading-tight pt-0.5">The student will be added to this class immediately.</p>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email học sinh</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Student email</label>
                     <input 
                       autoFocus type="email" value={studentEmail} onChange={(e) => setStudentEmail(e.target.value)}
                       placeholder="student@example.com" 
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                      className="app-input w-full"
                     />
                 </div>
-                <button onClick={submitAddStudent} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 flex justify-center items-center gap-2">
-                  <CheckCircle2 size={20}/> Xác nhận thêm
+                <button onClick={submitAddStudent} className="app-button app-button-primary w-full">
+                  <CheckCircle2 size={18}/> Add student
                 </button>
             </div>
           </div>
@@ -187,7 +187,7 @@ const StudentAndTeacherDashBoard = ({
       {/* --- MAIN CONTENT --- */}
         {classDetail ? (
           <>
-            <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center z-30 shadow-sm">
+            <header className="flex-none h-[60px] bg-white border-b border-[#E2EDE9] px-4 md:px-6 flex items-center z-30">
               {/* Left: Tên lớp (Ẩn trên mobile để ưu tiên Tabs) */}
               <div className="flex-1 hidden lg:flex items-center">
                 <h1 className="text-sm font-bold text-slate-800 truncate max-w-[200px]">
@@ -197,11 +197,11 @@ const StudentAndTeacherDashBoard = ({
 
               {/* Center: Tabs (Căn giữa tuyệt đối) */}
               <div className="flex items-center justify-center gap-1 md:gap-4 overflow-x-auto no-scrollbar">
-                <TabButton id="STREAM" label="Bảng tin" icon={LayoutList} active={activeTab === 'STREAM'} />
-                <TabButton id="MEMBERS" label="Thành viên" icon={Users} active={activeTab === 'MEMBERS'} />
+                <TabButton id="STREAM" label="Stream" icon={LayoutList} active={activeTab === 'STREAM'} />
+                <TabButton id="MEMBERS" label="Members" icon={Users} active={activeTab === 'MEMBERS'} />
                 {currentUser.role === 'TEACHER' && (
                   <>
-                    <TabButton id="PROGRESS" label="Tiến độ" icon={Calendar} active={activeTab === 'PROGRESS'} />
+                    <TabButton id="PROGRESS" label="Progress" icon={Calendar} active={activeTab === 'PROGRESS'} />
                     <TabButton id="SCORES" label="Score Report" icon={BarChart3} active={activeTab === 'SCORES'} />
                   </>
                 )}
@@ -214,7 +214,7 @@ const StudentAndTeacherDashBoard = ({
             </header>
 
             {/* 2. TAB CONTENT AREA */}
-            <main className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50/50">
+            <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#F2F8F5]">
               <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-6 animate-fade-in-up">
 
                 {/* --- TAB 1: BẢNG TIN (STREAM) --- */}
@@ -222,11 +222,11 @@ const StudentAndTeacherDashBoard = ({
                   <div className="space-y-6 animate-fade-in-up">
                     
                     {/* Banner ảnh bìa (Full width trong container) */}
-                    <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-indigo-700 p-8 rounded-2xl shadow-md text-white relative overflow-hidden min-h-[180px] flex flex-col justify-end">
+                    <div className="bg-gradient-to-r from-[#0F4D38] via-[#145F47] to-[#1B7A5A] p-8 rounded-xl shadow-md text-white relative overflow-hidden min-h-[180px] flex flex-col justify-end">
                       <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4 blur-3xl"></div>
                       <div className="relative z-10">
                         <h2 className="text-4xl font-black mb-1">{classDetail.name}</h2>
-                        <p className="text-indigo-100 font-medium opacity-90">Học kỳ Fall 2024 • SAT Master Course</p>
+                        <p className="text-[#D6EDE4] font-medium opacity-90">Fall 2024 · SAT Master Course</p>
                       </div>
                     </div>
 
@@ -236,30 +236,30 @@ const StudentAndTeacherDashBoard = ({
                       {/* CỘT TRÁI: THÔNG TIN NHANH (Mã lớp) */}
                       <div className="lg:col-span-1 space-y-4">
                         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">Mã lớp học</h3>
+                          <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Class code</h3>
                           <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <span className="text-2xl font-black text-indigo-600 tracking-widest">
+                            <span className="text-2xl font-black text-[#1B7A5A] tracking-widest">
                               {classDetail.id?.substring(0, 6).toUpperCase() || "ABCXYZ"}
                             </span>
                             <button 
                               onClick={() => {
                                 navigator.clipboard.writeText(classDetail.id || "");
-                                toast.success("Đã sao chép mã lớp!");
+                                toast.success("Class code copied");
                               }}
-                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-all shadow-sm"
-                              title="Sao chép mã"
+                              className="p-2 text-slate-400 hover:text-[#1B7A5A] hover:bg-white rounded-md transition-all shadow-sm"
+                              title="Copy class code"
                             >
                               <Copy size={16} />
                             </button>
                           </div>
                           <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
-                            Gửi mã này cho học sinh để họ có thể tham gia vào lớp học ngay lập tức.
+                            Share this code with students so they can join the class.
                           </p>
                         </div>
 
                         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Sắp tới</h3>
-                          <p className="text-xs text-slate-500">Tuyệt vời! Không có bài tập nào sắp đến hạn.</p>
+                          <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Upcoming</h3>
+                          <p className="text-xs text-slate-500">No assignments are due soon.</p>
                         </div>
                       </div>
 
@@ -268,10 +268,10 @@ const StudentAndTeacherDashBoard = ({
                         {/* Thanh tạo bài tập nhanh */}
                         {currentUser.role === 'TEACHER' && (
                           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-all group" onClick={() => setShowAnnouncementForm(true)}>
-                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-[#E8F5EF] group-hover:text-[#1B7A5A] transition-colors">
                               <Plus size={20} />
                             </div>
-                            <span className="text-sm font-medium text-slate-500 group-hover:text-slate-800">Thông báo nội dung nào đó cho lớp học của bạn...</span>
+                            <span className="text-sm font-medium text-slate-500 group-hover:text-slate-800">Share an announcement with your class…</span>
                           </div>
                         )}
 
@@ -282,14 +282,14 @@ const StudentAndTeacherDashBoard = ({
                               <div 
                                 key={assignment.id} 
                                 onClick={() => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} 
-                                className="group bg-white p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md cursor-pointer flex items-center gap-4"
+                                className="group bg-white p-4 rounded-xl border border-gray-200 hover:border-[#A9CFC1] hover:shadow-md cursor-pointer flex items-center gap-4"
                               >
-                                <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                                <div className="w-12 h-12 rounded-full bg-[#E8F5EF] text-[#1B7A5A] flex items-center justify-center flex-shrink-0 group-hover:bg-[#1B7A5A] group-hover:text-white transition-colors duration-300">
                                   <FileText size={24} />
                                 </div>  
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-gray-800 text-base mb-1 group-hover:text-indigo-700 transition">
-                                    Giáo viên đã đăng một bài tập mới: <span className="font-bold">{assignment.title}</span>
+                                  <h4 className="font-medium text-gray-800 text-base mb-1 group-hover:text-[#1B7A5A] transition">
+                                    New assignment: <span className="font-semibold">{assignment.title}</span>
                                   </h4>
                                   <div className="text-xs text-gray-400 font-medium">
                                     {assignment.createdAt 
@@ -297,17 +297,17 @@ const StudentAndTeacherDashBoard = ({
                                       : format(new Date(), 'dd/MM/yyyy')}
                                   </div>
                                 </div>
-                                <div className="text-gray-300 group-hover:text-indigo-500 px-2 transition-colors">
+                                <div className="text-gray-300 group-hover:text-[#1B7A5A] px-2 transition-colors">
                                   <ChevronRight size={20} />
                                 </div>
                               </div>  
                             ))
                           ) : (
-                            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
+                            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
                               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                                 <LayoutList size={32} className="text-slate-300" />
                               </div>
-                              <p className="text-slate-500 font-medium">Chưa có bài đăng nào trong lớp học này.</p>
+                              <p className="text-slate-500 font-medium">There are no posts in this class yet.</p>
                             </div>
                           )}
                         </div>
@@ -318,20 +318,20 @@ const StudentAndTeacherDashBoard = ({
 
                 {/* --- TAB 2: THÀNH VIÊN (MEMBERS) --- */}
                 {activeTab === 'MEMBERS' && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="bg-white rounded-xl shadow-sm border border-[#E2EDE9] overflow-hidden">
                       <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                          <h3 className="text-lg font-bold text-indigo-900">Danh sách học sinh</h3>
-                          <button onClick={() => setIsAddStudentModalOpen(true)} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-100 flex items-center gap-2">
-                            <Plus size={16}/> Thêm học sinh
+                          <h3 className="text-lg font-semibold text-[#1A1A1A]">Students</h3>
+                          <button onClick={() => setIsAddStudentModalOpen(true)} className="app-button app-button-primary">
+                            <Plus size={16}/> Add student
                           </button>
                       </div>
                       <div className="overflow-x-auto">
                           <table className="w-full text-left border-collapse">
                               <thead className="bg-gray-50 text-gray-500 text-xs font-bold uppercase">
                                   <tr>
-                                      <th className="p-5 pl-8">Họ và tên</th>
+                                      <th className="p-5 pl-8">Name</th>
                                       <th className="p-5">Email</th>
-                                      <th className="p-5 text-right pr-8">Trạng thái</th>
+                                      <th className="p-5 text-right pr-8">Status</th>
                                   </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100">
@@ -340,7 +340,7 @@ const StudentAndTeacherDashBoard = ({
                                   <tr key={st.id} className="hover:bg-gray-50/80 transition">
                                       <td className="p-5 pl-8">
                                           <div className="flex items-center gap-3">
-                                              <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
+                                              <div className="w-9 h-9 rounded-full bg-[#C2DDD4] text-[#1B7A5A] flex items-center justify-center font-bold text-sm">
                                                   {st.name ? st.name.charAt(0).toUpperCase() : 'S'}
                                               </div>
                                               <span className="font-semibold text-gray-700">{st.name || "Unknown"}</span>
@@ -348,13 +348,13 @@ const StudentAndTeacherDashBoard = ({
                                       </td>
                                       <td className="p-5 text-gray-600 text-sm">{st.email}</td>
                                       <td className="p-5 text-right pr-8">
-                                          <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">Đã tham gia</span>
+                                          <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">Joined</span>
                                       </td>
                                   </tr>
                                   ))
                               ) : (
                                   <tr>
-                                      <td colSpan={3} className="py-12 text-center text-gray-400 text-sm">Chưa có thành viên nào.</td>
+                                      <td colSpan={3} className="py-12 text-center text-gray-400 text-sm">No students have joined yet.</td>
                                   </tr>
                               )}
                               </tbody>
@@ -388,8 +388,8 @@ const StudentAndTeacherDashBoard = ({
                 <div className="w-40 h-40 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm relative">
                      <LayoutDashboard size={64} className="text-indigo-300"/>
                 </div>
-                <h2 className="text-xl font-bold text-gray-800 mb-2">Chưa chọn lớp học</h2>
-                <p className="text-gray-500 text-sm">Vui lòng chọn một lớp từ menu bên trái.</p>
+                <h2 className="text-xl font-semibold text-gray-800 mb-2">No class selected</h2>
+                <p className="text-gray-500 text-sm">Select a class from the sidebar.</p>
             </div>
         )}
       </div>

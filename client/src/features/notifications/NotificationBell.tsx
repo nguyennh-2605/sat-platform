@@ -13,10 +13,10 @@ const timeAgo = (dateString: string | Date | null | undefined): string => {
   const hours = Math.round(minutes / 60);
   const days = Math.round(hours / 24);
 
-  if (seconds < 60) return "Vài giây trước";
-  if (minutes < 60) return `${minutes} phút trước`;
-  if (hours < 24) return `${hours} giờ trước`;
-  if (days < 7) return `${days} ngày trước`;
+  if (seconds < 60) return "A few seconds ago";
+  if (minutes < 60) return `${minutes} minutes ago`;
+  if (hours < 24) return `${hours} hours ago`;
+  if (days < 7) return `${days} days ago`;
   
   // Nếu lâu hơn 7 ngày thì hiển thị ngày tháng năm
   return date.toLocaleDateString('vi-VN', { 
@@ -133,7 +133,7 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
       {/* Nút Chuông */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors relative"
+        className="p-2 text-slate-400 hover:text-[#1B7A5A] hover:bg-[#E8F5EF] rounded-full transition-colors relative"
       >
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -145,13 +145,13 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-            <h3 className="font-bold text-slate-800 text-sm">Thông báo</h3>
+            <h3 className="font-bold text-slate-800 text-sm">Notifications</h3>
             {unreadCount > 0 && (
               <button 
                 onClick={handleMarkAllAsRead}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                className="text-xs font-semibold text-[#1B7A5A] hover:text-[#145F47]"
               >
-                Đánh dấu đã đọc
+                Mark as read
               </button>
             )}
           </div>
@@ -161,7 +161,7 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
               notifications.map((notif) => (
                 <div 
                   key={notif.id} 
-                  className={`p-4 border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-colors ${!notif.isRead ? 'bg-indigo-50/40' : ''}`}
+                  className={`p-4 border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-colors ${!notif.isRead ? 'bg-[#E8F5EF]/40' : ''}`}
                   onClick={() => {
                     if (notif.link) window.location.href = notif.link;
                     setIsOpen(false);
@@ -176,7 +176,7 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
             ) : (
               <div className="p-8 text-center flex flex-col items-center justify-center text-slate-400">
                 <Bell size={32} className="mb-2 opacity-20" />
-                <p className="text-sm">Chưa có thông báo nào</p>
+                <p className="text-sm">No notifications yet</p>
               </div>
             )}
           </div>

@@ -39,17 +39,17 @@ model Class {
 }
 
 model Assignment {
-  id          String               @id @default(uuid())
-  title       String
-  content     String?
-  fileUrls    String[]
-  links       String[]
-  testIds     Int[]                @default([])
-  deadline    DateTime?
-  createdAt   DateTime             @default(now())
-  classId     String
-  class       Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
-  submissions HomeworkSubmission[]
+  id              String               @id @default(uuid())
+  title           String
+  content         String?
+  fileUrls        String[]
+  links           String[]
+  testIds         Int[]                @default([])
+  deadline        DateTime?
+  createdAt       DateTime             @default(now())
+  classId         String
+  class           Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+  submissions     HomeworkSubmission[]
   testSubmissions Submission[]
 }
 
@@ -73,16 +73,16 @@ model Folder {
   id        Int      @id @default(autoincrement())
   name      String
   createdAt DateTime @default(now())
-  userId    Int      // Của giáo viên nào
+  userId    Int // Của giáo viên nào
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   // Quan hệ tự trỏ (Folder con nằm trong Folder cha)
-  parentId  Int?
-  parent    Folder?  @relation("SubFolders", fields: [parentId], references: [id], onDelete: Cascade)
-  children  Folder[] @relation("SubFolders")
+  parentId Int?
+  parent   Folder?  @relation("SubFolders", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[] @relation("SubFolders")
 
   // Quan hệ với Test
-  tests     Test[]
+  tests Test[]
 }
 
 model Test {
@@ -115,7 +115,7 @@ model ClassTest {
   class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
   test       Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
 
-  submissions Submission[] 
+  submissions Submission[]
 
   @@unique([classId, testId])
 }
@@ -131,17 +131,46 @@ model Section {
 }
 
 model Question {
-  id            Int      @id @default(autoincrement())
+  id            Int             @id @default(autoincrement())
   sectionId     Int
-  type          QuestionType  @default(MCQ)
+  type          QuestionType    @default(MCQ)
   choices       Json
   correctAnswer String
   blocks        Json
   questionText  String
   explanation   String?
-  order         Int      @default(0)
+  order         Int             @default(0)
+  domainCode    String?
+  skillCode     String?
   answers       Answer[]
-  section       Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  section       Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  domain        QuestionDomain? @relation("QuestionDomainQuestions", fields: [domainCode], references: [code], onDelete: SetNull)
+  skill         QuestionSkill?  @relation("QuestionSkillQuestions", fields: [skillCode], references: [code], onDelete: SetNull)
+
+  @@index([domainCode])
+  @@index([skillCode])
+}
+
+model QuestionDomain {
+  code      String          @id
+  name      String
+  subject   TestSubject
+  sortOrder Int
+  skills    QuestionSkill[]
+  questions Question[]      @relation("QuestionDomainQuestions")
+
+  @@index([subject, sortOrder])
+}
+
+model QuestionSkill {
+  code       String         @id
+  name       String
+  domainCode String
+  sortOrder  Int
+  domain     QuestionDomain @relation(fields: [domainCode], references: [code], onDelete: Cascade)
+  questions  Question[]     @relation("QuestionSkillQuestions")
+
+  @@index([domainCode, sortOrder])
 }
 
 model Submission {
@@ -194,13 +223,13 @@ model ErrorLog {
 
 model Notification {
   id        String   @id @default(uuid())
-  userId    Int      // ID của người nhận thông báo (Giáo viên hoặc Học sinh)
-  message   String   // Nội dung chi tiết
-  link      String?  // (Tùy chọn) Link để click vào thông báo bay đến trang tương ứng
+  userId    Int // ID của người nhận thông báo (Giáo viên hoặc Học sinh)
+  message   String // Nội dung chi tiết
+  link      String? // (Tùy chọn) Link để click vào thông báo bay đến trang tương ứng
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
@@ -231,8 +260,8 @@ enum SubmissionStatus {
 }
 
 enum QuestionType {
-  MCQ      // Trắc nghiệm
-  SPR      // Tự luận điền số (Grid-in)
+  MCQ // Trắc nghiệm
+  SPR // Tự luận điền số (Grid-in)
 }
 
 model Week {

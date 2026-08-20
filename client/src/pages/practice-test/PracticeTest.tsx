@@ -1,541 +1,343 @@
-import { useEffect, useState, useMemo, useRef, memo, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Clock, ChevronRight, Filter, Layers, Calendar, GraduationCap, ArrowUp, X } from 'lucide-react';
-import { useDebounce } from '../../hooks/useDebounce';
-import axiosClient from '../../lib/axios';
+import { Bell, BookOpen, BookOpenCheck, Check, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Play, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Ripple from '../../components/ui/RippleButton';
-
-// --- CONSTANTS ---
-const TEST_DATES = [
-  "All Dates", 
-  "11/2025", "10/2025", "09/2025", "08/2025", 
-  "06/2025", "05/2025", "03/2025", 
-  "10/2024", "08/2024", "06/2024"
-];
-
-interface FilterChipProps {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  icon?: React.ElementType; // Kiểu dữ liệu cho Icon component (Lucide)
-  colorClass?: string;
-}
-
-interface Test {
-  id: number | string;
-  title: string;
-  description?: string;
-  duration: number;
-  subject: string;     // 'RW' | 'MATH'
-  category: string;    // 'REAL' | 'CLASS'
-  mode: string;        // 'PRACTICE' | 'EXAM'
-  testDate?: string | null;
-  classTests?: any[];
-  isDoing?: boolean;   // Optional vì có thể chưa làm
-}
+import axiosClient from '../../lib/axios';
 
 interface ClassInfo {
   id: string;
   name: string;
+  _count?: { students: number };
 }
 
-// Component con: Chip Filter (Nút bấm bộ lọc)
-const FilterChip = ({ label, active, onClick, icon: Icon, colorClass = "blue" }: FilterChipProps) => {
-  const activeStyle = colorClass === "blue" 
-    ? 'bg-blue-600 text-white border-blue-600'
-    : 'bg-slate-800 text-white border-slate-800 shadow-md';
+interface TestItem {
+  id: number;
+  title: string;
+  description?: string;
+  duration: number;
+  subject: 'RW' | 'MATH';
+  category: string;
+  mode: 'PRACTICE' | 'EXAM';
+  isDoing?: boolean;
+  questionCount: number;
+  progress: number;
+  attemptStatus: 'NOT_STARTED' | 'DOING' | 'COMPLETED';
+  lastAttempt?: string | null;
+  lastScore?: number | null;
+  author?: { id: number; name?: string; role: 'ADMIN' | 'TEACHER' | 'STUDENT' } | null;
+  classTests?: Array<{ classId: string; class?: { name: string } }>;
+}
 
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 border flex items-center gap-2
-        ${active 
-          ? activeStyle
-          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-        }
-      `}
-    >
-      {Icon && <Icon size={14} />}
-      {label}
-    </button>
-  );
+type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT';
+
+const subjectLabel: Record<TestItem['subject'], string> = {
+  RW: 'RW',
+  MATH: 'Math',
 };
 
-const TestCard = memo(({ test, index, onStart }: { test: Test, index: number, onStart: (t: Test) => void }) => {
-  return (
-    <div className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-[0_2px_10px_-4px_rgba(6,81,237,0.1)] hover:shadow-md transition-all duration-300 flex flex-col">
-      {/* Card Header */}
-      <div className="flex justify-between items-start mb-4">
-        <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold text-lg group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-          {String(index + 1).padStart(2, '0')}
-        </div>
-        
-        <div className="flex flex-col items-end gap-1.5">
-          <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
-            <Clock size={12} className="text-slate-400"/>
-            <span>{Math.floor(test.duration)} phút</span>
-          </div>
-          
-          <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border 
-            ${test.mode === 'PRACTICE' 
-              ? 'text-emerald-600 bg-emerald-50 border-emerald-100' 
-              : 'text-rose-600 bg-rose-50 border-rose-100'
-            }`}
-          >
-            <div className={`w-1.5 h-1.5 rounded-full animate-pulse 
-              ${test.mode === 'PRACTICE' ? 'bg-emerald-500' : 'bg-rose-500'}`}
-            ></div>
-            <span>{test.mode}</span>
-          </div>
-        </div>
-      </div>
+const typeLabel: Record<TestItem['mode'], string> = {
+  PRACTICE: 'Practice',
+  EXAM: 'Test',
+};
 
-      {/* Card Content */}
-      <div className="flex-1">
-        <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-2">
-          {test.title}
-        </h3>
-        <p className="text-slate-500 text-sm mb-4 line-clamp-2">
-          {test.description || "No description"}
-        </p>
-      </div>
+const formatLastAttempt = (value?: string | null) => {
+  if (!value) return 'Never';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Never';
+  const elapsed = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
-      {/* Action Button */}
-      <button 
-        onClick={() => onStart(test)} 
-        className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all transform active:scale-95 ${
-          test.isDoing
-            ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-            : "bg-slate-900 text-white hover:bg-blue-600 shadow-lg shadow-slate-200"
-        }`}
-      >
-        {test.isDoing ? "Tiếp tục bài thi" : "Bắt đầu làm bài"}
-        {!test.isDoing && <ChevronRight size={18} />}
-      </button>
-    </div>
-  );
-});
-
-const SearchInput = memo(({ onSearch }: { onSearch: (val: string) => void }) => {
-  const [localSearch, setLocalSearch] = useState('');
-  const debouncedValue = useDebounce(localSearch, 150);
-
-  // Chỉ gọi lên cha khi giá trị debounce thay đổi
-  useEffect(() => {
-    onSearch(debouncedValue);
-  }, [debouncedValue, onSearch]);
-
-  return (
-    <input 
-      type="text"   
-      value={localSearch}
-      onChange={(e) => setLocalSearch(e.target.value)}
-      placeholder="Search tests by name..." 
-      className="w-full outline-none text-slate-700 placeholder-slate-400 bg-transparent text-base font-medium"
-    />
-  );
-});
+const formatTestTitle = (title: string) => {
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) return title;
+  return `${trimmedTitle.charAt(0).toLocaleUpperCase()}${trimmedTitle.slice(1)}`;
+};
 
 const PracticeTest = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState({ name: '', role: '' });
-  
-  // State dữ liệu
-  const [tests, setTests] = useState<Test[]>([]);
-  const [myClasses, setMyClasses] = useState<ClassInfo[]>([]);
+  const role = (localStorage.getItem('userRole') || 'STUDENT') as UserRole;
+  const userName = localStorage.getItem('userName') || 'Student';
+  const canManage = role === 'TEACHER' || role === 'ADMIN';
+  const initials = userName.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase() || 'ST';
+
+  const [tests, setTests] = useState<TestItem[]>([]);
+  const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [subject, setSubject] = useState<'ALL' | TestItem['subject']>('ALL');
+  const [type, setType] = useState<'ALL' | TestItem['mode']>('ALL');
+  const [sortOrder, setSortOrder] = useState<'NEWEST' | 'OLDEST'>('NEWEST');
+  const [classFilter, setClassFilter] = useState('ALL');
+  const [selectedTestIds, setSelectedTestIds] = useState<number[]>([]);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [startClassTest, setStartClassTest] = useState<TestItem | null>(null);
 
-  // --- STATE QUẢN LÝ FILTER ---
-  // 1. Category: 'ALL' | 'REAL' | ClassUUID (string)
-  const [activeCategory, setActiveCategory] = useState('ALL'); 
-  
-  // 2. Date: Chỉ dùng khi category = 'REAL'
-  const [activeDate, setActiveDate] = useState('All Dates');   
-  
-  // 3. Subject: 'ALL' | 'RW' | 'MATH'
-  const [activeSubject, setActiveSubject] = useState('ALL');
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const filterRef = useRef<HTMLDivElement>(null);
-
-  // State quan li Infinite Scroll
-  const [visibleCount, setVisibleCount] = useState(12);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const observer = useRef<IntersectionObserver | null>(null);
-  const [isClassSelectOpen, setIsClassSelectOpen] = useState(false);
-  const [selectedTestForClassModal, setSelectedTestForClassModal] = useState<Test | null>(null);
-
-  useEffect(() => {
-    // 1. Setup User
-    const name = localStorage.getItem('userName') || 'Student';
-    const role = localStorage.getItem('userRole');
-    setUser({ name: name, role: role || 'STUDENT'});
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [classesRes, testsRes] = await Promise.all([
-          axiosClient.get<ClassInfo[], ClassInfo[]>(`/api/tests/classes`),
-          axiosClient.get<Test[], Test[]>(`/api/tests`)
-        ]);
-
-        setMyClasses(classesRes);
-        setTests(testsRes);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast.error("Không thể tải dữ liệu bài thi");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Nếu flyout đang mở VÀ vị trí click không nằm trong filterRef
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-        setIsFilterOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    // Quan trọng: Gỡ bỏ sự kiện khi component unmount để tránh rò rỉ bộ nhớ
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  useEffect(() => {
-    const mainContainer = document.getElementById("main-scroll");
-    if (!mainContainer) {
-      return;
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [testData, classData] = await Promise.all([
+        axiosClient.get<TestItem[], TestItem[]>('/api/tests'),
+        axiosClient.get<ClassInfo[], ClassInfo[]>('/api/tests/classes'),
+      ]);
+      setTests(testData.map(test => ({ ...test, title: formatTestTitle(test.title) })));
+      setClasses(classData);
+    } catch (error) {
+      console.error(error);
+      toast.error('Unable to load Practice Center');
+    } finally {
+      setLoading(false);
     }
-    const toggleVisibility = () => {
-      if (mainContainer.scrollTop > 400) {
-        setShowScrollTop(true);
-      } else {
-        setShowScrollTop(false);
-      }
-    };
-    mainContainer.addEventListener("scroll", toggleVisibility);
-    return () => mainContainer.removeEventListener("scroll", toggleVisibility);
   }, []);
 
-  const lastElementRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      // Nếu observer cũ đang chạy, ngắt kết nối nó đi
-      if (observer.current) observer.current.disconnect();
-      // Khởi tạo observer mới
-      observer.current = new IntersectionObserver(
-        (entries) => {
-          // Nếu người dùng cuộn tới thẻ div này
-          if (entries[0].isIntersecting) {
-            setVisibleCount((prev) => prev + 12);
-          }
-        },
-        { threshold: 0.1 }
-      );
-      // Nếu thẻ div (node) đã được render trên màn hình -> bắt đầu theo dõi nó
-      if (node) {
-        observer.current.observe(node);
-      }
-    },
-    [] // Không cần dependency vì ta dùng functional update (prev => prev + 12)
-  );
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  // --- LOGIC FILTER (CORE) ---
   const filteredTests = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-
+    const keyword = search.trim().toLocaleLowerCase();
     return tests.filter(test => {
-      // 1. Search Query
-      if (searchQuery && !test.title.toLowerCase().includes(query)) {
-        return false;
-      }
-
-      // 2. Category Filter
-      if (activeCategory === 'REAL') {
-        if (test.category !== 'REAL') return false;
-        // Check Date
-        if (activeDate !== 'All Dates' && test.testDate !== activeDate) return false;
-      } 
-      else if (activeCategory !== 'ALL') {
-        // Đây là trường hợp lọc theo Class ID (activeCategory là chuỗi UUID)
-        // Check xem test này có được assign vào lớp đó không
-        const assignedToClass = test.classTests?.some(ct => ct.classId === activeCategory);
-        if (!assignedToClass) return false;
-      }
-
-      // 3. Subject Filter
-      if (activeSubject !== 'ALL' && test.subject !== activeSubject) {
-        return false;
-      }
-
+      if (keyword && !`${test.title} ${test.description || ''}`.toLocaleLowerCase().includes(keyword)) return false;
+      if (subject !== 'ALL' && test.subject !== subject) return false;
+      if (type !== 'ALL' && test.mode !== type) return false;
+      if (classFilter !== 'ALL' && !test.classTests?.some(item => item.classId === classFilter)) return false;
       return true;
-    });
-  }, [tests, activeCategory, activeDate, activeSubject, searchQuery]);
+    }).sort((first, second) => sortOrder === 'NEWEST' ? second.id - first.id : first.id - second.id);
+  }, [classFilter, search, sortOrder, subject, tests, type]);
 
-  const navigateToTestRoom = useCallback((exam: Test, classId?: string) => {
-    const examInfo = {
-      id: exam.id,
-      title: exam.title,
-      description: exam.description,
-      duration: exam.duration
-    };
-    localStorage.setItem('current_exam_info', JSON.stringify(examInfo));
-    navigate(`/test/${exam.id}${classId ? `?classId=${classId}` : ''}`);
+  const openTest = useCallback((test: TestItem, classId?: string) => {
+    localStorage.setItem('current_exam_info', JSON.stringify({
+      id: test.id,
+      title: test.title,
+      description: test.description,
+      duration: test.duration,
+    }));
+    navigate(`/test/${test.id}${classId ? `?classId=${classId}` : ''}`);
   }, [navigate]);
 
-  const handleStartExam = useCallback((exam: Test) => {
-    const classIds = Array.from(new Set((exam.classTests || []).map(ct => ct.classId).filter(Boolean)));
-
-    if (classIds.length > 1) {
-      setSelectedTestForClassModal(exam);
-      setIsClassSelectOpen(true);
+  const handleStart = useCallback((test: TestItem) => {
+    const assignedClassIds = [...new Set((test.classTests || []).map(item => item.classId))];
+    if (role === 'STUDENT' && assignedClassIds.length > 1) {
+      setStartClassTest(test);
       return;
     }
+    openTest(test, role === 'STUDENT' ? assignedClassIds[0] : undefined);
+  }, [openTest, role]);
 
-    if (classIds.length === 1) {
-      navigateToTestRoom(exam, classIds[0]);
+  const toggleTest = (testId: number) => {
+    setSelectedTestIds(current => current.includes(testId) ? current.filter(id => id !== testId) : [...current, testId]);
+  };
+
+  const toggleClass = (classId: string) => {
+    setSelectedClassIds(current => current.includes(classId) ? current.filter(id => id !== classId) : [...current, classId]);
+  };
+
+  const assignTests = async () => {
+    if (selectedTestIds.length === 0 || selectedClassIds.length === 0) {
+      toast.error('Select at least one test and one class');
       return;
     }
-
-    navigateToTestRoom(exam);
-  }, [navigateToTestRoom]);
-
-  useEffect(() => {
-    setVisibleCount(12);
-  }, [filteredTests]);
-
-  const scrollToTop = () => {
-    const mainContainer = document.getElementById("main-scroll");
-    if (mainContainer) {
-      mainContainer.scrollTo({
-        top: 0,
-        behavior: "smooth" // Tạo hiệu ứng lướt lên mượt mà thay vì giật cục
-      });
+    setAssigning(true);
+    try {
+      await axiosClient.post('/api/tests/assign', { testIds: selectedTestIds, classIds: selectedClassIds });
+      toast.success(`Assigned ${selectedTestIds.length} test(s) to ${selectedClassIds.length} class(es)`);
+      setAssignmentOpen(false);
+      setSelectionMode(false);
+      setSelectedTestIds([]);
+      setSelectedClassIds([]);
+      await loadData();
+    } catch (error: unknown) {
+      const requestError = error as { response?: { data?: { error?: string } } };
+      toast.error(requestError.response?.data?.error || 'Unable to assign tests');
+    } finally {
+      setAssigning(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden">
-      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-center z-30 shadow-sm">
-        <h1 className="text-lg font-bold text-slate-800 tracking-tight">
-          Practice Center
-        </h1>
-      </header>
-      
-      <main id="main-scroll" className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-          {/* 1. HEADER SECTION (Chỉ còn chữ) */}
-          <div className="mb-6">
-            <h2 className="text-3xl font-extrabold text-slate-800 mb-2">
-              Xin chào, {user.name.split(' ').pop()}! 👋
-            </h2>
-            <p className="text-slate-500 text-lg">Hôm nay bạn muốn luyện tập kỹ năng nào?</p>
+    <div className="flex h-full min-h-0 flex-col bg-[#F2F8F5] text-[#1A1A1A]">
+      <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center justify-between border-b border-[#E2EDE9] bg-white px-6">
+        <div>
+          <h1 className="text-base font-semibold leading-tight">Practice Center</h1>
+          <p className="mt-0.5 text-xs leading-tight text-[#6B7280]">Browse and attempt SAT practice tests</p>
+        </div>
+        <div className="flex items-center gap-5">
+          <button className="relative text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
+            <Bell size={20} />
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+          </button>
+          <div className="flex h-8 w-8 select-none items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-white transition-all hover:ring-[#1B7A5A]/30" title={userName}>
+            {initials}
           </div>
+        </div>
+      </header>
 
-          {/* 2. ACTION TOOLBAR (Search, Filter, Add Button nằm cùng 1 dòng) */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 mb-6 relative">
-            {/* Search Bar (flex-1 để tự động chiếm hết khoảng trống) */}
-            <div className="flex-1 w-full bg-white px-4 h-[52px] rounded-2xl shadow-sm 
-              border border-slate-300 flex items-center gap-2 focus-within:border-2 focus-within:border-blue-500">
-              <div className="pl-1 text-slate-400">
-                <Search size={20} />
-              </div>
-              <SearchInput onSearch={setSearchQuery} />
-            </div>
-
-            {/* Nút Filter & Flyout */}
-            <div className="relative w-full sm:w-auto z-40" ref={filterRef}>
-              <button 
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`w-full sm:w-auto relative overflow-hidden flex items-center justify-center gap-2 px-5 h-[52px] rounded-2xl font-semibold transition-all border shadow-sm ${
-                  isFilterOpen || activeCategory !== 'ALL' 
-                    ? 'bg-slate-100 border-slate-300 text-slate-800' 
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Ripple color="rgba(15, 23, 42, 0.1)" />
-                <span className="relative z-10 pointer-events-none flex items-center gap-2 text-sm">
-                  <Filter size={18} /> 
-                  <span>Filter</span>
-                </span>
-                {activeCategory !== 'ALL' && (
-                  <span className="absolute top-2.5 right-2.5 h-2.5 w-2.5 rounded-full bg-red-500 border border-slate-100 shadow-sm z-20"></span>
-                )}
-              </button>
-
-              {/* FLYOUT FILTER (Hiển thị khi isFilterOpen === true) */}
-              {isFilterOpen && (
-                <div className="absolute right-0 top-full mt-2 w-full sm:w-[420px] bg-white border border-slate-200 rounded-2xl shadow-xl p-5 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                  <div className="space-y-5">
-                    
-                    {/* Nhóm 1: Nguồn */}
-                    <div>
-                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Nguồn đề thi</div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <FilterChip label="Tất cả" active={activeCategory === 'ALL'} onClick={() => setActiveCategory('ALL')} />
-                        <FilterChip label="Real Tests" icon={Layers} active={activeCategory === 'REAL'} onClick={() => setActiveCategory('REAL')} />
-                        
-                        {myClasses.length > 0 && <div className="h-6 w-[1px] bg-slate-300 mx-1"></div>}
-
-                        {myClasses.map(cls => (
-                          <FilterChip 
-                            key={cls.id} label={cls.name} icon={GraduationCap} 
-                            active={activeCategory === cls.id} onClick={() => setActiveCategory(cls.id)} colorClass="slate"
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="h-[1px] w-full bg-slate-100"></div>
-
-                    {/* Nhóm 2: Chi tiết (Môn & Ngày) */}
-                    <div className="flex flex-col gap-4">
-                      {/* Môn thi */}
-                      <div>
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Môn thi</div>
-                        <div className="inline-flex bg-slate-100 p-1 rounded-xl">
-                          {['RW', 'MATH', 'ALL'].map((sub) => (
-                            <button
-                              key={sub}
-                              onClick={() => setActiveSubject(sub)}
-                              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                activeSubject === sub ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                              }`}
-                            >
-                              {sub === 'ALL' ? 'ALL' : sub}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Kỳ thi (Chỉ hiện khi chọn Real Test) */}
-                      {activeCategory === 'REAL' && (
-                        <div className="animate-in fade-in slide-in-from-left-2 duration-300">
-                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                            <Calendar size={14}/> Kỳ thi
-                          </div>
-                          <select 
-                            value={activeDate}
-                            onChange={(e) => setActiveDate(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none"
-                          >
-                            {TEST_DATES.map(date => <option key={date} value={date}>{date}</option>)}
-                          </select>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-[1200px] p-6 lg:p-8 lg:pt-6">
+          <section className="mb-8 rounded-xl border border-[#E2EDE9] bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <label className="flex h-9 min-w-0 max-w-md flex-1 items-center gap-2.5 rounded-lg border border-[#E2EDE9] bg-[#F2F8F5] px-3 focus-within:border-[#1B7A5A] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#1B7A5A]/20">
+                <Search size={15} className="shrink-0 text-[#6B7280]" />
+                <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search tests..." className="h-full w-full bg-transparent text-sm outline-none placeholder:text-[#6B7280]" />
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="whitespace-nowrap text-sm font-medium text-[#1A1A1A]">Sort by:</span>
+                  <select value={sortOrder} onChange={event => setSortOrder(event.target.value as 'NEWEST' | 'OLDEST')} className="app-input cursor-pointer">
+                    <option value="NEWEST">Newest</option>
+                    <option value="OLDEST">Oldest</option>
+                  </select>
                 </div>
+                {canManage && (
+                  selectionMode ? (
+                    <>
+                      <button
+                        onClick={() => { setSelectionMode(false); setSelectedTestIds([]); }}
+                        className="app-button app-button-secondary"
+                      >
+                        Cancel
+                      </button>
+                      <button disabled={selectedTestIds.length === 0} onClick={() => setAssignmentOpen(true)} className="app-button app-button-primary">
+                        <GraduationCap size={16} /> Assign selected{selectedTestIds.length > 0 ? ` (${selectedTestIds.length})` : ''}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => setSelectionMode(true)} className="app-button app-button-secondary">
+                        <GraduationCap size={16} /> Assign tests
+                      </button>
+                      <button onClick={() => navigate('/dashboard/practice-test/create')} className="app-button app-button-primary">
+                        <Plus size={16} /> Create Exam
+                      </button>
+                    </>
+                  )
+                )}
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-3 border-t border-[#E2EDE9] pt-4 lg:flex-row lg:items-center">
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                <SlidersHorizontal size={15} className="mr-1 shrink-0 text-[#6B7280]" />
+                <span className="mr-1 text-xs font-medium text-[#6B7280]">Subject:</span>
+                {(['ALL', 'RW', 'MATH'] as const).map(value => (
+                  <button key={value} onClick={() => setSubject(value)} className={`h-7 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors ${subject === value ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]'}`}>
+                    {value === 'ALL' ? 'All' : subjectLabel[value]}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                <span className="mr-1 text-xs font-medium text-[#6B7280]">Type:</span>
+                {(['ALL', 'EXAM', 'PRACTICE'] as const).map(value => (
+                  <button key={value} onClick={() => setType(value)} className={`h-7 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors ${type === value ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]'}`}>
+                    {value === 'ALL' ? 'All' : typeLabel[value]}
+                  </button>
+                ))}
+              </div>
+              {classes.length > 0 && (
+                <select value={classFilter} onChange={event => setClassFilter(event.target.value)} className="app-input lg:ml-auto">
+                  <option value="ALL">All classes</option>
+                  {classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
               )}
             </div>
+          </section>
 
-          </div>
-
-          {/* List Cards */}
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 opacity-60">
-              <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="text-slate-500 font-medium">Đang tải dữ liệu...</p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {[1, 2, 3, 4, 5, 6].map(item => <div key={item} className="h-[280px] animate-pulse rounded-xl border border-[#E2EDE9] bg-white p-5"><div className="mb-8 h-8 w-20 rounded-full bg-[#EAF2EE]" /><div className="mb-3 h-5 w-2/3 rounded bg-[#EAF2EE]" /><div className="h-4 w-full rounded bg-[#EAF2EE]" /></div>)}
+            </div>
+          ) : filteredTests.length === 0 ? (
+            <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-[#C2DDD4] bg-white px-6 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-[#E8F5EF] text-[#1B7A5A]"><BookOpenCheck size={26} /></div>
+              <h3 className="font-semibold text-[#1A1A1A]">No matching tests</h3>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-[#6B7280]">{canManage ? 'Create your first exam or adjust the current filters.' : 'Your teacher has not assigned a test to your class yet. Admin tests appear here automatically.'}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-              {filteredTests.length > 0 ? (
-                <>
-                  {filteredTests.slice(0, visibleCount).map((test, index) => (
-                    <TestCard
-                      key={test.id}
-                      test={test}
-                      index={index}
-                      onStart={handleStartExam}
-                  />
-                  ))}
-                  {visibleCount < filteredTests.length && (
-                    <div 
-                      ref={lastElementRef} 
-                      className="col-span-full py-8 flex justify-center items-center"
-                    >
-                      {/* Nút loading xoay xoay nhỏ cho đẹp mắt */}
-                      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin opacity-50"></div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredTests.map(test => {
+                const selected = selectedTestIds.includes(test.id);
+                const hasPartialProgress = test.progress > 0 && test.progress < 100;
+                return (
+                  <article key={test.id} className={`group relative flex flex-col gap-3 rounded-xl border bg-white p-5 transition-all duration-200 ${selected ? 'border-[#1B7A5A] ring-2 ring-[#1B7A5A]/15' : 'border-[#E2EDE9] hover:border-[#1B7A5A]/40 hover:shadow-md'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${test.subject === 'MATH' ? 'border-[#F0D070] bg-[#FEF9E7] text-[#92640A]' : 'border-[#C2DDD4] bg-[#E8F5EF] text-[#1B7A5A]'}`}>
+                          {subjectLabel[test.subject]}
+                        </span>
+                        <span className="rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-2 py-0.5 text-[11px] text-[#6B7280]">
+                          {typeLabel[test.mode]}
+                        </span>
+                      </div>
+                      {canManage && (selectionMode ? (
+                        <button onClick={() => toggleTest(test.id)} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${selected ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#C2DDD4] bg-white text-transparent hover:border-[#1B7A5A]'}`} aria-label={selected ? 'Deselect test' : 'Select test'}>
+                          <Check size={15} strokeWidth={3} />
+                        </button>
+                      ) : (
+                        <button className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#6B7280] transition-colors hover:bg-[#EAF2EE] hover:text-[#1A1A1A]" aria-label={`Actions for ${test.title}`}>
+                          <MoreHorizontal size={16} />
+                        </button>
+                      ))}
                     </div>
-                  )}
-                </>
-              ) : (
-                // Empty State
-                <div className="col-span-full py-20 flex flex-col items-center justify-center text-center bg-white rounded-3xl border border-dashed border-slate-300">
-                  <div className="bg-slate-50 p-4 rounded-full mb-4">
-                    <Search size={32} className="text-slate-300" />
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-700">Không tìm thấy bài thi</h3>
-                  <p className="text-slate-500 max-w-xs mx-auto mt-2">Thử thay đổi bộ lọc môn học hoặc từ khóa tìm kiếm.</p>
-                </div>
-              )}
+
+                    <h3 className="line-clamp-2 text-sm font-medium leading-snug text-[#1A1A1A]">{test.title}</h3>
+
+                    <div>
+                      <div className="mb-1 flex justify-between text-xs text-[#6B7280]">
+                        <span>{test.attemptStatus === 'COMPLETED' ? 'Completed' : test.isDoing ? 'In progress' : 'Not started'}</span>
+                        <span>{test.progress ?? 0}%</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EAF2EE]">
+                        <div className="h-full rounded-full bg-[#1B7A5A] transition-all duration-300" style={{ width: `${test.progress ?? 0}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-[#6B7280]">
+                      <span className="flex items-center gap-1"><BookOpen size={12} /> {test.questionCount ?? 0}Q</span>
+                      <span className="flex items-center gap-1"><Clock3 size={12} /> {Math.floor(test.duration)}m</span>
+                    </div>
+
+                    <p className="text-xs text-[#6B7280]/70">Last attempted {formatLastAttempt(test.lastAttempt)}</p>
+
+                    <button onClick={() => handleStart(test)} className={`mt-auto flex h-9 w-full items-center justify-center gap-1.5 rounded-lg px-4 text-xs font-medium transition-all duration-150 group-hover:gap-2 ${hasPartialProgress ? 'border border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]' : 'bg-[#E8C040] text-[#1A1A1A] hover:bg-[#D9B138]'}`}>
+                      {hasPartialProgress ? <><Play size={13} /> Continue</> : <><Play size={13} /> Start <ChevronRight size={13} /></>}
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           )}
-          {/* --- NÚT SCROLL TO TOP --- */}
-          <button
-            onClick={scrollToTop}
-            className={`
-              fixed bottom-8 right-8 p-3 rounded-full bg-slate-900 text-white 
-              shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:bg-blue-600 hover:shadow-lg hover:-translate-y-1
-              transition-all duration-300 z-50 flex items-center justify-center
-              ${showScrollTop 
-                ? 'opacity-100 translate-y-0' 
-                : 'opacity-0 translate-y-10 pointer-events-none' // Ẩn và vô hiệu hóa click khi ở trên đầu
-              }
-            `}
-            aria-label="Scroll to top"
-          >
-            <ArrowUp size={24} strokeWidth={2.5} />
-          </button>
         </div>
       </main>
 
-      {isClassSelectOpen && selectedTestForClassModal && (
-        <div className="fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-slate-800">Chọn lớp để làm bài</h3>
-                <p className="text-xs text-slate-500 mt-1 truncate">{selectedTestForClassModal.title}</p>
-              </div>
-              <button
-                onClick={() => {
-                  setIsClassSelectOpen(false);
-                  setSelectedTestForClassModal(null);
-                }}
-                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500"
-              >
-                <X size={16} />
-              </button>
+      {assignmentOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0A1F16]/50 p-4 backdrop-blur-sm">
+          <div className="app-modal w-full max-w-lg">
+            <div className="flex items-start justify-between border-b border-[#E2EDE9] px-6 py-5"><div><h3 className="text-lg font-semibold">Assign tests to classes</h3><p className="mt-1 text-sm text-[#6B7280]">{selectedTestIds.length} test(s) selected</p></div><button className="app-icon-button" onClick={() => setAssignmentOpen(false)}><X size={18} /></button></div>
+            <div className="max-h-[420px] space-y-2 overflow-y-auto p-6">
+              {classes.length === 0 ? <p className="rounded-lg bg-[#EAF2EE] p-5 text-center text-sm text-[#6B7280]">You do not have any classes yet.</p> : classes.map(item => {
+                const checked = selectedClassIds.includes(item.id);
+                return <button key={item.id} onClick={() => toggleClass(item.id)} className={`flex w-full items-center gap-4 rounded-lg border p-4 text-left transition-colors ${checked ? 'border-[#1B7A5A] bg-[#E8F5EF]' : 'border-[#E2EDE9] hover:bg-[#F2F8F5]'}`}><span className={`flex h-9 w-9 items-center justify-center rounded-lg ${checked ? 'bg-[#1B7A5A] text-white' : 'bg-[#EAF2EE] text-[#6B7280]'}`}>{checked ? <Check size={18} strokeWidth={3} /> : <GraduationCap size={18} />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-[#1A1A1A]">{item.name}</span><span className="mt-1 block text-xs text-[#6B7280]">{item._count?.students || 0} student(s)</span></span></button>;
+              })}
             </div>
+            <div className="flex justify-end gap-3 border-t border-[#E2EDE9] bg-[#F2F8F5] px-6 py-4"><button className="app-button app-button-secondary" onClick={() => setAssignmentOpen(false)}>Cancel</button><button className="app-button app-button-primary" disabled={assigning || selectedClassIds.length === 0} onClick={assignTests}>{assigning ? 'Assigning...' : `Assign to ${selectedClassIds.length} class(es)`}</button></div>
+          </div>
+        </div>
+      )}
 
-            <div className="p-4 space-y-2 max-h-[340px] overflow-y-auto custom-scrollbar">
-              {Array.from(new Set((selectedTestForClassModal.classTests || []).map(ct => ct.classId)))
-                .map((classId) => {
-                  const classInfo = myClasses.find(cls => cls.id === classId);
-                  return (
-                    <button
-                      key={classId}
-                      onClick={() => {
-                        navigateToTestRoom(selectedTestForClassModal, classId);
-                        setIsClassSelectOpen(false);
-                        setSelectedTestForClassModal(null);
-                      }}
-                      className="w-full text-left px-4 py-3 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition"
-                    >
-                      <p className="font-semibold text-slate-700">{classInfo?.name || classId}</p>
-                      <p className="text-xs text-slate-500 mt-1">Hệ thống sẽ đồng bộ kết quả cho các assignment chưa có dữ liệu trong lớp này.</p>
-                    </button>
-                  );
-                })}
-            </div>
+      {startClassTest && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0A1F16]/50 p-4 backdrop-blur-sm">
+          <div className="app-modal w-full max-w-md p-6">
+            <div className="mb-5 flex items-start justify-between gap-4"><div><h3 className="font-semibold text-[#1A1A1A]">Choose a class</h3><p className="mt-1 line-clamp-1 text-sm text-[#6B7280]">{startClassTest.title}</p></div><button className="app-icon-button" onClick={() => setStartClassTest(null)}><X size={18} /></button></div>
+            <div className="space-y-2">{[...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <button key={classId} onClick={() => openTest(startClassTest, classId)} className="flex w-full items-center justify-between rounded-lg border border-[#E2EDE9] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></button>)}</div>
           </div>
         </div>
       )}

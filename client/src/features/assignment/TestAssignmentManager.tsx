@@ -39,7 +39,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [folderPath, setFolderPath] = useState<{ id: number | null, name: string }[]>([{ id: null, name: 'Tất cả tài liệu' }]);
+  const [folderPath, setFolderPath] = useState<{ id: number | null, name: string }[]>([{ id: null, name: 'All tests' }]);
 
   const isEditMode = !!initialData;
   const currentFolderId = folderPath[folderPath.length - 1].id;
@@ -133,9 +133,9 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
   }, [currentFolderId, searchQuery, tests]);
 
   const handleSubmit = () => {
-    if (!form.title.trim()) return toast.error("Vui lòng nhập tiêu đề!");
-    if (!form.content || form.content === '<p><br></p>') return toast.error("Vui lòng nhập nội dung!");
-    if (selectedTests.length === 0) return toast.error("Vui lòng chọn ít nhất một bài kiểm tra!");
+    if (!form.title.trim()) return toast.error("Enter a title");
+    if (!form.content || form.content === '<p><br></p>') return toast.error("Enter content");
+    if (selectedTests.length === 0) return toast.error("Select at least one test");
 
     setIsSubmitting(true);
     onSubmit({
@@ -179,16 +179,16 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
             <X size={24} className="text-gray-500" />
           </button>
           <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">
-            {isEditMode ? 'Chỉnh sửa bài kiểm tra' : 'Giao bài kiểm tra mới'}
+            {isEditMode ? 'Edit assignment' : 'Create assignment'}
           </h2>
         </div>
 
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="px-4 py-2 md:px-6 md:py-2.5 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 shadow-md transition flex items-center gap-2 text-sm md:text-base"
+          className="px-4 py-2 md:px-6 md:py-2.5 bg-[#1B7A5A] text-white rounded-full font-bold hover:bg-[#145F47] shadow-md transition flex items-center gap-2 text-sm md:text-base"
         >
-          <span className="hidden sm:inline">{isEditMode ? 'Lưu thay đổi' : 'Giao bài'}</span>
+          <span className="hidden sm:inline">{isEditMode ? 'Save changes' : 'Assign'}</span>
         </button>
       </header>
 
@@ -214,11 +214,11 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                   <label
                     htmlFor="test-title"
                     className="absolute text-base text-gray-500 italic font-medium duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0]
-                               peer-focus:text-indigo-600
+                               peer-focus:text-[#1B7A5A]
                                peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2
                                peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-0 cursor-text"
                   >
-                    Tiêu đề bài kiểm tra...
+                    Assignment title…
                   </label>
                 </div>
               </div>
@@ -226,7 +226,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
               {/* 2. KHU VỰC NỘI DUNG */}
               <div>
                 <label className="block text-base font-bold text-gray-700 mb-3 ml-1">
-                  Hướng dẫn
+                  Instructions
                 </label>
                 <div className="
                   bg-white rounded-lg shadow-sm border border-gray-300 focus-within:border-indigo-600 transition-colors overflow-hidden
@@ -238,7 +238,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                     theme="snow"
                     value={form.content}
                     onChange={(content) => setForm({ ...form, content })}
-                    placeholder="Nhập hướng dẫn cho bài kiểm tra..."
+                    placeholder="Add instructions for students…"
                     className="mb-12"
                     modules={{
                       toolbar: [
@@ -253,25 +253,25 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
 
               {/* 3. CHỌN BÀI KIỂM TRA */}
               <div>
-                <label className="block text-base font-bold text-gray-700 mb-3 ml-1">Bài kiểm tra</label>
+                <label className="block text-base font-bold text-gray-700 mb-3 ml-1">Tests</label>
                 {selectedTests.length === 0 ? (
                   <div onClick={openTestModal} className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-white hover:bg-gray-50 transition cursor-pointer group">
-                    <Plus className="mx-auto text-gray-400 group-hover:text-indigo-500 transition mb-2" size={28} />
-                    <p className="text-sm font-medium text-gray-600">Chọn bài kiểm tra từ Test Bank</p>
+                    <Plus className="mx-auto text-gray-400 group-hover:text-[#1B7A5A] transition mb-2" size={28} />
+                    <p className="text-sm font-medium text-gray-600">Select tests from Practice Center</p>
                   </div>
                 ) : (
-                  <div onClick={openTestModal} className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-200 rounded-xl cursor-pointer hover:bg-indigo-100/70 transition">
+                  <div onClick={openTestModal} className="flex items-center justify-between p-4 bg-[#E8F5EF] border border-[#C2DDD4] rounded-xl cursor-pointer hover:bg-[#C2DDD4]/70 transition">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-sm">
+                      <div className="w-10 h-10 bg-[#1B7A5A] rounded-full flex items-center justify-center text-white font-bold shadow-sm">
                         {selectedTests.length}
                       </div>
                       <div>
-                        <p className="font-bold text-indigo-900">Đã chọn {selectedTests.length} bài kiểm tra</p>
-                        <p className="text-sm text-indigo-600/80">Nhấn vào đây để xem chi tiết hoặc thay đổi</p>
+                        <p className="font-semibold text-[#1A1A1A]">{selectedTests.length} selected tests</p>
+                        <p className="text-sm text-[#1B7A5A]/80">Open to review or change the selection</p>
                       </div>
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-600 text-sm font-bold rounded-lg border border-indigo-200 shadow-sm hover:bg-gray-50">
-                      <Edit2 size={16} /> Chỉnh sửa
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white text-[#1B7A5A] text-sm font-bold rounded-lg border border-[#C2DDD4] shadow-sm hover:bg-gray-50">
+                      <Edit2 size={16} /> Edit
                     </button>
                   </div>
                 )}
@@ -281,11 +281,11 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
             {/* CỘT PHẢI: Cài đặt */}
             <div className="space-y-6">
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-300">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-300">
                 <h3 className="text-base font-bold text-gray-700 mb-2 flex items-center gap-2">
-                  Hạn nộp bài
+                  Due date
                 </h3>
-                <p className="text-sm text-gray-400 mb-4">Chọn thời gian hết hạn cho bài kiểm tra.</p>
+                <p className="text-sm text-gray-400 mb-4">Choose when this assignment is due.</p>
                 <Flatpickr
                   data-enable-time
                   value={form.deadline}
@@ -299,8 +299,8 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                     dateFormat: "d/m/Y H:i",
                     time_24hr: true,
                   }}
-                  placeholder="Chọn hạn nộp bài..."
-                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                  placeholder="Choose a due date…"
+                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition"
                 />
               </div>
 
@@ -313,12 +313,12 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
       {/* TEST MODAL */}
       {isTestModalOpen && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 md:p-8 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl flex flex-col h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl flex flex-col h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
 
             {/* Modal Header & Breadcrumb */}
             <div className="px-6 pt-5 pb-3 border-b border-gray-200 bg-white z-10 flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-slate-800">Chọn bài kiểm tra</h3>
+                <h3 className="text-xl font-semibold text-slate-800">Select tests</h3>
                 <button onClick={() => setIsTestModalOpen(false)} className="text-gray-400 hover:bg-gray-100 p-1.5 rounded-full transition"><X size={24} /></button>
               </div>
 
@@ -328,7 +328,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                   <div key={folder.id || null} className="flex items-center gap-1">
                     <button
                       onClick={() => jumpToBreadcrumb(index)}
-                      className={`hover:text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-md transition whitespace-nowrap ${index === folderPath.length - 1 ? 'text-slate-800 font-bold' : ''}`}
+                      className={`hover:text-[#1B7A5A] hover:bg-[#E8F5EF] px-2 py-1 rounded-md transition whitespace-nowrap ${index === folderPath.length - 1 ? 'text-slate-800 font-bold' : ''}`}
                     >
                       {folder.name}
                     </button>
@@ -342,10 +342,10 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
                   type="text"
-                  placeholder="Tìm kiếm tên bài test hoặc thư mục..."
+                  placeholder="Search tests or folders…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm"
+                  className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition text-sm"
                 />
               </div>
             </div>
@@ -356,22 +356,22 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
               {/* Table Header */}
               <div className="sticky top-0 bg-gray-50/95 border-b border-gray-200 flex items-center px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider z-10">
                 <div className="w-10"></div>
-                <div className="flex-1">Tên mục</div>
-                <div className="w-28 text-center hidden md:block">Phân loại</div>
-                <div className="w-24 text-center hidden sm:block">Chế độ</div>
-                <div className="w-24 text-center hidden sm:block">Thời lượng</div>
-                <div className="w-24 text-center">Số câu</div>
+                <div className="flex-1">Name</div>
+                <div className="w-28 text-center hidden md:block">Category</div>
+                <div className="w-24 text-center hidden sm:block">Mode</div>
+                <div className="w-24 text-center hidden sm:block">Duration</div>
+                <div className="w-24 text-center">Questions</div>
               </div>
 
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center h-48 text-gray-400">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-3"></div>
-                  <p>Đang tải dữ liệu...</p>
+                  <p>Loading data…</p>
                 </div>
               ) : displayedFolders.length === 0 && displayedTests.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-gray-400">
                   <Folder size={48} className="mb-3 opacity-20" />
-                  <p>Thư mục này trống hoặc không tìm thấy kết quả.</p>
+                  <p>This folder is empty or no results were found.</p>
                 </div>
               ) : (
                 <>
@@ -381,8 +381,8 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                       onClick={() => navigateToFolder(folder)}
                       className="flex items-center px-6 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition group"
                     >
-                      <div className="w-10 flex justify-center"><Folder size={20} className="text-gray-400 group-hover:text-indigo-500" fill="currentColor" fillOpacity={0.2} /></div>
-                      <div className="flex-1 font-medium text-slate-700 group-hover:text-indigo-700">{folder.name}</div>
+                      <div className="w-10 flex justify-center"><Folder size={20} className="text-gray-400 group-hover:text-[#1B7A5A]" fill="currentColor" fillOpacity={0.2} /></div>
+                      <div className="flex-1 font-medium text-slate-700 group-hover:text-[#1B7A5A]">{folder.name}</div>
                       <div className="w-28 text-center hidden md:block text-sm text-gray-400">-</div>
                       <div className="w-24 text-center hidden sm:block text-sm text-gray-400">-</div>
                       <div className="w-24 text-center hidden sm:block text-sm text-gray-400">-</div>
@@ -396,17 +396,17 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                       <div
                         key={test.id}
                         onClick={() => toggleTestSelection(test.id)}
-                        className={`flex items-center px-6 py-3 border-b transition cursor-pointer ${isSelected ? 'bg-indigo-50/50 border-indigo-100' : 'border-gray-100 hover:bg-gray-50'}`}
+                        className={`flex items-center px-6 py-3 border-b transition cursor-pointer ${isSelected ? 'bg-[#E8F5EF]/50 border-indigo-100' : 'border-gray-100 hover:bg-gray-50'}`}
                       >
                         <div className="w-10 flex justify-center">
-                          <div className={`w-5 h-5 rounded flex items-center justify-center border transition ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-gray-300'}`}>
+                          <div className={`w-5 h-5 rounded flex items-center justify-center border transition ${isSelected ? 'bg-[#1B7A5A] border-indigo-600' : 'bg-white border-gray-300'}`}>
                             {isSelected && <Check size={14} className="text-white" />}
                           </div>
                         </div>
 
                         <div className="flex-1 flex items-center gap-3 overflow-hidden">
-                          <FileIcon size={18} className={isSelected ? 'text-indigo-500' : 'text-gray-400'} />
-                          <span className={`font-medium truncate ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>{test.title}</span>
+                          <FileIcon size={18} className={isSelected ? 'text-[#1B7A5A]' : 'text-gray-400'} />
+                          <span className={`font-medium truncate ${isSelected ? 'text-[#1A1A1A]' : 'text-slate-800'}`}>{test.title}</span>
                         </div>
 
                         <div className="w-28 text-center hidden md:flex justify-center">
@@ -429,15 +429,15 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
             {/* Footer */}
             <div className="p-5 border-t border-gray-200 bg-white flex items-center justify-between z-10">
               <span className="text-sm font-medium text-gray-600">
-                Đang chọn <span className="text-indigo-600 font-bold text-base px-1">{tempSelectedTestIds.length}</span> bài test
+                Selecting <span className="text-[#1B7A5A] font-semibold text-base px-1">{tempSelectedTestIds.length}</span> tests
               </span>
               <div className="flex gap-3">
                 <button onClick={() => {
                   setTempSelectedTestIds([]);
-                  setFolderPath([{ id: null, name: 'Tất cả tài liệu' }]);
+                  setFolderPath([{ id: null, name: 'All tests' }]);
                   setIsTestModalOpen(false);
-                }} className="px-6 py-2 rounded-full font-medium text-gray-600 hover:bg-gray-100 transition">Hủy</button>
-                <button onClick={saveTestSelection} className="px-8 py-2 rounded-full font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-md">Xác nhận</button>
+                }} className="px-6 py-2 rounded-full font-medium text-gray-600 hover:bg-gray-100 transition">Cancel</button>
+                <button onClick={saveTestSelection} className="app-button app-button-primary px-8">Confirm</button>
               </div>
             </div>
 

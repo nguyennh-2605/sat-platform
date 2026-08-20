@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, Maximize } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
@@ -10,7 +10,6 @@ import BlockRenderer from '../../components/content/BlockRenderer';
 import ToolsHeader from '../../components/ui/ToolsHeader';
 import InteractiveText from '../../features/quiz/InteractiveText';
 import ReviewScreen from '../../features/quiz/ReviewModule';
-import ScoreReport from '../score-report/ScoreReport';
 import type { QuestionData } from '../../types/quiz';
 import type { QuestionResult } from '../score-report/ScoreReport';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
@@ -83,7 +82,7 @@ function ExamRoom() {
   const [isStrikeMode, setIsStrikeMode] = useState(false);
 
   // STATE LƯU NHỮNG CÂU BỊ GẠCH
-  // Cấu trúc: { 0: [0, 2], 1: [1] } -> Câu 0 gạch đáp án A, C; Câu 1 gạch đáp án B
+  // Cấu trúc: { 0: [0, 2], 1: [1] } -> Question 0 gạch đáp án A, C; Question 1 gạch đáp án B
   const [eliminatedMap, setEliminatedMap] = useState<Record<number, number[]>>({});
 
   // State lưu thông tin bài thi từ Dashboard gửi qua
@@ -148,7 +147,7 @@ function ExamRoom() {
 
     const userId = localStorage.getItem('userId');
     if (!userId) {
-      toast.error("Bạn chưa đăng nhập!");
+      toast.error("You are not signed in");
       navigate('/login');
       return;
     }
@@ -164,7 +163,7 @@ function ExamRoom() {
 
         const data = await axiosClient.get(`/api/test/${id}?userId=${userId}${assignmentId ? `&assignmentId=${assignmentId}` : ''}${classId ? `&classId=${classId}` : ''}`);
 
-        if (!data) throw new Error("Không có dữ liệu");
+        if (!data) throw new Error("No data");
 
         if (data.sections) {
           let allQuestions: QuestionData[] = [];
@@ -323,7 +322,7 @@ function ExamRoom() {
         }
       } catch (error) {
       console.error("Lỗi tải đề:", error);
-      toast.error("Không thể tải bài thi. Vui lòng thử lại.");
+      toast.error("Unable to load the test. Try again.");
       navigate('/dashboard');
       } finally {
         setIsLoading(false);
@@ -359,7 +358,7 @@ function ExamRoom() {
         const userId = storedUserId ? parseInt(storedUserId) : null;
 
         if (!userId) {
-            toast.error("Lỗi: Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại!");
+            toast.error("User information not found. Sign in again.");
             return;
         }
 
@@ -380,10 +379,10 @@ function ExamRoom() {
         localStorage.removeItem(`violations_${userId}_${id}_${contextKey}`);
         setApiResult(response);
         setIsSubmitted(true);
-        toast.success("Nộp bài thành công!");
+        toast.success("Test submitted");
     } catch (error) {
         console.error("Lỗi mạng:", error);
-        toast.error("Không thể kết nối đến server để nộp bài!");
+        toast.error("Unable to submit the test. Check your connection.");
     } finally {
         submitInFlightRef.current = false;
         setIsSubmitting(false);
@@ -407,7 +406,7 @@ function ExamRoom() {
           }
           else {
             startModule2();
-            toast("Hết giờ Module 1, chuyển sang Module 2.");
+            toast("Module 1 is over. Moving to Module 2.");
           }
         }
       }, 1000);
@@ -453,7 +452,7 @@ function ExamRoom() {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         setViolationCount(prev => prev + 1);
-        toast(`⚠️ CẢNH BÁO: Đừng rời khỏi màn hình!`);
+        toast(`Warning: do not leave the test screen`);
       }
     };
 
@@ -533,7 +532,7 @@ function ExamRoom() {
     if (testMode === 'EXAM') {
       enterFullscreen();
       if (!submissionId || !id) {
-        toast.error('Không tìm thấy phiên làm bài. Vui lòng tải lại trang.');
+        toast.error('Test session not found. Reload the page.');
         return;
       }
       try {
@@ -551,7 +550,7 @@ function ExamRoom() {
         )));
       } catch (error) {
         console.error('Lỗi bắt đầu bài thi:', error);
-        toast.error('Không thể bắt đầu bài thi. Vui lòng thử lại.');
+        toast.error('Unable to start the test. Try again.');
         return;
       }
     }
@@ -575,7 +574,7 @@ function ExamRoom() {
     // Tùy chọn: Lọc bỏ các ký tự không hợp lệ (chỉ giữ lại số, dấu chấm, dấu /, và dấu -)
     const sanitizedValue = value.replace(/[^0-9./-]/g, '');
 
-    // Cập nhật vào state answers chung (Giả sử bạn đang dùng setAnswers)
+    // Update vào state answers chung (Giả sử bạn đang dùng setAnswers)
     // Thay setAnswers bằng hàm update state thực tế của bạn nếu tên khác nhé
     setAnswers((prevAnswers: any) => {
       const newAnswers = { ...prevAnswers, [currentQ.id]: sanitizedValue };
@@ -731,7 +730,7 @@ function ExamRoom() {
       setIsFullscreenBlocked(false);
     } catch (err) {
       console.error("Lỗi fullscreen:", err);
-      toast.error("Vui lòng cho phép Fullscreen để tiếp tục làm bài!");
+      toast.error("Allow full screen to continue the test");
     }
   };
 
@@ -741,7 +740,7 @@ function ExamRoom() {
     const userId = localStorage.getItem('userId');
     const token = localStorage.getItem('token');
     if (!userId || !token) {
-      toast.error("Vui lòng đăng nhập lại!");
+      toast.error("Sign in again");
       return;
     }
 
@@ -767,7 +766,7 @@ function ExamRoom() {
       await axiosClient.post(`/api/test/${id}/save-progress${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`, payload);
 
       console.log("Đã đồng bộ dữ liệu lên Server thành công");
-      toast.success("Lưu bài làm thành công!");
+      toast.success("Test saved");
       navigate('/dashboard'); // Hoặc trang danh sách bài thi
 
     } catch (error) {
@@ -808,17 +807,17 @@ function ExamRoom() {
   if (isLoading) {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="text-xl font-bold text-blue-600 animate-pulse">⏳ Đang tải đề thi...</div>
+            <div className="text-xl font-bold text-blue-600 animate-pulse">⏳ Loading test…</div>
         </div>
     );
   }
 
   if (isSubmitting) {
-    return <div className="h-screen flex items-center justify-center text-blue-600 font-bold"> Đang chấm điểm...</div>;
+    return <div className="h-screen flex items-center justify-center text-blue-600 font-bold"> Grading…</div>;
   }
 
   if (questions.length === 0) {
-      return <div className="min-h-screen flex items-center justify-center">Không tìm thấy câu hỏi nào!</div>;
+      return <div className="min-h-screen flex items-center justify-center">No questions found</div>;
   }
 
   // --- RENDER KẾT QUẢ ---
@@ -842,30 +841,31 @@ function ExamRoom() {
     }
     const secondsUsed = mod1TimeUsed + mod2TimeUsed;
 
+    const completedAt = new Date();
+    const effectiveSecondsUsed = secondsUsed <= 0 ? TestInfo.duration * 60 : secondsUsed;
     const reportData = {
       examTitle: TestInfo.title,
       subject: TestInfo.subject,
-      date: new Date().toLocaleString(),
-      duration: formatDuration(secondsUsed <= 0 ? TestInfo.duration * 60 : secondsUsed), // Thời gian làm bài thực tế
+      date: completedAt.toISOString(),
+      startedAt: new Date(completedAt.getTime() - effectiveSecondsUsed * 1000).toISOString(),
+      completedAt: completedAt.toISOString(),
+      duration: formatDuration(effectiveSecondsUsed),
       questions: getResults()
     }
 
-    return (
-      <ScoreReport 
-        initialData={reportData}
-        onBackToHome={() => {
-          localStorage.removeItem(`mod2Start_${userId}_${id}_${contextKey}`);
-          localStorage.removeItem(`mod1TimeUsed_${userId}_${id}_${contextKey}`);
-          localStorage.removeItem('current_exam_info');
-          window.location.href = '/dashboard';
-        }}
-      />
-    );
+    return <Navigate to="/dashboard/score-report" replace state={{
+      reportData,
+      cleanupKeys: [
+        `mod2Start_${userId}_${id}_${contextKey}`,
+        `mod1TimeUsed_${userId}_${id}_${contextKey}`,
+        'current_exam_info',
+      ],
+    }} />;
   }
 
   // 1. KIỂM TRA DỮ LIỆU TRƯỚC (Thêm đoạn này vào đầu hàm return hoặc trước khi khai báo currentQ)
   if (!questions || questions.length === 0 || !questions[currentQuestionIndex]) {
-    return <div className="p-10 text-center">Đang tải đề thi...</div>;
+    return <div className="p-10 text-center">Loading test…</div>;
   }
 
   // --- BIẾN CHO CÂU HỎI HIỆN TẠI ---
@@ -990,10 +990,10 @@ function ExamRoom() {
       {isTransitioning && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
           {/* Icon Spinner xoay xoay */}
-          <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+          <div className="w-16 h-16 border-4 border-[#C2DDD4] border-t-indigo-600 rounded-full animate-spin mb-4"></div>
           
-          <h2 className="text-2xl font-bold text-slate-800">Đang chuẩn bị Module 2...</h2>
-          <p className="text-slate-500 mt-2">Vui lòng đợi trong giây lát</p>
+          <h2 className="text-2xl font-bold text-slate-800">Preparing Module 2…</h2>
+          <p className="text-slate-500 mt-2">Please wait a moment</p>
         </div>
       )}
 
@@ -1282,7 +1282,7 @@ function ExamRoom() {
         <footer className="bg-blue-50 h-auto py-3 px-8 flex items-center justify-between z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <div className="flex items-center gap-2 text-slate-600">
             <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-bold">HV</div>
-            <div className="font-bold">{localStorage.getItem('userName') || 'Học viên'}</div>
+            <div className="font-bold">{localStorage.getItem('userName') || 'Student'}</div>
           </div>
 
           <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
@@ -1415,33 +1415,33 @@ function ExamRoom() {
       {/* --- MODAL XÁC NHẬN NỘP BÀI --- */}
       {showSubmitModal && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform transition-all scale-100">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 transform transition-all scale-100">
             <div className="text-center">
               <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Xác nhận nộp bài?</h3>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Submit test?</h3>
               <p className="text-slate-500 mb-6">
-                Bạn có chắc chắn muốn kết thúc bài thi tại đây? <br/>
+                Are you sure you want to end the test now? <br/>
               </p>
               
               <div className="flex gap-3">
                 <button 
                   onClick={() => setShowSubmitModal(false)} // Tắt modal
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-slate-700 font-bold rounded-full hover:bg-gray-200 transition"
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-slate-700 font-medium rounded-lg hover:bg-gray-200 transition"
                 >
-                  Hủy bỏ
+                  Cancel
                 </button>
                 <button 
                   onClick={() => {
                     setShowSubmitModal(false); // Tắt modal
                     finishTest(); // Gọi hàm nộp thật
                   }}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition shadow-lg shadow-red-500/30"
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition shadow-sm"
                 >
-                  Nộp bài
+                  Submit test
                 </button>
               </div>
             </div>
@@ -1452,17 +1452,17 @@ function ExamRoom() {
       {/* MODAL START */}
       {showStartModal && (
         <div className="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-md w-full p-8 text-center shadow-2xl">
+          <div className="bg-white rounded-xl max-w-md w-full p-8 text-center shadow-2xl">
             <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
             </div>
-            <h2 className="text-2xl font-bold mb-2 text-slate-800">Sẵn sàng làm bài?</h2>
+            <h2 className="text-2xl font-bold mb-2 text-slate-800">Ready to begin?</h2>
             <p className="text-slate-600 mb-6 text-sm">
-                Bài thi sẽ diễn ra ở chế độ toàn màn hình. 
-                <br/>⚠️ Mỗi lần thoát màn hình tính là 1 lần vi phạm.
+                This test will run in full-screen mode.
+                <br/>⚠️ Each full-screen exit counts as one violation.
             </p>
-            <button onClick={handleStartTest} className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/30">
-              Bắt đầu làm bài
+            <button onClick={handleStartTest} className="w-full bg-[#1B7A5A] text-white font-medium py-3.5 rounded-lg hover:bg-[#145F47] transition shadow-sm">
+              Start test
             </button>
           </div>
         </div>
@@ -1471,21 +1471,21 @@ function ExamRoom() {
       {/* --- MODAL CHẶN MÀN HÌNH KHI THOÁT FULLSCREEN --- */}
      {isFullscreenBlocked && (
       <div className="fixed inset-0 z-50 bg-white/80 flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center relative overflow-hidden">
+        <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full text-center relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-rose-500"></div>
           <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-6 text-orange-600">
             <AlertTriangle size={32} />
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">
-            Gián đoạn chế độ toàn màn hình
+            Full-screen mode interrupted
           </h2>
           <p className="text-gray-600 mb-6 leading-relaxed">
-            Hệ thống phát hiện bạn đã rời khỏi màn hình thi. 
-            Vui lòng quay lại ngay để tránh bị ghi nhận vi phạm.
+            The system detected that you left the test screen.
+            Return immediately to avoid recording a violation.
           </p>
           <div className="bg-gray-50 rounded-xl p-4 mb-8 border border-gray-100">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-              Số lần cảnh báo ({violationCount}/3)
+              Warnings ({violationCount}/3)
             </p>
             <div className="flex justify-center gap-3">
               {[1, 2, 3].map((index) => (
@@ -1501,16 +1501,16 @@ function ExamRoom() {
             </div>
             {violationCount >= 2 && (
               <p className="text-xs text-rose-500 mt-2 font-medium italic">
-                Cảnh báo: Bài thi sẽ tự động nộp nếu vi phạm lần 3.
+                Warning: the test will submit automatically after the third violation.
               </p>
             )}
           </div>
           <button 
             onClick={handleReturnToFullscreen}
-            className="w-full bg-gray-900 text-white font-bold py-3.5 px-6 rounded-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-gray-200"
+            className="w-full bg-[#1B7A5A] text-white font-medium py-3.5 px-6 rounded-lg hover:bg-[#145F47] transition-all flex items-center justify-center gap-2 shadow-sm"
           >
             <Maximize size={18} />
-            Quay lại làm bài
+            Return to test
           </button>
 
         </div>

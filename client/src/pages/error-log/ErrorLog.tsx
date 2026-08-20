@@ -6,6 +6,7 @@ import {
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
+import { AppHeader, Button, Input } from '../../components/ui/AppUI';
 
 interface ErrorEntry {
   id: string; // Prisma UUID
@@ -28,7 +29,7 @@ const getCategoryStyle = (category: string) => {
   if (norm.includes("grammar") || norm.includes("convention")) 
     return "bg-emerald-50 text-emerald-700 border-emerald-200"; 
   if (norm.includes("math") || norm.includes("logic")) 
-    return "bg-indigo-50 text-indigo-700 border-indigo-200";
+    return "bg-[#E8F5EF] text-[#1B7A5A] border-[#C2DDD4]";
   return "bg-slate-100 text-slate-600 border-slate-200";
 };
 
@@ -58,7 +59,7 @@ const ErrorLog = () => {
       setLogs(data);
     } catch (error) {
       console.error("Failed to fetch logs:", error);
-      toast.error("Không thể tải dữ liệu từ server!");
+      toast.error("Unable to load error log");
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +72,7 @@ const ErrorLog = () => {
   // -- 2. ACTIONS (CREATE / UPDATE) --
   const handleSave = async () => {
     if (!formData.source || !formData.userAnswer || !formData.correctAnswer) {
-      toast.error("Vui lòng điền thông tin cơ bản!");
+      toast.error("Complete the required fields");
       return;
     }
 
@@ -91,11 +92,11 @@ const ErrorLog = () => {
       if (formData.id) {
           // --- UPDATE ---
         await axiosClient.put(`/api/error-logs/${formData.id}`, payload);
-        toast.success("Đã cập nhật dữ liệu!");
+        toast.success("Entry updated");
       } else {
           // --- CREATE ---
         await axiosClient.post(`/api/error-logs`, payload);
-        toast.success("Đã lưu vào Database!");
+        toast.success("Entry saved");
       }
       
       // Reset form & Reload data
@@ -105,7 +106,7 @@ const ErrorLog = () => {
 
     } catch (error) {
       console.error(error);
-      toast.error("Có lỗi xảy ra khi lưu!");
+      toast.error("Unable to save entry");
     } finally {
       setIsSaving(false);
     }
@@ -113,17 +114,17 @@ const ErrorLog = () => {
 
   // -- 3. DELETE --
   const handleDelete = async (id: string) => {
-    if (confirm("Bạn chắc chắn muốn xóa dòng này vĩnh viễn?")) {
+    if (confirm("Permanently delete this entry?")) {
       try {
         // Optimistic Update: Xóa trên UI trước cho nhanh
         setLogs(prev => prev.filter(l => l.id !== id));
         await axiosClient.delete(`/api/error-logs/${id}`);
-        toast.success("Đã xóa!");
+        toast.success("Entry deleted");
         if (currentItems.length === 1 && currentPage > 1) {
             setCurrentPage(prev => prev - 1);
         }
-      } catch (error) {
-        toast.error("Lỗi khi xóa!");
+      } catch {
+        toast.error("Unable to delete entry");
         fetchLogs(); // Rollback lại data nếu lỗi
       }
     }
@@ -155,43 +156,39 @@ const ErrorLog = () => {
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden">
-      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-center z-30 shadow-sm">
-        <h1 className="text-lg font-bold text-slate-800 tracking-tight">
-          Error Log
-        </h1>
-      </header>
+    <div className="flex flex-col h-full w-full bg-[#F2F8F5] overflow-hidden">
+      <AppHeader title="Error Log" subtitle="Review mistakes and turn them into study notes" />
       
       <main className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
         <div className="max-w-7xl mx-auto space-y-4">
           {/* --- HEADER CONTROL --- */}
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div>
-              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                 <AlertCircle className="text-rose-500" /> Error Log
               </h2>
               <p className="text-xs text-slate-500 font-medium">
-                {isLoading ? "Đang đồng bộ..." : `Hiện tại có ${logs.length} bản ghi`}
+                {isLoading ? "Syncing…" : `${logs.length} ${logs.length === 1 ? 'entry' : 'entries'}`}
               </p>
             </div>
             
             <div className="flex items-center gap-3 w-full md:w-auto">
                 <div className="relative flex-1 md:w-64">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
+                    <Input
                         type="text" 
-                        placeholder="Tìm kiếm..." 
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                        placeholder="Search entries…"
+                        className="w-full pl-9 pr-4"
                         value={searchTerm}
                         onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                     />
                 </div>
-                <button 
+                <Button
                     onClick={() => { resetForm(); setShowModal(true); }}
-                    className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-md transition-all whitespace-nowrap"
+                    className="whitespace-nowrap"
                 >
-                    <Plus size={16} /> Thêm mới
-                </button>
+                    <Plus size={16} /> Add entry
+                </Button>
             </div>
           </div>
 
@@ -201,9 +198,9 @@ const ErrorLog = () => {
             {/* Loading Overlay */}
             {isLoading && (
               <div className="absolute inset-0 z-20 bg-white/80 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-2 text-indigo-600">
+                <div className="flex flex-col items-center gap-2 text-[#1B7A5A]">
                     <Loader2 size={32} className="animate-spin" />
-                    <span className="text-xs font-semibold">Đang tải dữ liệu...</span>
+                    <span className="text-xs font-semibold">Loading entries…</span>
                 </div>
               </div>
             )}
@@ -227,7 +224,7 @@ const ErrorLog = () => {
                   {!isLoading && currentItems.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
-                          {logs.length === 0 ? "Chưa có dữ liệu nào." : "Không tìm thấy dữ liệu phù hợp."}
+                          {logs.length === 0 ? "No entries yet." : "No matching entries found."}
                       </td>
                     </tr>
                   ) : (
@@ -282,15 +279,15 @@ const ErrorLog = () => {
                           <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={() => handleEdit(log)} 
-                                className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-md transition-colors"
-                                title="Sửa"
+                                className="p-1.5 text-[#1B7A5A] hover:bg-[#E8F5EF] rounded-md transition-colors"
+                                title="Edit"
                               >
                                 <Edit3 size={16} />
                               </button>
                               <button 
                                 onClick={() => handleDelete(log.id)} 
                                 className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-md transition-colors"
-                                title="Xóa"
+                                title="Delete"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -307,7 +304,7 @@ const ErrorLog = () => {
             {filteredLogs.length > 0 && (
                 <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
                     <div className="text-xs text-slate-500">
-                        Hiển thị <b>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredLogs.length)}</b> trong số <b>{filteredLogs.length}</b> lỗi
+                        Showing <b>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredLogs.length)}</b> of <b>{filteredLogs.length}</b> entries
                     </div>
                     <div className="flex items-center gap-2">
                         <button 
@@ -318,7 +315,7 @@ const ErrorLog = () => {
                             <ChevronLeft size={16} />
                         </button>
                         {/* Simple Pagination Display to save space */}
-                        <span className="text-xs font-bold px-2 text-slate-600">Trang {currentPage} / {totalPages}</span>
+                        <span className="text-xs font-semibold px-2 text-slate-600">Page {currentPage} / {totalPages}</span>
 
                         <button 
                             onClick={() => paginate(currentPage + 1)} 
@@ -335,13 +332,13 @@ const ErrorLog = () => {
           {/* --- MODAL FORM --- */}
           {showModal && createPortal(
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 animate-in fade-in duration-200">
-              <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+              <div className="bg-white rounded-xl border border-[#E2EDE9] w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
                 
                 {/* Modal Header */}
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                       {formData.id ? <Edit3 size={18}/> : <Plus size={18}/>}
-                      {formData.id ? "Chỉnh sửa phân tích" : "Ghi lại lỗi sai mới"}
+                      {formData.id ? "Edit error analysis" : "Add error entry"}
                     </h3>
                     <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-rose-500 transition-colors">
                         <XCircle size={22}/>
@@ -352,19 +349,19 @@ const ErrorLog = () => {
                 <div className="p-6 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-slate-700">Nguồn đề (Source)</label>
+                          <label className="text-sm font-semibold text-slate-700">Source</label>
                           <input 
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
-                            placeholder="VD: Test 1 - Module 2 - Câu 15"
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none text-sm transition-all"
+                            placeholder="e.g. Test 1 · Module 2 · Question 15"
                             value={formData.source}
                             onChange={e => setFormData({...formData, source: e.target.value})}
                           />
                       </div>
                       <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-slate-700">Dạng bài (Category)</label>
+                          <label className="text-sm font-semibold text-slate-700">Category</label>
                           <input 
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
-                            placeholder="VD: Words in Context..."
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none text-sm transition-all"
+                            placeholder="e.g. Words in Context"
                             list="cat-suggestions"
                             value={formData.category}
                             onChange={e => setFormData({...formData, category: e.target.value})}
@@ -381,7 +378,7 @@ const ErrorLog = () => {
 
                     <div className="grid grid-cols-2 gap-8 p-5 bg-slate-50 rounded-xl border border-slate-100">
                       <div className="text-center">
-                          <label className="block text-xs font-bold text-rose-500 uppercase tracking-wide mb-3">Bạn chọn (Wrong)</label>
+                          <label className="block text-xs font-semibold text-rose-500 uppercase tracking-wide mb-3">Your answer</label>
                           <div className="flex justify-center gap-2">
                             {['A','B','C','D'].map(opt => (
                                 <button 
@@ -397,7 +394,7 @@ const ErrorLog = () => {
                           </div>
                       </div>
                       <div className="text-center border-l border-slate-200 pl-8">
-                          <label className="block text-xs font-bold text-emerald-600 uppercase tracking-wide mb-3">Đáp án đúng (Correct)</label>
+                          <label className="block text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Correct answer</label>
                           <div className="flex justify-center gap-2">
                             {['A','B','C','D'].map(opt => (
                                 <button 
@@ -417,24 +414,24 @@ const ErrorLog = () => {
                     <div className="grid grid-cols-1 gap-5">
                       <div className="space-y-1.5">
                           <label className="text-sm font-semibold text-rose-600 flex items-center gap-2">
-                              <AlertCircle size={14}/> Tại sao bạn chọn sai? (Tư duy sai)
+                              <AlertCircle size={14}/> Why was your answer wrong?
                           </label>
                           <textarea 
                             rows={3}
                             className="w-full px-3 py-2.5 border border-rose-100 rounded-lg bg-rose-50/30 focus:bg-white focus:ring-2 focus:ring-rose-200 outline-none text-sm leading-relaxed"
-                            placeholder="Phân tích lỗi sai của bản thân..."
+                            placeholder="Describe the misconception or reasoning error…"
                             value={formData.whyWrong}
                             onChange={e => setFormData({...formData, whyWrong: e.target.value})}
                           />
                       </div>
                       <div className="space-y-1.5">
                           <label className="text-sm font-semibold text-emerald-600 flex items-center gap-2">
-                              <Save size={14}/> Tại sao đáp án kia đúng? (Bài học)
+                              <Save size={14}/> Why is the correct answer right?
                           </label>
                           <textarea 
                             rows={3}
                             className="w-full px-3 py-2.5 border border-emerald-100 rounded-lg bg-emerald-50/30 focus:bg-white focus:ring-2 focus:ring-emerald-200 outline-none text-sm leading-relaxed"
-                            placeholder="Giải thích logic đúng hoặc kiến thức cần nhớ..."
+                            placeholder="Explain the correct reasoning and key takeaway…"
                             value={formData.whyRight}
                             onChange={e => setFormData({...formData, whyRight: e.target.value})}
                           />
@@ -443,21 +440,21 @@ const ErrorLog = () => {
                 </div>
 
                 {/* Modal Footer */}
-                <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 rounded-b-2xl">
+                <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 rounded-b-xl">
                     <button 
                         onClick={() => setShowModal(false)} 
                         disabled={isSaving}
-                        className="px-5 py-2.5 text-slate-500 hover:bg-slate-200 rounded-xl font-medium transition-colors"
+                        className="app-button app-button-secondary"
                     >
-                        Hủy
+                        Cancel
                     </button>
                     <button 
                         onClick={handleSave} 
                         disabled={isSaving}
-                        className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-indigo-600 shadow-lg shadow-indigo-200 hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="app-button app-button-primary"
                     >
                       {isSaving ? <Loader2 size={18} className="animate-spin"/> : <Save size={18} />} 
-                      {isSaving ? 'Đang lưu...' : 'Lưu lại'}
+                      {isSaving ? 'Saving…' : 'Save entry'}
                     </button>
                 </div>
               </div>

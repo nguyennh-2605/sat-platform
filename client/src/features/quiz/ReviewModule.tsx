@@ -1,6 +1,6 @@
 import React from 'react';
 
-// 1. Định nghĩa kiểu dữ liệu cho một Câu hỏi (cơ bản)
+// 1. Định nghĩa kiểu dữ liệu cho một Question hỏi (cơ bản)
 interface Question {
   id: number | string;
   // Bạn có thể thêm các trường khác nếu cần, ví dụ: questionText: string;
@@ -13,7 +13,7 @@ interface ReviewScreenProps {
   questions: Question[];          // Mảng các câu hỏi
   answers: Record<string, any>;   // Object chứa đáp án: { "1": "A", "2": "B" }
   markedQuestions: (number | string)[]; // Mảng chứa ID các câu đã bookmark
-  splitIndex: number;             // Số nguyên
+  splitIndex: number;             // number nguyên
   onQuestionClick: (index: number) => void; // Hàm nhận vào số, không trả về gì
   description: string
 }

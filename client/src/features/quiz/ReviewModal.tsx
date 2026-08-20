@@ -83,7 +83,7 @@ const TypewriterMarkdown = ({
 const StaticMessage = React.memo(({ msg }: { msg: ChatMessage }) => {
   return (
     <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[85%] rounded-2xl px-5 py-3 text-sm ${
+      <div className={`max-w-[85%] rounded-xl px-5 py-3 text-sm ${
         msg.role === 'user' 
           ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-tr-sm shadow-md' 
           : 'bg-white text-gray-800 border border-gray-100 rounded-tl-sm shadow-sm'
@@ -330,7 +330,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
       console.error("Lỗi gọi AI Stream:", error);
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'ai', content: 'Xin lỗi, đã có lỗi kết nối đến AI. Vui lòng thử lại.' }
+        { role: 'ai', content: 'The AI connection failed. Try again.' }
       ]);
       setIsTyping(false);
     }
@@ -404,7 +404,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
-      <div className={`bg-white rounded-2xl shadow-2xl flex flex-row h-[90vh] overflow-hidden ring-1 ring-gray-900/5 transition-all duration-300 ease-in-out w-full ${isAiOpen ? 'max-w-7xl' : 'max-w-5xl'}`}>
+      <div className={`bg-white rounded-xl shadow-2xl flex flex-row h-[90vh] overflow-hidden ring-1 ring-gray-900/5 transition-all duration-300 ease-in-out w-full ${isAiOpen ? 'max-w-7xl' : 'max-w-5xl'}`}>
         
         {/* ================= CỘT TRÁI ================= */}
         <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -439,7 +439,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
               </button>
               <button 
                 onClick={() => setIsAiOpen(!isAiOpen)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${isAiOpen ? 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-300' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-md hover:-translate-y-0.5'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${isAiOpen ? 'bg-[#C2DDD4] text-[#1B7A5A] ring-1 ring-indigo-300' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-md hover:-translate-y-0.5'}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4M3 5h4"/></svg>
               </button>
@@ -486,7 +486,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
               <div className="flex flex-col items-center justify-center h-full px-2 mt-8">
                 <h2 className="text-lg font-bold text-gray-700 mb-6">Hỏi AI bất cứ điều gì về câu này</h2>
                 <div className="flex flex-col gap-3 w-full">
-                  <button onClick={handleTranslateQuestion} disabled={isTyping || !!streamingContent} className="flex items-center justify-between w-full p-4 bg-[#F7F7F9] hover:bg-[#F0F0F4] rounded-2xl transition-colors group disabled:opacity-50">
+                  <button onClick={handleTranslateQuestion} disabled={isTyping || !!streamingContent} className="flex items-center justify-between w-full p-4 bg-[#F7F7F9] hover:bg-[#F0F0F4] rounded-xl transition-colors group disabled:opacity-50">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-[#E1F3FB] flex items-center justify-center text-[#007EE5]">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
@@ -499,7 +499,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
                     <svg className="text-gray-400 group-hover:text-gray-600 transition-colors" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                   </button>
 
-                  <button onClick={handleExplainAnswer} disabled={isTyping || !!streamingContent} className="flex items-center justify-between w-full p-4 bg-[#F7F7F9] hover:bg-[#F0F0F4] rounded-2xl transition-colors group disabled:opacity-50">
+                  <button onClick={handleExplainAnswer} disabled={isTyping || !!streamingContent} className="flex items-center justify-between w-full p-4 bg-[#F7F7F9] hover:bg-[#F0F0F4] rounded-xl transition-colors group disabled:opacity-50">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-[#FFF4CE] flex items-center justify-center text-[#D97706]">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
@@ -521,7 +521,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
 
             {streamingContent && (
               <div className="flex justify-start">
-                <div className="max-w-[85%] rounded-2xl px-5 py-3 text-sm bg-white text-gray-800 border border-gray-100 rounded-tl-sm shadow-sm">
+                <div className="max-w-[85%] rounded-xl px-5 py-3 text-sm bg-white text-gray-800 border border-gray-100 rounded-tl-sm shadow-sm">
                   <div className="leading-relaxed">
                     <TypewriterMarkdown 
                       content={streamingContent}
@@ -560,7 +560,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
                 scrollToBottom(true);
                 setShowScrollButton(false);
               }}
-              className="absolute left-1/2 -translate-x-1/2 bottom-[85px] z-20 bg-white/90 border border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.1)] rounded-full w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-all text-gray-500 hover:text-indigo-600"
+              className="absolute left-1/2 -translate-x-1/2 bottom-[85px] z-20 bg-white/90 border border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.1)] rounded-full w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-all text-gray-500 hover:text-[#1B7A5A]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
             </button>
@@ -580,12 +580,12 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
                 onChange={(e) => setChatInput(e.target.value)}
                 disabled={isTyping || !!streamingContent} // Khóa gõ chữ lúc AI đang trả lời
                 placeholder="Hỏi AI về câu này..." 
-                className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-2xl pl-5 pr-12 py-3.5 text-sm outline-none transition-all disabled:opacity-60 placeholder:text-gray-400"
+                className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#6BBFA0] focus:ring-4 focus:ring-indigo-100 rounded-xl pl-5 pr-12 py-3.5 text-sm outline-none transition-all disabled:opacity-60 placeholder:text-gray-400"
               />
               <button 
                 type="submit"
                 disabled={!chatInput.trim() || isTyping || !!streamingContent}
-                className="absolute right-2 p-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-xl transition-all shadow-sm"
+                className="absolute right-2 p-2 bg-[#1B7A5A] hover:bg-[#145F47] disabled:bg-gray-300 text-white rounded-xl transition-all shadow-sm"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
               </button>

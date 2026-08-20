@@ -1,367 +1,132 @@
-import { useState, useMemo, useEffect } from 'react';
-import { 
-  ClipboardList, ArrowLeft, 
-  ChevronLeft, ChevronRight, Users, 
-  Eye, EyeOff, FileText
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { ArrowLeft, ArrowRight, ClipboardList, FileText, Users } from 'lucide-react';
 import axiosClient from '../../lib/axios';
+import { Badge, Button, Card, TableShell } from '../../components/ui/AppUI';
 
-// --- INTERFACES ---
-interface ExamItem {
-  id: number;
-  title: string;
-  date: string;
-  mode: 'EXAM';
-  subject: string;
-  duration: number;
-}
+interface ExamItem { id: number; title: string; date: string; mode: 'EXAM'; subject: string; duration: number }
+interface AssignmentScoreItem { id: string; title: string; createdAt: string; tests: ExamItem[] }
+interface StudentStat { key: string; count: number; students: string[] }
+interface QuestionReport { id: number; correctChoice: string; stats: StudentStat[] }
+interface LeaderboardItem { id: number; name: string; score: number; time: string }
+interface ReportResponse { leaderboard: LeaderboardItem[]; questions: QuestionReport[] }
 
-interface AssignmentScoreItem {
-  id: string;
-  title: string;
-  createdAt: string;
-  tests: ExamItem[];
-}
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase();
 
-interface ScoreReportAssignmentsResponse {
-  success: boolean;
-  message: string;
-  data: AssignmentScoreItem[];
-}
-
-interface StudentStat {
-  key: string;
-  count: number;
-  students: string[];
-}
-
-interface QuestionReport {
-  id: number;
-  correctChoice: string;
-  stats: StudentStat[];
-}
-
-interface LeaderboardItem {
-  id: number;
-  name: string;
-  score: number;
-  time: string;
-}
-
-interface ReportResponse {
-  leaderboard: LeaderboardItem[]; 
-  questions: QuestionReport[];
-}
-
-const StudentAnalytics = ({ classId }: { classId?: string }) => {
+export default function StudentAnalytics({ classId }: { classId?: string }) {
+  const [assignments, setAssignments] = useState<AssignmentScoreItem[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentScoreItem | null>(null);
-  const [selectedTestId, setSelectedTestId] = useState<number | null>(null);
-  const [assignmentList, setAssignmentList] = useState<AssignmentScoreItem[]>([]);
+  const [selectedTest, setSelectedTest] = useState<ExamItem | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchScoreReportAssignments = async () => {
-      if (!classId) return;
-      try {
-        const response = await axiosClient.get<ScoreReportAssignmentsResponse, ScoreReportAssignmentsResponse>(`/api/classes/${classId}/score-report`);
-        setAssignmentList(Array.isArray(response.data) ? response.data : []);
-      } catch (error) {
-        console.error("Lỗi tải danh sách assignment score report:", error);
-      }
-    };
-    fetchScoreReportAssignments();
+    if (!classId) return;
+    axiosClient.get<{ data: AssignmentScoreItem[] }, { data: AssignmentScoreItem[] }>(`/api/classes/${classId}/score-report`)
+      .then(response => setAssignments(Array.isArray(response.data) ? response.data : []))
+      .catch(error => console.error('Failed to load class score reports:', error))
+      .finally(() => setLoading(false));
   }, [classId]);
 
-  // VIEW 1: DANH SÁCH ASSIGNMENT
-  if (!selectedAssignment) {
+  if (selectedAssignment && selectedTest) {
+    return <TestPerformance assignment={selectedAssignment} test={selectedTest} onBack={() => setSelectedTest(null)} />;
+  }
+
+  if (selectedAssignment) {
     return (
-      <div className="max-w-4xl mx-auto pt-4">
-        <h2 className="text-xl font-bold text-gray-800 mb-6 px-2">Score Report theo Assignment</h2>
-        <div className="space-y-4">
-          {assignmentList.length === 0 ? (
-             <div className="text-center text-gray-500 py-8">Chưa có assignment nào.</div>
-          ) : (
-            assignmentList.map((assignment) => (
-              <div
-                key={assignment.id}
-                onClick={() => setSelectedAssignment(assignment)}
-                className="group flex items-center gap-4 bg-[#F0F2F5] hover:bg-[#E4E6E9] p-4 rounded-xl cursor-pointer transition-colors"
-              >
-                <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-sm shrink-0">
-                  <FileText size={20} strokeWidth={2.5} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 truncate text-[15px]">{assignment.title}</div>
-                  <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
-                    {assignment.tests.length} bài test EXAM đính kèm
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+      <div className="space-y-5">
+        <SectionHeading title={selectedAssignment.title} subtitle="Select a test to view its performance" onBack={() => setSelectedAssignment(null)} />
+        <div className="grid gap-4 md:grid-cols-2">
+          {selectedAssignment.tests.map(test => (
+            <PickerCard key={test.id} icon={<ClipboardList size={19} />} title={test.title} meta={`${test.subject} · ${test.duration} min · ${test.date}`} onClick={() => setSelectedTest(test)} />
+          ))}
         </div>
+        {selectedAssignment.tests.length === 0 && <EmptyState text="No exam tests are attached to this assignment." />}
       </div>
     );
   }
 
-  // VIEW 2: DANH SÁCH TEST EXAM CỦA ASSIGNMENT ĐÃ CHỌN
-  if (!selectedTestId) {
-    return (
-      <div className="max-w-4xl mx-auto pt-4">
-        <div className="flex items-center gap-3 mb-6 px-2">
-          <button
-            onClick={() => setSelectedAssignment(null)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">{selectedAssignment.title}</h2>
-            <p className="text-sm text-gray-500">Danh sách test EXAM đính kèm</p>
-          </div>
-        </div>
-        <div className="space-y-4">
-          {selectedAssignment.tests.length === 0 ? (
-             <div className="text-center text-gray-500 py-8">Assignment này chưa có test EXAM.</div>
-          ) : (
-            selectedAssignment.tests.map((exam) => (
-              <div 
-                key={exam.id} onClick={() => setSelectedTestId(exam.id)}
-                className="group flex items-center gap-4 bg-[#F0F2F5] hover:bg-[#E4E6E9] p-4 rounded-xl cursor-pointer transition-colors"
-              >
-                <div className="h-10 w-10 rounded-full bg-[#E37400] flex items-center justify-center text-white shadow-sm shrink-0">
-                  <ClipboardList size={20} strokeWidth={2.5} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 truncate text-[15px]">{exam.title}</div>
-                  <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
-                    {exam.subject} • {exam.duration} phút • {exam.date}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // VIEW 2: CHI TIẾT BÁO CÁO
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full flex flex-col">
-      <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-100">
-        <button 
-            onClick={() => setSelectedTestId(null)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
-        >
-          <ArrowLeft size={24}/>
-        </button>
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">Chi tiết thống kê</h2>
-          <p className="text-sm text-gray-500">{selectedAssignment.title}</p>
+    <div className="space-y-5">
+      <div><h2 className="text-lg font-semibold">Test Performance</h2><p className="mt-1 text-xs text-[#6B7280]">Review assignment results and student performance</p></div>
+      {loading ? <EmptyState text="Loading score reports…" /> : assignments.length === 0 ? <EmptyState text="No score reports are available yet." /> : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {assignments.map(assignment => <PickerCard key={assignment.id} icon={<FileText size={19} />} title={assignment.title} meta={`${assignment.tests.length} exam ${assignment.tests.length === 1 ? 'test' : 'tests'}`} onClick={() => setSelectedAssignment(assignment)} />)}
         </div>
-      </div>
-      <DetailedScoreReport testId={selectedTestId} assignmentId={selectedAssignment.id} />
+      )}
     </div>
   );
-};
+}
 
-const DetailedScoreReport = ({ testId, assignmentId }: { testId: number; assignmentId?: string }) => {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
-  const [questions, setQuestions] = useState<QuestionReport[]>([]);
-  
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; 
+function PickerCard({ icon, title, meta, onClick }: { icon: ReactNode; title: string; meta: string; onClick: () => void }) {
+  return (
+    <Card className="group cursor-pointer p-5 transition hover:border-[#A9CFC1] hover:shadow-md" onClick={onClick}>
+      <div className="flex items-center gap-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E8F5EF] text-[#1B7A5A]">{icon}</div><div className="min-w-0 flex-1"><h3 className="truncate text-sm font-semibold">{title}</h3><p className="mt-1 text-xs text-[#6B7280]">{meta}</p></div><ArrowRight size={17} className="text-[#9CA3AF] transition group-hover:translate-x-0.5 group-hover:text-[#1B7A5A]" /></div>
+    </Card>
+  );
+}
+
+function SectionHeading({ title, subtitle, onBack }: { title: string; subtitle: string; onBack: () => void }) {
+  return <div className="flex items-center gap-3"><Button variant="ghost" size="icon" onClick={onBack} aria-label="Go back"><ArrowLeft size={18} /></Button><div><h2 className="text-lg font-semibold">{title}</h2><p className="text-xs text-[#6B7280]">{subtitle}</p></div></div>;
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <Card className="flex min-h-40 items-center justify-center p-8 text-sm text-[#6B7280]">{text}</Card>;
+}
+
+function TestPerformance({ assignment, test, onBack }: { assignment: AssignmentScoreItem; test: ExamItem; onBack: () => void }) {
+  const [report, setReport] = useState<ReportResponse>({ leaderboard: [], questions: [] });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchReport = async () => {
-      try {
-        const data = await axiosClient.get<ReportResponse, ReportResponse>(`/api/classes/${testId}/report`, {
-          params: {
-            assignmentId
-          }
-        });
-        
-        // Đảm bảo dữ liệu là mảng để tránh lỗi map
-        setLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
-        setQuestions(Array.isArray(data.questions) ? data.questions : []);
-        
-      } catch (error) {
-        console.error("Lỗi tải báo cáo:", error);
-      }
-    };
-    if (testId) fetchReport();
-  }, [testId, assignmentId]);
+    axiosClient.get<ReportResponse, ReportResponse>(`/api/classes/${test.id}/report`, { params: { assignmentId: assignment.id } })
+      .then(data => setReport({ leaderboard: Array.isArray(data.leaderboard) ? data.leaderboard : [], questions: Array.isArray(data.questions) ? data.questions : [] }))
+      .catch(error => console.error('Failed to load test performance:', error))
+      .finally(() => setLoading(false));
+  }, [assignment.id, test.id]);
 
-  const totalPages = Math.max(1, Math.ceil(questions.length / itemsPerPage));
-  
-  const currentQuestions = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return questions.slice(start, start + itemsPerPage);
-  }, [questions, currentPage]);
+  const scores = report.leaderboard.map(student => Number(student.score)).filter(Number.isFinite);
+  const average = scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length) : 0;
+  const kpis = [
+    ['AVERAGE SCORE', `${average}%`, ''],
+    ['HIGHEST SCORE', `${scores.length ? Math.max(...scores) : 0}%`, ''],
+    ['LOWEST SCORE', `${scores.length ? Math.min(...scores) : 0}%`, ''],
+    ['PARTICIPANTS', String(report.leaderboard.length), 'Submitted'],
+    ['QUESTIONS', String(report.questions.length), 'In this test'],
+    ['TIME LIMIT', `${test.duration}m`, 'Per student'],
+  ];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-      {/* CỘT TRÁI: LIST CÂU HỎI */}
-      <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-[500px]">
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-gray-50/30 custom-scrollbar">
-          {currentQuestions.map((q, index) => {
-            // Tính số thứ tự thực tế (VD: Trang 2 bắt đầu từ câu 6)
-            const realIndex = (currentPage - 1) * itemsPerPage + index + 1;
-            return (
-                <QuestionAnalyticsItem 
-                    key={q.id} 
-                    question={q} 
-                    index={realIndex} 
-                />
-            );
-          })}
-          {currentQuestions.length === 0 && (
-              <p className="text-center text-gray-400 mt-10">Đang tải dữ liệu hoặc không có câu hỏi...</p>
-          )}
+    <div className="space-y-6">
+      <SectionHeading title={test.title} subtitle={`${assignment.title} · Test performance`} onBack={onBack} />
+      {loading ? <EmptyState text="Loading performance data…" /> : <>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {kpis.map(([label, value, sub], index) => (
+            <Card key={label} className="flex min-h-[116px] flex-col justify-between p-4"><span className="text-[10px] font-semibold tracking-[0.08em] text-[#6B7280]">{label}</span><div><div className={`text-2xl font-semibold ${index === 2 && scores.length ? 'text-red-600' : ''}`}>{value}</div>{sub && <p className="mt-1 text-xs text-[#9CA3AF]">{sub}</p>}{index < 3 && <div className={`mt-2 h-1 w-12 rounded-full ${index === 2 && scores.length ? 'bg-red-600' : 'bg-[#1B7A5A]'}`} />}</div></Card>
+          ))}
         </div>
-        
-        {/* Pagination */}
-        {questions.length > 0 && (
-            <div className="p-3 border-t border-gray-100 bg-white flex justify-between items-center">
-                <button disabled={currentPage === 1} onClick={() => setCurrentPage(c => c - 1)} className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-30 transition-all">
-                <ChevronLeft size={20}/>
-                </button>
-                <span className="text-sm font-bold text-gray-600">Trang {currentPage}/{totalPages}</span>
-                <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(c => c + 1)} className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-30 transition-all">
-                <ChevronRight size={20}/>
-                </button>
+        <div className="grid items-start gap-6 lg:grid-cols-12">
+          <Card className="overflow-hidden lg:col-span-7">
+            <div className="flex items-center justify-between border-b border-[#E2EDE9] p-5"><h3 className="text-sm font-semibold">Question Performance Breakdown</h3><div className="flex gap-4 text-xs text-[#6B7280]"><Legend color="#115E43" label="Correct" /><Legend color="#B31919" label="Incorrect" /></div></div>
+            <div className="max-h-[430px] space-y-5 overflow-y-auto p-5">
+              {report.questions.map((question, index) => {
+                const total = question.stats.reduce((sum, item) => sum + item.count, 0);
+                const correct = question.stats.find(item => item.key === question.correctChoice)?.count || 0;
+                const percentage = total ? Math.round((correct / total) * 100) : 0;
+                return <div key={question.id}><div className="mb-2 flex items-center gap-3 text-xs"><span className="w-7 font-semibold text-[#6B7280]">Q{index + 1}</span><div className="flex h-3 flex-1 overflow-hidden rounded-full bg-[#FEECEC]"><div className="bg-[#115E43]" style={{ width: `${percentage}%` }} /><div className="bg-[#B31919]" style={{ width: `${100 - percentage}%` }} /></div><span className="w-9 text-right font-semibold text-[#6B7280]">{percentage}%</span></div><div className="ml-10 flex flex-wrap gap-1.5">{question.stats.map(stat => <Badge key={stat.key} tone={stat.key === question.correctChoice ? 'success' : 'neutral'}>{stat.key}: {stat.count}</Badge>)}</div></div>;
+              })}
+              {report.questions.length === 0 && <p className="py-12 text-center text-sm text-[#6B7280]">No question data yet.</p>}
             </div>
-        )}
-      </div>
-
-      {/* CỘT PHẢI: RANKING */}
-      <div className="w-full lg:w-72 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden h-fit max-h-full">
-        <div className="p-3 bg-yellow-50/50 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2">
-            <Users size={16} className="text-yellow-600"/> Bảng xếp hạng
+          </Card>
+          <TableShell className="lg:col-span-5">
+            <div className="flex items-center gap-2 border-b border-[#E2EDE9] p-5"><Users size={16} className="text-[#1B7A5A]" /><h3 className="text-sm font-semibold">Student Rankings</h3></div>
+            <div className="max-h-[430px] overflow-auto"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-[#F8FBF9] text-[10px] tracking-wide text-[#6B7280]"><tr><th className="px-5 py-3">STUDENT NAME</th><th className="px-5 py-3 text-center">SCORE</th><th className="px-5 py-3 text-right">TIME</th></tr></thead><tbody className="divide-y divide-[#E2EDE9]">{report.leaderboard.map(student => <tr key={student.id} className="hover:bg-[#F8FBF9]"><td className="px-5 py-3"><div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E8F5EF] text-[10px] font-semibold text-[#1B7A5A]">{initials(student.name)}</span><span className="max-w-[150px] truncate font-medium">{student.name}</span></div></td><td className="px-5 py-3 text-center font-semibold text-[#1B7A5A]">{student.score}%</td><td className="px-5 py-3 text-right text-[#6B7280]">{student.time || '—'}</td></tr>)}</tbody></table>{report.leaderboard.length === 0 && <p className="py-12 text-center text-sm text-[#6B7280]">No submissions yet.</p>}</div>
+          </TableShell>
         </div>
-        <div className="overflow-y-auto max-h-[500px] custom-scrollbar">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-white shadow-sm text-xs text-gray-400 z-10">
-               <tr><th className="p-2 text-left pl-4">HS</th><th className="p-2 text-right pr-4">Điểm</th></tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {leaderboard.map((st, idx) => (
-                <tr key={st.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="p-2 pl-4">
-                    <div className="font-medium text-gray-700 truncate w-32" title={st.name}>{st.name}</div>
-                  </td>
-                  <td className={`p-2 pr-4 text-right font-bold ${idx < 3 ? 'text-yellow-600' : 'text-gray-600'}`}>
-                    {st.score}
-                  </td>
-                </tr>
-              ))}
-              {leaderboard.length === 0 && (
-                  <tr><td colSpan={2} className="p-4 text-center text-gray-400 text-xs">Chưa có dữ liệu</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      </>}
     </div>
   );
-};
+}
 
-const QuestionAnalyticsItem = ({ question, index }: { question: QuestionReport, index: number }) => {
-  // State lưu key của đáp án đang mở 
-  const [expandedChoice, setExpandedChoice] = useState<string | null>(null);
-
-  const toggleExpand = (choiceKey: string) => {
-    setExpandedChoice(prev => prev === choiceKey ? null : choiceKey);
-  };
-
-  // Tính tổng số phiếu trả lời cho câu này để tính %
-  const totalVotes = question.stats.reduce((acc, curr) => acc + curr.count, 0);
-
-  return (
-    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-      {/* Header câu hỏi */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="bg-indigo-100 text-indigo-700 font-bold px-3 py-1 rounded-lg text-sm">
-          Câu {index}
-        </div>
-        <div className="text-xs text-gray-400 font-medium">
-          Đáp án đúng: <span className="text-green-600 font-bold text-sm">{question.correctChoice}</span>
-        </div>
-      </div>
-
-      {/* Danh sách 4 thanh Bar (A, B, C, D) */}
-      <div className="space-y-3">
-        {question.stats.map((stat) => {
-          const isCorrect = stat.key === question.correctChoice;
-          const percent = totalVotes > 0 ? Math.round((stat.count / totalVotes) * 100) : 0;
-          const hasStudents = stat.students && stat.students.length > 0;
-          const isExpanded = expandedChoice === stat.key;
-
-          return (
-            <div key={stat.key} className="relative">
-              <div className="flex items-center gap-3">
-                {/* Label A/B/C/D */}
-                <div className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm shrink-0 border transition-colors ${
-                  isCorrect 
-                    ? 'bg-green-100 text-green-700 border-green-200' 
-                    : 'bg-gray-50 text-gray-500 border-gray-200'
-                }`}>
-                  {stat.key}
-                </div>
-
-                {/* Progress Bar */}
-                <div className="flex-1 h-8 bg-gray-50 rounded-lg relative overflow-hidden flex items-center px-3 border border-gray-100">
-                  <div 
-                    className={`absolute top-0 left-0 h-full transition-all duration-500 ease-out ${isCorrect ? 'bg-green-100' : 'bg-indigo-50'}`} 
-                    style={{ width: `${percent}%` }}
-                  />
-                  <div className="relative z-10 flex justify-between w-full text-sm">
-                    <span className={`font-medium ${isCorrect ? 'text-green-800' : 'text-gray-700'}`}>
-                      {stat.count} học sinh
-                    </span>
-                    <span className="text-gray-400 text-xs mt-0.5">{percent}%</span>
-                  </div>
-                </div>
-
-                {/* Button Toggle (Con mắt) */}
-                <button
-                  onClick={() => toggleExpand(stat.key)}
-                  disabled={!hasStudents}
-                  className={`p-2 rounded-lg transition-all shrink-0 border ${
-                    isExpanded 
-                      ? 'bg-indigo-100 text-indigo-600 border-indigo-200' 
-                      : hasStudents 
-                        ? 'bg-white text-gray-400 hover:text-indigo-600 hover:border-indigo-200 border-gray-200' 
-                        : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
-                  }`}
-                  title={hasStudents ? "Xem danh sách" : "Không có ai chọn"}
-                >
-                  {isExpanded ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-
-              {/* Danh sách học sinh (Accordion) */}
-              {isExpanded && hasStudents && (
-                <div className="mt-2 ml-11 p-3 bg-gray-50 rounded-lg border border-gray-100 animate-in fade-in slide-in-from-top-1 duration-200">
-                   <div className="text-xs font-bold text-gray-400 uppercase mb-2">
-                      Danh sách chọn {stat.key}:
-                   </div>
-                   <div className="flex flex-wrap gap-2">
-                     {stat.students.map((name, idx) => (
-                       <span key={idx} className="inline-flex items-center px-2 py-1 rounded bg-white border border-gray-200 text-xs font-medium text-gray-700 shadow-sm">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5"></div>
-                          {name}
-                       </span>
-                     ))}
-                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-export default StudentAnalytics;
+function Legend({ color, label }: { color: string; label: string }) {
+  return <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />{label}</span>;
+}

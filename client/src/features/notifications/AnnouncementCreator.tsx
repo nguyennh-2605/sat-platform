@@ -44,11 +44,11 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
             const urlObj = new URL(urlStr);
             let filename = urlObj.searchParams.get('name');
             return {
-              name: filename ? decodeURIComponent(filename) : 'Tệp đính kèm',
+              name: filename ? decodeURIComponent(filename) : 'Attachment',
               url: urlStr
             };
           } catch (e) {
-            return { name: 'Tệp đính kèm', url: urlStr };
+            return { name: 'Attachment', url: urlStr };
           }
         });
         setDriveFiles(recoveredFiles);
@@ -114,8 +114,8 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
   };
 
   const handleSubmit = () => {
-    if (!form.title.trim()) return toast.error("Vui lòng nhập tiêu đề!");
-    if (!form.content || form.content === '<p><br></p>') return toast.error("Vui lòng nhập nội dung!");
+    if (!form.title.trim()) return toast.error("Enter a title");
+    if (!form.content || form.content === '<p><br></p>') return toast.error("Enter content");
 
     const formattedFileUrls = driveFiles.map(f => {
       try {
@@ -148,16 +148,16 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
             <X size={24} className="text-gray-500" />
           </button>
           <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">
-            {isEditMode ? 'Chỉnh sửa bài đăng' : 'Bài đăng mới'}
+            {isEditMode ? 'Edit post' : 'New post'}
           </h2>
         </div>
 
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="px-4 py-2 md:px-6 md:py-2.5 bg-indigo-600 text-white rounded-full font-bold hover:bg-indigo-700 shadow-md transition flex items-center gap-2 text-sm md:text-base"
+          className="px-4 py-2 md:px-6 md:py-2.5 bg-[#1B7A5A] text-white rounded-full font-bold hover:bg-[#145F47] shadow-md transition flex items-center gap-2 text-sm md:text-base"
         >
-          <span className="hidden sm:inline">{isEditMode ? 'Lưu thay đổi' : 'Đăng bài'}</span>
+          <span className="hidden sm:inline">{isEditMode ? 'Save changes' : 'Publish'}</span>
         </button>
       </header>
 
@@ -183,11 +183,11 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                   <label
                     htmlFor="post-title"
                     className="absolute text-base text-gray-500 italic font-medium duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0]
-                               peer-focus:text-indigo-600
+                               peer-focus:text-[#1B7A5A]
                                peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2
                                peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-0 cursor-text"
                   >
-                    Tiêu đề bài viết...
+                    Post title…
                   </label>
                 </div>
               </div>
@@ -195,7 +195,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
               {/* 2. KHU VỰC NỘI DUNG */}
               <div>
                 <label className="block text-base font-bold text-gray-700 mb-3 ml-1">
-                  Nội dung
+                  Content
                 </label>
                 <div className="
                   bg-white rounded-lg shadow-sm border border-gray-300 focus-within:border-indigo-600 transition-colors overflow-hidden
@@ -207,7 +207,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                     theme="snow"
                     value={form.content}
                     onChange={(content) => setForm({ ...form, content })}
-                    placeholder="Nhập nội dung chi tiết hoặc hướng dẫn..."
+                    placeholder="Add details or instructions…"
                     className="mb-12"
                     modules={{
                       toolbar: [
@@ -225,11 +225,11 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
             {/* CỘT PHẢI: Cài đặt & Đính kèm */}
             <div className="space-y-6">
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-300">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-300">
                 <h3 className="text-base font-bold text-gray-700 mb-2 flex items-center gap-2">
-                  Hạn nộp bài
+                  Due date
                 </h3>
-                <p className="text-sm text-gray-400 mb-4">Để trống nếu đây chỉ là thông báo.</p>
+                <p className="text-sm text-gray-400 mb-4">Leave blank for an announcement without a due date.</p>
                 <Flatpickr
                   data-enable-time
                   value={form.deadline}
@@ -243,14 +243,14 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                     dateFormat: "d/m/Y H:i",
                     time_24hr: true,
                   }}
-                  placeholder="Chọn hạn nộp bài..."
-                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                  placeholder="Choose a due date…"
+                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition"
                 />
               </div>
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-300">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-300">
                 <h3 className="text-base font-bold text-gray-700 mb-6 flex items-center gap-2">
-                  Đính kèm tài liệu
+                  Attach resources
                 </h3>
 
                 <div className="flex items-center justify-center gap-8 mb-6">
@@ -279,15 +279,15 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                       type="url"
                       value={linkUrl}
                       onChange={(e) => setLinkUrl(e.target.value)}
-                      placeholder="Dán đường dẫn vào đây..."
-                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                      placeholder="Paste a link…"
+                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#1B7A5A]"
                     />
                     <button
                       type="button"
                       onClick={handleAddLink}
-                      className="px-4 py-2 bg-indigo-50 text-indigo-600 text-sm font-medium rounded-full hover:bg-indigo-100 transition-colors"
+                      className="px-4 py-2 bg-[#E8F5EF] text-[#1B7A5A] text-sm font-medium rounded-full hover:bg-[#C2DDD4] transition-colors"
                     >
-                      Thêm
+                      Add
                     </button>
                   </div>
                 )}
@@ -295,7 +295,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                 {/* DANH SÁCH FILE ĐÃ CHỌN */}
                 {driveFiles.length > 0 && (
                   <div className="mt-4 space-y-2">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tệp đính kèm ({driveFiles.length})</p>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Attachments ({driveFiles.length})</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
                       {driveFiles.map((file, index) => (
                         <div key={index} className="flex items-center justify-between bg-gray-50 p-2.5 rounded-lg border border-gray-100 group">
@@ -315,7 +315,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                 {/* DANH SÁCH LINK ĐÃ CHỌN */}
                 {links.length > 0 && (
                   <div className="mt-4 space-y-2">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Liên kết đính kèm ({links.length})</p>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Attached links ({links.length})</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
                       {links.map((link, index) => (
                         <div key={index} className="flex items-center justify-between bg-blue-50/50 p-2.5 rounded-lg border border-blue-100 group">

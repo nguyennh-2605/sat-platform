@@ -25,7 +25,7 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
         htmlFor={id}
         // Các class xử lý hiệu ứng bay lên bay xuống
         className="absolute text-base text-slate-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-1 
-                   peer-focus:px-2 peer-focus:text-indigo-600 
+                   peer-focus:px-2 peer-focus:text-[#1B7A5A]
                    peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 
                    peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 cursor-text"
       >

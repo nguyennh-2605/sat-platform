@@ -1,6 +1,6 @@
 import React from 'react';
 
-// 1. Icon Bookmark: Cập nhật logic màu đỏ khi active
+// 1. Icon Bookmark: Update logic màu đỏ khi active
 const BookmarkIcon = ({ filled }: { filled: boolean }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
@@ -14,7 +14,7 @@ const BookmarkIcon = ({ filled }: { filled: boolean }) => (
   </svg>
 );
 
-// 2. Icon ABC: Cập nhật thành gạch chéo
+// 2. Icon ABC: Update thành gạch chéo
 const StrikethroughIcon = () => (
   <div className="
     relative flex items-center justify-center 
@@ -83,7 +83,7 @@ const QuestionHeader: React.FC<Props> = ({
               className={`
                 transition-all duration-200 rounded p-0.5
                 ${isStrikeMode 
-                  ? 'ring-1 ring-indigo-600 bg-indigo-100' // Bỏ scale lớn để trông gọn hơn
+                  ? 'ring-1 ring-indigo-600 bg-[#C2DDD4]' // Bỏ scale lớn để trông gọn hơn
                   : 'opacity-70 hover:opacity-100 hover:bg-gray-200'
                 }
               `}

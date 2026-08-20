@@ -58,7 +58,7 @@ const TableRenderer = ({ block, isMath, readOnly }: { block: TableBlock, isMath:
 
 // --- 2. Component hiển thị Thơ (Poem) ---
 const PoemRenderer = ({ block, isMath, readOnly }: { block: PoemBlock, isMath: boolean, readOnly: boolean }) => (
-  <div className="my-6 pl-6 border-l-4 border-indigo-300 bg-gray-50 p-5 rounded-r-md">
+  <div className="my-6 pl-6 border-l-4 border-[#A9CFC1] bg-gray-50 p-5 rounded-r-md">
     {/* Tiêu đề bài thơ */}
     {block.title && (
       <div className="mb-3 font-serif font-bold text-lg text-gray-800">

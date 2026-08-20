@@ -117,7 +117,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
         }
       }
       if (hasBlock) {
-        toast.error("Vui lòng không highlight qua nhiều đoạn văn (xuống dòng).");
+        toast.error("Do not highlight across multiple paragraphs.");
         setToolbar(null);
         return;
       }
@@ -151,7 +151,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
       }
     } catch (e) {
       console.error("Highlight Error:", e);
-      toast.error("Không thể highlight vùng này do cấu trúc HTML quá phức tạp.");
+      toast.error("This area cannot be highlighted because its HTML structure is too complex.");
       setToolbar(null);
     }
   };
@@ -299,7 +299,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
           <button 
             onClick={() => applyFormat('note')} 
             className="w-7 h-7 rounded-full flex items-center border-2 border-slate-200 justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
-            title="Thêm Ghi Chú"
+            title="Add note"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
@@ -312,7 +312,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
           <button 
             onClick={handleRemoveHighlight} 
             className="w-7 h-7 rounded-full flex items-center justify-center border-2 border-slate-200 text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
-            title="Xóa định dạng"
+            title="Remove formatting"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18"></path>
@@ -351,7 +351,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
               <button 
                 onClick={deleteActiveNote} 
                 className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-all duration-200"
-                title="Xóa ghi chú này"
+                title="Delete note"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 6h18"></path>
@@ -377,7 +377,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
                 onClick={() => setActiveNoteId(null)}
                 className="px-4 py-2 text-[14px] font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 hover:text-gray-800 rounded-full transition-colors"
               >
-                Hủy
+                Cancel
               </button>
               <button 
                 onClick={() => setActiveNoteId(null)}

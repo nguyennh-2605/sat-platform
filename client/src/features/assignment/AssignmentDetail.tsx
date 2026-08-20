@@ -20,13 +20,13 @@ const getLinkIcon = (url: string) => {
 
 const getFileTypeName = (fileName: string) => {
   const name = fileName.toLowerCase();
-  if (name.includes('.pdf')) return 'Tài liệu PDF';
-  if (name.match(/\.(doc|docx)$/)) return 'Tài liệu Word';
-  if (name.match(/\.(xls|xlsx|csv)$/)) return 'Bảng tính Excel';
-  if (name.match(/\.(ppt|pptx)$/)) return 'Bài trình chiếu';
-  if (name.match(/\.(jpg|jpeg|png|gif|webp)$/)) return 'Hình ảnh';
+  if (name.includes('.pdf')) return 'PDF document';
+  if (name.match(/\.(doc|docx)$/)) return 'Word document';
+  if (name.match(/\.(xls|xlsx|csv)$/)) return 'Excel spreadsheet';
+  if (name.match(/\.(ppt|pptx)$/)) return 'Presentation';
+  if (name.match(/\.(jpg|jpeg|png|gif|webp)$/)) return 'Image';
   if (name.match(/\.(mp4|avi|mov|mkv)$/)) return 'Video';
-  if (name.match(/\.(zip|rar|7z)$/)) return 'Tệp nén';
+  if (name.match(/\.(zip|rar|7z)$/)) return 'Archive';
   return 'Google Drive'; // Mặc định nếu không nhận diện được
 };
 
@@ -60,7 +60,7 @@ const AssignmentDetail = () => {
       setAssignment(res.data);
     } catch (error) {
       console.error(error);
-      toast.error("Không thể tải thông tin bài tập");
+      toast.error("Unable to load assignment");
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ const AssignmentDetail = () => {
   // Hàm nộp bài của bạn (đã được tinh chỉnh xíu cho mượt)
   const handleSubmitAssignment = async () => {
     if (!submissionContent.trim()) {
-      toast.error("Vui lòng nhập nội dung hoặc đường dẫn file!");
+      toast.error("Enter content or a file link");
       return;
     }
 
@@ -87,11 +87,11 @@ const AssignmentDetail = () => {
         fileUrl: submissionType === 'FILE' ? submissionContent : undefined,
       });
       
-      toast.success("Nộp bài thành công!");
+      toast.success("Test submitted");
       // Nộp xong có thể reset form hoặc gọi API cập nhật lại trạng thái (Đã nộp)
       setSubmissionContent('');
     } catch (error) {
-      toast.error("Lỗi nộp bài!");
+      toast.error("Unable to submit assignment");
     } finally {
       setIsSubmitting(false);
     }
@@ -100,24 +100,24 @@ const AssignmentDetail = () => {
   const handleDelete = async () => {
     try {
       await axiosClient.delete(`/api/assignments/${assignmentId}`);
-      toast.success("Xóa bài tập thành công!");
+      toast.success("Assignment deleted");
       setShowDeleteModal(false);
       navigate(`/dashboard/class/${classId}`);
     } catch (error) {
       console.error(error);
-      toast.error("Lỗi khi xóa bài tập!");
+      toast.error("Unable to delete assignment");
     }
   };
 
   const handleUpdateAssignment = async (updatedData: Partial<AssignmentProps>) => {
     try {
       await axiosClient.put(`/api/assignments/${assignmentId}`, updatedData);
-      toast.success("Cập nhật bài thành công!");
+      toast.success("Assignment updated");
       setShowEditModal(false);
       fetchAssignmentDetail();
     } catch (error) {
       console.log(error);
-      toast.error("Lỗi khi cập nhật bài tập");
+      toast.error("Unable to update assignment");
     }
   };
 
@@ -162,8 +162,8 @@ const AssignmentDetail = () => {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-slate-500">
         <svg className="w-16 h-16 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-        <p className="text-lg font-medium">Không tìm thấy bài tập!</p>
-        <p className="text-sm">Bài tập này có thể đã bị xóa hoặc đường dẫn không hợp lệ.</p>
+        <p className="text-lg font-medium">Assignment not found</p>
+        <p className="text-sm">This assignment may have been deleted or the link is invalid.</p>
       </div>
     );
   }
@@ -173,37 +173,37 @@ const AssignmentDetail = () => {
       {/* Nút Back */}
       <button 
         onClick={() => navigate(-1)}
-        className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition mb-6 font-medium"
+        className="flex items-center gap-2 text-slate-500 hover:text-[#1B7A5A] transition mb-6 font-medium"
       >
-        <ArrowLeft size={20} /> Quay lại lớp học
+        <ArrowLeft size={20} /> Back to class
       </button>
 
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="flex-1">
-          {/* Header Bài tập */}
+          {/* Header Assignments */}
           <div className="flex justify-between items-start mb-6 border-b border-slate-300 pb-6 relative">
             
             {/* --- Phần bên trái: Icon và Thông tin bài tập --- */}
             <div className="flex gap-4 items-start flex-1">
-              <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0 mt-1">
+              <div className="w-12 h-12 rounded-full bg-[#C2DDD4] text-[#1B7A5A] flex items-center justify-center flex-shrink-0 mt-1">
                 <FileText size={24} />
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-slate-800 mb-2">{assignment.title}</h1>
                 <div className="flex items-center gap-4 text-sm text-slate-500 font-medium">
-                  <span>Đăng ngày: {format(parseISO(assignment.createdAt), 'dd/MM/yyyy')}</span>
+                  <span>Posted: {format(parseISO(assignment.createdAt), 'MMM d, yyyy')}</span>
 
                   {/* 2. HIỂN THỊ HẠN NỘP */}
                   {/* Code của bạn hơi bị lặp điều kiện, chỉ cần viết ngắn gọn thế này thôi: */}
                   {assignment.deadline ? (
                     <span className="flex items-center gap-1 text-red-500">
                       <Clock size={16} /> 
-                      Hạn nộp: {format(parseISO(assignment.deadline), 'dd/MM/yyyy HH:mm')}
+                      Due: {format(parseISO(assignment.deadline), 'dd/MM/yyyy HH:mm')}
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-gray-500 italic">
                       <Clock size={16} /> 
-                      Không có hạn nộp
+                      No due date
                     </span>
                   )}
                 </div>
@@ -231,7 +231,7 @@ const AssignmentDetail = () => {
                           setShowActionMenu(false);
                           setShowEditModal(true);
                         }}
-                        className="w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-3 transition-colors text-left font-medium"
+                        className="w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-[#E8F5EF] hover:text-[#1B7A5A] flex items-center gap-3 transition-colors text-left font-medium"
                       >
                         <Edit size={16} />
                         Edit
@@ -273,11 +273,11 @@ const AssignmentDetail = () => {
                   dangerouslySetInnerHTML={{ __html: assignment.content || '' }} 
                 />
 
-                {/* 2. Phần Tài liệu đính kèm */}
+                {/* 2. Phần Attachments */}
                 {hasAttachments && (
                   <div className={`${!isStudent ? 'w-full lg:w-80 flex-shrink-0' : 'w-full mt-4'} space-y-4`}>
                     <h3 className="font-semibold text-slate-800 border-b border-slate-300 pb-2 uppercase text-sm tracking-wider">
-                      Tài liệu đính kèm
+                      Attachments
                     </h3>
                     
                     {/* Dàn layout file: Dọc cho giáo viên, Lưới (Grid) 2 cột cho học sinh */}
@@ -285,7 +285,7 @@ const AssignmentDetail = () => {
                       
                       {/* Render File Drive */}
                       {assignment.fileUrls?.map((url: string, idx: number) => {
-                        let fileName = `Tài liệu đính kèm ${idx + 1}`;
+                        let fileName = `Attachments ${idx + 1}`;
                         let cleanUrl = url;
                         let fileTypeLabel = 'Google Drive';
 
@@ -307,7 +307,7 @@ const AssignmentDetail = () => {
 
                         return (
                           <a key={`file-${idx}`} href={cleanUrl} target="_blank" rel="noreferrer" 
-                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 hover:shadow-sm transition group">
+                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-[#A9CFC1] hover:shadow-sm transition group">
                             <div className="w-11 h-11 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                               <img 
                                 src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" 
@@ -316,7 +316,7 @@ const AssignmentDetail = () => {
                               />
                             </div>
                             <div className="flex flex-col overflow-hidden">
-                              <span className="font-semibold text-sm text-slate-700 truncate group-hover:text-indigo-600 underline underline-offset-4 transition-all">
+                              <span className="font-semibold text-sm text-slate-700 truncate group-hover:text-[#1B7A5A] underline underline-offset-4 transition-all">
                                 {fileName}
                               </span>
                               <span className="text-[12px] font-medium text-slate-500 mt-0.5 uppercase tracking-wide">
@@ -331,7 +331,7 @@ const AssignmentDetail = () => {
                       {assignment.links?.map((link: string, idx: number) => {
                         return (
                           <a key={`link-${idx}`} href={link} target="_blank" rel="noreferrer" 
-                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 hover:shadow-sm transition group">
+                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-[#A9CFC1] hover:shadow-sm transition group">
                             <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                               {getLinkIcon(link)}
                             </div>
@@ -359,22 +359,22 @@ const AssignmentDetail = () => {
             <div className="mb-8">
               <button
                 onClick={() => setShowTestsModal(true)}
-                className="w-full flex items-center justify-between p-4 md:p-5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100/70 transition text-left"
+                className="w-full flex items-center justify-between p-4 md:p-5 rounded-xl border border-[#C2DDD4] bg-[#E8F5EF] hover:bg-[#C2DDD4]/70 transition text-left"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-[#1B7A5A] text-white flex items-center justify-center">
                     <ClipboardList size={18} />
                   </div>
                   <div>
-                    <p className="font-bold text-indigo-900">
-                      Bài kiểm tra đính kèm ({assignment.selectedTests.length})
+                    <p className="font-bold text-[#1A1A1A]">
+                      Attached tests ({assignment.selectedTests.length})
                     </p>
-                    <p className="text-sm text-indigo-700/90">
-                      Nhấn để xem toàn bộ danh sách bài kiểm tra
+                    <p className="text-sm text-[#1B7A5A]/90">
+                      View the full list of assigned tests
                     </p>
                   </div>
                 </div>
-                <ChevronRight size={18} className="text-indigo-500" />
+                <ChevronRight size={18} className="text-[#1B7A5A]" />
               </button>
             </div>
           )}
@@ -383,11 +383,11 @@ const AssignmentDetail = () => {
         {/* ============ CỘT PHẢI: KHU VỰC NỘP BÀI (Chỉ dành cho Học sinh) ============ */}
         {userRole === 'STUDENT' && assignment.deadline && (
           <div className="w-full lg:w-80 flex-shrink-0">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm sticky top-6">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-800">Bài tập của bạn</h2>
+                <h2 className="text-xl font-bold text-slate-800">Your assignment</h2>
                 <span className="text-sm font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-                  Đã giao
+                  Assigned
                 </span>
               </div>
 
@@ -395,15 +395,15 @@ const AssignmentDetail = () => {
               <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
                 <button 
                   onClick={() => setSubmissionType('TEXT')}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'TEXT' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'TEXT' ? 'bg-white shadow text-[#1B7A5A]' : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                  Nhập văn bản
+                  Write response
                 </button>
                 <button 
                   onClick={() => setSubmissionType('FILE')}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'FILE' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'FILE' ? 'bg-white shadow text-[#1B7A5A]' : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                  Gửi Link/File
+                  Share link or file
                 </button>
               </div>
 
@@ -411,8 +411,8 @@ const AssignmentDetail = () => {
               {submissionType === 'TEXT' ? (
                 <textarea 
                   rows={5}
-                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm mb-4"
-                  placeholder="Nhập câu trả lời của bạn vào đây..."
+                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition text-sm mb-4"
+                  placeholder="Write your response here…"
                   value={submissionContent}
                   onChange={(e) => setSubmissionContent(e.target.value)}
                 />
@@ -423,8 +423,8 @@ const AssignmentDetail = () => {
                   </div>
                   <input 
                     type="text"
-                    className="w-full pl-10 p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm"
-                    placeholder="Dán đường dẫn (Google Drive, Docs...)"
+                    className="w-full pl-10 p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition text-sm"
+                    placeholder="Paste a Google Drive or Docs link…"
                     value={submissionContent}
                     onChange={(e) => setSubmissionContent(e.target.value)}
                   />
@@ -436,10 +436,10 @@ const AssignmentDetail = () => {
               <button 
                 onClick={handleSubmitAssignment}
                 disabled={isSubmitting}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-70"
+                className="w-full bg-[#1B7A5A] hover:bg-[#145F47] text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-70"
               >
-                {isSubmitting ? 'Đang nộp...' : (
-                  <> <Send size={18} /> Nộp bài </>
+                {isSubmitting ? 'Submitting…' : (
+                  <> <Send size={18} /> Submit test </>
                 )}
               </button>
             </div>
@@ -448,23 +448,23 @@ const AssignmentDetail = () => {
       </div>
       {showDeleteModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl scale-in-95 duration-200">
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Xóa bài tập?</h3>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl scale-in-95 duration-200">
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Delete assignment?</h3>
             <p className="text-slate-500 mb-6 text-sm">
-              Bạn có chắc chắn muốn xóa bài tập <span className="font-semibold text-slate-700">"{assignment.title}"</span> không? Toàn bộ bài nộp của học sinh sẽ bị xóa vĩnh viễn và không thể khôi phục.
+              Are you sure you want to delete assignment <span className="font-semibold text-slate-700">"{assignment.title}"</span>? All student submissions will be permanently deleted.
             </p>
             <div className="flex justify-end gap-3">
               <button 
                 onClick={() => setShowDeleteModal(false)}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
               >
-                Hủy bỏ
+                Cancel
               </button>
               <button 
                 onClick={handleDelete}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm"
               >
-                Xóa vĩnh viễn
+                Delete permanently
               </button>
             </div>
           </div>
@@ -479,16 +479,16 @@ const AssignmentDetail = () => {
       )}
       {showTestsModal && assignment.selectedTests && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden shadow-2xl">
+          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[80vh] overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <h3 className="text-lg font-bold text-slate-800">
-                Danh sách bài kiểm tra đính kèm
+                Attached tests
               </h3>
               <button
                 onClick={() => setShowTestsModal(false)}
                 className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition"
               >
-                Đóng
+                Close
               </button>
             </div>
 
@@ -496,7 +496,7 @@ const AssignmentDetail = () => {
               {assignment.selectedTests.map((test) => (
                 <div
                   key={test.id}
-                  className="border border-slate-200 rounded-xl p-4 bg-white hover:border-indigo-200 transition"
+                  className="border border-slate-200 rounded-xl p-4 bg-white hover:border-[#C2DDD4] transition"
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <h4 className="font-semibold text-slate-800">{test.title}</h4>
@@ -505,16 +505,16 @@ const AssignmentDetail = () => {
                     </span>
                   </div>
                   <div className="text-sm text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
-                    <span>Môn: {test.subject}</span>
-                    <span>Thời lượng: {test.duration} phút</span>
-                    <span>Số câu: {test.questionCount}</span>
+                    <span>Subject: {test.subject}</span>
+                    <span>Duration: {test.duration} min</span>
+                    <span>Questions: {test.questionCount}</span>
                   </div>
                   <div className="mt-3">
                     <button
                       onClick={() => navigate(`/test/${test.id}?assignmentId=${assignment.id}`)}
-                      className="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition"
+                      className="px-3 py-2 text-sm font-semibold text-white bg-[#1B7A5A] hover:bg-[#145F47] rounded-lg transition"
                     >
-                      Làm bài kiểm tra này
+                      Start this test
                     </button>
                   </div>
                 </div>

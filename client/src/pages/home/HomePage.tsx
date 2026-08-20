@@ -15,7 +15,7 @@ function HomePage() {
     }
   }, []);
 
-  // Xử lý khi bấm "Bắt đầu làm bài"
+  // Xử lý khi bấm "Start test"
   const handleStartTest = () => {
     if (isLoggedIn) {
       navigate('/dashboard');
@@ -29,7 +29,7 @@ function HomePage() {
   const handleLogout = () => {
     localStorage.removeItem('isLoggedIn');
     setIsLoggedIn(false);
-    toast("Đã đăng xuất!");
+    toast("Signed out");
   };
 
   return (
@@ -70,11 +70,11 @@ function HomePage() {
       {/* --- NỘI DUNG CHÍNH (GIỮ NGUYÊN) --- */}
       <div className="max-w-3xl w-full text-center space-y-8 mt-10">
         <div className="inline-block px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold tracking-wide mb-4">
-          Luyện thi Digital SAT 2026
+          Digital SAT Preparation 2026
         </div>
 
         <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight leading-tight">
-          Chinh phục điểm số <br />
+          Reach your target score <br />
           <span className="text-blue-600">Digital SAT</span>
         </h1>
 
@@ -105,7 +105,7 @@ function HomePage() {
           </div>
           <div className="flex flex-col items-center border-l-0 md:border-l border-slate-200">
             <span className="font-bold text-slate-900 text-lg">Real-time</span>
-            <span>Chấm điểm tức thì</span>
+            <span>Instant scoring</span>
           </div>
         </div>
       </div>

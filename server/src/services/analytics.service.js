@@ -1,71 +1,34 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const { buildAnalyticsPayload } = require('../utils/analytics-transform');
 
 exports.getData = async ({ userId, days }) => {
-  const daysLimit = parseInt(days) || 7;
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - daysLimit);
-  // Set về đầu ngày (00:00:00) để lấy trọn vẹn dữ liệu ngày đó
-  startDate.setHours(0, 0, 0, 0);
-
   const rawData = await prisma.submission.findMany({
     where: {
       userId: userId,
-      startedAt: { gte: startDate },
     },
     orderBy: { startedAt: 'asc' },
-    include: {
-      test: { select: { id: true, title: true } },
-      answers: { select: { isCorrect: true } }
+    select: {
+      id: true,
+      status: true,
+      startedAt: true,
+      endTime: true,
+      test: { select: { id: true, title: true, subject: true } },
+      answers: {
+        select: {
+          isCorrect: true,
+          question: {
+            select: {
+              domain: { select: { code: true, name: true, subject: true, sortOrder: true } },
+              skill: { select: { code: true, name: true, sortOrder: true } },
+            }
+          }
+        }
+      }
     }
   });
 
-  const processedData = rawData.map(r => {
-    const totalQuestion = r.answers.length;
-    const correctCount = r.answers.filter(a => a.isCorrect).length;
-
-    return {
-      id: r.id,
-      testId: r.test?.id,
-      date: r.startedAt,
-      testName: r.test?.title || "Practice Test",
-      status: r.status,
-      totalQuestions: totalQuestion,
-      correctCount: correctCount,
-      accuracy: totalQuestion > 0 ? Math.round((correctCount / totalQuestion) * 100) : 0,
-    };
-  });
-
-  const chartData = processedData
-    .filter(item => item.status === 'COMPLETED')
-    .map(item => ({
-      date: item.date,
-      accuracy: item.accuracy,
-      correctCount: item.correctCount,
-      totalQuestions: item.totalQuestions,
-      testName: item.testName
-    }));
-
-  const latestSubmissionMap = new Map()
-
-  processedData.forEach(item => {
-    const key = item.testId || item.testName;
-    latestSubmissionMap.set(key, item);
-  });
-
-  const historyData = Array.from(latestSubmissionMap.values())
-    .reverse()
-    .map(item => ({
-      id: item.id,
-      createdAt: item.date, // Frontend đang map theo key 'createdAt'
-      status: item.status,
-      test: { title: item.testName },
-      correctCount: item.correctCount,
-      totalQuestions: item.totalQuestions,
-      accuracy: item.accuracy
-    }))
-
-  return { chartData, historyData };
+  return buildAnalyticsPayload(rawData, { days });
 };
 
 exports.getSubmissionDetail = async ({ id, userId }) => {
@@ -121,7 +84,9 @@ exports.getSubmissionDetail = async ({ id, userId }) => {
   return {
     examTitle: submission.test.title,
     subject: submission.test.subject,
-    date: submission.endTime.toLocaleString(),
+    date: submission.endTime?.toISOString() || submission.startedAt.toISOString(),
+    startedAt: submission.startedAt.toISOString(),
+    completedAt: submission.endTime?.toISOString() || null,
     duration: durationString,
     questions: formattedQuestions
   };

@@ -80,6 +80,16 @@ const main = async () => {
     assert.equal(first.score, Number(process.env.DEPLOY_EXPECTED_SCORE), 'unexpected deployed score');
   }
 
+  if (process.env.DEPLOY_EXPECTED_DOMAIN_CODE) {
+    const analytics = await request('/api/results-analytics?days=84');
+    const domain = analytics.sectionPerformance?.find(item => item.code === process.env.DEPLOY_EXPECTED_DOMAIN_CODE);
+    assert.ok(domain, `missing analytics domain ${process.env.DEPLOY_EXPECTED_DOMAIN_CODE}`);
+    assert.ok(domain.attempted > 0, 'analytics domain has no attempted questions');
+    if (process.env.DEPLOY_EXPECTED_DOMAIN_ACCURACY) {
+      assert.equal(domain.accuracy, Number(process.env.DEPLOY_EXPECTED_DOMAIN_ACCURACY), 'unexpected domain accuracy');
+    }
+  }
+
   console.log(`Deploy smoke test passed: submission ${submissionId}, score ${first.score}/${first.totalQuestions}`);
 };
 

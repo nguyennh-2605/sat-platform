@@ -62,7 +62,7 @@ const WeeklyProgress = () => {
       }
     } catch (error) {
       console.error('Error fetching weeks:', error);
-      toast.error('Lỗi khi tải danh sách tuần học');
+      toast.error('Unable to load learning weeks');
     } finally {
       setLoading(false);
     }
@@ -107,7 +107,7 @@ const WeeklyProgress = () => {
 
   const handleSaveWeek = async () => {
     if (!newWeekTitle.trim()) {
-      toast.error('Vui lòng nhập tiêu đề tuần!');
+      toast.error('Enter a week title');
       return;
     }
 
@@ -122,7 +122,7 @@ const WeeklyProgress = () => {
           setWeeks(weeks.map(week =>
             week.id === editingWeek.id ? { ...week, title: newWeekTitle } : week
           ));
-          toast.success('Đã cập nhật tuần học!');
+          toast.success('Week updated');
         }
       } else {
         // Add new week
@@ -137,30 +137,30 @@ const WeeklyProgress = () => {
             isExpanded: true
           };
           setWeeks([...weeks, newWeek]);
-          toast.success('Đã thêm tuần học mới!');
+          toast.success('Week added');
         }
       }
       setShowWeekModal(false);
       setNewWeekTitle('');
     } catch (error) {
       console.error('Error saving week:', error);
-      toast.error('Lỗi khi lưu tuần học');
+      toast.error('Unable to save week');
     }
   };
 
   const handleDeleteWeek = async (weekId: string) => {
-    if (window.confirm('Bạn có chắc muốn xóa tuần học này? Tất cả buổi học trong tuần cũng sẽ bị xóa.')) {
+    if (window.confirm('Delete this week and all of its lessons?')) {
       try {
         const response = await axiosClient.delete(
           `/api/progress/weeks/${weekId}`
         );
         if (response.success) {
           setWeeks(weeks.filter(week => week.id !== weekId));
-          toast.success('Đã xóa tuần học!');
+          toast.success('Week deleted');
         }
       } catch (error) {
         console.error('Error deleting week:', error);
-        toast.error('Lỗi khi xóa tuần học');
+        toast.error('Unable to delete week');
       }
     }
     setWeekMenuOpen(null);
@@ -174,7 +174,7 @@ const WeeklyProgress = () => {
 
   const handleSaveLesson = async () => {
     if (!newLessonTitle.trim()) {
-      toast.error('Vui lòng nhập tiêu đề buổi học!');
+      toast.error('Enter a lesson title');
       return;
     }
 
@@ -199,11 +199,11 @@ const WeeklyProgress = () => {
             : week
         ));
 
-        toast.success('Đã thêm buổi học mới!');
+        toast.success('Lesson added');
       }
     } catch (error) {
       console.error('Error creating lesson:', error);
-      toast.error('Lỗi khi thêm buổi học');
+      toast.error('Unable to add lesson');
     }
 
     setShowLessonModal(false);
@@ -212,7 +212,7 @@ const WeeklyProgress = () => {
   };
 
   const handleDeleteLesson = async (weekId: string, lessonId: string) => {
-    if (window.confirm('Bạn có chắc muốn xóa buổi học này?')) {
+    if (window.confirm('Delete this lesson?')) {
       try {
         const response = await axiosClient.delete(
           `/api/progress/lessons/${lessonId}`
@@ -224,11 +224,11 @@ const WeeklyProgress = () => {
               ? { ...week, lessons: week.lessons.filter(lesson => lesson.id !== lessonId) }
               : week
           ));
-          toast.success('Đã xóa buổi học!');
+          toast.success('Lesson deleted');
         }
       } catch (error) {
         console.error('Error deleting lesson:', error);
-        toast.error('Lỗi khi xóa buổi học');
+        toast.error('Unable to delete lesson');
       }
     }
     setLessonMenuOpen(null);
@@ -280,11 +280,11 @@ const WeeklyProgress = () => {
             : week
         ));
 
-        toast.success('Đã giao bài tập thành công!');
+        toast.success('Assignment published');
       }
     } catch (error) {
       console.error('Error creating assignment:', error);
-      toast.error('Lỗi khi giao bài tập');
+      toast.error('Unable to publish assignment');
     }
 
     setShowAssignmentManager(false);
@@ -351,7 +351,7 @@ const WeeklyProgress = () => {
                       }
                     : week
                 ));
-                toast.success(`Đã thêm ${pickedFiles.length} tài liệu!`);
+                toast.success(`Added ${pickedFiles.length} resources`);
               }
             } catch (error) {
               console.error('Error adding files:', error);
@@ -382,7 +382,7 @@ const WeeklyProgress = () => {
               }
             : week
         ));
-        toast.success('Đã xóa tài liệu!');
+        toast.success('Resource removed');
       }
     } catch (error) {
       console.error('Error deleting file:', error);
@@ -394,29 +394,29 @@ const WeeklyProgress = () => {
     <div className="space-y-6 animate-fade-in-up">
       {/* Header with Add Week Button */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">Tiến độ học tập</h2>
+        <h2 className="text-2xl font-bold text-slate-800">Learning Progress</h2>
         <button
           onClick={openAddWeekModal}
-          className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-md flex items-center gap-2"
+          className="px-6 py-3 bg-[#1B7A5A] text-white rounded-xl font-bold hover:bg-[#145F47] transition shadow-md flex items-center gap-2"
         >
-          <Plus size={20} /> Thêm tuần học
+          <Plus size={20} /> Add week
         </button>
       </div>
 
       {/* Loading State */}
       {loading ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
           <div className="text-center text-gray-500">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <p className="font-medium">Đang tải...</p>
+            <p className="font-medium">Loading…</p>
           </div>
         </div>
       ) : weeks.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
           <div className="text-center text-gray-500">
             <Calendar size={48} className="mx-auto mb-4 text-gray-300" />
-            <p className="font-medium text-lg">Chưa có tuần học nào</p>
-            <p className="text-sm mt-2">Nhấn nút "Thêm tuần học" để bắt đầu tạo lộ trình</p>
+            <p className="font-medium text-lg">No weeks yet</p>
+            <p className="text-sm mt-2">Select “Add week” to create a learning plan</p>
           </div>
         </div>
       ) : (
@@ -424,7 +424,7 @@ const WeeklyProgress = () => {
           {weeks.map((week) => (
             <div key={week.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               {/* Week Header */}
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-200">
+              <div className="bg-[#E8F5EF] border-b border-[#E2EDE9]">
                 <div className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3 flex-1">
                     <button
@@ -432,23 +432,23 @@ const WeeklyProgress = () => {
                       className="p-1 hover:bg-white/50 rounded transition"
                     >
                       {week.isExpanded ? (
-                        <ChevronDown size={20} className="text-indigo-600" />
+                        <ChevronDown size={20} className="text-[#1B7A5A]" />
                       ) : (
-                        <ChevronRight size={20} className="text-indigo-600" />
+                        <ChevronRight size={20} className="text-[#1B7A5A]" />
                       )}
                     </button>
-                    <h3 className="text-lg font-bold text-indigo-900">{week.title}</h3>
-                    <span className="text-sm text-indigo-600 bg-white px-3 py-1 rounded-full font-medium">
-                      {week.lessons.length} buổi học
+                    <h3 className="text-lg font-bold text-[#1A1A1A]">{week.title}</h3>
+                    <span className="text-sm text-[#1B7A5A] bg-white px-3 py-1 rounded-full font-medium">
+                      {week.lessons.length} lessons
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => openAddLessonModal(week.id)}
-                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition flex items-center gap-1"
+                      className="px-4 py-2 bg-[#1B7A5A] text-white text-sm font-bold rounded-lg hover:bg-[#145F47] transition flex items-center gap-1"
                     >
-                      <Plus size={16} /> Thêm buổi học
+                      <Plus size={16} /> Add lesson
                     </button>
                     <div className="relative">
                       <button
@@ -464,14 +464,14 @@ const WeeklyProgress = () => {
                             className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
                           >
                             <Edit2 size={16} className="text-blue-600" />
-                            <span>Sửa tên tuần</span>
+                            <span>Rename week</span>
                           </button>
                           <button
                             onClick={() => handleDeleteWeek(week.id)}
                             className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
                           >
                             <Trash2 size={16} />
-                            <span>Xóa tuần</span>
+                            <span>Delete week</span>
                           </button>
                         </div>
                       )}
@@ -485,12 +485,12 @@ const WeeklyProgress = () => {
                 <div className="p-4">
                   {week.lessons.length === 0 ? (
                     <div className="text-center py-8 text-gray-400">
-                      <p className="text-sm">Chưa có buổi học nào trong tuần này</p>
+                      <p className="text-sm">No lessons in this week</p>
                       <button
                         onClick={() => openAddLessonModal(week.id)}
-                        className="mt-3 text-indigo-600 text-sm font-medium hover:text-indigo-700"
+                        className="mt-3 text-[#1B7A5A] text-sm font-medium hover:text-[#1B7A5A]"
                       >
-                        + Thêm buổi học đầu tiên
+                        + Add the first lesson
                       </button>
                     </div>
                   ) : (
@@ -517,7 +517,7 @@ const WeeklyProgress = () => {
                                     className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
                                   >
                                     <Trash2 size={16} />
-                                    <span>Xóa buổi học</span>
+                                    <span>Delete lesson</span>
                                   </button>
                                 </div>
                               )}
@@ -530,7 +530,7 @@ const WeeklyProgress = () => {
                             <div>
                               <h5 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
                                 <FileText size={16} />
-                                Tài liệu
+                                Resources
                               </h5>
                               {lesson.files.length === 0 ? (
                                 <button
@@ -538,7 +538,7 @@ const WeeklyProgress = () => {
                                   className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition text-center group"
                                 >
                                   <Upload className="mx-auto text-gray-400 group-hover:text-blue-600 transition mb-1" size={20} />
-                                  <p className="text-sm font-medium text-gray-500 group-hover:text-blue-700">Tải lên tài liệu</p>
+                                  <p className="text-sm font-medium text-gray-500 group-hover:text-blue-700">Upload resources</p>
                                 </button>
                               ) : (
                                 <div className="space-y-2">
@@ -570,7 +570,7 @@ const WeeklyProgress = () => {
                                   >
                                     <p className="text-sm font-medium text-gray-500 group-hover:text-blue-700 flex items-center justify-center gap-1">
                                       <Plus size={16} />
-                                      Thêm tài liệu
+                                      Add resources
                                     </p>
                                   </button>
                                 </div>
@@ -581,20 +581,20 @@ const WeeklyProgress = () => {
                             <div>
                               <h5 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
                                 <LinkIcon size={16} />
-                                Bài tập
+                                Assignments
                               </h5>
                               {lesson.assignments.length === 0 ? (
                                 <button
                                   onClick={() => openAssignmentManager(week.id, lesson.id)}
-                                  className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition text-center group"
+                                  className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#6BBFA0] hover:bg-[#E8F5EF] transition text-center group"
                                 >
-                                  <Plus className="mx-auto text-gray-400 group-hover:text-indigo-600 transition mb-1" size={20} />
-                                  <p className="text-sm font-medium text-gray-500 group-hover:text-indigo-700">Giao bài tập</p>
+                                  <Plus className="mx-auto text-gray-400 group-hover:text-[#1B7A5A] transition mb-1" size={20} />
+                                  <p className="text-sm font-medium text-gray-500 group-hover:text-[#1B7A5A]">Assign tests</p>
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => handleAssignmentClick(lesson.assignments[0].id)}
-                                  className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 transition text-left shadow-sm"
+                                  className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:bg-[#E8F5EF] hover:border-[#A9CFC1] transition text-left shadow-sm"
                                 >
                                   <div className="flex items-center gap-3 flex-1">
                                     <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -605,7 +605,7 @@ const WeeklyProgress = () => {
                                       {lesson.assignments[0].dueDate && (
                                         <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                                           <Clock size={12} />
-                                          Hạn: {format(new Date(lesson.assignments[0].dueDate), 'dd/MM/yyyy HH:mm')}
+                                          Due: {format(new Date(lesson.assignments[0].dueDate), 'dd/MM/yyyy HH:mm')}
                                         </p>
                                       )}
                                     </div>
@@ -629,16 +629,16 @@ const WeeklyProgress = () => {
       {/* Add/Edit Week Modal */}
       {showWeekModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+          <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl">
             <h3 className="text-xl font-bold text-gray-800 mb-4">
-              {editingWeek ? 'Sửa tên tuần học' : 'Thêm tuần học mới'}
+              {editingWeek ? 'Rename week' : 'Add new week'}
             </h3>
             <input
               type="text"
               value={newWeekTitle}
               onChange={(e) => setNewWeekTitle(e.target.value)}
-              placeholder="VD: Tuần 1: Giới thiệu khóa học"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none mb-4"
+              placeholder="e.g. Week 1: SAT foundations"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none mb-4"
               autoFocus
             />
             <div className="flex gap-3 justify-end">
@@ -646,13 +646,13 @@ const WeeklyProgress = () => {
                 onClick={() => setShowWeekModal(false)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
               >
-                Hủy
+                Cancel
               </button>
               <button
                 onClick={handleSaveWeek}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition"
+                className="px-6 py-2 bg-[#1B7A5A] text-white rounded-lg font-bold hover:bg-[#145F47] transition"
               >
-                {editingWeek ? 'Cập nhật' : 'Thêm'}
+                {editingWeek ? 'Update' : 'Add'}
               </button>
             </div>
           </div>
@@ -662,14 +662,14 @@ const WeeklyProgress = () => {
       {/* Add Lesson Modal */}
       {showLessonModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Thêm buổi học mới</h3>
+          <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Add new lesson</h3>
             <input
               type="text"
               value={newLessonTitle}
               onChange={(e) => setNewLessonTitle(e.target.value)}
-              placeholder="VD: Buổi 1: Làm quen với SAT"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none mb-4"
+              placeholder="e.g. Lesson 1: SAT introduction"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none mb-4"
               autoFocus
             />
             <div className="flex gap-3 justify-end">
@@ -677,13 +677,13 @@ const WeeklyProgress = () => {
                 onClick={() => setShowLessonModal(false)}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
               >
-                Hủy
+                Cancel
               </button>
               <button
                 onClick={handleSaveLesson}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition"
+                className="px-6 py-2 bg-[#1B7A5A] text-white rounded-lg font-bold hover:bg-[#145F47] transition"
               >
-                Thêm
+                Add
               </button>
             </div>
           </div>

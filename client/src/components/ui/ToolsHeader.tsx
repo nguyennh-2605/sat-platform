@@ -17,7 +17,7 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
       await onSaveAction();
     } catch (error) {
       console.error("Lỗi khi lưu:", error);
-      alert("Lỗi khi lưu bài. Vui lòng thử lại!");
+      alert("Unable to save the test. Try again.");
     } finally {
       setIsSaving(false);
     }

@@ -1,380 +1,280 @@
-import { useEffect, useState, useMemo } from 'react';
-import axiosClient from '../../lib/axios';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine 
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
-import { format, subDays, isSameDay, parseISO } from 'date-fns';
-import { 
-  BarChart3, Calendar, CheckCircle2, Clock, ChevronRight, ChevronLeft, History 
-} from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { format } from 'date-fns';
+import { ArrowRight, BookmarkCheck, Calendar, CheckCircle2, PenTool } from 'lucide-react';
+import toast from 'react-hot-toast';
+import axiosClient from '../../lib/axios';
+import { AppHeader, Badge, Button, Card, TableShell } from '../../components/ui/AppUI';
+import { ui } from '../../components/ui/styles';
+
+interface AnalyticsSummary {
+  overallAccuracy: number;
+  correctAnswers: number;
+  questionsAttempted: number;
+  completedTests: number;
+}
+
+interface ScoreHistoryPoint {
+  date: string;
+  testName: string;
+  rw: number | null;
+  math: number | null;
+}
+
+interface HeatmapPoint {
+  date: string;
+  count: number;
+}
+
+interface SectionPerformanceItem {
+  code: string;
+  name: string;
+  subject: 'RW' | 'MATH';
+  sortOrder: number;
+  correct: number;
+  accuracy: number | null;
+  attempted: number;
+  skills: Array<{ code: string; name: string; correct: number; attempted: number; accuracy: number | null }>;
+}
+
+interface ClassificationCoverage {
+  classified: number;
+  total: number;
+  percentage: number | null;
+  uncategorizedAttempted: number;
+}
+
+interface HistoryItem {
+  id: number;
+  createdAt: string;
+  status: 'DOING' | 'COMPLETED';
+  subject: 'RW' | 'MATH';
+  test: { title: string };
+  correctCount: number;
+  totalQuestions: number;
+  accuracy: number;
+}
+
+interface AnalyticsResponse {
+  summary?: AnalyticsSummary;
+  scoreHistory?: ScoreHistoryPoint[];
+  heatmapData?: HeatmapPoint[];
+  sectionPerformance?: SectionPerformanceItem[];
+  classificationCoverage?: ClassificationCoverage;
+  historyData?: HistoryItem[];
+}
+
+const emptySummary: AnalyticsSummary = {
+  overallAccuracy: 0,
+  correctAnswers: 0,
+  questionsAttempted: 0,
+  completedTests: 0,
+};
+
+const heatmapColors = ['#EAF2EE', '#C2DDD4', '#6BBFA0', '#3AAD82', '#1B7A5A'];
+
+const getHeatmapLevel = (count: number) => {
+  if (count <= 0) return 0;
+  if (count === 1) return 1;
+  if (count === 2) return 2;
+  if (count === 3) return 3;
+  return 4;
+};
 
 const ResultAnalytics = () => {
   const navigate = useNavigate();
-  
-  // -- STATE --
-  const [rawData, setRawData] = useState<any[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  const userName = localStorage.getItem('userName') || 'Student';
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState(7); // Mặc định 7 ngày
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [summary, setSummary] = useState<AnalyticsSummary>(emptySummary);
+  const [scoreHistory, setScoreHistory] = useState<ScoreHistoryPoint[]>([]);
+  const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
+  const [sectionPerformance, setSectionPerformance] = useState<SectionPerformanceItem[]>([]);
+  const [classificationCoverage, setClassificationCoverage] = useState<ClassificationCoverage | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAnalytics = async () => {
       setLoading(true);
       try {
-        const response = await axiosClient.get(`/api/results-analytics?days=${timeRange}`);
-        
-        setRawData(response.chartData || []);
-        setHistory(response.historyData || []);
+        const response = await axiosClient.get<AnalyticsResponse, AnalyticsResponse>('/api/results-analytics?days=84');
+        setSummary(response.summary || emptySummary);
+        setScoreHistory(Array.isArray(response.scoreHistory) ? response.scoreHistory : []);
+        setHeatmapData(Array.isArray(response.heatmapData) ? response.heatmapData : []);
+        setSectionPerformance(Array.isArray(response.sectionPerformance) ? response.sectionPerformance : []);
+        setClassificationCoverage(response.classificationCoverage || null);
+        setHistory(Array.isArray(response.historyData) ? response.historyData : []);
       } catch (error) {
-        console.error("Failed to load analytics:", error);
-        toast.error("Không thể tải dữ liệu thống kê");
+        console.error('Failed to load analytics:', error);
+        toast.error('Unable to load analytics');
       } finally {
-        // Giả lập delay nhỏ để skeleton hiện mượt hơn (optional)
-        setTimeout(() => setLoading(false), 300);
+        setLoading(false);
       }
     };
-    fetchData();
-  }, [timeRange]);
 
-// -- LOGIC XỬ LÝ CHART DATA --
-  const chartData = useMemo(() => {
-    // Luôn tạo mảng chứa đủ số ngày (7 hoặc 30) để vẽ trục X
-    return Array.from({ length: timeRange }).map((_, i) => {
-      const date = subDays(new Date(), timeRange - 1 - i);
-      
-      // Tìm dữ liệu của ngày hôm đó trong rawData
-      // Giả sử API trả về: { date: '2026-01-24', accuracy: 80, correctCount: 40, totalQuestions: 50 }
-      const testsOnThisDay = rawData.filter((item: any) => isSameDay(parseISO(item.date), date));
+    fetchAnalytics();
+  }, []);
 
-      if (isSameDay(date, new Date())) {
-         console.log(`Hôm nay (${format(date, 'dd/MM')}) tìm thấy:`, testsOnThisDay.length, "bài test");
-         console.log("Chi tiết:", testsOnThisDay);
-      }
-
-      if (testsOnThisDay.length > 0) {
-        // Cộng dồn số câu đúng và tổng số câu của TẤT CẢ các bài trong ngày
-        const totalCorrect = testsOnThisDay.reduce((sum, t: any) => sum + (t.correctCount || 0), 0);
-        const totalQs = testsOnThisDay.reduce((sum, t: any) => sum + (t.totalQuestions || 0), 0);
-        // Tính lại Accuracy trung bình dựa trên tổng số câu
-        const avgAccuracy = totalQs > 0 ? Math.round((totalCorrect / totalQs) * 100) : 0;
-        return {
-          displayDate: format(date, 'dd/MM'),
-          fullDate: format(date, 'dd/MM/yyyy'),
-          accuracy: avgAccuracy,
-          correctCount: totalCorrect,   // Tổng câu đúng
-          totalQuestions: totalQs,      // Tổng số câu hỏi
-          hasData: true
-        };
-      }
-
-      return {
-        displayDate: format(date, 'dd/MM'), // Label trục X (24/01)
-        fullDate: format(date, 'dd/MM/yyyy'),
-        accuracy: null,
-        correctCount: 0,
-        totalQuestions: 0,
-        hasData: false
-      };
-    });
-  }, [rawData, timeRange]);
-
-  // -- PAGINATION --
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentHistoryItems = history.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(history.length / itemsPerPage);
-
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) setCurrentPage(newPage);
-  };
-
-  // -- CUSTOM TOOLTIP --
-  const CustomTooltip = ({ active, payload }: any) => {
-    // Chỉ hiện tooltip nếu active và giá trị accuracy không phải null
-    if (active && payload && payload.length && payload[0].value !== null) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white p-3 border border-indigo-100 shadow-xl rounded-xl text-sm min-w-[150px]">
-          <p className="font-semibold text-gray-700 mb-2 pb-2 border-b border-gray-100 flex items-center gap-2">
-            <Calendar size={14} className="text-gray-400"/> {data.fullDate}
-          </p>
-          
-          <div className="space-y-1.5">
-             <div className="flex items-center justify-between gap-4">
-                <span className="text-gray-500 text-xs">Accuracy:</span>
-                <span className="font-bold text-indigo-600">{data.accuracy}%</span>
-             </div>
-             
-             <div className="flex items-center justify-between gap-4">
-                <span className="text-gray-500 text-xs">Correct:</span>
-                <span className="font-medium text-emerald-600">{data.correctCount} ans</span>
-             </div>
-
-             <div className="flex items-center justify-between gap-4">
-                <span className="text-gray-500 text-xs">Total:</span>
-                <span className="font-medium text-gray-800">{data.totalQuestions} qs</span>
-             </div>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
+  const rwSections = useMemo(
+    () => sectionPerformance.filter(section => section.subject === 'RW').sort((first, second) => first.sortOrder - second.sortOrder),
+    [sectionPerformance],
+  );
+  const mathSections = useMemo(
+    () => sectionPerformance.filter(section => section.subject === 'MATH').sort((first, second) => first.sortOrder - second.sortOrder),
+    [sectionPerformance],
+  );
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden">
-      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-center z-30 shadow-sm">
-        <h1 className="text-lg font-bold text-slate-800 tracking-tight">
-          Analytics And Results
-        </h1>
-      </header>
+    <div className={ui.page}>
+      <AppHeader title="Analytics" subtitle={`${userName} · SAT Learning Platform`} />
 
-      <main className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-                Analytics Overview
-              </h1>
-              <p className="text-gray-500 mt-2 text-base">
-                Theo dõi sự tiến bộ và lịch sử làm bài thi của bạn.
-              </p>
-            </div>
-            
-            {/* Time Filter */}
-            <div className="bg-white p-1 rounded-lg border border-gray-200 shadow-sm flex">
-              {[7, 30].map((days) => (
-                <button
-                  key={days}
-                  onClick={() => setTimeRange(days)}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                    timeRange === days 
-                      ? 'bg-indigo-50 text-indigo-700 shadow-sm' 
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  Last {days} Days
-                </button>
-              ))}
-            </div>
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className={ui.content}>
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <MetricCard label="Overall Accuracy" value={`${summary.overallAccuracy}%`} icon={<CheckCircle2 size={22} />} iconClassName="bg-[#E8F5EF] text-[#1B7A5A]" valueClassName="text-[#1B7A5A]" loading={loading} />
+            <MetricCard label="Correct Answers" value={summary.correctAnswers.toLocaleString('en-US')} suffix="answers" icon={<BookmarkCheck size={22} />} iconClassName="bg-[#FEF9E7] text-[#E8C040]" valueClassName="text-[#92640A]" loading={loading} />
+            <MetricCard label="Questions Attempted" value={summary.questionsAttempted.toLocaleString('en-US')} suffix={`${summary.completedTests} completed tests`} icon={<PenTool size={22} />} iconClassName="bg-slate-100 text-slate-600" valueClassName="text-slate-800" loading={loading} />
           </div>
 
-          {/* --- PHẦN 1: LINE CHART (ACCURACY TREND) --- */}
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                <BarChart3 className="text-indigo-600" size={20}/> 
-                Accuracy Trend
-              </h2>
+          <Card className="mb-6 p-5">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-slate-800">Score Progress</h2>
+                <p className="text-xs text-[#6B7280]">Accuracy percentage across your latest 7 completed tests</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs font-medium text-slate-600">
+                <Legend color="#1B7A5A" label="RW" />
+                <Legend color="#E8C040" label="Math" />
+              </div>
             </div>
 
-            <div className="h-[350px] w-full">
+            <div className="h-[220px] w-full">
               {loading ? (
-                <div className="w-full h-full animate-pulse bg-gray-50 rounded-lg flex items-center justify-center">
-                    <BarChart3 className="text-gray-200" size={48}/>
-                </div>
+                <div className="h-full w-full animate-pulse rounded-lg bg-[#F2F8F5]" />
+              ) : scoreHistory.length === 0 ? (
+                <EmptyState label="Complete a test to see your score progress." />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  {/* connectNulls={true} sẽ nối các điểm lại với nhau ngay cả khi có ngày ở giữa không làm bài */}
-                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                    
-                    {/* Trục X: Luôn hiện ngày tháng */}
-                    <XAxis 
-                      dataKey="displayDate" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{fill: '#9CA3AF', fontSize: 12}} 
-                      dy={10} 
-                      padding={{ left: 10, right: 10 }}
-                    />
-
-                    {/* Trục Y: Luôn hiện thang 0-100 */}
-                    <YAxis 
-                      domain={[0, 100]} 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{fill: '#9CA3AF', fontSize: 12}} 
-                    />
-
-                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#6366f1', strokeWidth: 1, strokeDasharray: '5 5' }} />
-                    
-                    {/* Đường trung bình tham khảo 50% */}
-                    <ReferenceLine y={50} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'insideTopRight', value: 'Avg 50%', fill: '#EF4444', fontSize: 10 }} />
-
-                    <Line 
-                      connectNulls={true} // Quan trọng: Nối các điểm có dữ liệu lại với nhau
-                      type="monotone" 
-                      dataKey="accuracy" 
-                      stroke="#4F46E5" 
-                      strokeWidth={3}
-                      // Chỉ hiện chấm tròn (dot) tại những ngày CÓ dữ liệu
-                      dot={(props) => {
-                          const { cx, cy, payload } = props;
-                          if (!payload.hasData) return <></>; // Ẩn dot nếu ngày đó không làm bài
-                          return (
-                              <circle cx={cx} cy={cy} r={4} fill="#4F46E5" stroke="#fff" strokeWidth={2} />
-                          );
-                      }}
-                      activeDot={{ r: 6, strokeWidth: 0 }}
-                    />
+                  <LineChart data={scoreHistory} margin={{ top: 4, right: 12, bottom: 0, left: -10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2EDE9" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={{ stroke: '#CBD5E1' }} tickLine={false} />
+                    <YAxis domain={[0, 100]} tickFormatter={value => `${value}%`} tick={{ fontSize: 11, fill: '#64748B' }} axisLine={{ stroke: '#CBD5E1' }} tickLine={false} />
+                    <Tooltip content={<ScoreTooltip />} />
+                    <Line connectNulls type="monotone" dataKey="rw" name="RW" stroke="#1B7A5A" strokeWidth={2.5} dot={{ r: 4, fill: '#1B7A5A', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                    <Line connectNulls type="monotone" dataKey="math" name="Math" stroke="#E8C040" strokeWidth={2.5} dot={{ r: 4, fill: '#E8C040', strokeWidth: 0 }} activeDot={{ r: 6 }} />
                   </LineChart>
                 </ResponsiveContainer>
               )}
             </div>
-          </div>
+          </Card>
 
-          {/* --- PHẦN 2: HISTORY TABLE --- */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                        <History size={20}/>
-                    </div>
-                    <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
-                </div>
-                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                    Total: {history.length}
-                </span>
+          <Card className="mb-6 p-5">
+            <div className="mb-4 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div>
+                <h2 className="flex items-center gap-2 font-semibold text-slate-800"><Calendar size={18} className="text-[#1B7A5A]" /> Activity Heatmap</h2>
+                <p className="mt-0.5 text-xs text-[#6B7280]">Your study activity over the last 12 weeks</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                <span>Less</span>
+                <div className="flex gap-1">{heatmapColors.map(color => <span key={color} className="h-3 w-3 rounded-[2px]" style={{ backgroundColor: color }} />)}</div>
+                <span>More</span>
+              </div>
             </div>
 
             {loading ? (
-                // Skeleton cho Table
-                <div className="p-6 space-y-4">
-                    {[1,2,3].map(i => <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse"></div>)}
-                </div>
+              <div className="h-16 animate-pulse rounded-lg bg-[#F2F8F5]" />
             ) : (
-            <>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse table-fixed min-w-[800px]">
-                    <thead className="bg-gray-50/50 text-gray-500 text-xs uppercase font-semibold tracking-wider border-b border-gray-100">
-                      <tr>
-                        {/* Test Name: Căn trái + Padding để thoáng */}
-                        <th className="px-6 py-4 w-[30%]">Test Name</th>
-                        {/* Các cột còn lại: Căn giữa hoàn toàn */}
-                        <th className="px-4 py-4 w-[30%] text-center">Status</th>
-                        <th className="px-4 py-4 w-[25%] text-center">Date</th>
-                        <th className="px-4 py-4 w-[20%] text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {currentHistoryItems.length > 0 ? (
-                        currentHistoryItems.map((item: any) => (
-                          <tr key={item.id} className="hover:bg-gray-50/80 transition-colors group">
-                            
-                            {/* 1. Test Name */}
-                            <td className="px-6 py-4 text-left">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-gray-900 line-clamp-1" title={item.test?.title}>
-                                  {item.test?.title || "Unknown Test"}
-                                </span>
-                              </div>
-                            </td>
-
-                            {/* 2. Status (Căn giữa) */}
-                            <td className="px-4 py-4 text-center">
-                              {item.status === 'COMPLETED' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                  <CheckCircle2 size={12} /> Completed
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                                  <Clock size={12} /> Incomplete
-                                </span>
-                              )}
-                            </td>
-
-                            {/* 4. Date + Time (Căn giữa + Format AM/PM) */}
-                            <td className="px-4 py-4 text-center">
-                              <span className="text-sm text-gray-600 font-medium">
-                                {format(new Date(item.createdAt), 'MMM dd, yyyy')} •{' '}
-                                <span className="text-gray-400 font-normal">
-                                  {format(new Date(item.createdAt), 'HH:mm a')}
-                                </span>
-                              </span>
-                            </td>
-
-                            {/* 5. Action (Căn giữa - Không dính phải nữa) */}
-                            <td className="px-4 py-4 text-center">
-                                <div className="flex justify-center gap-2"> {/* Flex center để nút nằm giữa ô */}
-                                    <button 
-                                      disabled={item.status != 'COMPLETED'}
-                                      onClick={() => navigate('/score-report', { state: { resultId: item.id } })}
-                                      className= {item.status === 'COMPLETED' ? "text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap"
-                                                                              : "text-gray-400 bg-gray-100 px-3 py-1.5 rounded text-xs font-medium"
-                                      }
-                                    >
-                                      View Details
-                                    </button>
-                                </div>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">
-                            Chưa có dữ liệu.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* PAGINATION */}
-                {history.length > itemsPerPage && (
-                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
-                    <span className="text-sm text-gray-500">
-                    Page <span className="font-semibold text-gray-900">{currentPage}</span> of <span className="font-semibold text-gray-900">{totalPages}</span>
-                    </span>
-                    
-                    <div className="flex gap-2">
-                    <button 
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1}
-                        className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                    >
-                        <ChevronLeft size={16} />
-                    </button>
-                    
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
-                        // Logic ẩn bớt trang nếu quá nhiều trang (Optional simple logic)
-                        (Math.abs(currentPage - number) <= 1 || number === 1 || number === totalPages) && (
-                            <button
-                            key={number}
-                            onClick={() => handlePageChange(number)}
-                            className={`w-9 h-9 rounded-lg text-sm font-medium transition-all shadow-sm ${
-                                currentPage === number 
-                                ? "bg-indigo-600 text-white shadow-indigo-200 ring-2 ring-indigo-100" 
-                                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                            }`}
-                            >
-                            {number}
-                            </button>
-                        )
-                    ))}
-
-                    <button 
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage === totalPages}
-                        className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                    >
-                        <ChevronRight size={16} />
-                    </button>
-                    </div>
-                </div>
-                )}
-            </>
+              <div className="flex flex-wrap gap-1.5">
+                {heatmapData.map(point => (
+                  <div key={point.date} className="h-4 w-4 cursor-default rounded-[3px] transition-transform hover:scale-110" style={{ backgroundColor: heatmapColors[getHeatmapLevel(point.count)] }} title={`${point.date}: ${point.count} ${point.count === 1 ? 'activity' : 'activities'}`} />
+                ))}
+              </div>
             )}
-          </div>
+          </Card>
+
+          <Card className="mb-6 p-6">
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-slate-800">Section Performance Breakdown</h2><p className="mt-1 text-xs text-[#6B7280]">Accuracy by official SAT content domain during the selected period.</p></div>{!loading && classificationCoverage && classificationCoverage.uncategorizedAttempted > 0 && <Badge tone="warning">{classificationCoverage.uncategorizedAttempted} uncategorized question{classificationCoverage.uncategorizedAttempted === 1 ? '' : 's'}</Badge>}</div>
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+              <SectionGroup title="Reading & Writing" tone="green" items={rwSections} color="#1B7A5A" />
+              <SectionGroup title="Math" tone="gold" items={mathSections} color="#E8C040" />
+            </div>
+          </Card>
+
+          <TableShell className="mb-8">
+            <div className="border-b border-[#E2EDE9] p-5">
+              <h2 className="font-semibold text-slate-800">Recent Activity</h2>
+              <p className="text-xs text-[#6B7280]">Detailed history of your latest attempts</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px] text-left text-sm">
+                <thead className="border-b border-[#E2EDE9] bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                  <tr><th className="px-5 py-3">Test Name</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Date</th><th className="px-5 py-3 text-right">Action</th></tr>
+                </thead>
+                <tbody className="divide-y divide-[#E2EDE9]">
+                  {loading ? (
+                    [1, 2, 3].map(row => <tr key={row}><td colSpan={4} className="px-5 py-4"><div className="h-8 animate-pulse rounded bg-[#F2F8F5]" /></td></tr>)
+                  ) : history.length === 0 ? (
+                    <tr><td colSpan={4} className="px-5 py-12 text-center text-sm text-[#6B7280]">No recent activity yet.</td></tr>
+                  ) : history.map(item => (
+                    <tr key={item.id} className="transition-colors hover:bg-slate-50/50">
+                      <td className="px-5 py-4 font-medium text-slate-800">{item.test.title}</td>
+                      <td className="px-5 py-4"><Badge tone={item.status === 'COMPLETED' ? 'success' : 'warning'}>{item.status === 'COMPLETED' ? 'Completed' : 'Incomplete'}</Badge></td>
+                      <td className="px-5 py-4 text-xs font-medium text-slate-600">{format(new Date(item.createdAt), 'MMM d, yyyy')}</td>
+                      <td className="px-5 py-4 text-right"><Button variant="outline" size="sm" disabled={item.status !== 'COMPLETED'} onClick={() => navigate('/dashboard/score-report', { state: { resultId: item.id } })}>View Details <ArrowRight size={12} /></Button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </TableShell>
         </div>
       </main>
     </div>
   );
 };
+
+function MetricCard({ label, value, suffix, icon, iconClassName, valueClassName, loading }: { label: string; value: string; suffix?: string; icon: ReactNode; iconClassName: string; valueClassName: string; loading: boolean }) {
+  return (
+    <Card className="flex items-center gap-4 p-5">
+      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconClassName}`}>{icon}</div>
+      <div className="min-w-0">
+        <p className="mb-0.5 text-xs font-medium text-[#6B7280]">{label}</p>
+        {loading ? <div className="mt-1 h-8 w-24 animate-pulse rounded bg-[#EAF2EE]" /> : <div className="flex items-baseline gap-1.5"><span className={`font-mono text-3xl font-extrabold ${valueClassName}`}>{value}</span>{suffix && <span className="truncate text-xs text-[#6B7280]">{suffix}</span>}</div>}
+      </div>
+    </Card>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-3 rounded-full" style={{ background: color }} />{label}</span>;
+}
+
+function EmptyState({ label }: { label: string }) {
+  return <div className="flex h-full items-center justify-center text-sm text-[#6B7280]">{label}</div>;
+}
+
+function ScoreTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: ScoreHistoryPoint; color: string }> }) {
+  if (!active || !payload?.length) return null;
+  const available = payload.filter(item => item.value !== null && item.value !== undefined);
+  if (available.length === 0) return null;
+  return <div className="min-w-[150px] rounded-lg border border-[#C2DDD4] bg-white p-3 text-xs shadow-xl"><p className="mb-2 border-b border-[#E2EDE9] pb-2 font-semibold text-slate-700">{available[0].payload.testName}</p>{available.map(item => <p key={item.name} className="flex justify-between gap-5"><span>{item.name}</span><strong style={{ color: item.color }}>{item.value}%</strong></p>)}</div>;
+}
+
+function SectionGroup({ title, tone, items, color }: { title: string; tone: 'green' | 'gold'; items: SectionPerformanceItem[]; color: string }) {
+  return <div><Badge tone={tone} className="mb-4 rounded-md px-3 py-1.5">{title}</Badge>{items.length === 0 ? <p className="text-sm text-[#6B7280]">No performance data yet.</p> : <div className="flex flex-col gap-4">{items.map(item => <SectionBar key={item.name} name={item.name} percentage={item.accuracy} color={color} />)}</div>}</div>;
+}
+
+function SectionBar({ name, percentage, color }: { name: string; percentage: number | null; color: string }) {
+  const hasData = percentage !== null;
+  return <div className="flex items-center gap-4"><p className="w-40 shrink-0 truncate text-sm font-semibold text-slate-700" title={name}>{name}</p><div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full transition-all duration-500" style={{ width: hasData ? `${percentage}%` : '0%', background: color }} /></div><span className="w-14 shrink-0 text-right font-mono text-xs font-semibold" style={{ color: hasData ? color : '#6B7280' }}>{hasData ? `${percentage}%` : 'No data'}</span></div>;
+}
 
 export default ResultAnalytics;

@@ -5,7 +5,7 @@ import FormattedTextRenderer from '../../components/content/TextRenderer';
 interface AnswerProps {
   label: string;         // Ví dụ: "A", "B", "C"
   content: string;       // Nội dung đáp án
-  isSelected: boolean;   // Đã chọn đáp án này chưa?
+  isSelected: boolean;   // Selected đáp án này chưa?
   isEliminated: boolean; // Đáp án này có bị gạch không?
   isStrikeMode: boolean; // Chế độ gạch đang BẬT hay TẮT
   onSelect: () => void;  // Hàm khi bấm chọn đáp án

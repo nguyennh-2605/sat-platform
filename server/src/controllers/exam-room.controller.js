@@ -7,6 +7,7 @@ exports.startOrResumeTest = async (req, res) => {
     const data = await examRoomService.startOrResumeTest({
       testId: parseInt(req.params.id),
       userId: req.user.userId,
+      userRole: req.user.role,
       assignmentId: req.query.assignmentId ? String(req.query.assignmentId) : null,
       classId: req.query.classId ? String(req.query.classId) : null,
     });

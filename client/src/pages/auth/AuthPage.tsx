@@ -44,21 +44,21 @@ function AuthPage() {
         
         if (data.user) {
           localStorage.setItem('userId', data.user.id);
-          localStorage.setItem('userName', data.user.name || 'Học viên');
+          localStorage.setItem('userName', data.user.name || 'Student');
           localStorage.setItem('userAvatar', data.user.avatar || '');
           
           // Ưu tiên lấy từ server trả về (data.user.role), nếu không có thì lấy từ state
           localStorage.setItem('userRole', data.user.role || role);
         }
         
-        toast.success(data.message || (isLoginMode ? "Đăng nhập thành công!" : "Đăng ký thành công!"));
+        toast.success(data.message || (isLoginMode ? "Signed in" : "Account created"));
         navigate('/dashboard');
       } else {
-        toast.error(`Lỗi: ${data.message}`);
+        toast.error(data.message || 'Authentication failed');
       }
     } catch (error) {
-      console.error("Lỗi kết nối:", error);
-      toast.error("Không thể kết nối đến Server.");
+      console.error("Connection error:", error);
+      toast.error("Unable to connect to the server");
     }
   };
 
@@ -78,20 +78,20 @@ function AuthPage() {
         localStorage.setItem('userAvatar', data.user.avatar || '');
         localStorage.setItem('userRole', data.user.role || 'STUDENT');
 
-        toast.success('Đăng nhập Google thành công!');
+        toast.success('Signed in with Google');
         navigate('/dashboard');
       } else {
-        toast.error(`Lỗi Google Login: ${data.message}`);
+        toast.error(data.message || 'Google sign-in failed');
       }
     } catch (error) {
-      console.log("Lỗi kết nối Google Login:", error);
-      toast.error("Lỗi khi kết nối tới server.");
+      console.log("Google sign-in connection error:", error);
+      toast.error("Unable to connect to the server");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 font-sans">
-      <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-[#F2F8F5] px-4 font-sans">
+      <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-xl border border-[#E2EDE9]">
         
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
@@ -105,7 +105,7 @@ function AuthPage() {
                 setEmail(''); setPassword(''); setName('');
                 setRole('STUDENT');
               }}
-              className="text-blue-600 font-semibold hover:underline"
+              className="text-[#1B7A5A] font-semibold hover:underline"
             >
               {isLoginMode ? 'Register here' : 'Login here'}
             </button>
@@ -125,7 +125,7 @@ function AuthPage() {
                     <input
                     type="text"
                     required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="block w-full pl-10 pr-3 py-3 border border-[#E2EDE9] rounded-lg bg-[#F8FBF9] text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 focus:border-[#1B7A5A] transition-all"
                     placeholder="Enter your name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -137,7 +137,7 @@ function AuthPage() {
                 <div className="space-y-1">
                     <label className="text-sm font-medium text-gray-700 block">I am a</label>
                     <div className="flex gap-4 mt-2">
-                        <label className={`flex-1 flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all ${role === 'STUDENT' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50'}`}>
+                        <label className={`flex-1 flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all ${role === 'STUDENT' ? 'border-[#1B7A5A] bg-[#E8F5EF] text-[#1B7A5A]' : 'border-gray-200 hover:bg-gray-50'}`}>
                             <input
                                 type="radio"
                                 name="role"
@@ -150,7 +150,7 @@ function AuthPage() {
                             <span className="font-medium text-sm">Student</span>
                         </label>
 
-                        <label className={`flex-1 flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all ${role === 'TEACHER' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:bg-gray-50'}`}>
+                        <label className={`flex-1 flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all ${role === 'TEACHER' ? 'border-[#1B7A5A] bg-[#E8F5EF] text-[#1B7A5A]' : 'border-gray-200 hover:bg-gray-50'}`}>
                             <input
                                 type="radio"
                                 name="role"
@@ -176,7 +176,7 @@ function AuthPage() {
               <input
                 type="email"
                 required
-                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="block w-full pl-10 pr-3 py-3 border border-[#E2EDE9] rounded-lg bg-[#F8FBF9] text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 focus:border-[#1B7A5A] transition-all"
                 placeholder="Enter email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -193,7 +193,7 @@ function AuthPage() {
               <input
                 type={showPassword ? "text" : "password"}
                 required
-                className="block w-full pl-10 pr-10 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="block w-full pl-10 pr-10 py-3 border border-[#E2EDE9] rounded-lg bg-[#F8FBF9] text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 focus:border-[#1B7A5A] transition-all"
                 placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -219,14 +219,14 @@ function AuthPage() {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-[#1B7A5A] focus:ring-[#1B7A5A] border-gray-300 rounded"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-gray-500">
                   Remember me
                 </label>
               </div>
               <div className="text-sm">
-                <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+                <a href="#" className="font-medium text-[#1B7A5A] hover:text-[#145F47]">
                   Forgot Password?
                 </a>
               </div>
@@ -235,7 +235,7 @@ function AuthPage() {
 
           <button
             type="submit"
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-[#1B7A5A] hover:bg-[#145F47] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1B7A5A] transition-colors"
           >
             {isLoginMode ? 'Sign in' : 'Sign up'}
           </button>
@@ -254,7 +254,7 @@ function AuthPage() {
            <div className="w-full flex justify-center"> 
               <GoogleLogin
                   onSuccess={handleGoogleSuccess}
-                  onError={() => toast.error("Đăng nhập Google thất bại.")}
+                  onError={() => toast.error("Google sign-in failed")}
                   theme="outline"    
                   size="large"        
                   width="100%"        
