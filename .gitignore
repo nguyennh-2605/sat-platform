@@ -22,3 +22,7 @@ npm-debug.log*
 yarn-debug.log*
 
 .claude/
+
+# Local design references and Codex synchronization backups
+SAT Learning Management System UI.zip
+.codex-main-sync-files/
