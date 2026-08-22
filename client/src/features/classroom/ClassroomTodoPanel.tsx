@@ -40,20 +40,27 @@ const relativeTime = (value: string) => {
 
 const duration = (milliseconds?: number | null) => {
   if (!milliseconds) return null;
-  const minutes = Math.max(1, Math.round(milliseconds / 60_000));
-  return `${minutes}m`;
+  const totalSeconds = Math.max(1, Math.round(milliseconds / 1_000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
 };
 
-const itemMeta = (item: ClassroomTodoItem) => {
+const itemSummary = (item: ClassroomTodoItem) => {
   if (item.type === 'TEST_RESULT') {
-    const parts = [Number.isFinite(item.score) ? `${item.score}/${item.totalQuestions} correct` : null, duration(item.durationMs), capitalizeFirstLetter(item.className)];
+    const parts = [Number.isFinite(item.score) ? `${item.score}/${item.totalQuestions} correct` : null, duration(item.durationMs)];
     return parts.filter(Boolean).join(' · ');
   }
+  return item.description || capitalizeFirstLetter(item.className);
+};
+
+const itemTrailingMeta = (item: ClassroomTodoItem) => {
   if (item.dueAt) {
     const due = new Date(item.dueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return `${item.priority === 'OVERDUE' ? 'Overdue' : `Due ${due}`} · ${capitalizeFirstLetter(item.className)}`;
+    return item.priority === 'OVERDUE' ? `Overdue ${due}` : `Due ${due}`;
   }
-  return `${relativeTime(item.createdAt)} · ${capitalizeFirstLetter(item.className)}`;
+  return relativeTime(item.createdAt);
 };
 
 const iconFor = (type: ClassroomTodoItem['type']) => {
@@ -135,9 +142,10 @@ export function ClassroomTodoPanel() {
             const Icon = iconFor(item.type);
             return <button key={item.key} type="button" onClick={() => openItem(item)} className="group flex w-full gap-3 border-b border-[#D2DED9] px-1 py-4 text-left transition-colors hover:bg-[#E8F5EF] focus-visible:bg-[#E8F5EF]">
               <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.priority === 'OVERDUE' ? 'bg-red-50 text-red-700' : 'bg-[#E8F5EF] text-[#1B7A5A]'}`}><Icon size={16} aria-hidden="true" /></span>
-              <span className="min-w-0 flex-1">
+              <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-x-3">
                 <span className="line-clamp-2 text-sm font-semibold leading-5 text-[#1A1A1A] underline decoration-[#8FB9A9] underline-offset-4 group-hover:text-[#145F47]">{capitalizeFirstLetter(item.title)}</span>
-                <span className="mt-1 block line-clamp-2 text-xs leading-5 text-[#5E6B66]">{itemMeta(item)}</span>
+                <span className={`whitespace-nowrap pt-0.5 text-xs font-medium ${item.priority === 'OVERDUE' ? 'text-red-700' : 'text-[#66736E]'}`}>{itemTrailingMeta(item)}</span>
+                <span className="mt-1 block min-w-0 truncate text-xs leading-5 text-[#5E6B66]">{itemSummary(item)}</span>
               </span>
             </button>;
           })}

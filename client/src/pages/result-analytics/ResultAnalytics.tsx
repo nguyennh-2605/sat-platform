@@ -14,6 +14,7 @@ import { ArrowRight, BookmarkCheck, Calendar, CheckCircle2, PenTool } from 'luci
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { AppHeader, Badge, Button, Card, TableShell } from '../../components/ui/AppUI';
+import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { ui } from '../../components/ui/styles';
 import { capitalizeFirstLetter } from '../../utils/text';
 
@@ -135,7 +136,7 @@ const ResultAnalytics = () => {
 
   return (
     <div className={ui.page}>
-      <AppHeader title="Analytics" subtitle={`${userName} · SAT Learning Platform`} />
+      <AppHeader title="Analytics" subtitle={`${userName} · SAT Learning Platform`} rightContent={<SatCountdown />} />
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className={ui.content}>

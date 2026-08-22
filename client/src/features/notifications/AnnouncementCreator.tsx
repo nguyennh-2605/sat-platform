@@ -2,15 +2,14 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useDrivePicker from 'react-google-drive-picker';
-import Flatpickr from "react-flatpickr";
-import "flatpickr/dist/themes/light.css";
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { type AssignmentProps } from '../../types/quiz';
+import { DateTimePicker } from '../../components/ui/DateTimePicker';
 
 interface AnnouncementCreatorProps {
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: { title: string; content: string; deadline: string | null; fileUrls: string[]; links: string[] }) => void;
   initialData?: AssignmentProps;
 }
 
@@ -42,12 +41,12 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
         const recoveredFiles = initialData.fileUrls.map((urlStr: string) => {
           try {
             const urlObj = new URL(urlStr);
-            let filename = urlObj.searchParams.get('name');
+            const filename = urlObj.searchParams.get('name');
             return {
               name: filename ? decodeURIComponent(filename) : 'Attachment',
               url: urlStr
             };
-          } catch (e) {
+          } catch {
             return { name: 'Attachment', url: urlStr };
           }
         });
@@ -123,7 +122,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
         const urlObj = new URL(f.url);
         urlObj.searchParams.set('name', f.name);
         return urlObj.toString();
-      } catch (e) {
+      } catch {
         return `${f.url}${f.url.includes('?') ? '&' : '?'}name=${encodeURIComponent(f.name)}`;
       } finally {
         setIsSubmitting(false);
@@ -230,21 +229,11 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                   Due date
                 </h3>
                 <p className="text-sm text-gray-400 mb-4">Leave blank for an announcement without a due date.</p>
-                <Flatpickr
-                  data-enable-time
+                <DateTimePicker
                   value={form.deadline}
-                  onChange={([date]) => {
-                    if (date) {
-                      setForm({ ...form, deadline: date.toISOString() });
-                    }
-                  }}
-                  options={{
-                    enableTime: true,
-                    dateFormat: "d/m/Y H:i",
-                    time_24hr: true,
-                  }}
+                  onChange={deadline => setForm({ ...form, deadline })}
                   placeholder="Choose a due date…"
-                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition"
+                  ariaLabel="Post due date"
                 />
               </div>
 

@@ -8,6 +8,7 @@ import { capitalizeFirstLetter } from '../../utils/text';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { AppHeader, Button, Input } from '../../components/ui/AppUI';
+import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 
 interface ErrorEntry {
   id: string; // Prisma UUID
@@ -158,7 +159,7 @@ const ErrorLog = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-[#F2F8F5] overflow-hidden">
-      <AppHeader title="Error Log" subtitle="Review mistakes and turn them into study notes" />
+      <AppHeader title="Error Log" subtitle="Review mistakes and turn them into study notes" rightContent={<SatCountdown />} />
       
       <main className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
         <div className="max-w-7xl mx-auto space-y-4">

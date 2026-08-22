@@ -4,6 +4,8 @@ import { Bell, BookOpen, BookOpenCheck, Check, ChevronRight, Clock3, GraduationC
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
+import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
+import { DateTimePicker } from '../../components/ui/DateTimePicker';
 
 interface ClassInfo {
   id: string;
@@ -195,6 +197,7 @@ const PracticeTest = () => {
           <p className="mt-0.5 text-xs leading-tight text-[#6B7280]">Browse and attempt SAT practice tests</p>
         </div>
         <div className="flex items-center gap-5">
+          <SatCountdown />
           <button className="relative text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
             <Bell size={20} />
             <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
@@ -347,8 +350,8 @@ const PracticeTest = () => {
             <div className="flex items-start justify-between border-b border-[#E2EDE9] px-6 py-5"><div><h3 className="text-lg font-semibold">Assign tests to classes</h3><p className="mt-1 text-sm text-[#6B7280]">{selectedTestIds.length} test(s) selected</p></div><button className="app-icon-button" onClick={() => setAssignmentOpen(false)}><X size={18} /></button></div>
             <div className="max-h-[520px] space-y-5 overflow-y-auto p-6">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Available from<input type="datetime-local" value={availableAt} onChange={event => setAvailableAt(event.target.value)} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20" /></label>
-                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Deadline<input type="datetime-local" value={dueAt} min={availableAt || undefined} onChange={event => setDueAt(event.target.value)} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20" /></label>
+                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Available from<DateTimePicker value={availableAt} onChange={setAvailableAt} placeholder="Choose availability" ariaLabel="Available from" /></label>
+                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Deadline<DateTimePicker value={dueAt} minDate={availableAt || undefined} onChange={setDueAt} placeholder="Choose deadline" ariaLabel="Assignment deadline" /></label>
                 <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Attempts<input type="number" min={1} max={10} value={maxAttempts} onChange={event => setMaxAttempts(Math.min(10, Math.max(1, Number(event.target.value))))} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A]" /></label>
                 <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Score policy<select value={scorePolicy} onChange={event => setScorePolicy(event.target.value as typeof scorePolicy)} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A]"><option value="FIRST">First attempt</option><option value="BEST">Best attempt</option><option value="LATEST">Latest attempt</option></select></label>
               </div>

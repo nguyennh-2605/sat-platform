@@ -14,6 +14,7 @@ const assignmentRoutes = require('./assignment.routes');
 const testBankRoutes = require('./test-bank.routes');
 const progressRoutes = require('./progress.routes');
 const testDeliveryRoutes = require('./test-delivery.routes');
+const userPreferenceRoutes = require('./user-preference.routes');
 
 // Mount routes
 router.use('/classes', classRoutes);
@@ -28,5 +29,6 @@ router.use('/assignments', assignmentRoutes);
 router.use('/bank', testBankRoutes);
 router.use('/progress', progressRoutes);
 router.use('/test-deliveries', testDeliveryRoutes);
+router.use('/user-preferences', userPreferenceRoutes);
 
 module.exports = router;

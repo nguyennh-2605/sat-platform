@@ -16,6 +16,7 @@ model User {
   name                String?
   role                Role                 @default(STUDENT)
   avatar              String?
+  satTestDate         DateTime?
   taughtClasses       Class[]              @relation("TeacherClasses")
   errorLogs           ErrorLog[]
   homeworkSubmissions HomeworkSubmission[]

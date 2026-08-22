@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import BlockRenderer from '../../components/content/BlockRenderer';
 import { AppHeader, Badge, Button, Card, Input, Modal, Select } from '../../components/ui/AppUI';
+import { DateTimePicker } from '../../components/ui/DateTimePicker';
 import { ui } from '../../components/ui/styles';
 import type { ContentBlock } from '../../types/quiz';
 
@@ -379,7 +380,7 @@ const CreateTestWizard = () => {
                 <Field label="Duration (minutes)"><Input className="w-full" type="number" min={1} value={form.duration} onChange={event => setForm(current => ({ ...current, duration: Number(event.target.value) }))} /></Field>
                 <Field label="Modules"><Select className="w-full" value={form.moduleCount} onChange={event => setForm(current => ({ ...current, moduleCount: Number(event.target.value) }))}><option value={1}>1 module</option><option value={2}>2 modules</option></Select></Field>
                 <Field label="Test mode"><div className="grid grid-cols-2 gap-2"><ModeButton active={form.mode === 'PRACTICE'} icon={<FileText size={16} />} title="Practice" text="Flexible practice" onClick={() => setForm(current => ({ ...current, mode: 'PRACTICE' }))} /><ModeButton active={form.mode === 'EXAM'} icon={<ShieldCheck size={16} />} title="Secure exam" text="Timed exam rules" onClick={() => setForm(current => ({ ...current, mode: 'EXAM' }))} /></div></Field>
-                {userRole === 'ADMIN' && <Field label="Publication" className="md:col-span-2"><div className="flex flex-wrap items-center gap-3"><Select value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value, testDate: event.target.value === 'REAL' ? current.testDate : '' }))}><option value="PRACTICE">Practice</option><option value="REAL">Official</option></Select>{form.category === 'REAL' && <Input type="date" value={form.testDate} onChange={event => setForm(current => ({ ...current, testDate: event.target.value }))} />}</div></Field>}
+                {userRole === 'ADMIN' && <Field label="Publication" className="md:col-span-2"><div className="flex flex-wrap items-center gap-3"><Select value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value, testDate: event.target.value === 'REAL' ? current.testDate : '' }))}><option value="PRACTICE">Practice</option><option value="REAL">Official</option></Select>{form.category === 'REAL' && <DateTimePicker mode="date" value={form.testDate} onChange={testDate => setForm(current => ({ ...current, testDate }))} placeholder="Choose official test date" ariaLabel="Official test date" className="min-w-56" />}</div></Field>}
               </div>
               <div className="mt-8 flex justify-end"><Button onClick={handleSetupNext}>Continue <ArrowRight size={16} /></Button></div>
             </Card>

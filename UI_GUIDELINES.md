@@ -66,6 +66,7 @@ Các component hiện có:
 - `Badge`
 - `Input`
 - `Select`
+- `DateTimePicker`
 - `Modal`
 - `TableShell`
 
@@ -102,6 +103,8 @@ Không tạo lại button, modal hoặc card bằng một bộ class mới nếu
 - Icon-only button phải có `aria-label` hoặc `title`.
 - Không dùng button `rounded-full` cho action thông thường.
 - Input/select cao khoảng `36px`, `rounded-lg`, focus ring xanh nhẹ.
+- Mọi trường chọn ngày hoặc ngày–giờ phải dùng shared `DateTimePicker` từ `client/src/components/ui/DateTimePicker.tsx`; không dùng trực tiếp native `date`, `datetime-local` hoặc tạo theme calendar riêng theo từng feature.
+- Calendar dùng định dạng 24 giờ, lưu datetime dưới dạng UTC ISO và chỉ chuyển sang timezone local khi hiển thị. Date-only giữ định dạng `YYYY-MM-DD` để tránh lệch ngày do timezone.
 - Không tạo checkbox hoặc tick button quá lớn.
 
 ### Page-level Back button

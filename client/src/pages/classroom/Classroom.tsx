@@ -8,6 +8,7 @@ import { AppHeader, BackButton, Button, Card, Input, Modal, TableShell } from '.
 import { ui } from '../../components/ui/styles';
 import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import NotificationBell from '../../features/notifications/NotificationBell';
+import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
 import { capitalizeFirstLetter } from '../../utils/text';
@@ -164,6 +165,7 @@ function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack, curr
     </div>
     <nav className="flex h-full min-w-0 overflow-x-auto" aria-label="Classroom sections">{tabs.map(tab => <ClassTabButton key={tab.id} {...tab} active={activeTab === tab.id} onSelect={onSelectTab} />)}</nav>
     <div className="flex items-center justify-end gap-4">
+      {currentUser.role === 'STUDENT' && <SatCountdown />}
       <NotificationBell currentUserId={currentUser.id} />
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white" title={currentUser.name}>{profileInitials}</div>
     </div>

@@ -8,6 +8,7 @@ import { AppHeader, Button, Card, Input, Modal } from '../../components/ui/AppUI
 import { ui } from '../../components/ui/styles';
 import { capitalizeFirstLetter } from '../../utils/text';
 import { ClassroomTodoPanel } from '../../features/classroom/ClassroomTodoPanel';
+import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 
 const CLASS_COLORS = ['#1B7A5A', '#0F4D38', '#2563EB', '#A16207', '#B45309', '#8B3A62', '#475569'] as const;
 
@@ -72,7 +73,7 @@ export default function ClassroomList() {
       <AppHeader
         title="Classroom"
         subtitle={canCreate ? 'Manage your classes and learning spaces' : 'Classes you are enrolled in'}
-        rightContent={canCreate ? <Button size="sm" onClick={() => setEditor({ mode: 'create' })}><Plus size={15} />Create class</Button> : undefined}
+        rightContent={canCreate ? <Button size="sm" onClick={() => setEditor({ mode: 'create' })}><Plus size={15} />Create class</Button> : <SatCountdown />}
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto">

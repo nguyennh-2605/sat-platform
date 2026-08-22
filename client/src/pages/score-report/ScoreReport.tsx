@@ -18,6 +18,7 @@ import type { ContentBlock } from '../../types/quiz';
 import ReviewModal from '../../features/quiz/ReviewModal';
 import axiosClient from '../../lib/axios';
 import { AppHeader, BackButton, Badge, Button, Card, Select, TableShell } from '../../components/ui/AppUI';
+import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { capitalizeFirstLetter } from '../../utils/text';
 
 export interface QuestionResult {
@@ -164,7 +165,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F2F8F5] font-sans text-[#1A1A1A]">
-      <AppHeader title="Test Result Details" subtitle="Review your performance and identify areas for improvement." />
+      <AppHeader title="Test Result Details" subtitle="Review your performance and identify areas for improvement." rightContent={<SatCountdown />} />
       <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-8">
       <main className="mx-auto w-full max-w-[1200px] animate-in fade-in duration-300">
         <BackButton onClick={handleBack} className="mb-6" />
@@ -260,7 +261,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
 }
 
 function PageFrame({ children }: { children: React.ReactNode }) {
-  return <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F2F8F5] text-[#1A1A1A]"><AppHeader title="Test Result Details" subtitle="Review your performance and identify areas for improvement." />{children}</div>;
+  return <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F2F8F5] text-[#1A1A1A]"><AppHeader title="Test Result Details" subtitle="Review your performance and identify areas for improvement." rightContent={<SatCountdown />} />{children}</div>;
 }
 
 function TestMeta({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {

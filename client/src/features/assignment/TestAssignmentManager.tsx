@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Check, ChevronRight, Edit2, Folder, Plus, Search, X, File as FileIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Flatpickr from "react-flatpickr";
-import "flatpickr/dist/themes/light.css";
+import { DateTimePicker } from '../../components/ui/DateTimePicker';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { type TestItem } from '../../types/quiz';
@@ -11,7 +10,7 @@ import { capitalizeFirstLetter } from '../../utils/text';
 
 interface TestAssignmentManagerProps {
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: { title: string; content: string; deadline: string | null; testIds: number[] }) => void;
   initialData?: {
     title?: string;
     content?: string;
@@ -24,6 +23,21 @@ interface FolderItem {
   id: number;
   name: string;
   parentId: number | null;
+}
+
+interface BankTestItem {
+  id: number;
+  title: string;
+  subject: TestItem['subject'];
+  mode: TestItem['mode'];
+  duration: number;
+  questionCount: number;
+  folderId?: number | null;
+}
+
+interface BankResponse {
+  success: boolean;
+  data: { folders: FolderItem[]; tests: BankTestItem[] };
 }
 
 const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmentManagerProps) => {
@@ -67,19 +81,19 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
       setIsLoading(true);
       try {
         console.log("currentFolderId", currentFolderId);
-        const res = await axiosClient.get('/api/bank', {
+        const res = await axiosClient.get<BankResponse, BankResponse>('/api/bank', {
           params: {
             folderId: currentFolderId || null
           }
-        }) as any;
+        });
         if (res.success) {
           const { folders, tests } = res.data;
-          const formattedFolders: FolderItem[] = folders.map((f: any) => ({
+          const formattedFolders: FolderItem[] = folders.map(f => ({
             id: f.id,
             name: f.name,
             parentId: f.parentId
           }));
-          const formattedTests: TestItem[] = tests.map((t: any) => ({
+          const formattedTests: TestItem[] = tests.map(t => ({
             id: t.id,
             title: t.title,
             subject: t.subject,
@@ -287,21 +301,11 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                   Due date
                 </h3>
                 <p className="text-sm text-gray-400 mb-4">Choose when this assignment is due.</p>
-                <Flatpickr
-                  data-enable-time
+                <DateTimePicker
                   value={form.deadline}
-                  onChange={([date]) => {
-                    if (date) {
-                      setForm({ ...form, deadline: date.toISOString() });
-                    }
-                  }}
-                  options={{
-                    enableTime: true,
-                    dateFormat: "d/m/Y H:i",
-                    time_24hr: true,
-                  }}
+                  onChange={deadline => setForm({ ...form, deadline })}
                   placeholder="Choose a due date…"
-                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition"
+                  ariaLabel="Assignment due date"
                 />
               </div>
 
