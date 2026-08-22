@@ -1,11 +1,18 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   BarChart3,
   BookOpenCheck,
   GraduationCap,
   LogOut,
+  Palette,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import axiosClient from '../../lib/axios';
+import { BackgroundPicker } from '../../features/backgrounds/BackgroundPicker';
+import { backgroundById, normalizeBackgroundId, type BackgroundId } from '../../features/backgrounds/backgroundPresets';
+import { DashboardRouteViewport } from '../../features/navigation/DashboardRouteViewport';
 
 interface NavItemProps {
   to: string;
@@ -28,11 +35,49 @@ const NavItem = ({ to, label, icon: Icon, activePrefixes = [] }: NavItemProps) =
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const userId = localStorage.getItem('userId') || 'guest';
+  const storageKey = `dashboardBackground:${userId}`;
+  const [backgroundId, setBackgroundId] = useState<BackgroundId>(() => normalizeBackgroundId(localStorage.getItem(storageKey)));
+  const [backgroundOpen, setBackgroundOpen] = useState(false);
+  const [backgroundSaving, setBackgroundSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    axiosClient.get<{ backgroundId: BackgroundId }, { backgroundId: BackgroundId }>('/api/user-preferences/dashboard-background')
+      .then(response => {
+        if (!active) return;
+        const nextId = normalizeBackgroundId(response.backgroundId);
+        setBackgroundId(nextId);
+        localStorage.setItem(storageKey, nextId);
+      })
+      .catch(error => console.error('Unable to load dashboard background.', error));
+    return () => { active = false; };
+  }, [storageKey]);
+
+  const chooseBackground = async (nextId: BackgroundId) => {
+    const previousId = backgroundId;
+    setBackgroundId(nextId);
+    localStorage.setItem(storageKey, nextId);
+    setBackgroundSaving(true);
+    try {
+      await axiosClient.put('/api/user-preferences/dashboard-background', { backgroundId: nextId });
+    } catch (error) {
+      console.error(error);
+      setBackgroundId(previousId);
+      localStorage.setItem(storageKey, previousId);
+      toast.error('Unable to save background.');
+    } finally {
+      setBackgroundSaving(false);
+    }
+  };
 
   const logout = () => {
     localStorage.clear();
     navigate('/');
   };
+
+  const selectedBackground = backgroundById(backgroundId);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F2F8F5] font-sans text-[#1A1A1A]">
@@ -59,6 +104,10 @@ const Dashboard = () => {
         </nav>
 
         <div className="border-t border-[#174030] p-3">
+          <button onClick={() => setBackgroundOpen(true)} className="mb-1 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-[#D6EDE4] transition-colors hover:bg-[#174030] hover:text-white">
+            <Palette size={19} />
+            <span>Background</span>
+          </button>
           <button onClick={logout} className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-[#D6EDE4] transition-colors hover:bg-[#174030] hover:text-white">
             <LogOut size={19} />
             <span>Log out</span>
@@ -66,7 +115,13 @@ const Dashboard = () => {
         </div>
       </aside>
 
-      <main className="relative min-w-0 flex-1 overflow-hidden"><Outlet /></main>
+      <main
+        className="dashboard-surface relative min-w-0 flex-1 overflow-hidden bg-[#F2F8F5] bg-cover bg-center"
+        data-background-active={selectedBackground ? 'true' : 'false'}
+        style={selectedBackground ? { backgroundImage: `linear-gradient(rgba(232,245,239,.64), rgba(242,248,245,.78)), url(${selectedBackground.image})` } : undefined}
+      ><DashboardRouteViewport key={location.pathname} /></main>
+
+      <BackgroundPicker open={backgroundOpen} selectedId={backgroundId} saving={backgroundSaving} onSelect={id => void chooseBackground(id)} onClose={() => setBackgroundOpen(false)} />
 
     </div>
   );

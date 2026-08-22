@@ -130,3 +130,11 @@ textarea:focus-visible {
 .ql-container {
   height: 163px !important; /* chỉnh chiều cao tổng */
 }
+[data-background-active="true"].dashboard-surface > .dashboard-route-content > * {
+  background-color: transparent !important;
+}
+
+/* Keep route content from shifting horizontally when its vertical scrollbar appears. */
+.dashboard-surface main {
+  scrollbar-gutter: stable;
+}

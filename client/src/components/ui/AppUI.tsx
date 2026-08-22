@@ -37,23 +37,23 @@ export function AppHeader({
 
   return (
     <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center justify-between border-b border-[#C9D8D2] bg-white px-6">
-      <div className="flex w-[280px] min-w-0 flex-col justify-center">
+      <div className="flex w-[310px] min-w-0 flex-col justify-center">
         <h1 className="truncate text-base font-semibold leading-tight text-[#1A1A1A]">{title}</h1>
         {subtitle && <p className="mt-0.5 truncate text-xs leading-tight text-[#6B7280]">{subtitle}</p>}
       </div>
 
       <div className="flex h-full min-w-0 flex-1 items-center justify-center">{centerContent}</div>
 
-      <div className="flex w-[280px] items-center justify-end gap-5">
+      <div className="flex w-[310px] items-center justify-end gap-4">
         {rightContent}
         {showProfile && (
           <>
-            {showNotifications && <button className="relative text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
+            {showNotifications && <button className="relative shrink-0 text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
               <Bell size={20} />
               <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
             </button>}
             <div
-              className="flex h-8 w-8 select-none items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-white transition-all hover:ring-[#1B7A5A]/30"
+              className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 select-none items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-white transition-[box-shadow] hover:ring-[#1B7A5A]/30"
               title={userName}
             >
               {initials}

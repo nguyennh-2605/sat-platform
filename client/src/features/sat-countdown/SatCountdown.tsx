@@ -54,11 +54,39 @@ const formatDate = (date: Date) => date.toLocaleDateString('en-US', {
   year: 'numeric',
 });
 
+const SAT_DATE_CACHE_MS = 5 * 60_000;
+const satDateRequests = new Map<string, { promise: Promise<string | null>; expiresAt: number }>();
+
+const loadSatDate = (userId: string) => {
+  const cachedRequest = satDateRequests.get(userId);
+  if (cachedRequest && cachedRequest.expiresAt > Date.now()) return cachedRequest.promise;
+
+  const request = axiosClient
+    .get<{ satTestDate: string | null }, { satTestDate: string | null }>('/api/user-preferences/sat-test-date')
+    .then(response => response.satTestDate)
+    .catch(error => {
+      satDateRequests.delete(userId);
+      throw error;
+    });
+  satDateRequests.set(userId, { promise: request, expiresAt: Date.now() + SAT_DATE_CACHE_MS });
+  return request;
+};
+
+const cachedFutureDate = (storageKey: string, fallback: Date) => {
+  const value = localStorage.getItem(storageKey);
+  if (!value) return fallback;
+  const cached = new Date(value);
+  return Number.isNaN(cached.getTime()) || cached.getTime() <= Date.now() ? fallback : cached;
+};
+
 export function SatCountdown() {
   const role = localStorage.getItem('userRole') || 'STUDENT';
+  const userId = localStorage.getItem('userId') || 'guest';
+  const storageKey = `satTestDate:${userId}`;
   const defaultDate = useMemo(nearestOfficialDate, []);
-  const [selectedDate, setSelectedDate] = useState(defaultDate);
-  const [draftDate, setDraftDate] = useState(toDateInput(defaultDate));
+  const initialDate = useMemo(() => cachedFutureDate(storageKey, defaultDate), [defaultDate, storageKey]);
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [draftDate, setDraftDate] = useState(toDateInput(initialDate));
   const [customDate, setCustomDate] = useState('');
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -67,18 +95,25 @@ export function SatCountdown() {
   useEffect(() => {
     if (role !== 'STUDENT') return;
     let active = true;
-    axiosClient.get<{ satTestDate: string | null }, { satTestDate: string | null }>('/api/user-preferences/sat-test-date')
-      .then(response => {
-        if (!active || !response.satTestDate) return;
-        const storedDate = new Date(response.satTestDate);
+    loadSatDate(userId)
+      .then(satTestDate => {
+        if (!active) return;
+        if (!satTestDate) {
+          localStorage.removeItem(storageKey);
+          setSelectedDate(defaultDate);
+          setDraftDate(toDateInput(defaultDate));
+          return;
+        }
+        const storedDate = new Date(satTestDate);
         if (storedDate.getTime() > Date.now()) {
           setSelectedDate(storedDate);
           setDraftDate(toDateInput(storedDate));
+          localStorage.setItem(storageKey, storedDate.toISOString());
         }
       })
       .catch(error => console.error('Unable to load SAT test date.', error));
     return () => { active = false; };
-  }, [role]);
+  }, [defaultDate, role, storageKey, userId]);
 
   useEffect(() => {
     if (role !== 'STUDENT') return;
@@ -109,7 +144,13 @@ export function SatCountdown() {
       const response = await axiosClient.put<{ satTestDate: string }, { satTestDate: string }>('/api/user-preferences/sat-test-date', {
         satTestDate: target.toISOString(),
       });
-      setSelectedDate(new Date(response.satTestDate));
+      const savedDate = new Date(response.satTestDate);
+      setSelectedDate(savedDate);
+      localStorage.setItem(storageKey, savedDate.toISOString());
+      satDateRequests.set(userId, {
+        promise: Promise.resolve(savedDate.toISOString()),
+        expiresAt: Date.now() + SAT_DATE_CACHE_MS,
+      });
       setOpen(false);
       toast.success('SAT countdown updated.');
     } catch (error) {
@@ -124,19 +165,18 @@ export function SatCountdown() {
     <button
       type="button"
       onClick={openEditor}
-      className="group flex h-11 items-center gap-2.5 rounded-lg border border-[#C9D8D2] bg-[#F8FBF9] px-3 text-left transition-colors hover:border-[#8FB9A9] hover:bg-[#E8F5EF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B7A5A]/25"
+      className="group flex h-11 min-w-[218px] shrink-0 items-center gap-2.5 rounded-lg border border-[#B9CBC4] bg-[#F8FBF9] px-3 text-left transition-colors hover:border-[#1B7A5A] hover:bg-[#E8F5EF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B7A5A]/25"
       aria-label={`Next SAT in ${time.days} days, ${time.hours} hours, and ${time.minutes} minutes. Change test date.`}
     >
-      <CalendarDays size={17} className="shrink-0 text-[#1B7A5A]" aria-hidden="true" />
-      <span>
-        <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-[#5E6B66]">Next SAT</span>
-        <span className="mt-0.5 flex items-baseline gap-1 font-semibold tabular-nums text-[#1A1A1A]">
-          <span>{time.days}<small className="ml-0.5 text-[9px] font-medium text-[#6B7280]">d</small></span>
-          <span className="text-[#8AA299]">:</span>
-          <span>{String(time.hours).padStart(2, '0')}<small className="ml-0.5 text-[9px] font-medium text-[#6B7280]">h</small></span>
-          <span className="text-[#8AA299]">:</span>
-          <span>{String(time.minutes).padStart(2, '0')}<small className="ml-0.5 text-[9px] font-medium text-[#6B7280]">m</small></span>
-        </span>
+      <CalendarDays size={19} className="shrink-0 text-[#1B7A5A]" aria-hidden="true" />
+      <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.1em] text-[#4F5F59]">Next SAT</span>
+      <span aria-hidden="true" className="h-6 w-px shrink-0 bg-[#C9D8D2]" />
+      <span className="flex flex-1 items-baseline justify-end gap-1 text-lg font-bold leading-none tabular-nums text-[#145F47]">
+        <span>{time.days}<small className="ml-0.5 text-[10px] font-semibold text-[#5E6B66]">d</small></span>
+        <span className="text-sm text-[#8AA299]">:</span>
+        <span>{String(time.hours).padStart(2, '0')}<small className="ml-0.5 text-[10px] font-semibold text-[#5E6B66]">h</small></span>
+        <span className="text-sm text-[#8AA299]">:</span>
+        <span>{String(time.minutes).padStart(2, '0')}<small className="ml-0.5 text-[10px] font-semibold text-[#5E6B66]">m</small></span>
       </span>
     </button>
 

@@ -167,7 +167,7 @@ function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack, curr
     <div className="flex items-center justify-end gap-4">
       {currentUser.role === 'STUDENT' && <SatCountdown />}
       <NotificationBell currentUserId={currentUser.id} />
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white" title={currentUser.name}>{profileInitials}</div>
+      <div className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white" title={currentUser.name}>{profileInitials}</div>
     </div>
   </header>;
 }

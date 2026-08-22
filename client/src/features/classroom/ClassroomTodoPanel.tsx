@@ -131,9 +131,9 @@ export function ClassroomTodoPanel() {
 
   return (
     <>
-      <aside className="min-w-0 xl:sticky xl:top-6" aria-label="To Do">
-        <h2 className="border-b border-[#C9D8D2] pb-3 text-base font-semibold text-[#1A1A1A]">To Do</h2>
-        <div className="max-h-[620px] overflow-y-auto">
+      <aside className="min-w-0 overflow-hidden rounded-xl border border-[#C9D8D2] bg-white shadow-[0_3px_10px_rgba(15,77,56,0.10)] xl:sticky xl:top-6" aria-label="To Do">
+        <h2 className="mx-5 border-b border-[#C9D8D2] pb-3 pt-5 text-base font-semibold text-[#1A1A1A]">To Do</h2>
+        <div className="max-h-[620px] overflow-y-auto px-5 pb-2">
           {loading ? <TodoSkeleton /> : error ? (
             <div className="py-6 text-sm text-[#6B7280]"><p>{error}</p><Button variant="outline" size="sm" className="mt-3" onClick={() => { setLoading(true); void loadTodos(); }}>Try again</Button></div>
           ) : items.length === 0 ? (

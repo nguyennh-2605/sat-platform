@@ -14,6 +14,9 @@ Tài liệu này là nguồn quy tắc giao diện mặc định cho mọi thay 
 - Ưu tiên sự rõ ràng trước tính trang trí: control, đường viền, vùng nhập liệu và vùng nội dung phải nhận biết được ngay mà không cần người dùng đoán.
 - Mặc định dùng contrast đủ rõ và trọng lượng thị giác nhất quán. Chỉ tạo mức đậm–nhạt khi cần thể hiện UI hierarchy cụ thể; không làm mờ thành phần chỉ để giao diện trông “nhẹ”.
 - Ưu tiên hiệu năng và phản hồi mượt trên máy học sinh: không tùy tiện dùng `backdrop-filter`, `backdrop-blur`, blur lớn, animation liên tục, shadow nặng hoặc hiệu ứng GPU đắt tiền. Chỉ dùng khi Figma thực sự yêu cầu và lợi ích thị giác rõ ràng; ưu tiên overlay màu bán trong suốt đơn giản cho modal.
+- Background cá nhân hóa chỉ dùng preset đã kiểm soát và tối ưu trong source. Ảnh chỉ áp dụng cho vùng nội dung dashboard, không phủ sidebar/header và không dùng trong Exam Room; giữ card gần như opaque để bảo đảm khả năng đọc.
+- Mỗi background raster ưu tiên WebP/AVIF và mục tiêu dưới `200 KB` (giới hạn tối đa khoảng `500 KB`), không dùng GIF/video, parallax, `background-attachment: fixed` hoặc backdrop blur. Luôn có lớp overlay màu tĩnh để duy trì contrast.
+- Khi chuyển page trong dashboard, dùng progress bar mảnh ở đầu vùng nội dung và fade ngắn để tránh flash layout. Progress phải dựa trên route/request thật, có thời gian chờ tối đa để không khóa UI khi mạng chậm, không dùng backdrop/blur và phải tôn trọng `prefers-reduced-motion`.
 
 ## 2. Design tokens
 

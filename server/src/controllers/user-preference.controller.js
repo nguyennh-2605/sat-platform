@@ -29,3 +29,24 @@ exports.updateSatTestDate = async (req, res) => {
     handleError(res, error);
   }
 };
+
+exports.getDashboardBackground = async (req, res) => {
+  try {
+    res.json(await preferenceService.getDashboardBackground({
+      userId: req.user?.userId || req.user?.id,
+    }));
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+exports.updateDashboardBackground = async (req, res) => {
+  try {
+    res.json(await preferenceService.updateDashboardBackground({
+      userId: req.user?.userId || req.user?.id,
+      backgroundId: req.body?.backgroundId,
+    }));
+  } catch (error) {
+    handleError(res, error);
+  }
+};

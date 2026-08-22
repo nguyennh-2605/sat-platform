@@ -5,6 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import queryString from 'query-string';
+import { trackRequestEnd, trackRequestStart } from './requestActivity';
 
 interface DataAxiosInstance extends Omit<AxiosInstance, 'get' | 'post' | 'put' | 'patch' | 'delete'> {
   get<T = any, R = T, D = any>(url: string, config?: AxiosRequestConfig<D>): Promise<R>;
@@ -32,7 +33,7 @@ axiosClient.interceptors.request.use(
     if (token) {
       config.headers.set('Authorization', `Bearer ${token}`);
     }
-    return config;
+    return trackRequestStart(config);
   },
   (error) => Promise.reject(error)
 );
@@ -40,12 +41,14 @@ axiosClient.interceptors.request.use(
 // Interceptor Response
 axiosClient.interceptors.response.use(
   (response: AxiosResponse) => {
+    trackRequestEnd(response.config);
     if (response && response.data) {
       return response.data;
     }
     return response;
   },
   (error) => {
+    trackRequestEnd(error.config);
     if (error.code === "ERR_CANCELED") {
       return Promise.reject(error);
     }

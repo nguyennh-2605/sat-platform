@@ -198,11 +198,11 @@ const PracticeTest = () => {
         </div>
         <div className="flex items-center gap-5">
           <SatCountdown />
-          <button className="relative text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
+          <button className="relative shrink-0 text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
             <Bell size={20} />
             <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
           </button>
-          <div className="flex h-8 w-8 select-none items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-white transition-all hover:ring-[#1B7A5A]/30" title={userName}>
+          <div className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 select-none items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-white transition-[box-shadow] hover:ring-[#1B7A5A]/30" title={userName}>
             {initials}
           </div>
         </div>
