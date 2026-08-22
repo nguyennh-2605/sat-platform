@@ -10,6 +10,7 @@ exports.startOrResumeTest = async (req, res) => {
       userRole: req.user.role,
       assignmentId: req.query.assignmentId ? String(req.query.assignmentId) : null,
       classId: req.query.classId ? String(req.query.classId) : null,
+      deliveryId: req.query.deliveryId ? String(req.query.deliveryId) : null,
     });
     res.json(data);
   } catch (error) {
@@ -28,6 +29,7 @@ exports.saveProgress = async (req, res) => {
       timeLeft: req.body.timeLeft,
       currentQuestionIndex: req.body.currentQuestionIndex,
       violationCount: req.body.violationCount,
+      questionTimings: req.body.questionTimings,
     });
     res.json({ success: true, message: "Đã lưu tiến độ thành công!" });
   } catch (error) {
@@ -62,6 +64,8 @@ exports.submitTest = async (req, res) => {
       testId: parseInt(req.params.id),
       assignmentId: req.query.assignmentId ? String(req.query.assignmentId) : null,
       classId: req.query.classId ? String(req.query.classId) : null,
+      deliveryId: req.query.deliveryId ? String(req.query.deliveryId) : null,
+      questionTimings: req.body.questionTimings,
     });
     res.json(result);
   } catch (error) {

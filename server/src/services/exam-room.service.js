@@ -2,8 +2,10 @@ const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
 const { gradeQuestions } = require('../utils/grading');
+const testDeliveryService = require('./test-delivery.service');
+const { normalizeQuestionTimingSnapshot, timingRowsFromSnapshot } = require('../utils/question-timing');
 
-exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, classId }) => {
+exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, classId, deliveryId }) => {
   if (!userId || isNaN(userId)) {
     throw new ApiError(400, { error: "Thiếu thông tin User ID (userId is missing or invalid)" });
   }
@@ -45,7 +47,10 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
     const isAdminPublicTest = test.isPublic && test.author?.role === 'ADMIN';
     let hasClassAccess = false;
 
-    if (assignmentId) {
+    if (deliveryId) {
+      await testDeliveryService.assertStudentDeliveryAccess({ deliveryId, testId, userId });
+      hasClassAccess = true;
+    } else if (assignmentId) {
       const assignment = await prisma.assignment.findFirst({
         where: {
           id: assignmentId,
@@ -74,7 +79,14 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
   }
 
   let selectedClassTestId = null;
-  if (!assignmentId && classId) {
+  let selectedDelivery = null;
+  if (deliveryId) {
+    selectedDelivery = await prisma.testDelivery.findUnique({ where: { id: String(deliveryId) } });
+    if (!selectedDelivery || selectedDelivery.testId !== Number(testId)) {
+      throw new ApiError(400, { error: 'The assigned test does not match this test.' });
+    }
+    selectedClassTestId = selectedDelivery.legacyClassTestId;
+  } else if (!assignmentId && classId) {
     const classTest = await prisma.classTest.findFirst({
       where: {
         classId: classId,
@@ -106,8 +118,9 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
       where: {
         userId,
         testId,
-        assignmentId,
-        classTestId: selectedClassTestId,
+        ...(deliveryId
+          ? { deliveryId: String(deliveryId) }
+          : { assignmentId, classTestId: selectedClassTestId }),
         status: 'DOING'
       },
       orderBy: { startedAt: 'desc' }
@@ -115,12 +128,27 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
 
     if (activeSubmission) return activeSubmission;
 
+    let attemptNo = 1;
+    if (deliveryId) {
+      const priorAttempts = await tx.submission.findMany({
+        where: { userId, deliveryId: String(deliveryId) },
+        select: { attemptNo: true, status: true },
+      });
+      const completedAttempts = priorAttempts.filter(item => item.status === 'COMPLETED').length;
+      if (completedAttempts >= selectedDelivery.maxAttempts) {
+        throw new ApiError(409, { error: 'You have used all attempts for this assignment.' });
+      }
+      attemptNo = priorAttempts.reduce((highest, item) => Math.max(highest, item.attemptNo), 0) + 1;
+    }
+
     return tx.submission.create({
       data: {
         userId,
         testId,
         assignmentId,
         classTestId: selectedClassTestId,
+        deliveryId: deliveryId ? String(deliveryId) : null,
+        attemptNo,
         status: "DOING",
         startedAt: new Date(),
         timeRemaining: test.duration * 60,
@@ -140,6 +168,7 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
       savedAnswers: submission.savedAnswers,
       timeLeft: submission.timeRemaining,
       currentQuestionIndex: submission.currentQuestionIndex,
+      questionTimingSnapshot: submission.questionTimingSnapshot || {},
       violationCount: submission.violationCount,
       // ISO timestamps are timezone-independent. Returning the server clock lets
       // the browser compensate when a student's device clock is fast or slow.
@@ -150,8 +179,14 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
         : null,
       expiresAt: test.mode === 'EXAM' && submission.beganAt
         ? new Date(new Date(submission.beganAt).getTime() + test.duration * 60 * 1000)
-        : null
-    }
+        : null,
+      delivery: selectedDelivery ? {
+        id: selectedDelivery.id,
+        dueAt: selectedDelivery.dueAt,
+        maxAttempts: selectedDelivery.maxAttempts,
+        scorePolicy: selectedDelivery.scorePolicy,
+      } : null,
+    },
   };
 };
 
@@ -202,11 +237,19 @@ exports.beginTest = async ({ userId, submissionId, testId }) => {
   };
 };
 
-exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, currentQuestionIndex, violationCount }) => {
+exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, currentQuestionIndex, violationCount, questionTimings }) => {
   // Validate sở hữu: Có đúng user này đang làm bài này không?
   const submission = await prisma.submission.findFirst({
     where: { id: parseInt(submissionId), userId: userId },
-    include: { test: { select: { mode: true, duration: true } } }
+    include: {
+      test: {
+        select: {
+          mode: true,
+          duration: true,
+          sections: { select: { questions: { select: { id: true } } } },
+        },
+      },
+    }
   });
 
   if (!submission) throw new ApiError(403, { message: "Không có quyền truy cập" });
@@ -218,6 +261,15 @@ exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, current
         (new Date(submission.beganAt).getTime() + submission.test.duration * 60 * 1000 - Date.now()) / 1000
       ))
     : (Number.isFinite(clientTimeLeft) ? Math.max(0, Math.floor(clientTimeLeft)) : submission.timeRemaining);
+  const questionTimingSnapshot = submission.test.mode === 'EXAM'
+    ? normalizeQuestionTimingSnapshot({
+        snapshot: questionTimings,
+        questionIds: submission.test.sections.flatMap(section => section.questions.map(question => question.id)),
+        maxTotalMs: submission.beganAt
+          ? Math.min(submission.test.duration * 60 * 1000, Math.max(0, Date.now() - new Date(submission.beganAt).getTime()))
+          : 0,
+      })
+    : null;
 
   await prisma.submission.updateMany({
     where: { id: parseInt(submissionId), userId, status: 'DOING' },
@@ -230,11 +282,12 @@ exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, current
       violationCount: Number.isFinite(Number(violationCount))
         ? Math.max(0, Number(violationCount))
         : submission.violationCount,
+      ...(submission.test.mode === 'EXAM' ? { questionTimingSnapshot } : {}),
     }
   });
 };
 
-exports.submitTest = async ({ userId, submissionId, answers, violationCount, testId, assignmentId, classId }) => {
+exports.submitTest = async ({ userId, submissionId, answers, violationCount, testId, assignmentId, classId, deliveryId, questionTimings }) => {
   console.log(`📥 Đang chấm bài Test ID: ${testId} cho User ID: ${userId}`);
 
   if (!userId) {
@@ -257,6 +310,7 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
       userId: userId,
       testId: testId,
       assignmentId: assignmentId,
+      ...(deliveryId ? { deliveryId: String(deliveryId) } : {}),
       ...(expectedClassTestId !== undefined ? { classTestId: expectedClassTestId } : {})
     }
   });
@@ -297,6 +351,15 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
   const safeAnswers = submittedAnswers && typeof submittedAnswers === 'object' && !Array.isArray(submittedAnswers)
     ? submittedAnswers
     : {};
+  const timingSnapshot = test.mode === 'EXAM'
+    ? normalizeQuestionTimingSnapshot({
+        snapshot: questionTimings || submission.questionTimingSnapshot,
+        questionIds: allQuestions.map(question => question.id),
+        maxTotalMs: submission.beganAt
+          ? Math.min(test.duration * 60 * 1000, Math.max(0, Date.now() - new Date(submission.beganAt).getTime()))
+          : 0,
+      })
+    : {};
 
   const transactionResult = await prisma.$transaction(async (tx) => {
     // Claim the submission atomically. Concurrent double-clicks/retries can no
@@ -308,7 +371,8 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
         score: correctCount,
         violationCount: safeViolationCount,
         endTime: new Date(),
-        savedAnswers: safeAnswers
+        savedAnswers: safeAnswers,
+        ...(test.mode === 'EXAM' ? { questionTimingSnapshot: timingSnapshot } : {}),
       }
     });
 
@@ -322,7 +386,7 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
     const updatedSubmission = await tx.submission.findUnique({ where: { id: submission.id } });
 
     // Nếu học sinh làm từ Practice Center theo lớp, tự động cập nhật các assignment chưa có dữ liệu
-    if (!assignmentId && classId) {
+    if (!deliveryId && !assignmentId && classId) {
       const classAssignments = await tx.assignment.findMany({
         where: { classId: classId },
         select: { id: true, testIds: true }
@@ -395,6 +459,12 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
       });
     }
 
+    if (test.mode === 'EXAM') {
+      await tx.questionTiming.deleteMany({ where: { submissionId: submission.id } });
+      const timingRows = timingRowsFromSnapshot({ submissionId: submission.id, snapshot: timingSnapshot });
+      if (timingRows.length > 0) await tx.questionTiming.createMany({ data: timingRows });
+    }
+
     return { submission: updatedSubmission, didSubmit: true };
   });
 
@@ -424,6 +494,7 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
     total: totalQuestions,
     totalQuestions,
     submissionId: transactionResult.submission.id,
+    submittedAt: transactionResult.submission.endTime,
     details: responseDetails,
     message: "Nộp bài và lưu kết quả thành công"
   };

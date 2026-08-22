@@ -511,7 +511,7 @@ const AssignmentDetail = () => {
                   </div>
                   <div className="mt-3">
                     <button
-                      onClick={() => navigate(`/test/${test.id}?assignmentId=${assignment.id}`)}
+                      onClick={() => navigate(`/test/${test.id}?${test.deliveryId ? `deliveryId=${test.deliveryId}` : `assignmentId=${assignment.id}`}`)}
                       className="px-3 py-2 text-sm font-semibold text-white bg-[#1B7A5A] hover:bg-[#145F47] rounded-lg transition"
                     >
                       Start this test

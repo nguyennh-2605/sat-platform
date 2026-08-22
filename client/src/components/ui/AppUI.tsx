@@ -5,6 +5,7 @@ import type {
   ReactNode,
   SelectHTMLAttributes,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, X } from 'lucide-react';
 import { cx, ui } from './styles';
 
@@ -163,14 +164,32 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  presentation?: 'dialog' | 'content-dialog' | 'content-panel';
 }
 
-export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false, children, footer, className }: ModalProps) {
+export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false, children, footer, className, presentation = 'dialog' }: ModalProps) {
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0A1F16]/50 p-4" onMouseDown={event => { if (closeOnBackdrop && event.target === event.currentTarget) onClose(); }}>
-      <div className={cx('w-full max-w-lg overflow-hidden rounded-xl border border-[#E2EDE9] bg-white shadow-2xl', className)}>
+  const isContentPanel = presentation === 'content-panel';
+  const isContentDialog = presentation === 'content-dialog';
+
+  const modal = (
+    <div
+      className={isContentPanel
+        ? 'absolute inset-0 z-[200] flex min-h-0 min-w-0 bg-white'
+        : isContentDialog
+          ? 'fixed inset-y-0 right-0 left-56 z-[200] flex min-h-0 min-w-0 items-center justify-center bg-[#0A1F16]/50 p-4'
+          : 'fixed inset-0 z-[200] flex items-center justify-center bg-[#0A1F16]/50 p-4'}
+      onMouseDown={event => { if (!isContentPanel && closeOnBackdrop && event.target === event.currentTarget) onClose(); }}
+    >
+      <div className={cx(
+        isContentPanel
+          ? 'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white'
+          : isContentDialog
+            ? 'flex min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-xl border border-[#E2EDE9] bg-white shadow-xl'
+            : 'w-full max-w-lg overflow-hidden rounded-xl border border-[#E2EDE9] bg-white shadow-2xl',
+        className,
+      )}>
         <div className="flex items-start justify-between border-b border-[#E2EDE9] px-6 py-5">
           <div>
             <h2 className="text-lg font-semibold text-[#1A1A1A]">{title}</h2>
@@ -180,11 +199,13 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
             <X size={18} />
           </Button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className={isContentPanel || isContentDialog ? 'min-h-0 flex-1 overflow-hidden p-6' : 'p-6'}>{children}</div>
         {footer && <div className="flex justify-end gap-3 border-t border-[#E2EDE9] bg-[#F2F8F5] px-6 py-4">{footer}</div>}
       </div>
     </div>
   );
+
+  return isContentDialog ? createPortal(modal, document.body) : modal;
 }
 
 export function TableShell({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

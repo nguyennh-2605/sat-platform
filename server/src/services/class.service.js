@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const testDeliveryService = require('./test-delivery.service');
 const { sendNotificationToUser } = require('./notification.service');
 const { CLASS_COLORS, normalizeClassName, resolveAssignmentType, isAllowedClassColor, canManageClass } = require('../utils/classroom');
 
@@ -210,6 +211,17 @@ exports.addStudentToClass = async ({ classId, email, currentUserId }) => {
     }
   });
 
+  const activeDeliveries = await prisma.testDelivery.findMany({
+    where: { classId, status: 'PUBLISHED' },
+    select: { id: true },
+  });
+  if (activeDeliveries.length > 0) {
+    await prisma.deliveryAssignee.createMany({
+      data: activeDeliveries.map(delivery => ({ deliveryId: delivery.id, studentId: student.id })),
+      skipDuplicates: true,
+    });
+  }
+
   await sendNotificationToUser(
     student.id,
     `Bạn vừa được giáo viên thêm vào lớp học "${existingClass.name}".`,
@@ -239,6 +251,11 @@ exports.removeStudentFromClass = async ({ classId, studentId, currentUserId, use
     data: { students: { disconnect: { id: student.id } } },
   });
 
+  await prisma.deliveryAssignee.updateMany({
+    where: { studentId: student.id, delivery: { classId } },
+    data: { excusedAt: new Date() },
+  });
+
   return { message: 'Student removed from class.', student };
 };
 
@@ -265,6 +282,19 @@ exports.createAssignment = async ({ title, content, type, deadline, classId, dri
       classId: classId
     }
   });
+
+  if (newAssignment.testIds.length > 0) {
+    try {
+      await testDeliveryService.syncClassAssignmentDeliveries({
+        assignment: newAssignment,
+        userId: currentUserId,
+        userRole,
+      });
+    } catch (error) {
+      await prisma.assignment.delete({ where: { id: newAssignment.id } });
+      throw error;
+    }
+  }
 
   if (classData && classData.students.length > 0) {
     const teacherName = classData.teacher?.name || 'Giáo viên';

@@ -13,6 +13,7 @@ const notificationRoutes = require('./notification.routes');
 const assignmentRoutes = require('./assignment.routes');
 const testBankRoutes = require('./test-bank.routes');
 const progressRoutes = require('./progress.routes');
+const testDeliveryRoutes = require('./test-delivery.routes');
 
 // Mount routes
 router.use('/classes', classRoutes);
@@ -26,5 +27,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/assignments', assignmentRoutes);
 router.use('/bank', testBankRoutes);
 router.use('/progress', progressRoutes);
+router.use('/test-deliveries', testDeliveryRoutes);
 
 module.exports = router;

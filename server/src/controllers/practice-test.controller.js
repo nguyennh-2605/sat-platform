@@ -35,6 +35,10 @@ exports.assignTestsToClasses = async (req, res) => {
     const result = await practiceTestService.assignTestsToClasses({
       testIds: req.body.testIds,
       classIds: req.body.classIds,
+      availableAt: req.body.availableAt,
+      dueAt: req.body.dueAt,
+      maxAttempts: req.body.maxAttempts,
+      scorePolicy: req.body.scorePolicy,
       userId: req.user.userId,
       userRole: req.user.role,
     });

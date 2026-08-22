@@ -55,6 +55,7 @@ export interface TestItem {
   duration: number;
   questionCount: number;
   folderId: number | null;
+  deliveryId?: string | null;
 }
 
 export interface AssignmentProps {

@@ -2,6 +2,7 @@ const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { buildAttemptSummary } = require('../utils/practice-test-progress');
 const { getTaxonomy, validateClassification } = require('../utils/question-taxonomy');
+const testDeliveryService = require('./test-delivery.service');
 
 exports.getClasses = ({ userId, userRole }) => {
   let whereCondition = {};
@@ -38,10 +39,10 @@ exports.getTests = async ({ userId, userRole }) => {
         { isPublic: true, author: { role: 'ADMIN' } },
         // Đề của giáo viên chỉ hiện khi đã giao vào lớp mà học sinh tham gia.
         {
-          classTests: {
+          deliveries: {
             some: {
-              isHidden: false,
-              class: { students: { some: { id: userId } } }
+              status: 'PUBLISHED',
+              assignees: { some: { studentId: userId, excusedAt: null } }
             }
           }
         }
@@ -78,6 +79,25 @@ exports.getTests = async ({ userId, userRole }) => {
         } : {}),
         select: { classId: true, class: { select: { name: true } } }
       },
+      ...(userRole === 'STUDENT' && {
+        deliveries: {
+          where: {
+            status: 'PUBLISHED',
+            assignees: { some: { studentId: userId, excusedAt: null } }
+          },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            classId: true,
+            availableAt: true,
+            dueAt: true,
+            maxAttempts: true,
+            scorePolicy: true,
+            class: { select: { name: true } }
+          }
+        }
+      }),
       // Lấy lần làm gần nhất để dựng trạng thái và tiến trình thật trên card.
       ...(hasUser && {
         submissions: {
@@ -117,58 +137,22 @@ exports.getTests = async ({ userId, userRole }) => {
   });
 };
 
-exports.assignTestsToClasses = async ({ testIds, classIds, userId, userRole }) => {
-  const normalizedTestIds = [...new Set((Array.isArray(testIds) ? testIds : [])
-    .map(Number)
-    .filter(Number.isInteger))];
-  const normalizedClassIds = [...new Set((Array.isArray(classIds) ? classIds : [])
-    .map(String)
-    .filter(Boolean))];
-
-  if (normalizedTestIds.length === 0 || normalizedClassIds.length === 0) {
-    throw new ApiError(400, { error: 'Vui lòng chọn ít nhất một đề thi và một lớp học' });
-  }
-
-  const [ownedTests, ownedClasses] = await Promise.all([
-    prisma.test.findMany({
-      where: {
-        id: { in: normalizedTestIds },
-        authorId: userId
-      },
-      select: { id: true }
-    }),
-    prisma.class.findMany({
-      where: {
-        id: { in: normalizedClassIds },
-        ...(userRole === 'ADMIN' ? {} : { teacherId: userId })
-      },
-      select: { id: true }
-    })
-  ]);
-
-  if (ownedTests.length !== normalizedTestIds.length) {
-    throw new ApiError(403, { error: 'Bạn chỉ có thể giao những đề thi do mình tải lên' });
-  }
-  if (ownedClasses.length !== normalizedClassIds.length) {
-    throw new ApiError(403, { error: 'Bạn không có quyền giao bài cho một hoặc nhiều lớp đã chọn' });
-  }
-
-  const assignments = normalizedTestIds.flatMap(testId =>
-    normalizedClassIds.map(classId => ({ testId, classId, isHidden: false }))
-  );
-
-  await prisma.$transaction(async tx => {
-    await tx.classTest.updateMany({
-      where: {
-        testId: { in: normalizedTestIds },
-        classId: { in: normalizedClassIds }
-      },
-      data: { isHidden: false }
-    });
-    await tx.classTest.createMany({ data: assignments, skipDuplicates: true });
+exports.assignTestsToClasses = async ({ testIds, classIds, availableAt, dueAt, maxAttempts, scorePolicy, userId, userRole }) => {
+  const deliveries = await testDeliveryService.createDeliveries({
+    testIds,
+    classIds,
+    availableAt,
+    dueAt,
+    maxAttempts,
+    scorePolicy,
+    userId,
+    userRole,
   });
-
-  return { assignedTests: normalizedTestIds.length, assignedClasses: normalizedClassIds.length };
+  return {
+    assignedTests: new Set(deliveries.map(item => item.testId)).size,
+    assignedClasses: new Set(deliveries.map(item => item.classId)).size,
+    deliveries,
+  };
 };
 
 exports.getTaxonomy = ({ subject }) => {

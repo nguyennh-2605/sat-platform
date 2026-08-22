@@ -1,132 +1,194 @@
-import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, ClipboardList, FileText, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, ArrowRight, BarChart3, CheckCircle2, Clock3, Eye, FileText, Target, Trophy, Users } from 'lucide-react';
 import axiosClient from '../../lib/axios';
-import { Badge, Button, Card, TableShell } from '../../components/ui/AppUI';
+import { Badge, Button, Card, Modal, Select, TableShell } from '../../components/ui/AppUI';
 
-interface ExamItem { id: number; title: string; date: string; mode: 'EXAM'; subject: string; duration: number }
-interface AssignmentScoreItem { id: string; title: string; createdAt: string; tests: ExamItem[] }
-interface StudentStat { key: string; count: number; students: string[] }
-interface QuestionReport { id: number; correctChoice: string; stats: StudentStat[] }
-interface LeaderboardItem { id: number; name: string; score: number; time: string }
-interface ReportResponse { leaderboard: LeaderboardItem[]; questions: QuestionReport[] }
+interface DeliveryListItem {
+  id: string; title: string; createdAt: string; dueAt: string | null; maxAttempts: number; scorePolicy: 'FIRST' | 'BEST' | 'LATEST';
+  test: { id: number; title: string; mode: 'EXAM' | 'PRACTICE'; questionCount: number };
+  lesson?: { title: string; week: { title: string } } | null;
+  stats: { assigned: number; completed: number; inProgress: number; missing: number; averageScore: number | null };
+}
+interface StudentRow { id: number; name: string; email: string; status: 'COMPLETED' | 'IN_PROGRESS' | 'MISSING' | 'ASSIGNED'; score: number | null; attempts: number; submittedAt: string | null; completionTimeMs: number | null }
+interface QuestionRow { id: number; number: number; sectionName: string; questionText: string; domain: string | null; skill: string | null; correct: number; incorrect: number; correctPercentage: number; averageTimeMs: number | null }
+interface PerformanceReport {
+  delivery: DeliveryListItem & { test: DeliveryListItem['test'] & { duration: number; subject: string } };
+  kpis: { averageScore: number | null; medianScore: number | null; highestScore: number | null; lowestScore: number | null; participants: number; assigned: number; completionRate: number; averageTimeMs: number | null };
+  students: StudentRow[]; questions: QuestionRow[]; hardestQuestions: QuestionRow[]; scoreDistribution: { label: string; count: number }[];
+}
+interface StudentDetail {
+  student: { id: number; name: string; email: string }; testMode: 'EXAM' | 'PRACTICE';
+  attempts: Array<{ id: number; attemptNo: number; status: string; score: number | null; submittedAt: string | null; completionTimeMs: number | null; questions: Array<QuestionRow & { selectedChoice: string | null; correctAnswer: string; isCorrect: boolean; activeDurationMs: number | null; visitCount: number | null }> }>;
+}
 
+const formatDuration = (milliseconds: number | null | undefined) => {
+  if (!Number.isFinite(milliseconds) || !milliseconds) return '—';
+  const totalSeconds = Math.round(milliseconds / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
+};
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase();
 
 export default function StudentAnalytics({ classId }: { classId?: string }) {
-  const [assignments, setAssignments] = useState<AssignmentScoreItem[]>([]);
-  const [selectedAssignment, setSelectedAssignment] = useState<AssignmentScoreItem | null>(null);
-  const [selectedTest, setSelectedTest] = useState<ExamItem | null>(null);
+  const [deliveries, setDeliveries] = useState<DeliveryListItem[]>([]);
+  const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
+  const [report, setReport] = useState<PerformanceReport | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!classId) return;
-    axiosClient.get<{ data: AssignmentScoreItem[] }, { data: AssignmentScoreItem[] }>(`/api/classes/${classId}/score-report`)
-      .then(response => setAssignments(Array.isArray(response.data) ? response.data : []))
-      .catch(error => console.error('Failed to load class score reports:', error))
+    axiosClient.get(`/api/test-deliveries/class/${classId}`)
+      .then(data => setDeliveries(Array.isArray(data) ? data : []))
+      .catch(error => console.error('Unable to load assigned tests:', error))
       .finally(() => setLoading(false));
   }, [classId]);
-
-  if (selectedAssignment && selectedTest) {
-    return <TestPerformance assignment={selectedAssignment} test={selectedTest} onBack={() => setSelectedTest(null)} />;
-  }
-
-  if (selectedAssignment) {
-    return (
-      <div className="space-y-5">
-        <SectionHeading title={selectedAssignment.title} subtitle="Select a test to view its performance" onBack={() => setSelectedAssignment(null)} />
-        <div className="grid gap-4 md:grid-cols-2">
-          {selectedAssignment.tests.map(test => (
-            <PickerCard key={test.id} icon={<ClipboardList size={19} />} title={test.title} meta={`${test.subject} · ${test.duration} min · ${test.date}`} onClick={() => setSelectedTest(test)} />
-          ))}
-        </div>
-        {selectedAssignment.tests.length === 0 && <EmptyState text="No exam tests are attached to this assignment." />}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-5">
-      <div><h2 className="text-lg font-semibold">Test Performance</h2><p className="mt-1 text-xs text-[#6B7280]">Review assignment results and student performance</p></div>
-      {loading ? <EmptyState text="Loading score reports…" /> : assignments.length === 0 ? <EmptyState text="No score reports are available yet." /> : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {assignments.map(assignment => <PickerCard key={assignment.id} icon={<FileText size={19} />} title={assignment.title} meta={`${assignment.tests.length} exam ${assignment.tests.length === 1 ? 'test' : 'tests'}`} onClick={() => setSelectedAssignment(assignment)} />)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PickerCard({ icon, title, meta, onClick }: { icon: ReactNode; title: string; meta: string; onClick: () => void }) {
-  return (
-    <Card className="group cursor-pointer p-5 transition hover:border-[#A9CFC1] hover:shadow-md" onClick={onClick}>
-      <div className="flex items-center gap-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E8F5EF] text-[#1B7A5A]">{icon}</div><div className="min-w-0 flex-1"><h3 className="truncate text-sm font-semibold">{title}</h3><p className="mt-1 text-xs text-[#6B7280]">{meta}</p></div><ArrowRight size={17} className="text-[#9CA3AF] transition group-hover:translate-x-0.5 group-hover:text-[#1B7A5A]" /></div>
-    </Card>
-  );
-}
-
-function SectionHeading({ title, subtitle, onBack }: { title: string; subtitle: string; onBack: () => void }) {
-  return <div className="flex items-center gap-3"><Button variant="ghost" size="icon" onClick={onBack} aria-label="Go back"><ArrowLeft size={18} /></Button><div><h2 className="text-lg font-semibold">{title}</h2><p className="text-xs text-[#6B7280]">{subtitle}</p></div></div>;
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <Card className="flex min-h-40 items-center justify-center p-8 text-sm text-[#6B7280]">{text}</Card>;
-}
-
-function TestPerformance({ assignment, test, onBack }: { assignment: AssignmentScoreItem; test: ExamItem; onBack: () => void }) {
-  const [report, setReport] = useState<ReportResponse>({ leaderboard: [], questions: [] });
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
-    axiosClient.get<ReportResponse, ReportResponse>(`/api/classes/${test.id}/report`, { params: { assignmentId: assignment.id } })
-      .then(data => setReport({ leaderboard: Array.isArray(data.leaderboard) ? data.leaderboard : [], questions: Array.isArray(data.questions) ? data.questions : [] }))
-      .catch(error => console.error('Failed to load test performance:', error))
+    if (!selectedDeliveryId) return;
+    axiosClient.get(`/api/test-deliveries/${selectedDeliveryId}/performance`)
+      .then(data => setReport(data))
+      .catch(error => console.error('Unable to load test performance:', error))
       .finally(() => setLoading(false));
-  }, [assignment.id, test.id]);
+  }, [selectedDeliveryId]);
 
-  const scores = report.leaderboard.map(student => Number(student.score)).filter(Number.isFinite);
-  const average = scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length) : 0;
+  const openReport = (deliveryId: string) => { setReport(null); setLoading(true); setSelectedDeliveryId(deliveryId); };
+  const closeReport = () => { setSelectedDeliveryId(null); setReport(null); };
+  if (selectedDeliveryId) return <PerformanceDashboard report={report} loading={loading} onBack={closeReport} />;
+  return <div className="space-y-5 animate-fade-in-up">
+    <div><h2 className="text-lg font-semibold text-[#1A1A1A]">Test Performance</h2><p className="mt-1 text-xs text-[#6B7280]">Select an assigned test to review submissions and question-level performance.</p></div>
+    {loading ? <EmptyState text="Loading assigned tests…" /> : deliveries.length === 0 ? <EmptyState text="No tests have been assigned to this class yet." /> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{deliveries.map(delivery => <Card key={delivery.id} className="group cursor-pointer p-5 transition hover:border-[#A9CFC1] hover:shadow-md" onClick={() => openReport(delivery.id)}>
+      <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E8F5EF] text-[#1B7A5A]"><FileText size={19} /></div><div className="min-w-0"><h3 className="truncate text-sm font-semibold text-[#1A1A1A]">{delivery.title}</h3><p className="mt-1 text-xs text-[#6B7280]">{delivery.lesson ? `${delivery.lesson.week.title} · ${delivery.lesson.title}` : 'Direct assignment'}</p></div></div><ArrowRight size={17} className="mt-1 shrink-0 text-[#9CA3AF] transition group-hover:translate-x-0.5 group-hover:text-[#1B7A5A]" /></div>
+      <div className="mt-5 grid grid-cols-3 border-t border-[#D6E3DE] pt-4 text-center"><Metric value={`${delivery.stats.completed}/${delivery.stats.assigned}`} label="Submitted" /><Metric value={delivery.stats.averageScore === null ? '—' : `${delivery.stats.averageScore}%`} label="Average" bordered /><Metric value={String(delivery.stats.inProgress)} label="In progress" /></div>
+      <div className="mt-4 flex items-center justify-between text-[11px] text-[#6B7280]"><Badge tone={delivery.test.mode === 'EXAM' ? 'green' : 'gold'}>{delivery.test.mode === 'EXAM' ? 'Test' : 'Practice'}</Badge><span>{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleDateString()}` : 'No deadline'}</span></div>
+    </Card>)}</div>}
+  </div>;
+}
+
+function PerformanceDashboard({ report, loading, onBack }: { report: PerformanceReport | null; loading: boolean; onBack: () => void }) {
+  const [selectedStudent, setSelectedStudent] = useState<StudentRow | null>(null);
+  if (loading || !report) return <div className="space-y-5"><PageHeading title="Test Performance" subtitle="Loading report…" onBack={onBack} /><EmptyState text="Loading performance data…" /></div>;
   const kpis = [
-    ['AVERAGE SCORE', `${average}%`, ''],
-    ['HIGHEST SCORE', `${scores.length ? Math.max(...scores) : 0}%`, ''],
-    ['LOWEST SCORE', `${scores.length ? Math.min(...scores) : 0}%`, ''],
-    ['PARTICIPANTS', String(report.leaderboard.length), 'Submitted'],
-    ['QUESTIONS', String(report.questions.length), 'In this test'],
-    ['TIME LIMIT', `${test.duration}m`, 'Per student'],
+    { label: 'AVERAGE SCORE', value: score(report.kpis.averageScore), detail: `Median ${score(report.kpis.medianScore)}`, icon: Target },
+    { label: 'HIGHEST SCORE', value: score(report.kpis.highestScore), detail: 'Top result', icon: Trophy },
+    { label: 'LOWEST SCORE', value: score(report.kpis.lowestScore), detail: 'Needs support', icon: BarChart3 },
+    { label: 'PARTICIPANTS', value: `${report.kpis.participants}/${report.kpis.assigned}`, detail: 'Submitted', icon: Users },
+    { label: 'COMPLETION RATE', value: `${report.kpis.completionRate}%`, detail: 'Of assigned students', icon: CheckCircle2 },
+    { label: 'AVERAGE TIME', value: report.delivery.test.mode === 'EXAM' ? formatDuration(report.kpis.averageTimeMs) : 'N/A', detail: report.delivery.test.mode === 'EXAM' ? 'Active test duration' : 'Test mode only', icon: Clock3 },
   ];
+  return <div className="space-y-6">
+    <PageHeading title={report.delivery.title} subtitle={`${report.delivery.test.title} · ${report.delivery.test.mode === 'EXAM' ? 'Test mode' : 'Practice mode'} · ${report.delivery.test.questionCount} questions`} onBack={onBack} />
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{kpis.map(({ label, value, detail, icon: Icon }) => <Card key={label} className="min-h-[116px] p-4"><div className="flex items-start justify-between"><span className="text-[10px] font-semibold tracking-[0.08em] text-[#6B7280]">{label}</span><Icon size={15} className="text-[#1B7A5A]" /></div><p className="mt-4 text-2xl font-semibold text-[#1A1A1A]">{value}</p><p className="mt-1 text-[11px] text-[#6B7280]">{detail}</p></Card>)}</div>
+    <div className="grid items-start gap-6 xl:grid-cols-12"><div className="space-y-6 xl:col-span-8"><QuestionBreakdown questions={report.questions} showTiming={report.delivery.test.mode === 'EXAM'} /><StudentRankings students={report.students} showTiming={report.delivery.test.mode === 'EXAM'} onView={setSelectedStudent} /></div><div className="space-y-6 xl:col-span-4"><HardestQuestions questions={report.hardestQuestions} /><ScoreDistribution items={report.scoreDistribution} /></div></div>
+    {selectedStudent && <StudentDetailModal deliveryId={report.delivery.id} student={selectedStudent} onClose={() => setSelectedStudent(null)} />}
+  </div>;
+}
 
+function QuestionBreakdown({ questions, showTiming }: { questions: QuestionRow[]; showTiming: boolean }) {
+  return <Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#D6E3DE] p-5"><div><h3 className="text-sm font-semibold">Question Performance Breakdown</h3><p className="mt-1 text-xs text-[#6B7280]">Accuracy across counted submissions</p></div><div className="flex gap-4 text-xs text-[#6B7280]"><Legend color="#1B7A5A" label="Correct" /><Legend color="#C53B3B" label="Incorrect" /></div></div><div className="max-h-[520px] space-y-5 overflow-y-auto p-5">{questions.map(question => <div key={question.id}><div className="mb-2 flex items-center gap-3"><span className="w-8 text-xs font-semibold text-[#4B5563]">Q{question.number}</span><div className="flex h-3 flex-1 overflow-hidden rounded-sm bg-[#F7DEDE]"><div className="bg-[#1B7A5A]" style={{ width: `${question.correctPercentage}%` }} /></div><span className="w-10 text-right text-xs font-semibold">{question.correctPercentage}%</span></div><div className="ml-11 flex flex-wrap items-center gap-2 text-[11px] text-[#6B7280]"><span>{question.correct} correct · {question.incorrect} incorrect</span>{question.domain && <Badge>{question.domain}</Badge>}{question.skill && <Badge tone="green">{question.skill}</Badge>}{showTiming && <span className="ml-auto">Avg. {formatDuration(question.averageTimeMs)}</span>}</div></div>)}{questions.length === 0 && <p className="py-10 text-center text-sm text-[#6B7280]">No question data yet.</p>}</div></Card>;
+}
+function StudentRankings({ students, showTiming, onView }: { students: StudentRow[]; showTiming: boolean; onView: (student: StudentRow) => void }) {
+  const ordered = useMemo(() => [...students].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)), [students]);
+  return <TableShell><div className="flex items-center gap-2 border-b border-[#D6E3DE] p-5"><Users size={16} className="text-[#1B7A5A]" /><h3 className="text-sm font-semibold">Student Rankings</h3></div><div className="overflow-auto"><table className="w-full text-left text-xs"><thead className="bg-[#F2F8F5] text-[10px] tracking-wide text-[#4B5563]"><tr><th className="px-5 py-3">STUDENT</th><th className="px-4 py-3 text-center">STATUS</th><th className="px-4 py-3 text-center">SCORE</th>{showTiming && <th className="px-4 py-3 text-center">TIME</th>}<th className="px-5 py-3 text-right">ACTION</th></tr></thead><tbody className="divide-y divide-[#DDE7E3]">{ordered.map(student => <tr key={student.id} className="hover:bg-[#F8FBF9]"><td className="px-5 py-3"><div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E8F5EF] text-[10px] font-semibold text-[#1B7A5A]">{initials(student.name)}</span><div><p className="font-medium text-[#1A1A1A]">{student.name}</p><p className="text-[10px] text-[#6B7280]">{student.email}</p></div></div></td><td className="px-4 py-3 text-center"><StatusBadge status={student.status} /></td><td className="px-4 py-3 text-center font-semibold text-[#1B7A5A]">{score(student.score)}</td>{showTiming && <td className="px-4 py-3 text-center text-[#6B7280]">{formatDuration(student.completionTimeMs)}</td>}<td className="px-5 py-3 text-right"><Button variant="ghost" size="icon" onClick={() => onView(student)} aria-label={`View ${student.name}`}><Eye size={16} /></Button></td></tr>)}</tbody></table>{students.length === 0 && <p className="py-10 text-center text-sm text-[#6B7280]">No students are assigned.</p>}</div></TableShell>;
+}
+function HardestQuestions({ questions }: { questions: QuestionRow[] }) {
+  return <Card className="p-5"><h3 className="text-sm font-semibold">Hardest Questions</h3><p className="mt-1 text-xs text-[#6B7280]">Lowest class accuracy</p><div className="mt-5 space-y-4">{questions.map(question => <div key={question.id} className="flex items-center gap-3 border-b border-[#DDE7E3] pb-4 last:border-0 last:pb-0"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FDECEC] text-xs font-semibold text-[#B42318]">Q{question.number}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{question.skill || question.domain || question.sectionName}</p><div className="mt-2 h-1.5 overflow-hidden rounded-sm bg-[#F7DEDE]"><div className="h-full bg-[#C53B3B]" style={{ width: `${question.correctPercentage}%` }} /></div></div><span className="text-xs font-semibold text-[#B42318]">{question.correctPercentage}%</span></div>)}{questions.length === 0 && <p className="text-xs text-[#6B7280]">No completed submissions yet.</p>}</div></Card>;
+}
+function ScoreDistribution({ items }: { items: { label: string; count: number }[] }) {
+  const max = Math.max(1, ...items.map(item => item.count));
+  return <Card className="p-5"><h3 className="text-sm font-semibold">Score Distribution</h3><p className="mt-1 text-xs text-[#6B7280]">Counted submissions by score range</p><div className="mt-5 space-y-3">{items.map(item => <div key={item.label} className="grid grid-cols-[64px_1fr_24px] items-center gap-3 text-xs"><span className="text-[#6B7280]">{item.label}</span><div className="h-5 overflow-hidden rounded-sm bg-[#E8F5EF]"><div className="h-full bg-[#1B7A5A]" style={{ width: `${(item.count / max) * 100}%` }} /></div><span className="text-right font-semibold">{item.count}</span></div>)}</div></Card>;
+}
+function StudentDetailModal({ deliveryId, student, onClose }: { deliveryId: string; student: StudentRow; onClose: () => void }) {
+  const [detail, setDetail] = useState<StudentDetail | null>(null);
+  const [attemptIndex, setAttemptIndex] = useState(0);
+  useEffect(() => { axiosClient.get(`/api/test-deliveries/${deliveryId}/students/${student.id}`).then(setDetail).catch(error => console.error('Unable to load student detail:', error)); }, [deliveryId, student.id]);
+  const attempt = detail?.attempts[attemptIndex];
   return (
-    <div className="space-y-6">
-      <SectionHeading title={test.title} subtitle={`${assignment.title} · Test performance`} onBack={onBack} />
-      {loading ? <EmptyState text="Loading performance data…" /> : <>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          {kpis.map(([label, value, sub], index) => (
-            <Card key={label} className="flex min-h-[116px] flex-col justify-between p-4"><span className="text-[10px] font-semibold tracking-[0.08em] text-[#6B7280]">{label}</span><div><div className={`text-2xl font-semibold ${index === 2 && scores.length ? 'text-red-600' : ''}`}>{value}</div>{sub && <p className="mt-1 text-xs text-[#9CA3AF]">{sub}</p>}{index < 3 && <div className={`mt-2 h-1 w-12 rounded-full ${index === 2 && scores.length ? 'bg-red-600' : 'bg-[#1B7A5A]'}`} />}</div></Card>
-          ))}
-        </div>
-        <div className="grid items-start gap-6 lg:grid-cols-12">
-          <Card className="overflow-hidden lg:col-span-7">
-            <div className="flex items-center justify-between border-b border-[#E2EDE9] p-5"><h3 className="text-sm font-semibold">Question Performance Breakdown</h3><div className="flex gap-4 text-xs text-[#6B7280]"><Legend color="#115E43" label="Correct" /><Legend color="#B31919" label="Incorrect" /></div></div>
-            <div className="max-h-[430px] space-y-5 overflow-y-auto p-5">
-              {report.questions.map((question, index) => {
-                const total = question.stats.reduce((sum, item) => sum + item.count, 0);
-                const correct = question.stats.find(item => item.key === question.correctChoice)?.count || 0;
-                const percentage = total ? Math.round((correct / total) * 100) : 0;
-                return <div key={question.id}><div className="mb-2 flex items-center gap-3 text-xs"><span className="w-7 font-semibold text-[#6B7280]">Q{index + 1}</span><div className="flex h-3 flex-1 overflow-hidden rounded-full bg-[#FEECEC]"><div className="bg-[#115E43]" style={{ width: `${percentage}%` }} /><div className="bg-[#B31919]" style={{ width: `${100 - percentage}%` }} /></div><span className="w-9 text-right font-semibold text-[#6B7280]">{percentage}%</span></div><div className="ml-10 flex flex-wrap gap-1.5">{question.stats.map(stat => <Badge key={stat.key} tone={stat.key === question.correctChoice ? 'success' : 'neutral'}>{stat.key}: {stat.count}</Badge>)}</div></div>;
-              })}
-              {report.questions.length === 0 && <p className="py-12 text-center text-sm text-[#6B7280]">No question data yet.</p>}
+    <Modal
+      open
+      onClose={onClose}
+      closeOnBackdrop
+      title={student.name || 'Student performance'}
+      subtitle={student.email}
+      presentation="content-dialog"
+      className="h-[calc(100%_-_2rem)] max-w-[1100px]"
+    >
+      <div className="h-full min-h-0 min-w-0 overflow-y-auto pr-1">
+        {!detail ? (
+          <p className="py-12 text-center text-sm text-[#6B7280]">Loading attempt details…</p>
+        ) : detail.attempts.length === 0 ? (
+          <p className="py-12 text-center text-sm text-[#6B7280]">This student has not started the test.</p>
+        ) : (
+          <>
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Select
+                value={attemptIndex}
+                onChange={event => setAttemptIndex(Number(event.target.value))}
+                className="w-full sm:w-auto sm:min-w-48"
+              >
+                {detail.attempts.map((item, index) => (
+                  <option key={item.id} value={index}>Attempt {item.attemptNo} · {item.status}</option>
+                ))}
+              </Select>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[#4B5563]">
+                <span><b className="text-[#1A1A1A]">{score(attempt?.score)}</b> score</span>
+                {detail.testMode === 'EXAM' && (
+                  <span><b className="text-[#1A1A1A]">{formatDuration(attempt?.completionTimeMs)}</b> total time</span>
+                )}
+              </div>
             </div>
-          </Card>
-          <TableShell className="lg:col-span-5">
-            <div className="flex items-center gap-2 border-b border-[#E2EDE9] p-5"><Users size={16} className="text-[#1B7A5A]" /><h3 className="text-sm font-semibold">Student Rankings</h3></div>
-            <div className="max-h-[430px] overflow-auto"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-[#F8FBF9] text-[10px] tracking-wide text-[#6B7280]"><tr><th className="px-5 py-3">STUDENT NAME</th><th className="px-5 py-3 text-center">SCORE</th><th className="px-5 py-3 text-right">TIME</th></tr></thead><tbody className="divide-y divide-[#E2EDE9]">{report.leaderboard.map(student => <tr key={student.id} className="hover:bg-[#F8FBF9]"><td className="px-5 py-3"><div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E8F5EF] text-[10px] font-semibold text-[#1B7A5A]">{initials(student.name)}</span><span className="max-w-[150px] truncate font-medium">{student.name}</span></div></td><td className="px-5 py-3 text-center font-semibold text-[#1B7A5A]">{student.score}%</td><td className="px-5 py-3 text-right text-[#6B7280]">{student.time || '—'}</td></tr>)}</tbody></table>{report.leaderboard.length === 0 && <p className="py-12 text-center text-sm text-[#6B7280]">No submissions yet.</p>}</div>
-          </TableShell>
-        </div>
-      </>}
-    </div>
+
+            <TableShell className="max-w-full shadow-none">
+              <div className="max-w-full overflow-x-auto">
+                <table className="w-full min-w-[860px] table-fixed text-left text-xs">
+                  <thead className="sticky top-0 z-10 bg-[#F2F8F5] text-[10px] tracking-wide text-[#4B5563]">
+                    <tr>
+                      <th className="w-20 px-4 py-3">QUESTION</th>
+                      <th className="w-60 px-4 py-3">DOMAIN / SKILL</th>
+                      <th className="w-24 px-4 py-3 text-center">SELECTED</th>
+                      <th className="w-24 px-4 py-3 text-center">CORRECT</th>
+                      <th className="w-28 px-4 py-3 text-center">RESULT</th>
+                      {detail.testMode === 'EXAM' && (
+                        <>
+                          <th className="w-28 px-4 py-3 text-center">ACTIVE TIME</th>
+                          <th className="w-20 px-4 py-3 text-center">VISITS</th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#DDE7E3]">
+                    {attempt?.questions.map(question => (
+                      <tr key={question.id} className="align-top hover:bg-[#F8FBF9]">
+                        <td className="px-4 py-3 font-medium">Q{question.number}</td>
+                        <td className="px-4 py-3">
+                          <p className="break-words font-medium text-[#1A1A1A]">{question.domain || 'Uncategorized'}</p>
+                          <p className="mt-0.5 break-words text-[10px] leading-4 text-[#6B7280]">{question.skill || question.sectionName}</p>
+                        </td>
+                        <td className="break-all px-4 py-3 text-center">{question.selectedChoice || '—'}</td>
+                        <td className="break-all px-4 py-3 text-center font-semibold">{question.correctAnswer}</td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge tone={question.isCorrect ? 'success' : 'danger'}>{question.isCorrect ? 'Correct' : 'Incorrect'}</Badge>
+                        </td>
+                        {detail.testMode === 'EXAM' && (
+                          <>
+                            <td className="whitespace-nowrap px-4 py-3 text-center">{formatDuration(question.activeDurationMs)}</td>
+                            <td className="px-4 py-3 text-center">{question.visitCount || 0}</td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </TableShell>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }
-
-function Legend({ color, label }: { color: string; label: string }) {
-  return <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />{label}</span>;
-}
+function PageHeading({ title, subtitle, onBack }: { title: string; subtitle: string; onBack: () => void }) { return <div className="flex items-center gap-3"><Button variant="ghost" size="icon" onClick={onBack} aria-label="Go back"><ArrowLeft size={18} /></Button><div><h2 className="text-lg font-semibold">{title}</h2><p className="mt-0.5 text-xs text-[#6B7280]">{subtitle}</p></div></div>; }
+function EmptyState({ text }: { text: string }) { return <Card className="flex min-h-40 items-center justify-center p-8 text-sm text-[#6B7280]">{text}</Card>; }
+function Metric({ value, label, bordered = false }: { value: string; label: string; bordered?: boolean }) { return <div className={bordered ? 'border-x border-[#D6E3DE]' : ''}><p className="text-base font-semibold text-[#1A1A1A]">{value}</p><p className="mt-0.5 text-[10px] text-[#6B7280]">{label}</p></div>; }
+function Legend({ color, label }: { color: string; label: string }) { return <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />{label}</span>; }
+function score(value: number | null | undefined) { return Number.isFinite(value) ? `${value}%` : '—'; }
+function StatusBadge({ status }: { status: StudentRow['status'] }) { const tone = status === 'COMPLETED' ? 'success' : status === 'MISSING' ? 'danger' : status === 'IN_PROGRESS' ? 'warning' : 'neutral'; return <Badge tone={tone}>{status.replace('_', ' ').toLowerCase()}</Badge>; }

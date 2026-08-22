@@ -26,6 +26,7 @@ interface TestItem {
   lastScore?: number | null;
   author?: { id: number; name?: string; role: 'ADMIN' | 'TEACHER' | 'STUDENT' } | null;
   classTests?: Array<{ classId: string; class?: { name: string } }>;
+  deliveries?: Array<{ id: string; title: string; classId: string; availableAt: string | null; dueAt: string | null; maxAttempts: number; scorePolicy: 'FIRST' | 'BEST' | 'LATEST'; class: { name: string } }>;
 }
 
 type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT';
@@ -82,6 +83,10 @@ const PracticeTest = () => {
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [startClassTest, setStartClassTest] = useState<TestItem | null>(null);
+  const [availableAt, setAvailableAt] = useState('');
+  const [dueAt, setDueAt] = useState('');
+  const [maxAttempts, setMaxAttempts] = useState(1);
+  const [scorePolicy, setScorePolicy] = useState<'FIRST' | 'BEST' | 'LATEST'>('FIRST');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -115,23 +120,35 @@ const PracticeTest = () => {
     }).sort((first, second) => sortOrder === 'NEWEST' ? second.id - first.id : first.id - second.id);
   }, [classFilter, search, sortOrder, subject, tests, type]);
 
-  const openTest = useCallback((test: TestItem, classId?: string) => {
+  const openTest = useCallback((test: TestItem, context?: { classId?: string; deliveryId?: string }) => {
     localStorage.setItem('current_exam_info', JSON.stringify({
       id: test.id,
       title: test.title,
       description: test.description,
       duration: test.duration,
     }));
-    navigate(`/test/${test.id}${classId ? `?classId=${classId}` : ''}`);
+    const params = new URLSearchParams();
+    if (context?.deliveryId) params.set('deliveryId', context.deliveryId);
+    else if (context?.classId) params.set('classId', context.classId);
+    navigate(`/test/${test.id}${params.toString() ? `?${params}` : ''}`);
   }, [navigate]);
 
   const handleStart = useCallback((test: TestItem) => {
+    const deliveries = test.deliveries || [];
+    if (role === 'STUDENT' && deliveries.length > 1) {
+      setStartClassTest(test);
+      return;
+    }
+    if (role === 'STUDENT' && deliveries.length === 1) {
+      openTest(test, { deliveryId: deliveries[0].id });
+      return;
+    }
     const assignedClassIds = [...new Set((test.classTests || []).map(item => item.classId))];
     if (role === 'STUDENT' && assignedClassIds.length > 1) {
       setStartClassTest(test);
       return;
     }
-    openTest(test, role === 'STUDENT' ? assignedClassIds[0] : undefined);
+    openTest(test, role === 'STUDENT' && assignedClassIds[0] ? { classId: assignedClassIds[0] } : undefined);
   }, [openTest, role]);
 
   const toggleTest = (testId: number) => {
@@ -149,12 +166,23 @@ const PracticeTest = () => {
     }
     setAssigning(true);
     try {
-      await axiosClient.post('/api/tests/assign', { testIds: selectedTestIds, classIds: selectedClassIds });
+      await axiosClient.post('/api/tests/assign', {
+        testIds: selectedTestIds,
+        classIds: selectedClassIds,
+        availableAt: availableAt ? new Date(availableAt).toISOString() : null,
+        dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+        maxAttempts,
+        scorePolicy,
+      });
       toast.success(`Assigned ${selectedTestIds.length} test(s) to ${selectedClassIds.length} class(es)`);
       setAssignmentOpen(false);
       setSelectionMode(false);
       setSelectedTestIds([]);
       setSelectedClassIds([]);
+      setAvailableAt('');
+      setDueAt('');
+      setMaxAttempts(1);
+      setScorePolicy('FIRST');
       await loadData();
     } catch (error: unknown) {
       const requestError = error as { response?: { data?: { error?: string } } };
@@ -319,14 +347,22 @@ const PracticeTest = () => {
       </main>
 
       {assignmentOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0A1F16]/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0A1F16]/50 p-4">
           <div className="app-modal w-full max-w-lg">
             <div className="flex items-start justify-between border-b border-[#E2EDE9] px-6 py-5"><div><h3 className="text-lg font-semibold">Assign tests to classes</h3><p className="mt-1 text-sm text-[#6B7280]">{selectedTestIds.length} test(s) selected</p></div><button className="app-icon-button" onClick={() => setAssignmentOpen(false)}><X size={18} /></button></div>
-            <div className="max-h-[420px] space-y-2 overflow-y-auto p-6">
+            <div className="max-h-[520px] space-y-5 overflow-y-auto p-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Available from<input type="datetime-local" value={availableAt} onChange={event => setAvailableAt(event.target.value)} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20" /></label>
+                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Deadline<input type="datetime-local" value={dueAt} min={availableAt || undefined} onChange={event => setDueAt(event.target.value)} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20" /></label>
+                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Attempts<input type="number" min={1} max={10} value={maxAttempts} onChange={event => setMaxAttempts(Math.min(10, Math.max(1, Number(event.target.value))))} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A]" /></label>
+                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Score policy<select value={scorePolicy} onChange={event => setScorePolicy(event.target.value as typeof scorePolicy)} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A]"><option value="FIRST">First attempt</option><option value="BEST">Best attempt</option><option value="LATEST">Latest attempt</option></select></label>
+              </div>
+              <div className="border-t border-[#D6E3DE] pt-5">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Classes</p>
               {classes.length === 0 ? <p className="rounded-lg bg-[#EAF2EE] p-5 text-center text-sm text-[#6B7280]">You do not have any classes yet.</p> : classes.map(item => {
                 const checked = selectedClassIds.includes(item.id);
                 return <button key={item.id} onClick={() => toggleClass(item.id)} className={`flex w-full items-center gap-4 rounded-lg border p-4 text-left transition-colors ${checked ? 'border-[#1B7A5A] bg-[#E8F5EF]' : 'border-[#E2EDE9] hover:bg-[#F2F8F5]'}`}><span className={`flex h-9 w-9 items-center justify-center rounded-lg ${checked ? 'bg-[#1B7A5A] text-white' : 'bg-[#EAF2EE] text-[#6B7280]'}`}>{checked ? <Check size={18} strokeWidth={3} /> : <GraduationCap size={18} />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-[#1A1A1A]">{item.name}</span><span className="mt-1 block text-xs text-[#6B7280]">{item._count?.students || 0} student(s)</span></span></button>;
-              })}
+              })}</div>
             </div>
             <div className="flex justify-end gap-3 border-t border-[#E2EDE9] bg-[#F2F8F5] px-6 py-4"><button className="app-button app-button-secondary" onClick={() => setAssignmentOpen(false)}>Cancel</button><button className="app-button app-button-primary" disabled={assigning || selectedClassIds.length === 0} onClick={assignTests}>{assigning ? 'Assigning...' : `Assign to ${selectedClassIds.length} class(es)`}</button></div>
           </div>
@@ -337,7 +373,9 @@ const PracticeTest = () => {
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0A1F16]/50 p-4 backdrop-blur-sm">
           <div className="app-modal w-full max-w-md p-6">
             <div className="mb-5 flex items-start justify-between gap-4"><div><h3 className="font-semibold text-[#1A1A1A]">Choose a class</h3><p className="mt-1 line-clamp-1 text-sm text-[#6B7280]">{startClassTest.title}</p></div><button className="app-icon-button" onClick={() => setStartClassTest(null)}><X size={18} /></button></div>
-            <div className="space-y-2">{[...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <button key={classId} onClick={() => openTest(startClassTest, classId)} className="flex w-full items-center justify-between rounded-lg border border-[#E2EDE9] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></button>)}</div>
+            <div className="space-y-2">{(startClassTest.deliveries || []).length > 0
+              ? startClassTest.deliveries?.map(delivery => <button key={delivery.id} onClick={() => openTest(startClassTest, { deliveryId: delivery.id })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]"><span><span className="block">{delivery.class.name}</span><span className="mt-1 block text-xs font-normal text-[#6B7280]">{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleString()}` : 'No deadline'}</span></span><ChevronRight size={17} /></button>)
+              : [...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <button key={classId} onClick={() => openTest(startClassTest, { classId })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></button>)}</div>
           </div>
         </div>
       )}

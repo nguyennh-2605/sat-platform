@@ -13,6 +13,7 @@ Tài liệu này là nguồn quy tắc giao diện mặc định cho mọi thay 
 - Giữ giao diện gọn, chuyên nghiệp, tránh card quá cao, button quá lớn và khoảng trắng dư thừa.
 - Ưu tiên sự rõ ràng trước tính trang trí: control, đường viền, vùng nhập liệu và vùng nội dung phải nhận biết được ngay mà không cần người dùng đoán.
 - Mặc định dùng contrast đủ rõ và trọng lượng thị giác nhất quán. Chỉ tạo mức đậm–nhạt khi cần thể hiện UI hierarchy cụ thể; không làm mờ thành phần chỉ để giao diện trông “nhẹ”.
+- Ưu tiên hiệu năng và phản hồi mượt trên máy học sinh: không tùy tiện dùng `backdrop-filter`, `backdrop-blur`, blur lớn, animation liên tục, shadow nặng hoặc hiệu ứng GPU đắt tiền. Chỉ dùng khi Figma thực sự yêu cầu và lợi ích thị giác rõ ràng; ưu tiên overlay màu bán trong suốt đơn giản cho modal.
 
 ## 2. Design tokens
 
@@ -69,6 +70,8 @@ Các component hiện có:
 - `TableShell`
 
 Không tạo lại button, modal hoặc card bằng một bộ class mới nếu component dùng chung đã đáp ứng được yêu cầu. Nếu thiếu variant, mở rộng component dùng chung trước.
+
+- Trong dashboard có sidebar cố định bên trái, modal/panel thuộc một page phải được giới hạn trong vùng nội dung bên phải và không phủ, làm tối hoặc dịch chuyển sidebar. Dùng `Modal` với `presentation="content-dialog"` cho popup của page; variant này phải portal vào `document.body` và offset theo chiều rộng sidebar để không bị ancestor có `transform`, animation hoặc overflow làm lệch vị trí. Popup vẫn phải có khoảng đệm, backdrop và kích thước dialog bình thường. Chỉ dùng `presentation="content-panel"` khi người dùng thực sự yêu cầu một màn hình chi tiết phủ kín vùng nội dung.
 
 ## 4. Header và bố cục trang
 
@@ -149,6 +152,7 @@ Không tạo lại button, modal hoặc card bằng một bộ class mới nếu
 - [ ] Có loading, empty và error state.
 - [ ] Kiểm tra role Student/Teacher/Admin liên quan.
 - [ ] Kiểm tra responsive tối thiểu ở mobile và desktop.
+- [ ] Không thêm backdrop blur hoặc hiệu ứng gây tốn hiệu năng nếu không có lý do thiết kế rõ ràng.
 - [ ] Chạy targeted ESLint cho file đã sửa.
 - [ ] Chạy `npm run build` trong `client`.
 - [ ] Chạy `npm test` trong `server` nếu thay đổi API hoặc logic dữ liệu.

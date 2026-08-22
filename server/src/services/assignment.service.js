@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const testDeliveryService = require('./test-delivery.service');
 
 exports.deleteAssignment = async ({ assignmentId, userId }) => {
   // 1. Kiểm tra bài tập có tồn tại và lấy thông tin lớp học
@@ -18,6 +19,10 @@ exports.deleteAssignment = async ({ assignmentId, userId }) => {
   }
 
   // 3. Xóa bài tập (Prisma tự động xóa luôn các bài nộp nhờ Cascade)
+  await prisma.testDelivery.updateMany({
+    where: { sourceAssignmentId: assignmentId },
+    data: { status: 'CLOSED' },
+  });
   await prisma.assignment.delete({ where: { id: assignmentId } });
 };
 
@@ -43,7 +48,7 @@ exports.updateAssignment = async ({ assignmentId, userId, title, content, fileUr
   }
 
   // 3. Cập nhật dữ liệu
-  return prisma.assignment.update({
+  const updatedAssignment = await prisma.assignment.update({
     where: { id: assignmentId },
     data: {
       title: title !== undefined ? title : undefined,
@@ -54,6 +59,12 @@ exports.updateAssignment = async ({ assignmentId, userId, title, content, fileUr
       deadline: formattedDeadline
     }
   });
+  await testDeliveryService.syncClassAssignmentDeliveries({
+    assignment: updatedAssignment,
+    userId,
+    userRole: 'TEACHER',
+  });
+  return updatedAssignment;
 };
 
 exports.getAssignmentById = async ({ id, userId, userRole }) => {
@@ -96,6 +107,13 @@ exports.getAssignmentById = async ({ id, userId, userRole }) => {
         }
       })
     : [];
+  const deliveries = assignment.testIds.length > 0
+    ? await prisma.testDelivery.findMany({
+        where: { sourceAssignmentId: assignment.id, status: 'PUBLISHED' },
+        select: { id: true, testId: true },
+      })
+    : [];
+  const deliveryByTestId = new Map(deliveries.map(delivery => [delivery.testId, delivery.id]));
 
   const formattedSelectedTests = selectedTests.map(test => ({
     id: test.id,
@@ -106,7 +124,8 @@ exports.getAssignmentById = async ({ id, userId, userRole }) => {
     folderId: test.folderId,
     questionCount: test.sections.reduce((sum, section) => {
       return sum + section._count.questions;
-    }, 0)
+    }, 0),
+    deliveryId: deliveryByTestId.get(test.id) || null,
   }));
 
   const assignmentData = { ...assignment };

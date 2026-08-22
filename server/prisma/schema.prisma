@@ -24,19 +24,22 @@ model User {
   studyingClasses     Class[]              @relation("StudentClasses")
   notifications       Notification[]
   SubFolders          Folder[]
+  createdDeliveries   TestDelivery[]       @relation("DeliveryCreator")
+  deliveryAssignments DeliveryAssignee[]
 }
 
 model Class {
-  id          String       @id @default(uuid())
+  id          String         @id @default(uuid())
   name        String
-  color       String       @default("#1B7A5A")
-  createdAt   DateTime     @default(now())
+  color       String         @default("#1B7A5A")
+  createdAt   DateTime       @default(now())
   teacherId   Int
   assignments Assignment[]
-  teacher     User         @relation("TeacherClasses", fields: [teacherId], references: [id])
+  teacher     User           @relation("TeacherClasses", fields: [teacherId], references: [id])
   classTests  ClassTest[]
-  students    User[]       @relation("StudentClasses")
+  students    User[]         @relation("StudentClasses")
   weeks       Week[]
+  deliveries  TestDelivery[]
 }
 
 model Assignment {
@@ -88,23 +91,24 @@ model Folder {
 }
 
 model Test {
-  id          Int          @id @default(autoincrement())
+  id          Int            @id @default(autoincrement())
   description String?
-  duration    Int          @default(64)
+  duration    Int            @default(64)
   title       String
-  mode        TestMode     @default(PRACTICE)
+  mode        TestMode       @default(PRACTICE)
   authorId    Int?
-  category    TestCategory @default(PRACTICE)
-  isPublic    Boolean      @default(false)
-  subject     TestSubject  @default(RW)
-  createdAt   DateTime     @default(now())
+  category    TestCategory   @default(PRACTICE)
+  isPublic    Boolean        @default(false)
+  subject     TestSubject    @default(RW)
+  createdAt   DateTime       @default(now())
   testDate    String?
   classTests  ClassTest[]
   sections    Section[]
   submissions Submission[]
   folderId    Int?
-  folder      Folder?      @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  author      User?        @relation(fields: [authorId], references: [id])
+  folder      Folder?        @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  author      User?          @relation(fields: [authorId], references: [id])
+  deliveries  TestDelivery[]
 }
 
 model ClassTest {
@@ -133,21 +137,22 @@ model Section {
 }
 
 model Question {
-  id            Int             @id @default(autoincrement())
+  id            Int              @id @default(autoincrement())
   sectionId     Int
-  type          QuestionType    @default(MCQ)
+  type          QuestionType     @default(MCQ)
   choices       Json
   correctAnswer String
   blocks        Json
   questionText  String
   explanation   String?
-  order         Int             @default(0)
+  order         Int              @default(0)
   domainCode    String?
   skillCode     String?
   answers       Answer[]
-  section       Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  domain        QuestionDomain? @relation("QuestionDomainQuestions", fields: [domainCode], references: [code], onDelete: SetNull)
-  skill         QuestionSkill?  @relation("QuestionSkillQuestions", fields: [skillCode], references: [code], onDelete: SetNull)
+  section       Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  domain        QuestionDomain?  @relation("QuestionDomainQuestions", fields: [domainCode], references: [code], onDelete: SetNull)
+  skill         QuestionSkill?   @relation("QuestionSkillQuestions", fields: [skillCode], references: [code], onDelete: SetNull)
+  timings       QuestionTiming[]
 
   @@index([domainCode])
   @@index([skillCode])
@@ -176,25 +181,33 @@ model QuestionSkill {
 }
 
 model Submission {
-  id                   Int              @id @default(autoincrement())
-  userId               Int
-  testId               Int
-  assignmentId         String?
-  assignment           Assignment?      @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  classTestId          Int?
-  classTest            ClassTest?       @relation(fields: [classTestId], references: [id], onDelete: Cascade)
-  endTime              DateTime?
-  score                Int?
-  violationCount       Int              @default(0)
-  startedAt            DateTime         @default(now())
-  beganAt              DateTime?
-  currentQuestionIndex Int              @default(0)
-  savedAnswers         Json?
-  timeRemaining        Int?
-  status               SubmissionStatus @default(DOING)
-  answers              Answer[]
-  test                 Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
-  user                 User             @relation(fields: [userId], references: [id])
+  id                     Int              @id @default(autoincrement())
+  userId                 Int
+  testId                 Int
+  assignmentId           String?
+  assignment             Assignment?      @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  classTestId            Int?
+  classTest              ClassTest?       @relation(fields: [classTestId], references: [id], onDelete: Cascade)
+  deliveryId             String?
+  delivery               TestDelivery?    @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  attemptNo              Int              @default(1)
+  questionTimingSnapshot Json?
+  endTime                DateTime?
+  score                  Int?
+  violationCount         Int              @default(0)
+  startedAt              DateTime         @default(now())
+  beganAt                DateTime?
+  currentQuestionIndex   Int              @default(0)
+  savedAnswers           Json?
+  timeRemaining          Int?
+  status                 SubmissionStatus @default(DOING)
+  answers                Answer[]
+  test                   Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
+  user                   User             @relation(fields: [userId], references: [id])
+  questionTimings        QuestionTiming[]
+
+  @@unique([deliveryId, userId, attemptNo])
+  @@index([deliveryId, status])
 }
 
 model Answer {
@@ -261,6 +274,18 @@ enum SubmissionStatus {
   COMPLETED
 }
 
+enum DeliveryStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum ScorePolicy {
+  FIRST
+  BEST
+  LATEST
+}
+
 enum QuestionType {
   MCQ // Trắc nghiệm
   SPR // Tự luận điền số (Grid-in)
@@ -286,6 +311,61 @@ model Lesson {
   week        Week               @relation(fields: [weekId], references: [id], onDelete: Cascade)
   files       LessonFile[]
   assignments LessonAssignment[]
+  deliveries  TestDelivery[]
+}
+
+model TestDelivery {
+  id                       String             @id @default(uuid())
+  classId                  String
+  testId                   Int
+  lessonId                 String?
+  title                    String
+  availableAt              DateTime?
+  dueAt                    DateTime?
+  maxAttempts              Int                @default(1)
+  scorePolicy              ScorePolicy        @default(FIRST)
+  status                   DeliveryStatus     @default(PUBLISHED)
+  createdAt                DateTime           @default(now())
+  createdById              Int
+  legacyClassTestId        Int?               @unique
+  sourceAssignmentId       String?
+  sourceLessonAssignmentId String?
+  class                    Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  test                     Test               @relation(fields: [testId], references: [id], onDelete: Cascade)
+  lesson                   Lesson?            @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  createdBy                User               @relation("DeliveryCreator", fields: [createdById], references: [id])
+  assignees                DeliveryAssignee[]
+  submissions              Submission[]
+
+  @@index([classId, dueAt])
+  @@index([testId])
+  @@index([sourceAssignmentId, testId])
+  @@index([sourceLessonAssignmentId, testId])
+}
+
+model DeliveryAssignee {
+  deliveryId String
+  studentId  Int
+  assignedAt DateTime     @default(now())
+  excusedAt  DateTime?
+  delivery   TestDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  student    User         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([deliveryId, studentId])
+  @@index([studentId])
+}
+
+model QuestionTiming {
+  id               Int        @id @default(autoincrement())
+  submissionId     Int
+  questionId       Int
+  activeDurationMs Int
+  visitCount       Int        @default(1)
+  submission       Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  question         Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, questionId])
+  @@index([questionId])
 }
 
 model LessonFile {

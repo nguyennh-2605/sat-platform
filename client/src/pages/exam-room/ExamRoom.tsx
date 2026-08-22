@@ -30,7 +30,21 @@ function ExamRoom() {
     const searchParams = new URLSearchParams(window.location.search);
     return searchParams.get('classId');
   }, []);
-  const contextKey = assignmentId ? `assignment-${assignmentId}` : (classId ? `class-${classId}` : 'no-assignment');
+  const deliveryId = useMemo(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get('deliveryId');
+  }, []);
+  const contextKey = deliveryId
+    ? `delivery-${deliveryId}`
+    : assignmentId ? `assignment-${assignmentId}` : (classId ? `class-${classId}` : 'no-assignment');
+  const contextQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    if (deliveryId) params.set('deliveryId', deliveryId);
+    else if (assignmentId) params.set('assignmentId', assignmentId);
+    else if (classId) params.set('classId', classId);
+    const query = params.toString();
+    return query ? `?${query}` : '';
+  }, [assignmentId, classId, deliveryId]);
 
   // --- STATE QUẢN LÝ ---
   const [questions, setQuestions] = useState<QuestionData[]>([]);
@@ -53,6 +67,7 @@ function ExamRoom() {
   // Timer & Anticheat
   const [timeLeft, setTimeLeft] = useState(32 * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
   const [violationCount, setViolationCount] = useState(0);
 
   // Thêm state để lưu Submission ID
@@ -117,6 +132,31 @@ function ExamRoom() {
   const violationCountRef = useRef(0);
   const submitInFlightRef = useRef(false);
   const timeLeftRef = useRef(timeLeft);
+  type QuestionTiming = { activeDurationMs: number; visitCount: number };
+  const questionTimingsRef = useRef<Record<string, QuestionTiming>>({});
+  const activeQuestionRef = useRef<{ id: number; startedAt: number } | null>(null);
+
+  const flushActiveQuestion = useCallback(() => {
+    const active = activeQuestionRef.current;
+    if (!active) return;
+    const elapsed = Math.max(0, Math.round(performance.now() - active.startedAt));
+    const key = String(active.id);
+    const previous = questionTimingsRef.current[key] || { activeDurationMs: 0, visitCount: 1 };
+    questionTimingsRef.current = {
+      ...questionTimingsRef.current,
+      [key]: { ...previous, activeDurationMs: previous.activeDurationMs + elapsed },
+    };
+    activeQuestionRef.current = null;
+  }, []);
+
+  const getQuestionTimingSnapshot = useCallback((resumeTracking = true) => {
+    const active = activeQuestionRef.current;
+    flushActiveQuestion();
+    if (active && resumeTracking) {
+      activeQuestionRef.current = { id: active.id, startedAt: performance.now() };
+    }
+    return { ...questionTimingsRef.current };
+  }, [flushActiveQuestion]);
 
   // Timer callbacks live for a long time; refs ensure an automatic submit uses
   // the newest answers instead of the empty object captured when the timer began.
@@ -161,7 +201,7 @@ function ExamRoom() {
       try {
         setIsLoading(true);
 
-        const data = await axiosClient.get(`/api/test/${id}?userId=${userId}${assignmentId ? `&assignmentId=${assignmentId}` : ''}${classId ? `&classId=${classId}` : ''}`);
+        const data = await axiosClient.get(`/api/test/${id}${contextQuery}`);
 
         if (!data) throw new Error("No data");
 
@@ -226,8 +266,13 @@ function ExamRoom() {
             timeLeft: dbTimeLeft, 
             savedAnswers: dbSavedAnswers, 
             currentQuestionIndex: dbCurrentQuestionIndex,
-            violationCount: dbViolationCount
+            violationCount: dbViolationCount,
+            questionTimingSnapshot,
           } = data.session;
+
+          if (mode === 'EXAM' && questionTimingSnapshot && typeof questionTimingSnapshot === 'object') {
+            questionTimingsRef.current = questionTimingSnapshot;
+          }
 
           setSubmissionId(submissionId);
 
@@ -330,7 +375,32 @@ function ExamRoom() {
     };
 
     fetchExamData();
-  }, [id]);
+  }, [contextKey, contextQuery, id, navigate]);
+
+  useEffect(() => {
+    const question = questions[currentQuestionIndex];
+    const shouldTrack = testMode === 'EXAM'
+      && isTimerRunning
+      && isPageVisible
+      && !isReviewOpen
+      && !showStartModal
+      && !isTransitioning
+      && !isSubmitted
+      && Boolean(question);
+
+    flushActiveQuestion();
+    if (shouldTrack && question) {
+      const key = String(question.id);
+      const previous = questionTimingsRef.current[key] || { activeDurationMs: 0, visitCount: 0 };
+      questionTimingsRef.current = {
+        ...questionTimingsRef.current,
+        [key]: { ...previous, visitCount: previous.visitCount + 1 },
+      };
+      activeQuestionRef.current = { id: Number(question.id), startedAt: performance.now() };
+    }
+
+    return flushActiveQuestion;
+  }, [currentQuestionIndex, flushActiveQuestion, isPageVisible, isReviewOpen, isSubmitted, isTimerRunning, isTransitioning, questions, showStartModal, testMode]);
 
   // --- HÀM HỖ TRỢ ---
   const enterFullscreen = () => {
@@ -347,6 +417,7 @@ function ExamRoom() {
   ) => {
     if (submitInFlightRef.current) return;
     submitInFlightRef.current = true;
+    const questionTimings = testMode === 'EXAM' ? getQuestionTimingSnapshot(false) : undefined;
     setIsTimerRunning(false);
     setIsReviewOpen(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -369,10 +440,11 @@ function ExamRoom() {
              return;
         }
 
-        const response = await axiosClient.post(`/api/test/${id}/submit${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`, {
+        const response = await axiosClient.post(`/api/test/${id}/submit${contextQuery}`, {
           submissionId: idToSubmit,
           answers: answersOverride || answersRef.current,
-          violationCount: violationCountRef.current
+          violationCount: violationCountRef.current,
+          questionTimings,
         });
 
         localStorage.removeItem(`answers_${userId}_${id}_${contextKey}`);
@@ -387,7 +459,7 @@ function ExamRoom() {
         submitInFlightRef.current = false;
         setIsSubmitting(false);
     }
-  }, [assignmentId, classId, contextKey, id, submissionId]);
+  }, [contextKey, contextQuery, getQuestionTimingSnapshot, id, submissionId, testMode]);
 
   // --- LOGIC TIMER ---
   useEffect(() => {
@@ -427,7 +499,7 @@ function ExamRoom() {
   // server update is conditional on DOING, so it cannot overwrite a completed
   // submission if autosave and submit arrive concurrently.
   useEffect(() => {
-    if (!id || !submissionId || isSubmitted || Object.keys(answers).length === 0) return;
+    if (!id || !submissionId || isSubmitted) return;
 
     const timeout = window.setTimeout(() => {
       axiosClient.post(`/api/test/${id}/save-progress`, {
@@ -435,7 +507,8 @@ function ExamRoom() {
         answers,
         timeLeft: timeLeftRef.current,
         currentQuestionIndex,
-        violationCount: violationCountRef.current
+        violationCount: violationCountRef.current,
+        questionTimings: testMode === 'EXAM' ? getQuestionTimingSnapshot() : undefined,
       }).catch((error) => {
         // localStorage remains the offline fallback; avoid interrupting the exam.
         console.error('Autosave chưa đồng bộ được:', error);
@@ -443,13 +516,29 @@ function ExamRoom() {
     }, 800);
 
     return () => window.clearTimeout(timeout);
-  }, [answers, currentQuestionIndex, id, isSubmitted, submissionId]);
+  }, [answers, currentQuestionIndex, getQuestionTimingSnapshot, id, isSubmitted, submissionId, testMode]);
+
+  useEffect(() => {
+    if (!id || !submissionId || isSubmitted || testMode !== 'EXAM' || !isTimerRunning) return;
+    const interval = window.setInterval(() => {
+      axiosClient.post(`/api/test/${id}/save-progress`, {
+        submissionId,
+        answers: answersRef.current,
+        timeLeft: timeLeftRef.current,
+        currentQuestionIndex,
+        violationCount: violationCountRef.current,
+        questionTimings: getQuestionTimingSnapshot(),
+      }).catch(error => console.error('Unable to sync question timing:', error));
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, [currentQuestionIndex, getQuestionTimingSnapshot, id, isSubmitted, isTimerRunning, submissionId, testMode]);
 
   // --- LOGIC ANTICHEAT ---
   useEffect(() => {    
     if (!isTimerRunning || isSubmitted || testMode !== 'EXAM') return;
 
     const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
       if (document.hidden) {
         setViolationCount(prev => prev + 1);
         toast(`Warning: do not leave the test screen`);
@@ -758,12 +847,13 @@ function ExamRoom() {
         answers,
         timeLeft,
         violationCount,
-        currentQuestionIndex
+        currentQuestionIndex,
+        questionTimings: testMode === 'EXAM' ? getQuestionTimingSnapshot(false) : undefined,
       };
 
       console.log("payload gui ve backend", payload);
 
-      await axiosClient.post(`/api/test/${id}/save-progress${assignmentId || classId ? `?${assignmentId ? `assignmentId=${assignmentId}` : ''}${assignmentId && classId ? '&' : ''}${classId ? `classId=${classId}` : ''}` : ''}`, payload);
+      await axiosClient.post(`/api/test/${id}/save-progress${contextQuery}`, payload);
 
       console.log("Đã đồng bộ dữ liệu lên Server thành công");
       toast.success("Test saved");
@@ -774,7 +864,7 @@ function ExamRoom() {
       navigate('/dashboard');
     }
 
-  }, [id, answers, violationCount, currentQuestionIndex, submissionId, phase, timeLeft, navigate]);
+  }, [answers, contextKey, contextQuery, currentQuestionIndex, getQuestionTimingSnapshot, id, navigate, submissionId, testMode, timeLeft, violationCount]);
 
   const handleQuestionJump = (realIndex: number) => {
     // Xác định xem câu hỏi đó thuộc Module nào để chuyển phase cho đúng

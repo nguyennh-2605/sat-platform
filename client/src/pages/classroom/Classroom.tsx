@@ -12,7 +12,7 @@ import AnnouncementCreator from '../../features/notifications/AnnouncementCreato
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
 
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-type ClassroomTab = 'NOTIFICATIONS' | 'MEMBERS' | 'PROGRESS' | 'SCORES';
+type ClassroomTab = 'NOTIFICATIONS' | 'MEMBERS' | 'PROGRESS' | 'PERFORMANCE';
 type NotificationFilter = 'all' | 'assignment' | 'announcement';
 
 interface CurrentUser { id: string; name: string; role: UserRole }
@@ -110,7 +110,7 @@ export default function Classroom() {
   const tabs: Array<{ id: ClassroomTab; label: string; icon: ElementType }> = [
     { id: 'NOTIFICATIONS', label: 'Notifications', icon: Bell },
     { id: 'MEMBERS', label: 'Members', icon: Users },
-    ...(canManage ? [{ id: 'PROGRESS' as ClassroomTab, label: 'Progress Timeline', icon: GitBranch }, { id: 'SCORES' as ClassroomTab, label: 'Score Report', icon: BarChart3 }] : []),
+    ...(canManage ? [{ id: 'PROGRESS' as ClassroomTab, label: 'Progress Timeline', icon: GitBranch }, { id: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3 }] : []),
   ];
 
   return <div className={ui.page}>
@@ -127,7 +127,7 @@ export default function Classroom() {
       {activeTab === 'NOTIFICATIONS' && <NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} />}
       {activeTab === 'MEMBERS' && <MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} />}
       {activeTab === 'PROGRESS' && canManage && <div className="p-6 lg:p-8"><WeeklyProgress /></div>}
-      {activeTab === 'SCORES' && canManage && <div className="p-6 lg:p-8"><StudentAnalytics classId={classId} /></div>}
+      {activeTab === 'PERFORMANCE' && canManage && <div className="p-6 lg:p-8"><StudentAnalytics classId={classId} /></div>}
     </div></main>
 
     {announcementOpen && <AnnouncementCreator onClose={() => setAnnouncementOpen(false)} onSubmit={data => void createAnnouncement(data)} />}

@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const testDeliveryService = require('./test-delivery.service');
 
 // Helper dùng chung: lấy lesson kèm thông tin lớp để kiểm tra quyền sở hữu
 const getLessonWithClass = (lessonId) =>
@@ -21,7 +22,13 @@ exports.getWeeks = ({ classId }) =>
         orderBy: { order: 'asc' },
         include: {
           files: { orderBy: { createdAt: 'asc' } },
-          assignments: true
+          assignments: true,
+          deliveries: {
+            orderBy: { createdAt: 'desc' },
+            include: {
+              test: { select: { id: true, title: true, mode: true, duration: true } },
+            },
+          },
         }
       }
     }
@@ -209,22 +216,62 @@ exports.createOrUpdateAssignment = async ({ lessonId, title, content, dueDate, t
     throw new ApiError(403, { success: false, error: 'Bạn không có quyền giao bài tập' });
   }
 
-  return prisma.lessonAssignment.upsert({
+  const normalizedTestIds = [...new Set((Array.isArray(testIds) ? testIds : []).map(Number).filter(Number.isInteger))];
+  const assignment = await prisma.lessonAssignment.upsert({
     where: { lessonId },
     update: {
       title,
       content: content || null,
       dueDate: dueDate ? new Date(dueDate) : null,
-      testIds: Array.isArray(testIds) ? testIds : []
+      testIds: normalizedTestIds
     },
     create: {
       title,
       content: content || null,
       dueDate: dueDate ? new Date(dueDate) : null,
-      testIds: Array.isArray(testIds) ? testIds : [],
+      testIds: normalizedTestIds,
       lessonId
     }
   });
+
+  const existingDeliveries = await prisma.testDelivery.findMany({
+    where: { sourceLessonAssignmentId: assignment.id },
+    select: { id: true, testId: true },
+  });
+  const retainedTestIds = new Set(normalizedTestIds);
+  await prisma.testDelivery.updateMany({
+    where: {
+      sourceLessonAssignmentId: assignment.id,
+      testId: { notIn: normalizedTestIds.length ? normalizedTestIds : [-1] },
+    },
+    data: { status: 'CLOSED' },
+  });
+  await prisma.testDelivery.updateMany({
+    where: { sourceLessonAssignmentId: assignment.id, testId: { in: normalizedTestIds } },
+    data: { title, dueAt: dueDate ? new Date(dueDate) : null, status: 'PUBLISHED' },
+  });
+
+  const existingTestIds = new Set(existingDeliveries.map(item => item.testId));
+  const newTestIds = normalizedTestIds.filter(testId => !existingTestIds.has(testId) && retainedTestIds.has(testId));
+  if (newTestIds.length > 0) {
+    const deliveries = await testDeliveryService.createDeliveries({
+      classIds: [lesson.week.classId],
+      testIds: newTestIds,
+      lessonId,
+      title,
+      dueAt,
+      maxAttempts: 1,
+      scorePolicy: 'FIRST',
+      userId,
+      userRole: 'TEACHER',
+    });
+    await prisma.testDelivery.updateMany({
+      where: { id: { in: deliveries.map(item => item.id) } },
+      data: { sourceLessonAssignmentId: assignment.id },
+    });
+  }
+
+  return assignment;
 };
 
 exports.deleteAssignment = async ({ assignmentId, userId }) => {
@@ -243,5 +290,9 @@ exports.deleteAssignment = async ({ assignmentId, userId }) => {
     throw new ApiError(403, { success: false, error: 'Bạn không có quyền xóa' });
   }
 
+  await prisma.testDelivery.updateMany({
+    where: { sourceLessonAssignmentId: assignmentId },
+    data: { status: 'CLOSED' },
+  });
   await prisma.lessonAssignment.delete({ where: { id: assignmentId } });
 };
