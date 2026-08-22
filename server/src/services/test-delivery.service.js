@@ -226,6 +226,7 @@ exports.getDeliveryPerformance = async ({ deliveryId, userId, userRole }) => {
   }
   const counted = [...countedByStudent.values()];
   const scores = counted.map(item => percentageScore(item.score, questionCount)).filter(Number.isFinite);
+  const rawScores = counted.map(item => Number(item.score)).filter(Number.isFinite);
   const completionTimes = counted.map(item => item.beganAt && item.endTime ? Math.max(0, new Date(item.endTime) - new Date(item.beganAt)) : null).filter(Number.isFinite);
   const duePassed = delivery.dueAt && delivery.dueAt < new Date();
 
@@ -288,9 +289,12 @@ exports.getDeliveryPerformance = async ({ deliveryId, userId, userRole }) => {
     },
     kpis: {
       averageScore: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null,
+      averageCorrect: rawScores.length ? Math.round((rawScores.reduce((sum, score) => sum + score, 0) / rawScores.length) * 10) / 10 : null,
       medianScore: scores.length ? median(scores) : null,
       highestScore: scores.length ? Math.max(...scores) : null,
+      highestCorrect: rawScores.length ? Math.max(...rawScores) : null,
       lowestScore: scores.length ? Math.min(...scores) : null,
+      lowestCorrect: rawScores.length ? Math.min(...rawScores) : null,
       participants: counted.length,
       assigned: activeAssignees.length,
       completionRate: activeAssignees.length ? Math.round((counted.length / activeAssignees.length) * 100) : 0,

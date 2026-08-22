@@ -13,6 +13,8 @@ import InteractiveText from './InteractiveText';
 interface ReviewModalProps {
   data: QuestionResult;
   onClose: () => void;
+  onPrevious?: () => void;
+  onNext?: () => void;
   examTitle?: string;
   examSubject: string;
 }
@@ -104,7 +106,7 @@ const StaticMessage = React.memo(({ msg }: { msg: ChatMessage }) => {
   );
 });
 
-const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, examSubject }) => {
+const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, onNext, examTitle, examSubject }) => {
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -402,9 +404,27 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
     messagesRef.current = messages;
   }, [messages]);
 
+  const closeModal = useCallback(() => {
+    abortControllerRef.current?.abort();
+    onClose();
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
-      <div className={`bg-white rounded-xl shadow-2xl flex flex-row h-[90vh] overflow-hidden ring-1 ring-gray-900/5 transition-all duration-300 ease-in-out w-full ${isAiOpen ? 'max-w-7xl' : 'max-w-5xl'}`}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-14 py-4 animate-in fade-in duration-200"
+      onMouseDown={event => { if (event.target === event.currentTarget) closeModal(); }}
+    >
+      <div className={`relative h-[90vh] w-full transition-[max-width] duration-300 ease-in-out ${isAiOpen ? 'max-w-7xl' : 'max-w-5xl'}`}>
+      <button
+        type="button"
+        onClick={onPrevious}
+        disabled={!onPrevious}
+        aria-label="Previous question"
+        className="absolute -left-14 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white text-[#1B7A5A] shadow-lg transition-colors hover:bg-[#E8F5EF] disabled:cursor-not-allowed disabled:opacity-35"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+      </button>
+      <div className="flex h-full w-full flex-row overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-gray-900/5">
         
         {/* ================= CỘT TRÁI ================= */}
         <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -444,10 +464,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4M3 5h4"/></svg>
               </button>
               <button 
-                onClick={() => {
-                  abortControllerRef.current?.abort();
-                  onClose();
-                }} 
+                onClick={closeModal}
                 className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-800">
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
@@ -593,6 +610,16 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, examTitle, exa
           </div>
 
         </div>
+      </div>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={!onNext}
+        aria-label="Next question"
+        className="absolute -right-14 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white text-[#1B7A5A] shadow-lg transition-colors hover:bg-[#E8F5EF] disabled:cursor-not-allowed disabled:opacity-35"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+      </button>
       </div>
     </div>
   );

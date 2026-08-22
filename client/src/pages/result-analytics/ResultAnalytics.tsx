@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { AppHeader, Badge, Button, Card, TableShell } from '../../components/ui/AppUI';
 import { ui } from '../../components/ui/styles';
+import { capitalizeFirstLetter } from '../../utils/text';
 
 interface AnalyticsSummary {
   overallAccuracy: number;
@@ -225,7 +226,7 @@ const ResultAnalytics = () => {
                     <tr><td colSpan={4} className="px-5 py-12 text-center text-sm text-[#6B7280]">No recent activity yet.</td></tr>
                   ) : history.map(item => (
                     <tr key={item.id} className="transition-colors hover:bg-slate-50/50">
-                      <td className="px-5 py-4 font-medium text-slate-800">{item.test.title}</td>
+                      <td className="px-5 py-4 font-medium text-slate-800">{capitalizeFirstLetter(item.test.title)}</td>
                       <td className="px-5 py-4"><Badge tone={item.status === 'COMPLETED' ? 'success' : 'warning'}>{item.status === 'COMPLETED' ? 'Completed' : 'Incomplete'}</Badge></td>
                       <td className="px-5 py-4 text-xs font-medium text-slate-600">{format(new Date(item.createdAt), 'MMM d, yyyy')}</td>
                       <td className="px-5 py-4 text-right"><Button variant="outline" size="sm" disabled={item.status !== 'COMPLETED'} onClick={() => navigate('/dashboard/score-report', { state: { resultId: item.id } })}>View Details <ArrowRight size={12} /></Button></td>
@@ -265,7 +266,7 @@ function ScoreTooltip({ active, payload }: { active?: boolean; payload?: Array<{
   if (!active || !payload?.length) return null;
   const available = payload.filter(item => item.value !== null && item.value !== undefined);
   if (available.length === 0) return null;
-  return <div className="min-w-[150px] rounded-lg border border-[#C2DDD4] bg-white p-3 text-xs shadow-xl"><p className="mb-2 border-b border-[#E2EDE9] pb-2 font-semibold text-slate-700">{available[0].payload.testName}</p>{available.map(item => <p key={item.name} className="flex justify-between gap-5"><span>{item.name}</span><strong style={{ color: item.color }}>{item.value}%</strong></p>)}</div>;
+  return <div className="min-w-[150px] rounded-lg border border-[#C2DDD4] bg-white p-3 text-xs shadow-xl"><p className="mb-2 border-b border-[#E2EDE9] pb-2 font-semibold text-slate-700">{capitalizeFirstLetter(available[0].payload.testName)}</p>{available.map(item => <p key={item.name} className="flex justify-between gap-5"><span>{item.name}</span><strong style={{ color: item.color }}>{item.value}%</strong></p>)}</div>;
 }
 
 function SectionGroup({ title, tone, items, color }: { title: string; tone: 'green' | 'gold'; items: SectionPerformanceItem[]; color: string }) {

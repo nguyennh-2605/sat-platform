@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileText, Clock, Link as LinkIcon, ArrowLeft, Send, Github, Globe, YoutubeIcon, Edit, MoreVertical, Trash2, ClipboardList, ChevronRight } from 'lucide-react';
+import { FileText, Clock, Link as LinkIcon, Send, Github, Globe, YoutubeIcon, Edit, MoreVertical, Trash2, ClipboardList, ChevronRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
+import { capitalizeFirstLetter } from '../../utils/text';
+import { BackButton } from '../../components/ui/AppUI';
 import AnnouncementCreator from '../notifications/AnnouncementCreator';
 import { type AssignmentProps } from '../../types/quiz';
   
@@ -170,13 +172,7 @@ const AssignmentDetail = () => {
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8">
-      {/* Nút Back */}
-      <button 
-        onClick={() => navigate(-1)}
-        className="flex items-center gap-2 text-slate-500 hover:text-[#1B7A5A] transition mb-6 font-medium"
-      >
-        <ArrowLeft size={20} /> Back to class
-      </button>
+      <BackButton onClick={() => navigate(-1)} className="mb-6" />
 
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="flex-1">
@@ -499,7 +495,7 @@ const AssignmentDetail = () => {
                   className="border border-slate-200 rounded-xl p-4 bg-white hover:border-[#C2DDD4] transition"
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <h4 className="font-semibold text-slate-800">{test.title}</h4>
+                    <h4 className="font-semibold text-slate-800">{capitalizeFirstLetter(test.title)}</h4>
                     <span className={`px-2 py-1 rounded text-xs font-bold ${test.mode === 'EXAM' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                       {test.mode}
                     </span>

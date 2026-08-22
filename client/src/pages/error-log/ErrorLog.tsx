@@ -4,6 +4,7 @@ import {
   XCircle, Save, FileText, ChevronLeft, ChevronRight, AlertCircle, Loader2
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { capitalizeFirstLetter } from '../../utils/text';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { AppHeader, Button, Input } from '../../components/ui/AppUI';
@@ -242,7 +243,7 @@ const ErrorLog = () => {
                         <td className="px-6 py-4 align-top font-medium text-slate-700">
                             <div className="flex items-start gap-2">
                               <FileText size={14} className="mt-1 text-slate-300 shrink-0"/>
-                              <span className="line-clamp-2" title={log.source}>{log.source}</span>
+                              <span className="line-clamp-2" title={capitalizeFirstLetter(log.source)}>{capitalizeFirstLetter(log.source)}</span>
                             </div>
                         </td>
 

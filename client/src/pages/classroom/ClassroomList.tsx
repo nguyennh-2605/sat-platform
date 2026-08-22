@@ -6,6 +6,8 @@ import { format } from 'date-fns';
 import axiosClient from '../../lib/axios';
 import { AppHeader, Button, Card, Input, Modal } from '../../components/ui/AppUI';
 import { ui } from '../../components/ui/styles';
+import { capitalizeFirstLetter } from '../../utils/text';
+import { ClassroomTodoPanel } from '../../features/classroom/ClassroomTodoPanel';
 
 const CLASS_COLORS = ['#1B7A5A', '#0F4D38', '#2563EB', '#A16207', '#B45309', '#8B3A62', '#475569'] as const;
 
@@ -40,7 +42,7 @@ export default function ClassroomList() {
     setLoadError('');
     try {
       const result = await axiosClient.get<ClassSummary[], ClassSummary[]>('/api/classes');
-      setClasses(result);
+      setClasses(result.map(classroom => ({ ...classroom, name: capitalizeFirstLetter(classroom.name) })));
     } catch (error) {
       console.error(error);
       setLoadError(getErrorMessage(error, 'Unable to load your classes.'));
@@ -75,6 +77,8 @@ export default function ClassroomList() {
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className={ui.content}>
+          <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="min-w-0" aria-label="Classes">
           {loading ? <ClassGridSkeleton /> : loadError ? (
             <Card className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
               <p className="text-sm font-medium text-[#1A1A1A]">Classes could not be loaded</p>
@@ -89,7 +93,7 @@ export default function ClassroomList() {
               {canCreate && <Button className="mt-5" onClick={() => setEditor({ mode: 'create' })}><Plus size={16} />Create class</Button>}
             </Card>
           ) : (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3">
               {classes.map(classroom => (
                 <article
                   key={classroom.id}
@@ -133,6 +137,9 @@ export default function ClassroomList() {
               ))}
             </div>
           )}
+          </section>
+          <ClassroomTodoPanel />
+          </div>
         </div>
       </main>
 
@@ -202,5 +209,5 @@ function DeleteClassModal({ target, onClose, onDeleted }: { target: ClassSummary
 }
 
 function ClassGridSkeleton() {
-  return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} className="h-[238px] animate-pulse overflow-hidden p-0"><div className="h-24 bg-[#D8E7E1]" /><div className="space-y-3 p-5"><div className="h-4 w-2/3 rounded bg-[#E7EFEC]" /><div className="h-4 w-1/2 rounded bg-[#E7EFEC]" /><div className="h-3 w-1/3 rounded bg-[#E7EFEC]" /></div></Card>)}</div>;
+  return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} className="h-[238px] animate-pulse overflow-hidden p-0"><div className="h-24 bg-[#D8E7E1]" /><div className="space-y-3 p-5"><div className="h-4 w-2/3 rounded bg-[#E7EFEC]" /><div className="h-4 w-1/2 rounded bg-[#E7EFEC]" /><div className="h-3 w-1/3 rounded bg-[#E7EFEC]" /></div></Card>)}</div>;
 }

@@ -104,6 +104,13 @@ Không tạo lại button, modal hoặc card bằng một bộ class mới nếu
 - Input/select cao khoảng `36px`, `rounded-lg`, focus ring xanh nhẹ.
 - Không tạo checkbox hoặc tick button quá lớn.
 
+### Page-level Back button
+
+- Mọi hành động quay lại ở cấp trang hoặc quay lại một màn hình cha phải dùng shared component `BackButton` từ `client/src/components/ui/AppUI.tsx`; không tự viết lại bằng thẻ `button` và một bộ class riêng.
+- Mẫu mặc định luôn gồm icon `ArrowLeft` cỡ `16px` và nhãn English `Back`; cao `32px`, `rounded-lg`, nền trong suốt, chữ `#4B5563`, hover nền xanh nhạt và chữ xanh đậm.
+- Không đổi thành icon-only, outline button, text link hoặc các nhãn dài như `Back to Analytics` / `Back to class` nếu không có yêu cầu đặc biệt về accessibility hoặc không gian.
+- Điều hướng Previous/Next trong bảng, carousel, question review hoặc stepper là workflow control, không phải page-level Back và tiếp tục dùng variant phù hợp với ngữ cảnh đó.
+
 ## 7. Practice Center
 
 - Giáo viên chỉ thấy đề do chính giáo viên đó tạo.

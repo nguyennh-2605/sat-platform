@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, BookOpen, BookOpenCheck, Check, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Play, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
+import { capitalizeFirstLetter } from '../../utils/text';
 
 interface ClassInfo {
   id: string;
@@ -56,12 +57,6 @@ const formatLastAttempt = (value?: string | null) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-const formatTestTitle = (title: string) => {
-  const trimmedTitle = title.trim();
-  if (!trimmedTitle) return title;
-  return `${trimmedTitle.charAt(0).toLocaleUpperCase()}${trimmedTitle.slice(1)}`;
-};
-
 const PracticeTest = () => {
   const navigate = useNavigate();
   const role = (localStorage.getItem('userRole') || 'STUDENT') as UserRole;
@@ -95,8 +90,8 @@ const PracticeTest = () => {
         axiosClient.get<TestItem[], TestItem[]>('/api/tests'),
         axiosClient.get<ClassInfo[], ClassInfo[]>('/api/tests/classes'),
       ]);
-      setTests(testData.map(test => ({ ...test, title: formatTestTitle(test.title) })));
-      setClasses(classData);
+      setTests(testData.map(test => ({ ...test, title: capitalizeFirstLetter(test.title) })));
+      setClasses(classData.map(classroom => ({ ...classroom, name: capitalizeFirstLetter(classroom.name) })));
     } catch (error) {
       console.error(error);
       toast.error('Unable to load Practice Center');
@@ -374,7 +369,7 @@ const PracticeTest = () => {
           <div className="app-modal w-full max-w-md p-6">
             <div className="mb-5 flex items-start justify-between gap-4"><div><h3 className="font-semibold text-[#1A1A1A]">Choose a class</h3><p className="mt-1 line-clamp-1 text-sm text-[#6B7280]">{startClassTest.title}</p></div><button className="app-icon-button" onClick={() => setStartClassTest(null)}><X size={18} /></button></div>
             <div className="space-y-2">{(startClassTest.deliveries || []).length > 0
-              ? startClassTest.deliveries?.map(delivery => <button key={delivery.id} onClick={() => openTest(startClassTest, { deliveryId: delivery.id })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]"><span><span className="block">{delivery.class.name}</span><span className="mt-1 block text-xs font-normal text-[#6B7280]">{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleString()}` : 'No deadline'}</span></span><ChevronRight size={17} /></button>)
+              ? startClassTest.deliveries?.map(delivery => <button key={delivery.id} onClick={() => openTest(startClassTest, { deliveryId: delivery.id })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]"><span><span className="block">{capitalizeFirstLetter(delivery.class.name)}</span><span className="mt-1 block text-xs font-normal text-[#6B7280]">{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleString()}` : 'No deadline'}</span></span><ChevronRight size={17} /></button>)
               : [...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <button key={classId} onClick={() => openTest(startClassTest, { classId })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></button>)}</div>
           </div>
         </div>

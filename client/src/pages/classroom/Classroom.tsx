@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, BarChart3, Bell, Calendar, Check, ClipboardList, Clock, Copy, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Calendar, Check, ClipboardList, Clock, Copy, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
 import { compareAsc, format, formatDistanceToNow, isPast, isToday, isTomorrow } from 'date-fns';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
-import { AppHeader, Button, Card, Input, Modal, TableShell } from '../../components/ui/AppUI';
+import { AppHeader, BackButton, Button, Card, Input, Modal, TableShell } from '../../components/ui/AppUI';
 import { ui } from '../../components/ui/styles';
 import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import NotificationBell from '../../features/notifications/NotificationBell';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
+import { capitalizeFirstLetter } from '../../utils/text';
 
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
 type ClassroomTab = 'NOTIFICATIONS' | 'MEMBERS' | 'PROGRESS' | 'PERFORMANCE';
@@ -44,6 +45,7 @@ const notificationType = (item: ClassAssignment): 'assignment' | 'announcement' 
 export default function Classroom() {
   const { classId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentUser] = useState<CurrentUser | null>(() => {
     const id = localStorage.getItem('userId');
     if (!id) return null;
@@ -63,7 +65,7 @@ export default function Classroom() {
     setLoadError('');
     try {
       const result = await axiosClient.get<ClassDetail, ClassDetail>(`/api/classes/${classId}`);
-      setClassDetail(result);
+      setClassDetail({ ...result, name: capitalizeFirstLetter(result.name) });
     } catch (error) {
       console.error(error);
       setLoadError(requestErrorMessage(error, 'Unable to load class details.'));
@@ -77,6 +79,20 @@ export default function Classroom() {
   }, [fetchClassDetail]);
 
   const canManage = currentUser?.role === 'TEACHER' || currentUser?.role === 'ADMIN';
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab')?.toUpperCase();
+    if (requestedTab === 'NOTIFICATIONS' || requestedTab === 'MEMBERS') setActiveTab(requestedTab);
+    if (canManage && (requestedTab === 'PROGRESS' || requestedTab === 'PERFORMANCE')) setActiveTab(requestedTab);
+  }, [canManage, searchParams]);
+
+  const selectTab = (tab: ClassroomTab) => {
+    setActiveTab(tab);
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', tab.toLowerCase());
+    if (tab !== 'PERFORMANCE') next.delete('deliveryId');
+    setSearchParams(next, { replace: true });
+  };
 
   const createAnnouncement = async (data: AnnouncementData) => {
     if (!classId) return;
@@ -118,7 +134,7 @@ export default function Classroom() {
       className={classDetail.name}
       tabs={tabs}
       activeTab={activeTab}
-      onSelectTab={setActiveTab}
+      onSelectTab={selectTab}
       onBack={() => navigate('/dashboard/classes')}
       currentUser={currentUser}
     />
@@ -127,7 +143,7 @@ export default function Classroom() {
       {activeTab === 'NOTIFICATIONS' && <NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} />}
       {activeTab === 'MEMBERS' && <MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} />}
       {activeTab === 'PROGRESS' && canManage && <div className="p-6 lg:p-8"><WeeklyProgress /></div>}
-      {activeTab === 'PERFORMANCE' && canManage && <div className="p-6 lg:p-8"><StudentAnalytics classId={classId} /></div>}
+      {activeTab === 'PERFORMANCE' && canManage && <div className="p-6 lg:p-8"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
     </div></main>
 
     {announcementOpen && <AnnouncementCreator onClose={() => setAnnouncementOpen(false)} onSubmit={data => void createAnnouncement(data)} />}
@@ -140,7 +156,7 @@ function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack, curr
   const profileInitials = initials(currentUser.name);
   return <header className="sticky top-0 z-30 grid h-[68px] shrink-0 grid-cols-[minmax(180px,1fr)_auto_minmax(88px,1fr)] items-center border-b border-[#B9CBC4] bg-white px-4 lg:px-6">
     <div className="flex min-w-0 items-center gap-2.5">
-      <button type="button" onClick={onBack} className="app-icon-button h-8 w-8 shrink-0" aria-label="Back to classes"><ArrowLeft size={17} /></button>
+      <BackButton onClick={onBack} />
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold leading-5 text-[#1A1A1A]">Classroom</p>
         <p className="truncate text-xs leading-4 text-[#6B7280]">{className}</p>
@@ -251,7 +267,7 @@ function ClassroomLoading() {
 }
 
 function ClassroomError({ message, onBack, onRetry }: { message: string; onBack: () => void; onRetry: () => void }) {
-  return <div className={ui.page}><AppHeader title="Classroom" showProfile={false} /><main className="flex flex-1 items-center justify-center p-6"><Card className="w-full max-w-md p-8 text-center"><h2 className="text-base font-semibold text-[#1A1A1A]">Class could not be loaded</h2><p className="mt-2 text-sm text-[#6B7280]">{message}</p><div className="mt-5 flex justify-center gap-2"><Button variant="ghost" onClick={onBack}>Back</Button><Button variant="outline" onClick={onRetry}>Try again</Button></div></Card></main></div>;
+  return <div className={ui.page}><AppHeader title="Classroom" showProfile={false} /><main className="flex flex-1 items-center justify-center p-6"><Card className="w-full max-w-md p-8 text-center"><h2 className="text-base font-semibold text-[#1A1A1A]">Class could not be loaded</h2><p className="mt-2 text-sm text-[#6B7280]">{message}</p><div className="mt-5 flex justify-center gap-2"><BackButton onClick={onBack} /><Button variant="outline" onClick={onRetry}>Try again</Button></div></Card></main></div>;
 }
 
 const initials = (name: string | null) => String(name || 'Student').split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase();

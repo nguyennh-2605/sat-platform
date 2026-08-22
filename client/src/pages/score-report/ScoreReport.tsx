@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   Bookmark,
   Calendar,
   CheckCircle2,
@@ -18,7 +17,8 @@ import toast from 'react-hot-toast';
 import type { ContentBlock } from '../../types/quiz';
 import ReviewModal from '../../features/quiz/ReviewModal';
 import axiosClient from '../../lib/axios';
-import { AppHeader, Badge, Button, Card, Select, TableShell } from '../../components/ui/AppUI';
+import { AppHeader, BackButton, Badge, Button, Card, Select, TableShell } from '../../components/ui/AppUI';
+import { capitalizeFirstLetter } from '../../utils/text';
 
 export interface QuestionResult {
   id: number | string;
@@ -149,7 +149,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
   }
 
   if (loadError || !data) {
-    return <PageFrame><div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center"><XCircle size={40} className="text-red-500" /><div><h1 className="text-lg font-semibold">Score report unavailable</h1><p className="mt-1 text-sm text-[#6B7280]">This result may no longer exist or you may not have access.</p></div><Button variant="outline" onClick={handleBack}><ArrowLeft size={16} /> Back to Analytics</Button></div></PageFrame>;
+    return <PageFrame><div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center"><XCircle size={40} className="text-red-500" /><div><h1 className="text-lg font-semibold">Score report unavailable</h1><p className="mt-1 text-sm text-[#6B7280]">This result may no longer exist or you may not have access.</p></div><BackButton onClick={handleBack} /></div></PageFrame>;
   }
 
   const totalQuestions = data.questions.length;
@@ -158,20 +158,21 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
   const accuracy = totalQuestions ? Number(((correctCount / totalQuestions) * 100).toFixed(1)) : 0;
   const firstShown = filteredQuestions.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
   const lastShown = Math.min(currentPage * PAGE_SIZE, filteredQuestions.length);
+  const reviewingQuestionIndex = reviewingQuestion
+    ? data.questions.findIndex(question => question.id === reviewingQuestion.id)
+    : -1;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F2F8F5] font-sans text-[#1A1A1A]">
       <AppHeader title="Test Result Details" subtitle="Review your performance and identify areas for improvement." />
       <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-8">
       <main className="mx-auto w-full max-w-[1200px] animate-in fade-in duration-300">
-        <button onClick={handleBack} className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-[#6B7280] transition-colors hover:text-[#1A1A1A]">
-          <ArrowLeft size={16} /> Back to Analytics
-        </button>
+        <BackButton onClick={handleBack} className="mb-6" />
 
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="flex flex-col p-6 lg:col-span-2">
             <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row">
-              <h2 className="text-xl font-semibold text-[#1B7A5A]">{data.examTitle}</h2>
+              <h2 className="text-xl font-semibold text-[#1B7A5A]">{capitalizeFirstLetter(data.examTitle)}</h2>
               <Badge tone="success" className="rounded-md px-3 py-1">Completed</Badge>
             </div>
             <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
@@ -245,7 +246,15 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
       </main>
       </div>
 
-      {reviewingQuestion && <ReviewModal data={reviewingQuestion} onClose={() => setReviewingQuestion(null)} examTitle={data.examTitle} examSubject={data.subject} />}
+      {reviewingQuestion && <ReviewModal
+        key={reviewingQuestion.id}
+        data={reviewingQuestion}
+        onClose={() => setReviewingQuestion(null)}
+        onPrevious={reviewingQuestionIndex > 0 ? () => setReviewingQuestion(data.questions[reviewingQuestionIndex - 1]) : undefined}
+        onNext={reviewingQuestionIndex >= 0 && reviewingQuestionIndex < data.questions.length - 1 ? () => setReviewingQuestion(data.questions[reviewingQuestionIndex + 1]) : undefined}
+        examTitle={capitalizeFirstLetter(data.examTitle)}
+        examSubject={data.subject}
+      />}
     </div>
   );
 }

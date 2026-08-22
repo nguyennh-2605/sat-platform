@@ -233,7 +233,8 @@ const validateSections = ({ sections, subject }) => {
 };
 
 exports.createTest = async ({ title, duration, subject, mode, sections, testDate, category, folderId, userId, userRole }) => {
-  const normalizedTitle = String(title || '').trim();
+  const trimmedTitle = String(title || '').trim();
+  const normalizedTitle = trimmedTitle ? `${trimmedTitle.charAt(0).toLocaleUpperCase()}${trimmedTitle.slice(1)}` : trimmedTitle;
   if (!normalizedTitle) {
     throw new ApiError(400, { error: 'Enter a test name.' });
   }

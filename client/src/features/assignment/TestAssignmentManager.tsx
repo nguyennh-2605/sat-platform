@@ -7,6 +7,7 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { type TestItem } from '../../types/quiz';
 import axiosClient from '../../lib/axios';
+import { capitalizeFirstLetter } from '../../utils/text';
 
 interface TestAssignmentManagerProps {
   onClose: () => void;
@@ -406,7 +407,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
 
                         <div className="flex-1 flex items-center gap-3 overflow-hidden">
                           <FileIcon size={18} className={isSelected ? 'text-[#1B7A5A]' : 'text-gray-400'} />
-                          <span className={`font-medium truncate ${isSelected ? 'text-[#1A1A1A]' : 'text-slate-800'}`}>{test.title}</span>
+                          <span className={`font-medium truncate ${isSelected ? 'text-[#1A1A1A]' : 'text-slate-800'}`}>{capitalizeFirstLetter(test.title)}</span>
                         </div>
 
                         <div className="w-28 text-center hidden md:flex justify-center">

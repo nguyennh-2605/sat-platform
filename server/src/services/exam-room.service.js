@@ -475,13 +475,25 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
     responseDetails = committedGrade.details;
   }
 
-  if (transactionResult.didSubmit && test.mode === 'EXAM' && test.authorId) {
+  if (transactionResult.didSubmit && submission.deliveryId) {
     try {
-      const studentInfo = await prisma.user.findUnique({ where: { id: userId } });
-      await sendNotificationToUser(
-        test.authorId,
-        `Học sinh ${studentInfo?.name || studentInfo?.email} vừa hoàn thành bài thi "${test.title}" với số điểm ${correctCount}/${totalQuestions}.`,
-      );
+      const [studentInfo, delivery, completedCount] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } }),
+        prisma.testDelivery.findUnique({
+          where: { id: submission.deliveryId },
+          select: { id: true, classId: true, class: { select: { teacherId: true } } },
+        }),
+        prisma.submission.count({
+          where: { deliveryId: submission.deliveryId, userId, status: 'COMPLETED' },
+        }),
+      ]);
+      if (delivery && completedCount === 1) {
+        await sendNotificationToUser(
+          delivery.class.teacherId,
+          `${studentInfo?.name || studentInfo?.email} completed "${test.title}" with ${correctCount}/${totalQuestions} correct.`,
+          `/dashboard/class/${delivery.classId}?tab=performance&deliveryId=${delivery.id}`,
+        );
+      }
     } catch (error) {
       // The grade is already committed. A notification outage must not turn a
       // successful submission into a 500 response that encourages resubmits.

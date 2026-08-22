@@ -87,6 +87,7 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
             if (parsedData.type === 'CONNECTED') return;
             // Đẩy thông báo mới lên đầu
             setNotifications((prev) => [parsedData, ...prev]);
+            window.dispatchEvent(new Event('classroom-todos:refresh'));
           },
 
           // Xử lý khi rớt mạng hoặc có lỗi ngầm

@@ -8,7 +8,10 @@ const CLASS_COLORS = Object.freeze([
   '#475569',
 ]);
 
-const normalizeClassName = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+const normalizeClassName = (value) => {
+  const normalized = String(value || '').trim().replace(/\s+/g, ' ');
+  return normalized ? `${normalized.charAt(0).toLocaleUpperCase()}${normalized.slice(1)}` : normalized;
+};
 const normalizeAssignmentType = (value) => value === 'announcement' ? 'announcement' : 'assignment';
 const resolveAssignmentType = ({ type, deadline }) => deadline ? 'assignment' : normalizeAssignmentType(type);
 const isAllowedClassColor = (value) => CLASS_COLORS.includes(String(value || '').toUpperCase());

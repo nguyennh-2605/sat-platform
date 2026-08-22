@@ -6,7 +6,7 @@ import type {
   SelectHTMLAttributes,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, X } from 'lucide-react';
+import { ArrowLeft, Bell, X } from 'lucide-react';
 import { cx, ui } from './styles';
 
 interface AppHeaderProps {
@@ -100,6 +100,24 @@ export function Button({ className, variant = 'primary', size = 'md', type = 'bu
       )}
       {...props}
     />
+  );
+}
+
+type BackButtonProps = Omit<ButtonProps, 'children' | 'variant' | 'size'> & {
+  label?: string;
+};
+
+export function BackButton({ label = 'Back', className, ...props }: BackButtonProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className={cx('px-2.5 text-[#4B5563] hover:text-[#145F47]', className)}
+      {...props}
+    >
+      <ArrowLeft size={16} aria-hidden="true" />
+      {label}
+    </Button>
   );
 }
 

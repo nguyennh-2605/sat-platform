@@ -4,6 +4,7 @@ const { CLASS_COLORS, normalizeClassName, normalizeAssignmentType, resolveAssign
 
 test('class names are trimmed and internal whitespace is normalized', () => {
   assert.equal(normalizeClassName('  SAT   Math 12A1  '), 'SAT Math 12A1');
+  assert.equal(normalizeClassName('  reading   class  '), 'Reading class');
 });
 
 test('class colors only accept the controlled accessible palette', () => {
