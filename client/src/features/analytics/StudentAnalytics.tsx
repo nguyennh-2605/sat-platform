@@ -110,7 +110,7 @@ function StudentDetailModal({ deliveryId, student, onClose }: { deliveryId: stri
       title={student.name || 'Student performance'}
       subtitle={student.email}
       presentation="content-dialog"
-      className="h-[calc(100%_-_2rem)] max-w-[1100px]"
+      className="h-[calc(100%_-_2rem)] !max-w-[1100px]"
     >
       <div className="h-full min-h-0 min-w-0 overflow-y-auto pr-1">
         {!detail ? (
