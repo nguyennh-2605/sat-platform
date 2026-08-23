@@ -75,3 +75,44 @@ exports.createTest = async (req, res) => {
     res.status(500).json({ error: 'Lỗi server khi tạo đề thi', details: error.message });
   }
 };
+
+exports.getTestForEdit = async (req, res) => {
+  try {
+    const test = await practiceTestService.getTestForEdit({
+      testId: req.params.id,
+      userId: req.user.userId,
+    });
+    res.json(test);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Get test for edit error:', error);
+    res.status(500).json({ error: 'Unable to load this exam.' });
+  }
+};
+
+exports.updateTest = async (req, res) => {
+  try {
+    const test = await practiceTestService.updateTest({
+      ...req.body,
+      testId: req.params.id,
+      userId: req.user.userId,
+      userRole: req.user.role,
+    });
+    res.json(test);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Update test error:', error);
+    res.status(500).json({ error: 'Unable to update this exam.' });
+  }
+};
+
+exports.deleteTest = async (req, res) => {
+  try {
+    await practiceTestService.deleteTest({ testId: req.params.id, userId: req.user.userId });
+    res.status(204).send();
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Delete test error:', error);
+    res.status(500).json({ error: 'Unable to delete this exam.' });
+  }
+};

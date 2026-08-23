@@ -363,7 +363,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
               <BlockRenderer blocks={data.blocks} subject={examSubject} readOnly={true}/>
               <div className="mt-5 mb-6">
                 {examSubject === 'MATH' 
-                  ? <FormattedTextRenderer text={data.questionText} />
+                  ? <FormattedTextRenderer text={data.questionText} latexOnly />
                   : <InteractiveText content={data.questionText} readOnly={true}/>
                 }
               </div>
@@ -380,7 +380,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
                     </div>
                     <div className="font-['Source_Serif_4',_'Georgia',_serif] text-[16px] text-[#1a1a1a] lining-nums leading-relaxed">
                       {examSubject === 'MATH' 
-                        ? <FormattedTextRenderer text={opt.text} />
+                        ? <FormattedTextRenderer text={opt.text} latexOnly />
                         : <InteractiveText content={opt.text} readOnly={true}/>
                       }
                     </div>

@@ -231,7 +231,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
     return text.replace(/==([^=]+)==/g, '<u>$1</u>');
   };
 
-  if (isMath) return <FormattedTextRenderer text={content} inheritTypography={inheritTypography} />;
+  if (isMath) return <FormattedTextRenderer text={content} inheritTypography={inheritTypography} latexOnly />;
   
   if (readOnly) {
     return (

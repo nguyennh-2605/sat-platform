@@ -1,6 +1,6 @@
 const SPRInstructions = () => {
   return (
-    <div className="px-6 text-[#1a1a1a] font-serif text-[15px] leading-relaxed w-full">
+    <div className="exam-content w-full px-6 text-[#1a1a1a]">
       <p className="font-bold mb-5 text-xl -ml-3">
         Student-produced response directions
       </p>
@@ -18,45 +18,45 @@ const SPRInstructions = () => {
 
       <h4 className="text-center mb-3 text-[16px]">Examples</h4>
       
-      <div className="max-w-[500px] mx-auto overflow-hidden">
+      <div className="mx-auto max-w-[560px] overflow-x-auto rounded-xl border border-[#B9CBC4] bg-white">
         <table className="w-full border-collapse text-center text-sm">
-          <thead>
+          <thead className="bg-[#F2F8F5] text-[#374151]">
             <tr>
-              <th className="border border-gray-600 px-3 py-3 font-normal w-1/4 text-base">Answer</th>
-              <th className="border border-gray-600 px-3 py-3 font-normal w-2/4 text-base">Acceptable ways to enter answer</th>
-              <th className="border border-gray-600 px-3 py-3 font-normal w-1/4 text-base">Unacceptable: will NOT receive credit</th>
+              <th className="w-1/4 border-b border-r border-[#B9CBC4] px-3 py-3 text-sm font-semibold">Answer</th>
+              <th className="w-2/4 border-b border-r border-[#B9CBC4] px-3 py-3 text-sm font-semibold">Acceptable ways to enter answer</th>
+              <th className="w-1/4 border-b border-[#B9CBC4] px-3 py-3 text-sm font-semibold">Unacceptable: will NOT receive credit</th>
             </tr>
           </thead>
           <tbody>
             {/* Row 1: 3.5 */}
             <tr>
-              <td className="border border-gray-600 px-3 py-3 align-top">3.5</td>
-              <td className="border border-gray-600 px-3 py-3 align-top leading-loose">
+              <td className="border-b border-r border-[#D2DED9] px-3 py-3 align-top">3.5</td>
+              <td className="border-b border-r border-[#D2DED9] px-3 py-3 align-top leading-loose">
                 3.5<br />
                 3.50<br />
                 7/2
               </td>
-              <td className="border border-gray-600 px-3 py-3 align-top leading-loose">
+              <td className="border-b border-[#D2DED9] px-3 py-3 align-top leading-loose">
                 31/2<br />
                 3 1/2
               </td>
             </tr>
             {/* Row 2: 2/3 */}
             <tr>
-              <td className="border border-gray-600 px-3 py-3 align-top">
+              <td className="border-b border-r border-[#D2DED9] px-3 py-3 align-top">
                 <div className="flex flex-col items-center justify-center w-max mx-auto">
                   <span className="border-b border-gray-600 px-1 leading-none pb-[2px]">2</span>
                   <span className="leading-none pt-[2px]">3</span>
                 </div>
               </td>
-              <td className="border border-gray-600 px-3 py-3 align-top leading-loose">
+              <td className="border-b border-r border-[#D2DED9] px-3 py-3 align-top leading-loose">
                 2/3<br />
                 .6666<br />
                 .6667<br />
                 0.666<br />
                 0.667
               </td>
-              <td className="border border-gray-600 px-3 py-3 align-top leading-loose">
+              <td className="border-b border-[#D2DED9] px-3 py-3 align-top leading-loose">
                 0.66<br />
                 .66<br />
                 0.67<br />
@@ -65,7 +65,7 @@ const SPRInstructions = () => {
             </tr>
             {/* Row 3: -1/3 */}
             <tr>
-              <td className="border border-gray-600 px-3 py-3 align-top">
+              <td className="border-r border-[#D2DED9] px-3 py-3 align-top">
                  <div className="flex items-center justify-center w-max mx-auto gap-1">
                   <span>–</span>
                   <div className="flex flex-col items-center justify-center">
@@ -74,12 +74,12 @@ const SPRInstructions = () => {
                   </div>
                 </div>
               </td>
-              <td className="border border-gray-600 px-3 py-3 align-top leading-loose">
+              <td className="border-r border-[#D2DED9] px-3 py-3 align-top leading-loose">
                 -1/3<br />
                 -.3333<br />
                 -0.333
               </td>
-              <td className="border border-gray-600 px-3 py-3 align-top leading-loose">
+              <td className="px-3 py-3 align-top leading-loose">
                 -.33<br />
                 -0.33
               </td>

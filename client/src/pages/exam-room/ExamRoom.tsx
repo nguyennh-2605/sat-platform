@@ -885,12 +885,11 @@ function ExamRoom() {
       
       // Chỉ render phân số khi học sinh đã gõ cả tử và mẫu (tránh vỡ UI khi mới gõ "3/")
       if (numerator !== undefined && denominator !== undefined && denominator !== '') {
-        return `$\\frac{${numerator}}{${denominator}}$`;
+        return `\\frac{${numerator}}{${denominator}}`;
       }
     }
     
-    // Nếu là số bình thường, số âm, hoặc thập phân -> Bọc $ để dùng font Toán học
-    return `$${value}$`;
+    return value;
   };
 
   // --- RENDER LOADING ---
@@ -1004,7 +1003,7 @@ function ExamRoom() {
         )}
         <div className="exam-content font-normal text-[#1a1a1a]">
           {TestInfo.subject === 'MATH' 
-            ? <FormattedTextRenderer text={currentQ.questionText} inheritTypography/>
+            ? <FormattedTextRenderer text={currentQ.questionText} inheritTypography latexOnly/>
             : <InteractiveText content={currentQ.questionText} inheritTypography/>
           }
         </div>
@@ -1036,7 +1035,7 @@ function ExamRoom() {
                 {/* Render kết quả Preview bằng LaTeX */}
                 <div className="text-[18px] min-h-[30px] flex items-center justify-center">
                   {answers[currentQ.id] && (
-                    <FormattedTextRenderer text={formatSprPreview(answers[currentQ.id])} inheritTypography />
+                    <FormattedTextRenderer text={formatSprPreview(answers[currentQ.id])} inheritTypography latexOnly />
                   )}
                 </div>
               </div>

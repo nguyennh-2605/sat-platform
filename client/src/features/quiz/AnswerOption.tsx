@@ -47,7 +47,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
       <span className="exam-content min-w-0 font-normal text-[#1a1a1a]">
         {currentSubject === 'RW' 
           ? <InteractiveText content={content} inheritTypography />
-          : <FormattedTextRenderer text={content} inheritTypography />
+          : <FormattedTextRenderer text={content} inheritTypography latexOnly />
         }
       </span>
 

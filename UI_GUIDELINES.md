@@ -44,6 +44,8 @@ Không dùng indigo/purple làm màu primary. Màu đỏ, amber và emerald ch�
 
 Riêng nội dung trong Exam Room (passage, table, question và answer) dùng chung class `exam-content`: system stack `Arial`, `Helvetica Neue`, `Helvetica`, `Liberation Sans`, sans-serif ở `16px/1.55`. Không tải thêm webfont cho phòng thi; ưu tiên khả năng đọc, tốc độ và sự nhất quán giữa các loại content block.
 
+Nội dung đề Math dùng strict LaTeX trong toàn bộ luồng import, preview, Exam Room và review result. Question, choice, text block, table cell và explanation nhận LaTeX thô, không dùng `$...$` và không tự suy đoán công thức; prose phải đặt trong `\\text{...}`. Metadata của structured import và đáp án dùng để chấm (A–D hoặc giá trị SPR) vẫn là plain text.
+
 ### Contrast
 
 - Clarity là mặc định; hierarchy là một quyết định có chủ đích. Trước tiên mọi thành phần phải đọc và phân biệt rõ, sau đó mới giảm độ nổi của metadata hoặc vùng phụ.

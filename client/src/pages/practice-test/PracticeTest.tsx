@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, BookOpenCheck, Check, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Play, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Bell, BookOpen, BookOpenCheck, Check, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Pencil, Play, Plus, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
+import { Button, Modal } from '../../components/ui/AppUI';
 
 interface ClassInfo {
   id: string;
@@ -84,6 +85,19 @@ const PracticeTest = () => {
   const [dueAt, setDueAt] = useState('');
   const [maxAttempts, setMaxAttempts] = useState(1);
   const [scorePolicy, setScorePolicy] = useState<'FIRST' | 'BEST' | 'LATEST'>('FIRST');
+  const [openActionTestId, setOpenActionTestId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TestItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (openActionTestId === null) return;
+    const closeMenu = (event: PointerEvent) => {
+      if (!actionMenuRef.current?.contains(event.target as Node)) setOpenActionTestId(null);
+    };
+    document.addEventListener('pointerdown', closeMenu);
+    return () => document.removeEventListener('pointerdown', closeMenu);
+  }, [openActionTestId]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -186,6 +200,22 @@ const PracticeTest = () => {
       toast.error(requestError.response?.data?.error || 'Unable to assign tests');
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const deleteTest = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await axiosClient.delete(`/api/tests/${deleteTarget.id}`);
+      setTests(current => current.filter(test => test.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      toast.success('Exam deleted');
+    } catch (error: unknown) {
+      const requestError = error as { response?: { data?: { error?: string } } };
+      toast.error(requestError.response?.data?.error || 'Unable to delete this exam');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -308,9 +338,15 @@ const PracticeTest = () => {
                           <Check size={15} strokeWidth={3} />
                         </button>
                       ) : (
-                        <button className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#6B7280] transition-colors hover:bg-[#EAF2EE] hover:text-[#1A1A1A]" aria-label={`Actions for ${test.title}`}>
-                          <MoreHorizontal size={16} />
-                        </button>
+                        <div className="relative" ref={openActionTestId === test.id ? actionMenuRef : undefined}>
+                          <button onClick={() => setOpenActionTestId(current => current === test.id ? null : test.id)} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#6B7280] transition-colors hover:bg-[#EAF2EE] hover:text-[#1A1A1A]" aria-label={`Actions for ${test.title}`} aria-haspopup="menu" aria-expanded={openActionTestId === test.id}>
+                            <MoreHorizontal size={16} />
+                          </button>
+                          {openActionTestId === test.id && <div role="menu" className="absolute right-0 top-9 z-20 w-36 overflow-hidden rounded-lg border border-[#C9D8D2] bg-white py-1 shadow-lg">
+                            <button role="menuitem" onClick={() => navigate(`/dashboard/practice-test/create?edit=${test.id}`)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-[#374151] hover:bg-[#EAF2EE]"><Pencil size={14} />Edit</button>
+                            <button role="menuitem" onClick={() => { setOpenActionTestId(null); setDeleteTarget(test); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-red-700 hover:bg-red-50"><Trash2 size={14} />Delete</button>
+                          </div>}
+                        </div>
                       ))}
                     </div>
 
@@ -377,6 +413,13 @@ const PracticeTest = () => {
           </div>
         </div>
       )}
+
+      <Modal open={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)} closeOnBackdrop={!deleting} title="Delete exam?" subtitle={deleteTarget?.title} className="!max-w-md">
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-[#4B5563]">This permanently deletes the exam, its assignments, and any student attempt data associated with it. This action cannot be undone.</p>
+          <div className="flex justify-end gap-2 border-t border-[#E2EDE9] pt-4"><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={deleteTest}>{deleting ? 'Deleting…' : 'Delete exam'}</Button></div>
+        </div>
+      </Modal>
     </div>
   );
 };

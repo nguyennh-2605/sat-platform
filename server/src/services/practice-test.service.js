@@ -297,3 +297,123 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
   console.log(`Created test ID: ${newTest.id}`);
   return newTest;
 };
+
+const serializeBlock = (block) => {
+  if (!block || typeof block !== 'object') return '';
+  if (block.type === 'text') return `[TEXT]\n${String(block.content || '').trim()}`;
+  if (block.type === 'table') {
+    const rows = [block.headers, ...(Array.isArray(block.rows) ? block.rows : [])]
+      .filter(Array.isArray)
+      .map(row => row.map(cell => String(cell || '').trim()).join('\t'));
+    return `[TABLE]\n${rows.join('\n')}`;
+  }
+  if (block.type === 'poem') return `[POEM]\n${(block.lines || []).join('\n')}`;
+  if (block.type === 'note') return `[NOTE]\n${(block.lines || []).map(line => `- ${line}`).join('\n')}`;
+  if (block.type === 'image') return `[IMG]\n${String(block.src || '').trim()}`;
+  return '';
+};
+
+const serializeQuestion = (question) => {
+  const parts = [
+    `QUESTION ${question.order}`,
+    `Domain: ${question.domainCode || ''}`,
+    `Skill: ${question.skillCode || ''}`,
+    ...(Array.isArray(question.blocks) ? question.blocks.map(serializeBlock).filter(Boolean) : []),
+    question.questionText,
+    ...(question.type === 'MCQ' && Array.isArray(question.choices)
+      ? question.choices.map((choice, index) => `${String(choice.id || String.fromCharCode(65 + index)).toUpperCase()}. ${choice.text}`)
+      : []),
+    `Answer: ${question.correctAnswer}`,
+    ...(question.explanation ? [`Explanation: ${question.explanation}`] : []),
+  ];
+  return parts.filter(value => String(value || '').trim()).join('\n\n');
+};
+
+const serializeTest = (test) => test.sections.map(section => [
+  `=== MODULE ${section.order} ===`,
+  ...section.questions.map(serializeQuestion),
+].join('\n\n')).join('\n\n');
+
+const ownedTest = async ({ testId, userId, include = {} }) => {
+  const id = Number(testId);
+  if (!Number.isInteger(id)) throw new ApiError(400, { error: 'Invalid exam ID.' });
+  const test = await prisma.test.findFirst({ where: { id, authorId: Number(userId) }, include });
+  if (!test) throw new ApiError(404, { error: 'Exam not found or you do not have permission to manage it.' });
+  return test;
+};
+
+exports.getTestForEdit = async ({ testId, userId }) => {
+  const test = await ownedTest({
+    testId,
+    userId,
+    include: {
+      sections: {
+        orderBy: { order: 'asc' },
+        include: { questions: { orderBy: { order: 'asc' } } },
+      },
+      _count: { select: { submissions: true } },
+    },
+  });
+  return {
+    id: test.id,
+    title: test.title,
+    duration: test.duration,
+    subject: test.subject,
+    mode: test.mode,
+    category: test.category,
+    testDate: test.testDate,
+    folderId: test.folderId,
+    moduleCount: test.sections.length,
+    hasAttempts: test._count.submissions > 0,
+    structuredText: serializeTest(test),
+  };
+};
+
+exports.updateTest = async ({ testId, title, duration, subject, mode, sections, testDate, category, folderId, userId, userRole }) => {
+  const existing = await ownedTest({ testId, userId, include: { _count: { select: { submissions: true } } } });
+  if (existing._count.submissions > 0) {
+    throw new ApiError(409, { error: 'This exam cannot be edited because a student has already started it.' });
+  }
+
+  const trimmedTitle = String(title || '').trim();
+  const normalizedTitle = trimmedTitle ? `${trimmedTitle.charAt(0).toLocaleUpperCase()}${trimmedTitle.slice(1)}` : '';
+  if (!normalizedTitle) throw new ApiError(400, { error: 'Enter a test name.' });
+  if (!['RW', 'MATH'].includes(subject)) throw new ApiError(400, { error: 'Choose Reading & Writing or Math.' });
+  const normalizedDuration = Number.parseInt(duration, 10);
+  if (!Number.isInteger(normalizedDuration) || normalizedDuration < 1) throw new ApiError(400, { error: 'Enter a valid test duration.' });
+  const normalizedSections = validateSections({ sections, subject });
+  const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
+  const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' && testDate ? String(testDate) : null;
+
+  return prisma.$transaction(async tx => {
+    await tx.section.deleteMany({ where: { testId: existing.id } });
+    return tx.test.update({
+      where: { id: existing.id },
+      data: {
+        title: normalizedTitle,
+        duration: normalizedDuration,
+        subject,
+        mode: mode === 'EXAM' ? 'EXAM' : 'PRACTICE',
+        category: finalCategory,
+        isPublic: userRole === 'ADMIN',
+        testDate: finalTestDate,
+        folderId: Number.isInteger(Number(folderId)) ? Number(folderId) : null,
+        sections: {
+          create: normalizedSections.map(section => ({
+            name: section.name,
+            order: section.order,
+            duration: section.duration,
+            questions: { create: section.questions },
+          })),
+        },
+      },
+    });
+  });
+};
+
+exports.deleteTest = async ({ testId, userId }) => {
+  const test = await ownedTest({ testId, userId });
+  await prisma.test.delete({ where: { id: test.id } });
+};
+
+exports.serializeTest = serializeTest;
