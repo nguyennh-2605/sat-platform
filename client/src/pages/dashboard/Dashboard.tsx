@@ -13,6 +13,7 @@ import axiosClient from '../../lib/axios';
 import { BackgroundPicker } from '../../features/backgrounds/BackgroundPicker';
 import { backgroundById, normalizeBackgroundId, type BackgroundId } from '../../features/backgrounds/backgroundPresets';
 import { DashboardRouteViewport } from '../../features/navigation/DashboardRouteViewport';
+import { clearAuthSession } from '../../lib/authSession';
 
 interface NavItemProps {
   to: string;
@@ -73,8 +74,8 @@ const Dashboard = () => {
   };
 
   const logout = () => {
-    localStorage.clear();
-    navigate('/');
+    clearAuthSession();
+    navigate('/auth', { replace: true });
   };
 
   const selectedBackground = backgroundById(backgroundId);

@@ -3,6 +3,7 @@ import { type QuestionResult } from '../../pages/score-report/ScoreReport';
 import BlockRenderer from '../../components/content/BlockRenderer';
 import type { ContentBlock } from '../../types/quiz';
 import ReactMarkdown from 'react-markdown';
+import { authenticatedFetch } from '../../lib/authSession';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -154,7 +155,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
     }
   }, [messages.length, isTyping, scrollToBottom]);
 
-  const getOptionStyles = (optText: string, optId: string) => {
+  const getOptionStyles = useCallback((optText: string, optId: string) => {
     const isActualCorrect = optId === data.correctAnswer || optText === data.correctAnswer;
     const isUserSelected = optId === data.userAnswer || optText === data.userAnswer;
     // Trạng thái 1: ĐANG HIỆN ĐÁP ÁN
@@ -177,7 +178,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
       wrapper: "bg-white border-gray-500",
       circle: "bg-white border-gray-400 text-gray-500",
     };
-  };
+  }, [data.correctAnswer, data.userAnswer, showCorrectAnswer]);
 
   const parseQuestionData = useCallback(() => {
     let textContent = "";
@@ -232,7 +233,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
       subject: examSubject,
       questionText: combinedText,
       imageUrls: imageUrls,
-      choices: data.choices ? data.choices.map((c: any) => `${c.id}: ${c.text}`) : [],
+      choices: data.choices ? data.choices.map(c => `${c.id}: ${c.text}`) : [],
       correctAnswer: data.correctAnswer
     };
   }, [data, examSubject]);
@@ -269,11 +270,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
         content: msg.content
       }));
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/chat`, {
+      const response = await authenticatedFetch(`${import.meta.env.VITE_API_URL}/api/ai/chat`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           message: text,
@@ -392,7 +392,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
         </div>
       </div>
     );
-  }, [data, examSubject, showCorrectAnswer]);
+  }, [data, examSubject, getOptionStyles]);
 
   useEffect(() => {
     return () => {

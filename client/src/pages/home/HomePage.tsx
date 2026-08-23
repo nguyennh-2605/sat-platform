@@ -1,19 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { clearAuthSession, hasValidAuthSession } from '../../lib/authSession';
 
 function HomePage() {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(hasValidAuthSession);
   const userName = localStorage.getItem('userName');
-
-  // Kiểm tra xem đã đăng nhập chưa khi vừa vào trang
-  useEffect(() => {
-    const user = localStorage.getItem('isLoggedIn');
-    if (user === 'true') {
-      setIsLoggedIn(true);
-    }
-  }, []);
 
   // Xử lý khi bấm "Start test"
   const handleStartTest = () => {
@@ -27,7 +20,7 @@ function HomePage() {
 
   // Xử lý đăng xuất (để test)
   const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn');
+    clearAuthSession();
     setIsLoggedIn(false);
     toast("Signed out");
   };

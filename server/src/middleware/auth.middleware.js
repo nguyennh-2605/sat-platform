@@ -19,7 +19,10 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       console.log("Lỗi Verify:", err.message); // <--- Xem nó báo lỗi gì ở đây
-      return res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn.' });
+      return res.status(401).json({
+        error: 'Token không hợp lệ hoặc đã hết hạn.',
+        code: err.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
+      });
     }
     
     // Nếu OK, lưu thông tin user (id, email, role) vào biến req.user

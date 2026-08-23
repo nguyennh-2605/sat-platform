@@ -6,7 +6,10 @@ import axios, {
 } from 'axios';
 import queryString from 'query-string';
 import { trackRequestEnd, trackRequestStart } from './requestActivity';
+import { endAuthSession, handleUnauthorizedStatus, isTokenValid } from './authSession';
 
+/* The wrapper intentionally mirrors Axios' permissive generic defaults for existing callers. */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface DataAxiosInstance extends Omit<AxiosInstance, 'get' | 'post' | 'put' | 'patch' | 'delete'> {
   get<T = any, R = T, D = any>(url: string, config?: AxiosRequestConfig<D>): Promise<R>;
   post<T = any, R = T, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>): Promise<R>;
@@ -14,6 +17,7 @@ interface DataAxiosInstance extends Omit<AxiosInstance, 'get' | 'post' | 'put' |
   patch<T = any, R = T, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>): Promise<R>;
   delete<T = any, R = T, D = any>(url: string, config?: AxiosRequestConfig<D>): Promise<R>;
 }
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -31,6 +35,10 @@ axiosClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('token');
     if (token) {
+      if (!isTokenValid(token)) {
+        endAuthSession('session-expired');
+        return Promise.reject(new axios.CanceledError('Session expired'));
+      }
       config.headers.set('Authorization', `Bearer ${token}`);
     }
     return trackRequestStart(config);
@@ -53,13 +61,7 @@ axiosClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('userId');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    }
+    if (error.response) handleUnauthorizedStatus(error.response.status);
     return Promise.reject(error);
   }
 );

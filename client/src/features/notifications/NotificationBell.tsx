@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
+import { authenticatedFetch, endAuthSession } from '../../lib/authSession';
 
 const timeAgo = (dateString: string | Date | null | undefined): string => {
   if (!dateString) return "";
@@ -26,9 +27,17 @@ const timeAgo = (dateString: string | Date | null | undefined): string => {
   });
 };
 
+interface NotificationItem {
+  id: string | number;
+  message: string;
+  createdAt?: string | Date | null;
+  isRead?: boolean;
+  link?: string | null;
+}
+
 export default function NotificationBell({ currentUserId }: { currentUserId: number | string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // 1. Kết nối luồng SSE từ Backend
@@ -40,10 +49,9 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
 
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications`, {
+        const res = await authenticatedFetch(`${import.meta.env.VITE_API_URL}/api/notifications`, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
@@ -74,6 +82,10 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
             if (response.ok) {
               console.log('SSE Connected securely!');
               return; 
+            } else if (response.status === 401) {
+              ctrl.abort();
+              endAuthSession('session-expired');
+              throw new Error('Session expired');
             } else if (response.status >= 400 && response.status < 500) {
               throw new Error(`Server trả về lỗi: ${response.status}`);
             }
@@ -121,9 +133,8 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
 
   const handleMarkAllAsRead = async () => {
     setNotifications(notifications.map(n => ({...n, isRead: true})));
-    await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/read-all`, {
+    await authenticatedFetch(`${import.meta.env.VITE_API_URL}/api/notifications/read-all`, {
       method: 'PUT',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
     });
   };
 

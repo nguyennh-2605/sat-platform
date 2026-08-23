@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { Mail, Lock, Eye, EyeOff, User, GraduationCap } from 'lucide-react'; // Đã thêm icon GraduationCap
 import toast from 'react-hot-toast';
+import { storeAuthSession } from '../../lib/authSession';
 
 function AuthPage() {
   const [searchParams] = useSearchParams()
   const isRegisterParam = searchParams.get('mode') === 'register';
+  const sessionEnded = searchParams.get('reason') === 'session-expired' || searchParams.get('reason') === 'unauthorized';
 
   const [isLoginMode, setIsLoginMode] = useState(!isRegisterParam);
   const [email, setEmail] = useState('');
@@ -18,6 +20,10 @@ function AuthPage() {
   
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (sessionEnded) toast('Your session expired. Please sign in again.', { id: 'session-expired' });
+  }, [sessionEnded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,17 +45,7 @@ function AuthPage() {
       const data = await response.json();
 
       if (response.ok) {
-        if (data.token) localStorage.setItem('token', data.token);
-        localStorage.setItem('isLoggedIn', 'true');
-        
-        if (data.user) {
-          localStorage.setItem('userId', data.user.id);
-          localStorage.setItem('userName', data.user.name || 'Student');
-          localStorage.setItem('userAvatar', data.user.avatar || '');
-          
-          // Ưu tiên lấy từ server trả về (data.user.role), nếu không có thì lấy từ state
-          localStorage.setItem('userRole', data.user.role || role);
-        }
+        if (data.token && data.user) storeAuthSession(data.token, data.user, role);
         
         toast.success(data.message || (isLoginMode ? "Signed in" : "Account created"));
         navigate('/dashboard');
@@ -62,7 +58,7 @@ function AuthPage() {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google-login`, {
         method: 'POST',
@@ -71,12 +67,7 @@ function AuthPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userId', data.user.id);
-        localStorage.setItem('userName', data.user.name);
-        localStorage.setItem('userAvatar', data.user.avatar || '');
-        localStorage.setItem('userRole', data.user.role || 'STUDENT');
+        storeAuthSession(data.token, data.user);
 
         toast.success('Signed in with Google');
         navigate('/dashboard');
@@ -92,6 +83,7 @@ function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F2F8F5] px-4 font-sans">
       <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-xl border border-[#E2EDE9]">
+        {sessionEnded && <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Your session has expired. Sign in again to continue.</div>}
         
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
