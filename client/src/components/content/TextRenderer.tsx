@@ -6,13 +6,14 @@ import 'katex/dist/katex.min.css';
 interface FormattedTextRendererProps {
   text: string;       // Bắt buộc phải là chuỗi
   className?: string; // Có thể có hoặc không (optional)
+  inheritTypography?: boolean;
 }
 
-const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, className = "" }) => {
+const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, className = "", inheritTypography = false }) => {
   if (!text) return null;
 
   return (
-    <div className={`font-serif lining-nums text-[16px] leading-relaxed text-gray-800 space-y-3 ${className}`}>
+    <div className={`${inheritTypography ? '' : 'font-serif text-[16px] leading-relaxed'} lining-nums text-gray-800 space-y-3 ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[

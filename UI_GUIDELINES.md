@@ -42,6 +42,8 @@ Sử dụng các token đã định nghĩa trong `client/src/index.css` và comp
 
 Không dùng indigo/purple làm màu primary. Màu đỏ, amber và emerald chỉ dùng cho trạng thái semantic như error, warning và success.
 
+Riêng nội dung trong Exam Room (passage, table, question và answer) dùng chung class `exam-content`: system stack `Arial`, `Helvetica Neue`, `Helvetica`, `Liberation Sans`, sans-serif ở `16px/1.55`. Không tải thêm webfont cho phòng thi; ưu tiên khả năng đọc, tốc độ và sự nhất quán giữa các loại content block.
+
 ### Contrast
 
 - Clarity là mặc định; hierarchy là một quyết định có chủ đích. Trước tiên mọi thành phần phải đọc và phân biệt rõ, sau đó mới giảm độ nổi của metadata hoặc vùng phụ.

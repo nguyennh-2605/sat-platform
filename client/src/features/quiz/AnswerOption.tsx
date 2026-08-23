@@ -44,17 +44,10 @@ const AnswerOption: React.FC<AnswerProps> = ({
       </div>
 
       {/* 2. NỘI DUNG ĐÁP ÁN */}
-      <span className="
-        font-['Source_Serif_4',_'Georgia',_serif] lining-nums
-        tabular-nums font-normal text-[#1a1a1a] 
-        leading-relaxed tracking-normal
-        text-[16px]           /* Set cho h3 */
-        [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
-        [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
-        ">
+      <span className="exam-content min-w-0 font-normal text-[#1a1a1a]">
         {currentSubject === 'RW' 
-          ? <InteractiveText content={content} />
-          : <FormattedTextRenderer text={content} />
+          ? <InteractiveText content={content} inheritTypography />
+          : <FormattedTextRenderer text={content} inheritTypography />
         }
       </span>
 

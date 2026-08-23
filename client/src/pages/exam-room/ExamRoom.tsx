@@ -974,7 +974,7 @@ function ExamRoom() {
       );
     } 
     if (currentQ.blocks && currentQ.blocks.length > 0) {
-      return <BlockRenderer blocks={currentQ.blocks} subject={TestInfo.subject}/>
+      return <BlockRenderer blocks={currentQ.blocks} subject={TestInfo.subject} variant="exam"/>
     }
     return null;
   };
@@ -999,22 +999,13 @@ function ExamRoom() {
         )} 
         {TestInfo.subject === 'MATH' && currentQ.type !== 'MCQ' && currentQ.blocks && currentQ.blocks.length > 0 && (
           <div className="my-0"> 
-            <BlockRenderer blocks={currentQ.blocks} subject={TestInfo.subject}/>
+            <BlockRenderer blocks={currentQ.blocks} subject={TestInfo.subject} variant="exam"/>
           </div>
         )}
-        <div className="
-          font-['Source_Serif_4',_'Georgia',_serif] 
-          lining-nums tabular-nums 
-          font-normal text-[#1a1a1a] 
-          leading-relaxed tracking-normal
-          
-          text-[16px]           /* Set cho h3 */
-          [&_*]:text-[16px]     /* ÉP BUỘC các thẻ con bên trong cũng phải 13px */
-          [&_p]:text-[16px]     /* Cẩn thận hơn: Ép thẻ p bên trong (nếu có) */
-        ">
+        <div className="exam-content font-normal text-[#1a1a1a]">
           {TestInfo.subject === 'MATH' 
-            ? <FormattedTextRenderer text={currentQ.questionText}/>
-            : <InteractiveText content={currentQ.questionText}/>
+            ? <FormattedTextRenderer text={currentQ.questionText} inheritTypography/>
+            : <InteractiveText content={currentQ.questionText} inheritTypography/>
           }
         </div>
         <div className="space-y-3 mt-6">
@@ -1038,14 +1029,14 @@ function ExamRoom() {
               
               {/* Khu vực Answer Preview */}
               <div className="mt-8 flex items-center space-x-3">
-                <span className="font-bold text-[18px] font-['Source_Serif_4',_'Georgia',_serif] text-[#1a1a1a]">
+                <span className="exam-content font-bold text-[18px] text-[#1a1a1a]">
                   Answer Preview:
                 </span>
                 
                 {/* Render kết quả Preview bằng LaTeX */}
                 <div className="text-[18px] min-h-[30px] flex items-center justify-center">
                   {answers[currentQ.id] && (
-                    <FormattedTextRenderer text={formatSprPreview(answers[currentQ.id])} />
+                    <FormattedTextRenderer text={formatSprPreview(answers[currentQ.id])} inheritTypography />
                   )}
                 </div>
               </div>

@@ -8,9 +8,10 @@ interface Props {
   content: string;
   isMath?: boolean;
   readOnly?: boolean;
+  inheritTypography?: boolean;
 }
 
-const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = false }) => {
+const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = false, inheritTypography = false }) => {
   const { isHighlightMode } = useQuizTool();
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -230,11 +231,11 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
     return text.replace(/==([^=]+)==/g, '<u>$1</u>');
   };
 
-  if (isMath) return <FormattedTextRenderer text={content} />;
+  if (isMath) return <FormattedTextRenderer text={content} inheritTypography={inheritTypography} />;
   
   if (readOnly) {
     return (
-      <div className="leading-relaxed text-gray-800 text-[16px]">
+      <div className={`text-gray-800 ${inheritTypography ? '' : 'text-[16px] leading-relaxed'}`}>
         {parse(processUnderline(content))}
       </div>
     );
@@ -250,7 +251,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
         ref={contentRef}
         onMouseUp={handleMouseUp}
         onClick={handleContainerClick}
-        className={`leading-relaxed text-gray-800 select-text text-[16px] ${cursorClass}`}
+        className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} select-text text-gray-800 ${cursorClass}`}
       >
         {parse(processUnderline(htmlContent))}
       </div>

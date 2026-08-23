@@ -82,6 +82,14 @@ textarea:focus-visible {
 }
 
 @layer components {
+  .exam-content {
+    font-family: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    letter-spacing: 0;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
   .app-button {
     @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium shadow-sm transition-colors disabled:pointer-events-none disabled:opacity-50;
   }
