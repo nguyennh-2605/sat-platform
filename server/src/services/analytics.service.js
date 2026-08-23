@@ -47,7 +47,10 @@ exports.getSubmissionDetail = async ({ id, userId }) => {
         include: {
           question: { include: { section: true } }
         }
-      }
+      },
+      questionTimings: {
+        select: { questionId: true, activeDurationMs: true }
+      },
     }
   });
 
@@ -65,6 +68,10 @@ exports.getSubmissionDetail = async ({ id, userId }) => {
     durationString = `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
 
+  const timingByQuestionId = new Map(
+    submission.questionTimings.map(timing => [timing.questionId, timing.activeDurationMs])
+  );
+
   const formattedQuestions = submission.answers.map((ans, index) => {
     const question = ans.question;
 
@@ -77,7 +84,8 @@ exports.getSubmissionDetail = async ({ id, userId }) => {
       choices: question.choices || [],
       correctAnswer: question.correctAnswer,
       userAnswer: ans.selectedChoice,
-      isCorrect: ans.isCorrect
+      isCorrect: ans.isCorrect,
+      activeDurationMs: timingByQuestionId.get(question.id) ?? null,
     };
   });
 

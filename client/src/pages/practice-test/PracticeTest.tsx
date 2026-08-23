@@ -323,7 +323,7 @@ const PracticeTest = () => {
                 const selected = selectedTestIds.includes(test.id);
                 const hasPartialProgress = test.progress > 0 && test.progress < 100;
                 return (
-                  <article key={test.id} className={`group relative flex flex-col gap-3 rounded-xl border bg-white p-5 transition-all duration-200 ${selected ? 'border-[#1B7A5A] ring-2 ring-[#1B7A5A]/15' : 'border-[#E2EDE9] hover:border-[#1B7A5A]/40 hover:shadow-md'}`}>
+                  <article key={test.id} className={`group relative flex transform-gpu flex-col gap-3 rounded-xl border bg-white p-5 shadow-sm transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#1B7A5A]/45 hover:shadow-[0_6px_16px_rgba(15,77,56,0.12)] ${selected ? 'border-[#1B7A5A] ring-2 ring-[#1B7A5A]/15' : 'border-[#E2EDE9]'}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-wrap gap-1.5">
                         <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${test.subject === 'MATH' ? 'border-[#F0D070] bg-[#FEF9E7] text-[#92640A]' : 'border-[#C2DDD4] bg-[#E8F5EF] text-[#1B7A5A]'}`}>

@@ -83,8 +83,8 @@ export default function Classroom() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')?.toUpperCase();
-    if (requestedTab === 'NOTIFICATIONS' || requestedTab === 'MEMBERS') setActiveTab(requestedTab);
-    if (canManage && (requestedTab === 'PROGRESS' || requestedTab === 'PERFORMANCE')) setActiveTab(requestedTab);
+    if (requestedTab === 'NOTIFICATIONS' || requestedTab === 'MEMBERS' || requestedTab === 'PROGRESS') setActiveTab(requestedTab);
+    if (canManage && requestedTab === 'PERFORMANCE') setActiveTab(requestedTab);
   }, [canManage, searchParams]);
 
   const selectTab = (tab: ClassroomTab) => {
@@ -127,7 +127,8 @@ export default function Classroom() {
   const tabs: Array<{ id: ClassroomTab; label: string; icon: ElementType }> = [
     { id: 'NOTIFICATIONS', label: 'Notifications', icon: Bell },
     { id: 'MEMBERS', label: 'Members', icon: Users },
-    ...(canManage ? [{ id: 'PROGRESS' as ClassroomTab, label: 'Progress Timeline', icon: GitBranch }, { id: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3 }] : []),
+    { id: 'PROGRESS', label: 'Progress Timeline', icon: GitBranch },
+    ...(canManage ? [{ id: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3 }] : []),
   ];
 
   return <div className={ui.page}>
@@ -143,7 +144,7 @@ export default function Classroom() {
     <main className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto w-full max-w-[1200px]">
       {activeTab === 'NOTIFICATIONS' && <NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} />}
       {activeTab === 'MEMBERS' && <MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} />}
-      {activeTab === 'PROGRESS' && canManage && <div className="p-6 lg:p-8"><WeeklyProgress /></div>}
+      {activeTab === 'PROGRESS' && <div className="p-6 lg:p-8"><WeeklyProgress canManage={canManage} /></div>}
       {activeTab === 'PERFORMANCE' && canManage && <div className="p-6 lg:p-8"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
     </div></main>
 

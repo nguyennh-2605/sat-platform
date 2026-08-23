@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CalendarDays, GraduationCap, MoreVertical, Palette, Pencil, Plus, Trash2, UserRound, Users } from 'lucide-react';
+import { BarChart3, Bell, CalendarDays, GitBranch, GraduationCap, MoreVertical, Palette, Pencil, Plus, Trash2, UserRound, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -100,11 +100,11 @@ export default function ClassroomList() {
                   key={classroom.id}
                   role="link"
                   tabIndex={0}
-                  onClick={() => navigate(`/dashboard/class/${classroom.id}`)}
-                  onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); navigate(`/dashboard/class/${classroom.id}`); } }}
-                  className="group relative min-h-[238px] cursor-pointer overflow-hidden rounded-xl border border-[#C9D8D2] bg-white shadow-[0_3px_10px_rgba(15,77,56,0.10)] transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-[#8FB9A9] hover:shadow-[0_6px_16px_rgba(15,77,56,0.14)] focus:outline-none focus:ring-2 focus:ring-[#1B7A5A]/30"
+                  onClick={() => navigate(`/dashboard/class/${classroom.id}?tab=notifications`)}
+                  onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); navigate(`/dashboard/class/${classroom.id}?tab=notifications`); } }}
+                  className="group relative flex min-h-[218px] transform-gpu cursor-pointer flex-col overflow-visible rounded-xl border border-[#C9D8D2] bg-white shadow-[0_3px_10px_rgba(15,77,56,0.10)] transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8FB9A9] hover:shadow-[0_6px_16px_rgba(15,77,56,0.13)] focus:outline-none focus:ring-2 focus:ring-[#1B7A5A]/30"
                 >
-                  <div className="relative h-24 border-b border-black/10 px-5 py-4 text-white" style={{ backgroundColor: classroom.color || CLASS_COLORS[0] }}>
+                  <div className="relative h-20 rounded-t-[11px] border-b border-black/10 px-5 py-3.5 text-white" style={{ backgroundColor: classroom.color || CLASS_COLORS[0] }}>
                     <div className="pr-10">
                       <h2 className="line-clamp-2 text-lg font-semibold leading-6">{classroom.name}</h2>
                       <p className="mt-1 truncate text-xs text-white/85">{classroom.teacher?.name || 'Teacher'}</p>
@@ -129,11 +129,12 @@ export default function ClassroomList() {
                       </div>
                     )}
                   </div>
-                  <div className="space-y-3 p-5">
+                  <div className="flex-1 space-y-2.5 px-5 pb-2.5 pt-4">
                     <div className="flex items-center gap-2.5 text-sm text-[#374151]"><Users size={16} className="text-[#1B7A5A]" /><span>{classroom.studentCount} {classroom.studentCount === 1 ? 'student' : 'students'}</span></div>
                     <div className="flex items-center gap-2.5 text-sm text-[#374151]"><UserRound size={16} className="text-[#1B7A5A]" /><span className="truncate">{classroom.teacher?.email || 'No teacher email'}</span></div>
                     <div className="flex items-center gap-2.5 text-xs text-[#6B7280]"><CalendarDays size={15} /><span>Created {format(new Date(classroom.createdAt), 'MMM d, yyyy')}</span></div>
                   </div>
+                  <ClassCardTabs classroomId={classroom.id} showPerformance={canCreate} />
                 </article>
               ))}
             </div>
@@ -148,6 +149,34 @@ export default function ClassroomList() {
       <DeleteClassModal target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={classId => { setClasses(current => current.filter(item => item.id !== classId)); setDeleteTarget(null); }} />
     </div>
   );
+}
+
+function ClassCardTabs({ classroomId, showPerformance }: { classroomId: string; showPerformance: boolean }) {
+  const navigate = useNavigate();
+  const tabs = [
+    { id: 'notifications', label: 'Notification', icon: Bell },
+    { id: 'members', label: 'Members', icon: Users },
+    { id: 'progress', label: 'Progress', icon: GitBranch },
+    ...(showPerformance ? [{ id: 'performance', label: 'Performance', icon: BarChart3 }] : []),
+  ];
+
+  return <div className={`grid rounded-b-[11px] border-t border-[#D8E4DF] bg-[#F9FCFA] ${showPerformance ? 'grid-cols-4' : 'grid-cols-3'}`}>
+    {tabs.map(({ id, label, icon: Icon }) => <button
+      key={id}
+      type="button"
+      aria-label={label}
+      onClick={event => {
+        event.stopPropagation();
+        navigate(`/dashboard/class/${classroomId}?tab=${id}`);
+      }}
+      className="group/tab relative flex h-10 min-w-0 items-center justify-center border-r border-[#D8E4DF] text-[#5E6B66] transition-colors first:rounded-bl-[11px] last:rounded-br-[11px] last:border-r-0 hover:bg-[#E8F5EF] hover:text-[#1B7A5A] focus-visible:z-10 focus-visible:bg-[#E8F5EF] focus-visible:text-[#1B7A5A]"
+    >
+      <Icon size={17} />
+      <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#17352A] px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/tab:opacity-100 group-focus-visible/tab:opacity-100">
+        {label}
+      </span>
+    </button>)}
+  </div>;
 }
 
 function ClassEditorModal({ state, onClose, onSaved }: { state: { mode: 'create' | 'edit'; classroom?: ClassSummary } | null; onClose: () => void; onSaved: () => Promise<void> }) {
@@ -210,5 +239,5 @@ function DeleteClassModal({ target, onClose, onDeleted }: { target: ClassSummary
 }
 
 function ClassGridSkeleton() {
-  return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} className="h-[238px] animate-pulse overflow-hidden p-0"><div className="h-24 bg-[#D8E7E1]" /><div className="space-y-3 p-5"><div className="h-4 w-2/3 rounded bg-[#E7EFEC]" /><div className="h-4 w-1/2 rounded bg-[#E7EFEC]" /><div className="h-3 w-1/3 rounded bg-[#E7EFEC]" /></div></Card>)}</div>;
+  return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} className="h-[218px] animate-pulse overflow-hidden p-0"><div className="h-20 bg-[#D8E7E1]" /><div className="space-y-2.5 px-5 pb-2.5 pt-4"><div className="h-4 w-2/3 rounded bg-[#E7EFEC]" /><div className="h-4 w-1/2 rounded bg-[#E7EFEC]" /><div className="h-3 w-1/3 rounded bg-[#E7EFEC]" /></div><div className="mt-auto h-10 border-t border-[#D8E4DF] bg-[#F3F8F5]" /></Card>)}</div>;
 }

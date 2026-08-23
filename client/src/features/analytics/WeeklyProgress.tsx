@@ -28,7 +28,7 @@ interface Week {
   isExpanded: boolean;
 }
 
-const WeeklyProgress = () => {
+const WeeklyProgress = ({ canManage = true }: { canManage?: boolean }) => {
   const navigate = useNavigate();
   const { classId } = useParams();
   const [weeks, setWeeks] = useState<Week[]>([]);
@@ -50,23 +50,23 @@ const WeeklyProgress = () => {
 
   // Fetch weeks on component mount
   useEffect(() => {
-    fetchWeeks();
-  }, [classId]);
-
-  const fetchWeeks = async () => {
-    try {
-      setLoading(true);
-      const response = await axiosClient.get(`/api/progress/class/${classId}/weeks`);
-      if (response.success) {
-        setWeeks(response.data);
+    const fetchWeeks = async () => {
+      try {
+        setLoading(true);
+        const response = await axiosClient.get(`/api/progress/class/${classId}/weeks`);
+        if (response.success) {
+          setWeeks(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching weeks:', error);
+        toast.error('Unable to load learning weeks');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching weeks:', error);
-      toast.error('Unable to load learning weeks');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    void fetchWeeks();
+  }, [classId]);
 
   const toggleWeek = async (weekId: string) => {
     const week = weeks.find(w => w.id === weekId);
@@ -78,6 +78,8 @@ const WeeklyProgress = () => {
     setWeeks(weeks.map(w =>
       w.id === weekId ? { ...w, isExpanded: newExpandedState } : w
     ));
+
+    if (!canManage) return;
 
     try {
       await axiosClient.put(`/api/progress/weeks/${weekId}`,
@@ -243,7 +245,7 @@ const WeeklyProgress = () => {
     setShowAssignmentManager(true);
   };
 
-  const handleAssignmentSubmit = async (data: any) => {
+  const handleAssignmentSubmit = async (data: { title: string; content: string; deadline: string | null; testIds: number[] }) => {
     if (!currentLessonForAssignment) return;
 
     const { weekId, lessonId } = currentLessonForAssignment;
@@ -395,12 +397,12 @@ const WeeklyProgress = () => {
       {/* Header with Add Week Button */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">Learning Progress</h2>
-        <button
+        {canManage && <button
           onClick={openAddWeekModal}
           className="px-6 py-3 bg-[#1B7A5A] text-white rounded-xl font-bold hover:bg-[#145F47] transition shadow-md flex items-center gap-2"
         >
           <Plus size={20} /> Add week
-        </button>
+        </button>}
       </div>
 
       {/* Loading State */}
@@ -416,7 +418,7 @@ const WeeklyProgress = () => {
           <div className="text-center text-gray-500">
             <Calendar size={48} className="mx-auto mb-4 text-gray-300" />
             <p className="font-medium text-lg">No weeks yet</p>
-            <p className="text-sm mt-2">Select “Add week” to create a learning plan</p>
+            <p className="text-sm mt-2">{canManage ? 'Select “Add week” to create a learning plan' : 'Your teacher has not added any lessons yet.'}</p>
           </div>
         </div>
       ) : (
@@ -443,7 +445,7 @@ const WeeklyProgress = () => {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  {canManage && <div className="flex items-center gap-2">
                     <button
                       onClick={() => openAddLessonModal(week.id)}
                       className="px-4 py-2 bg-[#1B7A5A] text-white text-sm font-bold rounded-lg hover:bg-[#145F47] transition flex items-center gap-1"
@@ -476,7 +478,7 @@ const WeeklyProgress = () => {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </div>}
                 </div>
               </div>
 
@@ -486,12 +488,12 @@ const WeeklyProgress = () => {
                   {week.lessons.length === 0 ? (
                     <div className="text-center py-8 text-gray-400">
                       <p className="text-sm">No lessons in this week</p>
-                      <button
+                      {canManage && <button
                         onClick={() => openAddLessonModal(week.id)}
                         className="mt-3 text-[#1B7A5A] text-sm font-medium hover:text-[#1B7A5A]"
                       >
                         + Add the first lesson
-                      </button>
+                      </button>}
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -503,7 +505,7 @@ const WeeklyProgress = () => {
                           {/* Lesson Header */}
                           <div className="flex items-center justify-between p-4 bg-white border-b border-gray-200">
                             <h4 className="font-bold text-slate-800">{lesson.title}</h4>
-                            <div className="relative">
+                            {canManage && <div className="relative">
                               <button
                                 onClick={() => setLessonMenuOpen(lessonMenuOpen === lesson.id ? null : lesson.id)}
                                 className="p-1 hover:bg-gray-100 rounded transition"
@@ -521,7 +523,7 @@ const WeeklyProgress = () => {
                                   </button>
                                 </div>
                               )}
-                            </div>
+                            </div>}
                           </div>
 
                           {/* Lesson Content */}
@@ -533,13 +535,13 @@ const WeeklyProgress = () => {
                                 Resources
                               </h5>
                               {lesson.files.length === 0 ? (
-                                <button
+                                canManage ? <button
                                   onClick={() => handleOpenFilePicker(week.id, lesson.id)}
                                   className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition text-center group"
                                 >
                                   <Upload className="mx-auto text-gray-400 group-hover:text-blue-600 transition mb-1" size={20} />
                                   <p className="text-sm font-medium text-gray-500 group-hover:text-blue-700">Upload resources</p>
-                                </button>
+                                </button> : <p className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-400">No resources yet</p>
                               ) : (
                                 <div className="space-y-2">
                                   {lesson.files.map((file) => (
@@ -556,15 +558,15 @@ const WeeklyProgress = () => {
                                         <FileText size={18} className="text-blue-600 flex-shrink-0" />
                                         <span className="text-sm text-gray-700 truncate font-medium">{file.name}</span>
                                       </a>
-                                      <button
+                                      {canManage && <button
                                         onClick={() => handleRemoveFile(week.id, lesson.id, file.id)}
                                         className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                                       >
                                         <X size={16} />
-                                      </button>
+                                      </button>}
                                     </div>
                                   ))}
-                                  <button
+                                  {canManage && <button
                                     onClick={() => handleOpenFilePicker(week.id, lesson.id)}
                                     className="w-full p-2 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition text-center group"
                                   >
@@ -572,7 +574,7 @@ const WeeklyProgress = () => {
                                       <Plus size={16} />
                                       Add resources
                                     </p>
-                                  </button>
+                                  </button>}
                                 </div>
                               )}
                             </div>
@@ -584,13 +586,13 @@ const WeeklyProgress = () => {
                                 Assignments
                               </h5>
                               {lesson.assignments.length === 0 ? (
-                                <button
+                                canManage ? <button
                                   onClick={() => openAssignmentManager(week.id, lesson.id)}
                                   className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#6BBFA0] hover:bg-[#E8F5EF] transition text-center group"
                                 >
                                   <Plus className="mx-auto text-gray-400 group-hover:text-[#1B7A5A] transition mb-1" size={20} />
                                   <p className="text-sm font-medium text-gray-500 group-hover:text-[#1B7A5A]">Assign tests</p>
-                                </button>
+                                </button> : <p className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-400">No assignments yet</p>
                               ) : (
                                 <button
                                   onClick={() => handleAssignmentClick(lesson.assignments[0].id)}
@@ -627,7 +629,7 @@ const WeeklyProgress = () => {
       )}
 
       {/* Add/Edit Week Modal */}
-      {showWeekModal && (
+      {canManage && showWeekModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl">
             <h3 className="text-xl font-bold text-gray-800 mb-4">
@@ -660,7 +662,7 @@ const WeeklyProgress = () => {
       )}
 
       {/* Add Lesson Modal */}
-      {showLessonModal && (
+      {canManage && showLessonModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">Add new lesson</h3>
@@ -691,7 +693,7 @@ const WeeklyProgress = () => {
       )}
 
       {/* Test Assignment Manager Modal */}
-      {showAssignmentManager && (
+      {canManage && showAssignmentManager && (
         <TestAssignmentManager
           onClose={() => {
             setShowAssignmentManager(false);

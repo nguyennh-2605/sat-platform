@@ -766,7 +766,10 @@ function ExamRoom() {
         })),
         correctAnswer: gradedInfo?.correctOption || "",
         userAnswer: gradedInfo?.userSelected || null,
-        isCorrect: gradedInfo?.isCorrect || false
+        isCorrect: gradedInfo?.isCorrect || false,
+        activeDurationMs: testMode === 'EXAM'
+          ? questionTimingsRef.current[String(q.id)]?.activeDurationMs ?? null
+          : null,
       };
     });
   };

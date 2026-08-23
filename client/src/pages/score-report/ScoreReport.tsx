@@ -31,6 +31,7 @@ export interface QuestionResult {
   blocks: ContentBlock[];
   questionText: string;
   choices: { id: string; text: string }[];
+  activeDurationMs?: number | null;
 }
 
 interface ScoreReportData {
@@ -64,6 +65,14 @@ const formatTime = (value?: string) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '—';
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(parsed);
+};
+
+const formatQuestionDuration = (milliseconds?: number | null) => {
+  if (milliseconds == null || !Number.isFinite(milliseconds)) return '—';
+  const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
 };
 
 const subjectLabel = (subject: string) => subject === 'RW' ? 'Reading & Writing' : subject === 'MATH' ? 'Mathematics' : subject;
@@ -212,9 +221,9 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[860px] text-left text-sm">
               <thead className="border-b border-[#E2EDE9] bg-[#F8FBF9] text-[11px] font-semibold uppercase tracking-[0.06em] text-[#6B7280]">
-                <tr><th className="w-28 px-6 py-4">Question</th><th className="px-6 py-4 text-center">Status</th><th className="px-6 py-4 text-center">Correct Answer</th><th className="px-6 py-4 text-center">Your Answer</th><th className="px-6 py-4 text-right">Action</th></tr>
+                <tr><th className="w-28 px-6 py-4">Question</th><th className="px-6 py-4 text-center">Status</th><th className="px-6 py-4 text-center">Correct Answer</th><th className="px-6 py-4 text-center">Your Answer</th><th className="px-6 py-4 text-center">Time Spent</th><th className="px-6 py-4 text-right">Action</th></tr>
               </thead>
               <tbody className="divide-y divide-[#E2EDE9]">
                 {pageQuestions.map(question => {
@@ -222,14 +231,15 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
                   return (
                     <tr key={question.id} className="transition-colors hover:bg-[#F8FBF9]">
                       <td className="px-6 py-4"><p className="font-semibold text-slate-700">Q{question.questionNumber}</p><p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">{question.module}</p></td>
-                      <td className="px-6 py-4"><div className="flex justify-center">{question.isCorrect ? <CheckCircle2 size={20} className="text-[#1B7A5A]" aria-label="Correct" /> : <XCircle size={20} className="text-red-500" aria-label="Incorrect" />}</div></td>
+                      <td className="px-6 py-4"><div className="flex justify-center">{question.isCorrect ? <CheckCircle2 size={20} className="text-[#1B7A5A]" aria-label="Correct" /> : <XCircle size={20} className="text-[#B42318]" aria-label="Incorrect" />}</div></td>
                       <td className="px-6 py-4 text-center font-semibold text-slate-800">{question.correctAnswer}</td>
-                      <td className={`px-6 py-4 text-center font-semibold ${question.isCorrect ? 'text-[#1B7A5A]' : 'text-red-500'}`}>{question.userAnswer || 'Omitted'}</td>
+                      <td className={`px-6 py-4 text-center font-semibold ${question.isCorrect ? 'text-[#1B7A5A]' : 'text-[#B42318]'}`}>{question.userAnswer || 'Omitted'}</td>
+                      <td className="whitespace-nowrap px-6 py-4 text-center font-medium text-slate-700">{formatQuestionDuration(question.activeDurationMs)}</td>
                       <td className="px-6 py-4"><div className="flex items-center justify-end gap-2"><Button variant={logged ? 'accent' : 'ghost'} size="sm" disabled={logged} onClick={() => handleAddToErrorLog(question)} title={logged ? 'Added to Error Log' : 'Add to Error Log'}><Bookmark size={14} className={logged ? 'fill-current' : ''} />{logged ? 'Logged' : 'Log'}</Button><Button size="sm" onClick={() => setReviewingQuestion(question)}><Eye size={14} /> Review</Button></div></td>
                     </tr>
                   );
                 })}
-                {pageQuestions.length === 0 && <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-[#6B7280]">No questions match this filter.</td></tr>}
+                {pageQuestions.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-[#6B7280]">No questions match this filter.</td></tr>}
               </tbody>
             </table>
           </div>
