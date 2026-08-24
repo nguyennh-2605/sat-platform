@@ -9,6 +9,11 @@
     "test:deploy": "node scripts/deploy-smoke-test.js",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed:vocabulary": "node prisma/seed-vocabulary.js",
+    "admin:create": "node scripts/admin-cli.js create",
+    "admin:promote": "node scripts/admin-cli.js promote",
+    "admin:rotate-password": "node scripts/admin-cli.js rotate-password",
+    "admin:revoke-sessions": "node scripts/admin-cli.js revoke-sessions",
+    "admin:demote": "node scripts/admin-cli.js demote",
     "start": "node index.js",
     "postinstall": "prisma generate"
   },

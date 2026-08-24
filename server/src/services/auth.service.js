@@ -77,6 +77,7 @@ exports.googleLogin = async ({ token }) => {
   const ticket = await client.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
   const payload = ticket.getPayload();
   if (!payload?.email) throw new ApiError(400, { message: 'Google account does not provide an email address.' });
+  if (payload.email_verified !== true) throw new ApiError(403, { message: 'Google account email must be verified.' });
 
   let user = await prisma.user.findUnique({ where: { email: payload.email } });
   if (!user) {

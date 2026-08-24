@@ -540,6 +540,20 @@ model VocabularyTermProgress {
   @@index([userId, mastery])
 }
 
+model AdminAuditLog {
+  id           String   @id @default(uuid())
+  action       String
+  targetUserId Int?
+  targetEmail  String
+  environment  String
+  actor        String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([targetEmail, createdAt])
+  @@index([action, createdAt])
+}
+
 model ClassActivity {
   id                 String                   @id @default(uuid())
   type               ClassActivityType
