@@ -6,7 +6,9 @@ import axios, {
 } from 'axios';
 import queryString from 'query-string';
 import { trackRequestEnd, trackRequestStart } from './requestActivity';
-import { endAuthSession, handleUnauthorizedStatus, isTokenValid } from './authSession';
+import { endAuthSession, getValidAccessToken, refreshAccessToken } from './authSession';
+
+type AuthRequestConfig = InternalAxiosRequestConfig & { _authRetry?: boolean };
 
 /* The wrapper intentionally mirrors Axios' permissive generic defaults for existing callers. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -28,19 +30,15 @@ const axiosClient = axios.create({
     serialize: (params) => queryString.stringify(params),
   },
   timeout: 60000,
+  withCredentials: true,
 }) as DataAxiosInstance;
 
 // Interceptor Request
 axiosClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      if (!isTokenValid(token)) {
-        endAuthSession('session-expired');
-        return Promise.reject(new axios.CanceledError('Session expired'));
-      }
-      config.headers.set('Authorization', `Bearer ${token}`);
-    }
+    const token = await getValidAccessToken();
+    if (!token) return Promise.reject(new axios.CanceledError('Session expired'));
+    config.headers.set('Authorization', `Bearer ${token}`);
     return trackRequestStart(config);
   },
   (error) => Promise.reject(error)
@@ -55,13 +53,22 @@ axiosClient.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
+  async (error) => {
     trackRequestEnd(error.config);
     if (error.code === "ERR_CANCELED") {
       return Promise.reject(error);
     }
 
-    if (error.response) handleUnauthorizedStatus(error.response.status);
+    const requestConfig = error.config as AuthRequestConfig | undefined;
+    if (error.response?.status === 401 && requestConfig && !requestConfig._authRetry) {
+      requestConfig._authRetry = true;
+      const token = await refreshAccessToken();
+      if (token) {
+        requestConfig.headers.set('Authorization', `Bearer ${token}`);
+        return axiosClient.request(requestConfig);
+      }
+      endAuthSession('session-expired');
+    }
     return Promise.reject(error);
   }
 );

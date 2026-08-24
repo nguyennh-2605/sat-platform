@@ -830,8 +830,7 @@ function ExamRoom() {
     if (!id) return;
 
     const userId = localStorage.getItem('userId');
-    const token = localStorage.getItem('token');
-    if (!userId || !token) {
+    if (!userId) {
       toast.error("Sign in again");
       return;
     }

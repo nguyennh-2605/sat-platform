@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { clearAuthSession, hasValidAuthSession } from '../../lib/authSession';
+import { getAuthStatus, logoutAuthSession, subscribeAuthSession } from '../../lib/authSession';
 
 function HomePage() {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(hasValidAuthSession);
+  const authStatus = useSyncExternalStore(subscribeAuthSession, getAuthStatus, getAuthStatus);
+  const isLoggedIn = authStatus === 'authenticated';
   const userName = localStorage.getItem('userName');
 
   // Xử lý khi bấm "Start test"
@@ -19,9 +20,8 @@ function HomePage() {
   };
 
   // Xử lý đăng xuất (để test)
-  const handleLogout = () => {
-    clearAuthSession();
-    setIsLoggedIn(false);
+  const handleLogout = async () => {
+    await logoutAuthSession();
     toast("Signed out");
   };
 
@@ -35,7 +35,7 @@ function HomePage() {
           <div className="flex items-center gap-4">
             <span className="text-slate-600 font-medium">Hello, {userName}</span>
             <button
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
               className="text-sm text-red-600 hover:text-red-700 font-semibold"
             >
               Log out

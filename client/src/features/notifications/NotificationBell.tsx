@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { Bell } from 'lucide-react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
-import { authenticatedFetch, endAuthSession } from '../../lib/authSession';
+import { authenticatedFetch, endAuthSession, getAccessToken, refreshAccessToken, subscribeAuthSession } from '../../lib/authSession';
 
 const timeAgo = (dateString: string | Date | null | undefined): string => {
   if (!dateString) return "";
@@ -39,12 +39,11 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const accessToken = useSyncExternalStore(subscribeAuthSession, getAccessToken, getAccessToken);
 
   // 1. Kết nối luồng SSE từ Backend
   useEffect(() => {
-    if (!currentUserId) return;
-
-    const token = localStorage.getItem('token');
+    if (!currentUserId || !accessToken) return;
     const ctrl = new AbortController();
 
     const fetchHistory = async () => {
@@ -72,7 +71,7 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
         await fetchEventSource(`${import.meta.env.VITE_API_URL}/api/notifications/stream`, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`, 
+            'Authorization': `Bearer ${accessToken}`,
             'Accept': 'text/event-stream',
           },
           signal: ctrl.signal,
@@ -84,7 +83,8 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
               return; 
             } else if (response.status === 401) {
               ctrl.abort();
-              endAuthSession('session-expired');
+              const refreshed = await refreshAccessToken();
+              if (!refreshed) endAuthSession('session-expired');
               throw new Error('Session expired');
             } else if (response.status >= 400 && response.status < 500) {
               throw new Error(`Server trả về lỗi: ${response.status}`);
@@ -118,7 +118,7 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
     return () => {
       ctrl.abort();
     };
-  }, [currentUserId]);
+  }, [accessToken, currentUserId]);
 
   // 2. Xử lý click ra ngoài để đóng dropdown
   useEffect(() => {

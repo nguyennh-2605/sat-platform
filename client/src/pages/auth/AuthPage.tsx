@@ -33,6 +33,7 @@ function AuthPage() {
     try {
       const response = await fetch(apiUrl, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         // [MỚI 2] Gửi kèm role lên server khi đăng ký
         body: JSON.stringify({ 
@@ -45,7 +46,7 @@ function AuthPage() {
       const data = await response.json();
 
       if (response.ok) {
-        if (data.token && data.user) storeAuthSession(data.token, data.user, role);
+        if (data.accessToken && data.user) storeAuthSession(data.accessToken, data.user, role);
         
         toast.success(data.message || (isLoginMode ? "Signed in" : "Account created"));
         navigate('/dashboard');
@@ -62,12 +63,13 @@ function AuthPage() {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google-login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: credentialResponse.credential })
       });
       const data = await res.json();
       if (res.ok) {
-        storeAuthSession(data.token, data.user);
+        storeAuthSession(data.accessToken, data.user);
 
         toast.success('Signed in with Google');
         navigate('/dashboard');

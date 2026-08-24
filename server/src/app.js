@@ -3,9 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const corsOptions = require('./config/cors');
 const apiRoutes = require('./routes');
+const { authenticateToken } = require('./middleware/auth.middleware');
 
 // Login controllers (kept at root level since not part of REST API)
-const { register, login, googleLogin } = require('./controllers/auth.controller');
+const { register, login, googleLogin, upgrade, refresh, logout } = require('./controllers/auth.controller');
 
 const app = express();
 
@@ -17,6 +18,9 @@ app.use(express.json({ limit: '2mb' }));
 app.post('/api/register', register);
 app.post('/api/login', login);
 app.post('/api/auth/google-login', googleLogin);
+app.post('/api/auth/upgrade', authenticateToken, upgrade);
+app.post('/api/auth/refresh', refresh);
+app.post('/api/auth/logout', logout);
 
 // --- API ROUTES (RESTful routes) ---
 app.use('/api', apiRoutes);

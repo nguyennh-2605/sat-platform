@@ -29,6 +29,20 @@ model User {
   createdDeliveries   TestDelivery[]       @relation("DeliveryCreator")
   deliveryAssignments DeliveryAssignee[]
   todoStates          UserTodoState[]
+  refreshSessions     RefreshSession[]
+}
+
+model RefreshSession {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    Int
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
 model Class {

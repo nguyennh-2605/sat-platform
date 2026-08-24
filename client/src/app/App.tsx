@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useSyncExternalStore } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Toaster } from 'react-hot-toast';
@@ -17,13 +18,12 @@ import ScoreReport from '../pages/score-report/ScoreReport';
 import CreateTestWizard from '../features/test-creation/CreateTestWizard';
 import AssignmentDetail from '../features/assignment/AssignmentDetail';
 import { AuthSessionGuard } from '../features/auth/AuthSessionGuard';
-import { hasValidAuthSession } from '../lib/authSession';
+import { getAuthStatus, subscribeAuthSession } from '../lib/authSession';
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  if (!hasValidAuthSession()) {
-    const hadSession = Boolean(localStorage.getItem('token')) || localStorage.getItem('isLoggedIn') === 'true';
-    return <Navigate to={hadSession ? '/auth?reason=session-expired' : '/auth'} replace />;
-  }
+  const status = useSyncExternalStore(subscribeAuthSession, getAuthStatus, getAuthStatus);
+  if (status === 'loading') return <div className="flex min-h-screen items-center justify-center bg-[#F2F8F5] text-sm text-[#5E6B66]">Restoring your session…</div>;
+  if (status === 'anonymous') return <Navigate to="/auth" replace />;
   return children;
 }
 

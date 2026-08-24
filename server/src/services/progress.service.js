@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const testDeliveryService = require('./test-delivery.service');
+const { canManageProgress, canReadProgress } = require('../utils/progress-access');
 
 // Helper dùng chung: lấy lesson kèm thông tin lớp để kiểm tra quyền sở hữu
 const getLessonWithClass = (lessonId) =>
@@ -9,12 +10,35 @@ const getLessonWithClass = (lessonId) =>
     include: { week: { include: { class: true } } }
   });
 
+const assertCanManage = ({ classData, userId, userRole }) => {
+  if (!canManageProgress({ teacherId: classData.teacherId, userId, userRole })) {
+    throw new ApiError(403, { success: false, error: 'Bạn không có quyền chỉnh sửa tiến độ lớp học này.' });
+  }
+};
+
 // ==========================================
 // WEEK MANAGEMENT
 // ==========================================
 
-exports.getWeeks = ({ classId }) =>
-  prisma.week.findMany({
+exports.getWeeks = async ({ classId, userId, userRole }) => {
+  const classData = await prisma.class.findUnique({
+    where: { id: classId },
+    select: {
+      teacherId: true,
+      students: { where: { id: Number(userId) }, select: { id: true }, take: 1 },
+    },
+  });
+  if (!classData) throw new ApiError(404, { success: false, error: 'Không tìm thấy lớp học.' });
+  if (!canReadProgress({
+    teacherId: classData.teacherId,
+    studentIds: classData.students.map(student => student.id),
+    userId,
+    userRole,
+  })) {
+    throw new ApiError(403, { success: false, error: 'Bạn không có quyền xem tiến độ lớp học này.' });
+  }
+
+  return prisma.week.findMany({
     where: { classId },
     orderBy: { order: 'asc' },
     include: {
@@ -33,8 +57,9 @@ exports.getWeeks = ({ classId }) =>
       }
     }
   });
+};
 
-exports.createWeek = async ({ classId, title, userId }) => {
+exports.createWeek = async ({ classId, title, userId, userRole }) => {
   if (!title) {
     throw new ApiError(400, { success: false, error: 'Tiêu đề tuần không được để trống' });
   }
@@ -45,9 +70,7 @@ exports.createWeek = async ({ classId, title, userId }) => {
     throw new ApiError(404, { success: false, error: 'Không tìm thấy lớp học' });
   }
 
-  if (classData.teacherId !== userId) {
-    throw new ApiError(403, { success: false, error: 'Bạn không có quyền thêm tuần học' });
-  }
+  assertCanManage({ classData, userId, userRole });
 
   const maxOrderWeek = await prisma.week.findFirst({
     where: { classId },
@@ -61,7 +84,7 @@ exports.createWeek = async ({ classId, title, userId }) => {
   });
 };
 
-exports.updateWeek = async ({ weekId, title, isExpanded, userId }) => {
+exports.updateWeek = async ({ weekId, title, isExpanded, userId, userRole }) => {
   const week = await prisma.week.findUnique({
     where: { id: weekId },
     include: { class: true }
@@ -71,9 +94,7 @@ exports.updateWeek = async ({ weekId, title, isExpanded, userId }) => {
     throw new ApiError(404, { success: false, error: 'Không tìm thấy tuần học' });
   }
 
-  if (week.class.teacherId !== userId) {
-    throw new ApiError(403, { success: false, error: 'Bạn không có quyền chỉnh sửa' });
-  }
+  assertCanManage({ classData: week.class, userId, userRole });
 
   return prisma.week.update({
     where: { id: weekId },
@@ -84,7 +105,7 @@ exports.updateWeek = async ({ weekId, title, isExpanded, userId }) => {
   });
 };
 
-exports.deleteWeek = async ({ weekId, userId }) => {
+exports.deleteWeek = async ({ weekId, userId, userRole }) => {
   const week = await prisma.week.findUnique({
     where: { id: weekId },
     include: { class: true }
@@ -94,9 +115,7 @@ exports.deleteWeek = async ({ weekId, userId }) => {
     throw new ApiError(404, { success: false, error: 'Không tìm thấy tuần học' });
   }
 
-  if (week.class.teacherId !== userId) {
-    throw new ApiError(403, { success: false, error: 'Bạn không có quyền xóa' });
-  }
+  assertCanManage({ classData: week.class, userId, userRole });
 
   await prisma.week.delete({ where: { id: weekId } });
 };
@@ -105,7 +124,7 @@ exports.deleteWeek = async ({ weekId, userId }) => {
 // LESSON MANAGEMENT
 // ==========================================
 
-exports.createLesson = async ({ weekId, title, userId }) => {
+exports.createLesson = async ({ weekId, title, userId, userRole }) => {
   if (!title) {
     throw new ApiError(400, { success: false, error: 'Tiêu đề buổi học không được để trống' });
   }
@@ -119,9 +138,7 @@ exports.createLesson = async ({ weekId, title, userId }) => {
     throw new ApiError(404, { success: false, error: 'Không tìm thấy tuần học' });
   }
 
-  if (week.class.teacherId !== userId) {
-    throw new ApiError(403, { success: false, error: 'Bạn không có quyền thêm buổi học' });
-  }
+  assertCanManage({ classData: week.class, userId, userRole });
 
   const maxOrderLesson = await prisma.lesson.findFirst({
     where: { weekId },
@@ -136,16 +153,14 @@ exports.createLesson = async ({ weekId, title, userId }) => {
   });
 };
 
-exports.deleteLesson = async ({ lessonId, userId }) => {
+exports.deleteLesson = async ({ lessonId, userId, userRole }) => {
   const lesson = await getLessonWithClass(lessonId);
 
   if (!lesson) {
     throw new ApiError(404, { success: false, error: 'Không tìm thấy buổi học' });
   }
 
-  if (lesson.week.class.teacherId !== userId) {
-    throw new ApiError(403, { success: false, error: 'Bạn không có quyền xóa' });
-  }
+  assertCanManage({ classData: lesson.week.class, userId, userRole });
 
   await prisma.lesson.delete({ where: { id: lessonId } });
 };
@@ -154,7 +169,7 @@ exports.deleteLesson = async ({ lessonId, userId }) => {
 // FILE MANAGEMENT
 // ==========================================
 
-exports.addFiles = async ({ lessonId, files, userId }) => {
+exports.addFiles = async ({ lessonId, files, userId, userRole }) => {
   if (!files || !Array.isArray(files) || files.length === 0) {
     throw new ApiError(400, { success: false, error: 'Danh sách file không hợp lệ' });
   }
@@ -165,9 +180,7 @@ exports.addFiles = async ({ lessonId, files, userId }) => {
     throw new ApiError(404, { success: false, error: 'Không tìm thấy buổi học' });
   }
 
-  if (lesson.week.class.teacherId !== userId) {
-    throw new ApiError(403, { success: false, error: 'Bạn không có quyền thêm tài liệu' });
-  }
+  assertCanManage({ classData: lesson.week.class, userId, userRole });
 
   return prisma.$transaction(
     files.map(file =>
@@ -178,7 +191,7 @@ exports.addFiles = async ({ lessonId, files, userId }) => {
   );
 };
 
-exports.deleteFile = async ({ fileId, userId }) => {
+exports.deleteFile = async ({ fileId, userId, userRole }) => {
   const file = await prisma.lessonFile.findUnique({
     where: { id: fileId },
     include: {
@@ -190,9 +203,7 @@ exports.deleteFile = async ({ fileId, userId }) => {
     throw new ApiError(404, { success: false, error: 'Không tìm thấy tài liệu' });
   }
 
-  if (file.lesson.week.class.teacherId !== userId) {
-    throw new ApiError(403, { success: false, error: 'Bạn không có quyền xóa' });
-  }
+  assertCanManage({ classData: file.lesson.week.class, userId, userRole });
 
   await prisma.lessonFile.delete({ where: { id: fileId } });
 };
@@ -201,7 +212,7 @@ exports.deleteFile = async ({ fileId, userId }) => {
 // ASSIGNMENT MANAGEMENT
 // ==========================================
 
-exports.createOrUpdateAssignment = async ({ lessonId, title, content, dueDate, testIds, userId }) => {
+exports.createOrUpdateAssignment = async ({ lessonId, title, content, dueDate, testIds, userId, userRole }) => {
   if (!title) {
     throw new ApiError(400, { success: false, error: 'Tiêu đề bài tập không được để trống' });
   }
@@ -212,9 +223,7 @@ exports.createOrUpdateAssignment = async ({ lessonId, title, content, dueDate, t
     throw new ApiError(404, { success: false, error: 'Không tìm thấy buổi học' });
   }
 
-  if (lesson.week.class.teacherId !== userId) {
-    throw new ApiError(403, { success: false, error: 'Bạn không có quyền giao bài tập' });
-  }
+  assertCanManage({ classData: lesson.week.class, userId, userRole });
 
   const normalizedTestIds = [...new Set((Array.isArray(testIds) ? testIds : []).map(Number).filter(Number.isInteger))];
   const assignment = await prisma.lessonAssignment.upsert({
@@ -259,11 +268,11 @@ exports.createOrUpdateAssignment = async ({ lessonId, title, content, dueDate, t
       testIds: newTestIds,
       lessonId,
       title,
-      dueAt,
+      dueAt: dueDate ? new Date(dueDate) : null,
       maxAttempts: 1,
       scorePolicy: 'FIRST',
       userId,
-      userRole: 'TEACHER',
+      userRole,
     });
     await prisma.testDelivery.updateMany({
       where: { id: { in: deliveries.map(item => item.id) } },
@@ -274,7 +283,7 @@ exports.createOrUpdateAssignment = async ({ lessonId, title, content, dueDate, t
   return assignment;
 };
 
-exports.deleteAssignment = async ({ assignmentId, userId }) => {
+exports.deleteAssignment = async ({ assignmentId, userId, userRole }) => {
   const assignment = await prisma.lessonAssignment.findUnique({
     where: { id: assignmentId },
     include: {
@@ -286,9 +295,7 @@ exports.deleteAssignment = async ({ assignmentId, userId }) => {
     throw new ApiError(404, { success: false, error: 'Không tìm thấy bài tập' });
   }
 
-  if (assignment.lesson.week.class.teacherId !== userId) {
-    throw new ApiError(403, { success: false, error: 'Bạn không có quyền xóa' });
-  }
+  assertCanManage({ classData: assignment.lesson.week.class, userId, userRole });
 
   await prisma.testDelivery.updateMany({
     where: { sourceLessonAssignmentId: assignmentId },

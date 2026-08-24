@@ -13,7 +13,7 @@ import axiosClient from '../../lib/axios';
 import { BackgroundPicker } from '../../features/backgrounds/BackgroundPicker';
 import { backgroundById, normalizeBackgroundId, type BackgroundId } from '../../features/backgrounds/backgroundPresets';
 import { DashboardRouteViewport } from '../../features/navigation/DashboardRouteViewport';
-import { clearAuthSession } from '../../lib/authSession';
+import { logoutAuthSession } from '../../lib/authSession';
 
 interface NavItemProps {
   to: string;
@@ -73,8 +73,8 @@ const Dashboard = () => {
     }
   };
 
-  const logout = () => {
-    clearAuthSession();
+  const logout = async () => {
+    await logoutAuthSession();
     navigate('/auth', { replace: true });
   };
 
@@ -109,7 +109,7 @@ const Dashboard = () => {
             <Palette size={19} />
             <span>Background</span>
           </button>
-          <button onClick={logout} className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-[#D6EDE4] transition-colors hover:bg-[#174030] hover:text-white">
+          <button onClick={() => void logout()} className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-[#D6EDE4] transition-colors hover:bg-[#174030] hover:text-white">
             <LogOut size={19} />
             <span>Log out</span>
           </button>

@@ -2,6 +2,7 @@ const ApiError = require('../utils/ApiError');
 const progressService = require('../services/progress.service');
 
 const getUserId = (req) => req.user?.userId || req.user?.id;
+const getUserRole = (req) => req.user?.role;
 
 // ==========================================
 // WEEK MANAGEMENT
@@ -9,7 +10,7 @@ const getUserId = (req) => req.user?.userId || req.user?.id;
 
 exports.getWeeks = async (req, res) => {
   try {
-    const weeks = await progressService.getWeeks({ classId: req.params.classId });
+    const weeks = await progressService.getWeeks({ classId: req.params.classId, userId: getUserId(req), userRole: getUserRole(req) });
     res.json({ success: true, data: weeks });
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
@@ -24,6 +25,7 @@ exports.createWeek = async (req, res) => {
       classId: req.params.classId,
       title: req.body.title,
       userId: getUserId(req),
+      userRole: getUserRole(req),
     });
     res.status(201).json({ success: true, data: newWeek });
   } catch (error) {
@@ -40,6 +42,7 @@ exports.updateWeek = async (req, res) => {
       title: req.body.title,
       isExpanded: req.body.isExpanded,
       userId: getUserId(req),
+      userRole: getUserRole(req),
     });
     res.json({ success: true, data: updatedWeek });
   } catch (error) {
@@ -51,7 +54,7 @@ exports.updateWeek = async (req, res) => {
 
 exports.deleteWeek = async (req, res) => {
   try {
-    await progressService.deleteWeek({ weekId: req.params.weekId, userId: getUserId(req) });
+    await progressService.deleteWeek({ weekId: req.params.weekId, userId: getUserId(req), userRole: getUserRole(req) });
     res.json({ success: true, message: 'Đã xóa tuần học' });
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
@@ -70,6 +73,7 @@ exports.createLesson = async (req, res) => {
       weekId: req.params.weekId,
       title: req.body.title,
       userId: getUserId(req),
+      userRole: getUserRole(req),
     });
     res.status(201).json({ success: true, data: newLesson });
   } catch (error) {
@@ -81,7 +85,7 @@ exports.createLesson = async (req, res) => {
 
 exports.deleteLesson = async (req, res) => {
   try {
-    await progressService.deleteLesson({ lessonId: req.params.lessonId, userId: getUserId(req) });
+    await progressService.deleteLesson({ lessonId: req.params.lessonId, userId: getUserId(req), userRole: getUserRole(req) });
     res.json({ success: true, message: 'Đã xóa buổi học' });
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
@@ -100,6 +104,7 @@ exports.addFiles = async (req, res) => {
       lessonId: req.params.lessonId,
       files: req.body.files,
       userId: getUserId(req),
+      userRole: getUserRole(req),
     });
     res.status(201).json({ success: true, data: newFiles });
   } catch (error) {
@@ -111,7 +116,7 @@ exports.addFiles = async (req, res) => {
 
 exports.deleteFile = async (req, res) => {
   try {
-    await progressService.deleteFile({ fileId: req.params.fileId, userId: getUserId(req) });
+    await progressService.deleteFile({ fileId: req.params.fileId, userId: getUserId(req), userRole: getUserRole(req) });
     res.json({ success: true, message: 'Đã xóa tài liệu' });
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
@@ -133,6 +138,7 @@ exports.createOrUpdateAssignment = async (req, res) => {
       dueDate: req.body.dueDate,
       testIds: req.body.testIds,
       userId: getUserId(req),
+      userRole: getUserRole(req),
     });
     res.status(201).json({ success: true, data: assignment });
   } catch (error) {
@@ -144,7 +150,7 @@ exports.createOrUpdateAssignment = async (req, res) => {
 
 exports.deleteAssignment = async (req, res) => {
   try {
-    await progressService.deleteAssignment({ assignmentId: req.params.assignmentId, userId: getUserId(req) });
+    await progressService.deleteAssignment({ assignmentId: req.params.assignmentId, userId: getUserId(req), userRole: getUserRole(req) });
     res.json({ success: true, message: 'Đã xóa bài tập' });
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
