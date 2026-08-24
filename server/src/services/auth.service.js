@@ -10,6 +10,58 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const ALLOWED_REGISTER_ROLES = ['STUDENT', 'TEACHER'];
 const REFRESH_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
 const REFRESH_REUSE_GRACE_MS = 10_000;
+const MAX_GOOGLE_ID_TOKEN_LENGTH = 16_384;
+
+const normalizeEmail = value => String(value || '').trim().toLocaleLowerCase('en-US');
+const isGoogleAuthoritativeForEmail = payload => normalizeEmail(payload.email).endsWith('@gmail.com') || Boolean(payload.hd);
+
+const findUserByEmail = async (email, database = prisma) => database.user.findFirst({
+  where: { email: { equals: normalizeEmail(email), mode: 'insensitive' } },
+  orderBy: { id: 'asc' },
+});
+
+const resolveGoogleUser = async (payload, database = prisma) => {
+  const normalizedEmail = normalizeEmail(payload.email);
+  const subjectUser = await database.user.findUnique({ where: { googleSubject: payload.sub } });
+  if (subjectUser) return subjectUser;
+
+  const emailUser = await findUserByEmail(normalizedEmail, database);
+  if (emailUser?.password) {
+    throw new ApiError(409, {
+      code: 'GOOGLE_ACCOUNT_LINK_REQUIRED',
+      message: 'This email already uses password sign-in. Continue with your password; automatic Google linking is blocked for security.',
+    });
+  }
+  if (emailUser?.googleSubject && emailUser.googleSubject !== payload.sub) {
+    throw new ApiError(409, {
+      code: 'GOOGLE_ACCOUNT_CONFLICT',
+      message: 'This email is already linked to another Google account.',
+    });
+  }
+
+  if (emailUser) {
+    if (!isGoogleAuthoritativeForEmail(payload)) {
+      throw new ApiError(409, {
+        code: 'GOOGLE_LEGACY_REAUTH_REQUIRED',
+        message: 'This legacy account cannot be linked automatically. Contact support to verify account ownership.',
+      });
+    }
+    return database.user.update({
+      where: { id: emailUser.id },
+      data: { googleSubject: payload.sub },
+    });
+  }
+
+  return database.user.create({
+    data: {
+      email: normalizedEmail,
+      googleSubject: payload.sub,
+      name: payload.name,
+      avatar: payload.picture,
+      password: null,
+    },
+  });
+};
 
 const publicUser = user => ({
   id: user.id,
@@ -47,7 +99,8 @@ const createAuthResult = async (user, message) => {
 };
 
 exports.register = async ({ email, password, name, role }) => {
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  const normalizedEmail = normalizeEmail(email);
+  const existingUser = await findUserByEmail(normalizedEmail);
   if (existingUser) throw new ApiError(400, { message: 'Email này đã được sử dụng!' });
 
   const requestedRole = role || 'STUDENT';
@@ -56,13 +109,13 @@ exports.register = async ({ email, password, name, role }) => {
   }
 
   const user = await prisma.user.create({
-    data: { email, password: await bcrypt.hash(password, 10), name, role: requestedRole },
+    data: { email: normalizedEmail, password: await bcrypt.hash(password, 10), name, role: requestedRole },
   });
   return createAuthResult(user, 'Đăng ký thành công!');
 };
 
 exports.login = async ({ email, password }) => {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await findUserByEmail(email);
   if (!user) throw new ApiError(400, { message: 'Email chưa được đăng ký!' });
   if (!user.password) {
     throw new ApiError(400, { message: "Tài khoản này đăng ký bằng Google. Vui lòng chọn 'Login with Google'." });
@@ -74,16 +127,26 @@ exports.login = async ({ email, password }) => {
 };
 
 exports.googleLogin = async ({ token }) => {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    throw new ApiError(503, { code: 'GOOGLE_AUTH_NOT_CONFIGURED', message: 'Google sign-in is temporarily unavailable.' });
+  }
+  if (typeof token !== 'string' || !token.trim() || token.length > MAX_GOOGLE_ID_TOKEN_LENGTH) {
+    throw new ApiError(400, { code: 'GOOGLE_TOKEN_INVALID', message: 'Google sign-in credential is invalid.' });
+  }
+
   const ticket = await client.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
   const payload = ticket.getPayload();
   if (!payload?.email) throw new ApiError(400, { message: 'Google account does not provide an email address.' });
   if (payload.email_verified !== true) throw new ApiError(403, { message: 'Google account email must be verified.' });
+  if (!payload.sub) throw new ApiError(400, { code: 'GOOGLE_SUBJECT_MISSING', message: 'Google account identifier is unavailable.' });
 
-  let user = await prisma.user.findUnique({ where: { email: payload.email } });
-  if (!user) {
-    user = await prisma.user.create({
-      data: { email: payload.email, name: payload.name, avatar: payload.picture, password: null },
-    });
+  let user;
+  try {
+    user = await resolveGoogleUser(payload);
+  } catch (error) {
+    if (error?.code !== 'P2002') throw error;
+    user = await prisma.user.findUnique({ where: { googleSubject: payload.sub } });
+    if (!user) throw new ApiError(409, { code: 'GOOGLE_ACCOUNT_CONFLICT', message: 'Google account linking conflicted with another request. Please try again.' });
   }
   return createAuthResult(user, 'Google login successful');
 };
@@ -146,4 +209,12 @@ exports.logout = async ({ refreshToken }) => {
   });
 };
 
-exports._private = { hashRefreshToken, signAccessToken };
+exports._private = {
+  hashRefreshToken,
+  signAccessToken,
+  normalizeEmail,
+  isGoogleAuthoritativeForEmail,
+  findUserByEmail,
+  resolveGoogleUser,
+  MAX_GOOGLE_ID_TOKEN_LENGTH,
+};

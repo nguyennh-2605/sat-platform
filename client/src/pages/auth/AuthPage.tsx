@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { Mail, Lock, Eye, EyeOff, User, GraduationCap } from 'lucide-react'; // Đã thêm icon GraduationCap
@@ -19,6 +19,8 @@ function AuthPage() {
   const [role, setRole] = useState<RegisterRole>('STUDENT');
   
   const [showPassword, setShowPassword] = useState(false);
+  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
+  const googleSignInInFlight = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -60,6 +62,13 @@ function AuthPage() {
   };
 
   const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) {
+      toast.error('Google did not return a sign-in credential. Please try again.');
+      return;
+    }
+    if (googleSignInInFlight.current) return;
+    googleSignInInFlight.current = true;
+    setIsGoogleSigningIn(true);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google-login`, {
         method: 'POST',
@@ -79,6 +88,9 @@ function AuthPage() {
     } catch (error) {
       console.log("Google sign-in connection error:", error);
       toast.error("Unable to connect to the server");
+    } finally {
+      googleSignInInFlight.current = false;
+      setIsGoogleSigningIn(false);
     }
   };
 
@@ -245,7 +257,7 @@ function AuthPage() {
         </div>
 
         <div className="mt-6 flex justify-center w-full">
-           <div className="w-full flex justify-center"> 
+           <div className={`w-full flex justify-center ${isGoogleSigningIn ? 'pointer-events-none opacity-60' : ''}`} aria-busy={isGoogleSigningIn}>
               <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => toast.error("Google sign-in failed")}

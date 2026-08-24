@@ -1,6 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseArgs, normalizeEmail, validatePassword, resolveEnvironment } = require('../scripts/admin-cli');
+const {
+  parseArgs,
+  normalizeEmail,
+  validatePassword,
+  resolveEnvironment,
+  validateProductionGoogleAccount,
+} = require('../scripts/admin-cli');
 
 test('admin CLI parses commands without accepting a password argument', () => {
   assert.deepEqual(parseArgs(['promote', '--email', 'Admin@Example.com', '--environment', 'production', '--confirm-production']), {
@@ -28,4 +34,10 @@ test('admin CLI refuses to label a remote database as local', () => {
 test('admin CLI refuses production mode for a local database', () => {
   assert.throws(() => resolveEnvironment({ requested: 'production', databaseUrl: 'postgresql://user:pass@127.0.0.1:5432/app' }), /local database/);
   assert.equal(resolveEnvironment({ requested: 'production', databaseUrl: 'postgresql://user:pass@prod.example.com:5432/app' }), 'production');
+});
+
+test('production Admin promotion requires a verified Google subject and no password', () => {
+  assert.throws(() => validateProductionGoogleAccount({ password: null, googleSubject: null }), /verified through Google/);
+  assert.throws(() => validateProductionGoogleAccount({ password: 'hash', googleSubject: 'google-123' }), /verified through Google/);
+  assert.doesNotThrow(() => validateProductionGoogleAccount({ password: null, googleSubject: 'google-123' }));
 });

@@ -11,6 +11,7 @@ datasource db {
 model User {
   id                    Int                      @id @default(autoincrement())
   email                 String                   @unique
+  googleSubject         String?                  @unique
   password              String?
   createdAt             DateTime                 @default(now())
   name                  String?

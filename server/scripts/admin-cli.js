@@ -104,6 +104,12 @@ const confirmProduction = async flags => {
   if (answer !== 'PRODUCTION') throw new Error('Production confirmation did not match.');
 };
 
+const validateProductionGoogleAccount = user => {
+  if (user.password !== null || !user.googleSubject) {
+    throw new Error('Production promotion requires an account verified through Google sign-in without an application password.');
+  }
+};
+
 const createAdmin = async ({ email, name, environment }) => {
   if (environment === 'production') throw new Error('Password-based Admin creation is disabled in production. Sign in with Google, then use admin:promote.');
   const password = await readPasswordPair();
@@ -119,7 +125,7 @@ const createAdmin = async ({ email, name, environment }) => {
 const promoteAdmin = async ({ email, environment }) => prisma.$transaction(async transaction => {
   const existing = await transaction.user.findUnique({ where: { email } });
   if (!existing) throw new Error('Account not found. Sign in once before promoting this email.');
-  if (environment === 'production' && existing.password !== null) throw new Error('Production promotion requires a Google-created account without an application password.');
+  if (environment === 'production') validateProductionGoogleAccount(existing);
   if (existing.role === 'ADMIN') return { user: existing, unchanged: true, revoked: 0 };
   const revoked = await transaction.refreshSession.deleteMany({ where: { userId: existing.id } });
   const user = await transaction.user.update({ where: { id: existing.id }, data: { role: 'ADMIN' } });
@@ -185,4 +191,4 @@ if (require.main === module) {
   main().catch(error => { console.error(`Admin CLI error: ${error.message}`); process.exitCode = 1; }).finally(() => prisma.$disconnect());
 }
 
-module.exports = { parseArgs, normalizeEmail, validatePassword, resolveEnvironment };
+module.exports = { parseArgs, normalizeEmail, validatePassword, resolveEnvironment, validateProductionGoogleAccount };
