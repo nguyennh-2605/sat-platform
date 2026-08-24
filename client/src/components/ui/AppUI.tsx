@@ -1,12 +1,18 @@
 import type {
   ButtonHTMLAttributes,
+  ElementType,
   HTMLAttributes,
   InputHTMLAttributes,
+  KeyboardEvent,
   ReactNode,
   SelectHTMLAttributes,
+  TableHTMLAttributes,
+  TdHTMLAttributes,
+  ThHTMLAttributes,
 } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Bell, X } from 'lucide-react';
+import { ArrowLeft, Bell, Inbox, X } from 'lucide-react';
 import { cx, ui } from './styles';
 
 interface AppHeaderProps {
@@ -36,10 +42,10 @@ export function AppHeader({
     .toUpperCase() || 'ST';
 
   return (
-    <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center justify-between border-b border-[#C9D8D2] bg-white px-6">
+    <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center justify-between border-b border-ui-border-strong bg-surface px-6">
       <div className="flex w-[310px] min-w-0 flex-col justify-center">
-        <h1 className="truncate text-base font-semibold leading-tight text-[#1A1A1A]">{title}</h1>
-        {subtitle && <p className="mt-0.5 truncate text-xs leading-tight text-[#6B7280]">{subtitle}</p>}
+        <h1 className="truncate text-title font-semibold text-foreground">{title}</h1>
+        {subtitle && <p className="mt-0.5 truncate text-caption text-muted-foreground">{subtitle}</p>}
       </div>
 
       <div className="flex h-full min-w-0 flex-1 items-center justify-center">{centerContent}</div>
@@ -48,12 +54,12 @@ export function AppHeader({
         {rightContent}
         {showProfile && (
           <>
-            {showNotifications && <button className="relative shrink-0 text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
+            {showNotifications && <button className="relative shrink-0 text-muted-foreground transition-colors hover:text-foreground" aria-label="Notifications">
               <Bell size={20} />
               <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
             </button>}
             <div
-              className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 select-none items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-white transition-[box-shadow] hover:ring-[#1B7A5A]/30"
+              className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 select-none items-center justify-center rounded-full bg-primary text-caption font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-surface transition-[box-shadow] hover:ring-primary/30"
               title={userName}
             >
               {initials}
@@ -69,11 +75,11 @@ type ButtonVariant = 'primary' | 'outline' | 'accent' | 'ghost' | 'destructive';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 const buttonVariantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-[#1B7A5A] text-white hover:bg-[#145F47]',
-  outline: 'border border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]',
-  accent: 'bg-[#E8C040] text-[#1A1A1A] hover:bg-[#D9B138]',
-  ghost: 'bg-transparent text-[#6B7280] shadow-none hover:bg-[#EAF2EE] hover:text-[#1A1A1A]',
-  destructive: 'bg-red-600 text-white hover:bg-red-700',
+  primary: 'bg-primary text-white hover:bg-primary-hover',
+  outline: 'border border-primary bg-surface text-primary hover:bg-primary-soft',
+  accent: 'bg-accent text-foreground hover:bg-accent-hover',
+  ghost: 'bg-transparent text-muted-foreground shadow-none hover:bg-muted hover:text-foreground',
+  destructive: 'bg-danger text-white hover:bg-red-700',
 };
 
 const buttonSizeClasses: Record<ButtonSize, string> = {
@@ -93,7 +99,7 @@ export function Button({ className, variant = 'primary', size = 'md', type = 'bu
     <button
       type={type}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center rounded-lg font-medium shadow-sm transition-colors disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex shrink-0 items-center justify-center rounded-control font-medium shadow-card transition-colors disabled:pointer-events-none disabled:opacity-50',
         buttonVariantClasses[variant],
         buttonSizeClasses[size],
         className,
@@ -112,7 +118,7 @@ export function BackButton({ label = 'Back', className, ...props }: BackButtonPr
     <Button
       variant="ghost"
       size="sm"
-      className={cx('px-2.5 text-[#4B5563] hover:text-[#145F47]', className)}
+      className={cx('px-2.5 text-subtle hover:text-primary-hover', className)}
       {...props}
     >
       <ArrowLeft size={16} aria-hidden="true" />
@@ -128,12 +134,12 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 type BadgeTone = 'green' | 'gold' | 'neutral' | 'success' | 'warning' | 'danger';
 
 const badgeToneClasses: Record<BadgeTone, string> = {
-  green: 'border-[#C2DDD4] bg-[#E8F5EF] text-[#1B7A5A]',
-  gold: 'border-[#F0D070] bg-[#FEF9E7] text-[#92640A]',
-  neutral: 'border-[#E5E7EB] bg-[#F9FAFB] text-[#6B7280]',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  warning: 'border-amber-200 bg-amber-50 text-amber-700',
-  danger: 'border-red-200 bg-red-50 text-red-700',
+  green: 'border-primary/25 bg-primary-soft text-primary',
+  gold: 'border-accent/60 bg-accent-soft text-warning',
+  neutral: 'border-ui-border bg-background text-muted-foreground',
+  success: 'border-success/20 bg-success-soft text-success',
+  warning: 'border-warning/20 bg-warning-soft text-warning',
+  danger: 'border-danger/20 bg-danger-soft text-danger',
 };
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
@@ -153,7 +159,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cx(
-        'h-9 rounded-lg border border-[#E2EDE9] bg-white px-3 text-sm text-[#1A1A1A] outline-none placeholder:text-[#6B7280] focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20',
+        'h-9 rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20',
         className,
       )}
       {...props}
@@ -165,7 +171,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={cx(
-        'h-9 cursor-pointer rounded-lg border border-[#E2EDE9] bg-white px-3 text-sm text-[#1A1A1A] outline-none focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20',
+        'h-9 cursor-pointer rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20',
         className,
       )}
       {...props}
@@ -186,6 +192,57 @@ interface ModalProps {
 }
 
 export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false, children, footer, className, presentation = 'dialog' }: ModalProps) {
+  const titleId = useId();
+  const subtitleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousActiveElement = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusFirst = () => (dialog?.querySelector<HTMLElement>(focusableSelector) || dialog)?.focus();
+    const frame = window.requestAnimationFrame(focusFirst);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousActiveElement?.focus();
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const isContentPanel = presentation === 'content-panel';
@@ -196,29 +253,36 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
       className={isContentPanel
         ? 'absolute inset-0 z-[200] flex min-h-0 min-w-0 bg-white'
         : isContentDialog
-          ? 'fixed inset-y-0 right-0 left-56 z-[200] flex min-h-0 min-w-0 items-center justify-center bg-[#0A1F16]/50 p-4'
-          : 'fixed inset-0 z-[200] flex items-center justify-center bg-[#0A1F16]/50 p-4'}
+          ? 'fixed inset-y-0 right-0 left-56 z-[200] flex min-h-0 min-w-0 items-center justify-center bg-[var(--ui-overlay)] p-4'
+          : 'fixed inset-0 z-[200] flex items-center justify-center bg-[var(--ui-overlay)] p-4'}
       onMouseDown={event => { if (!isContentPanel && closeOnBackdrop && event.target === event.currentTarget) onClose(); }}
     >
-      <div className={cx(
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={subtitle ? subtitleId : undefined}
+        tabIndex={-1}
+        className={cx(
         isContentPanel
-          ? 'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white'
+          ? 'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-surface'
           : isContentDialog
-            ? 'flex min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-xl border border-[#E2EDE9] bg-white shadow-xl'
-            : 'w-full max-w-lg overflow-hidden rounded-xl border border-[#E2EDE9] bg-white shadow-2xl',
+            ? 'flex min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay'
+            : 'w-full max-w-lg overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay',
         className,
       )}>
-        <div className="flex items-start justify-between border-b border-[#E2EDE9] px-6 py-5">
+        <div className="flex items-start justify-between border-b border-ui-border px-6 py-5">
           <div>
-            <h2 className="text-lg font-semibold text-[#1A1A1A]">{title}</h2>
-            {subtitle && <p className="mt-1 text-sm text-[#6B7280]">{subtitle}</p>}
+            <h2 id={titleId} className="text-heading font-semibold text-foreground">{title}</h2>
+            {subtitle && <p id={subtitleId} className="mt-1 text-body text-muted-foreground">{subtitle}</p>}
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X size={18} />
           </Button>
         </div>
         <div className={isContentPanel || isContentDialog ? 'min-h-0 flex-1 overflow-hidden p-6' : 'p-6'}>{children}</div>
-        {footer && <div className="flex justify-end gap-3 border-t border-[#E2EDE9] bg-[#F2F8F5] px-6 py-4">{footer}</div>}
+        {footer && <div className="flex justify-end gap-3 border-t border-ui-border bg-background px-6 py-4">{footer}</div>}
       </div>
     </div>
   );
@@ -227,5 +291,122 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
 }
 
 export function TableShell({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx('overflow-hidden rounded-xl border border-[#E2EDE9] bg-white shadow-sm', className)} {...props} />;
+  return <div className={cx('overflow-hidden rounded-card border border-ui-border bg-surface shadow-card', className)} {...props} />;
+}
+
+export function Table({ className, ...props }: TableHTMLAttributes<HTMLTableElement>) {
+  return <table className={cx('w-full text-left text-body', className)} {...props} />;
+}
+
+export function TableHeader({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
+  return <thead className={cx('border-b border-ui-border-strong bg-background text-caption font-medium text-subtle', className)} {...props} />;
+}
+
+export function TableBody({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
+  return <tbody className={cx('divide-y divide-ui-border', className)} {...props} />;
+}
+
+export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
+  return <tr className={cx('transition-colors hover:bg-background/70', className)} {...props} />;
+}
+
+export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
+  return <th className={cx('px-5 py-3 text-left font-medium', className)} {...props} />;
+}
+
+export function TableCell({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
+  return <td className={cx('px-5 py-3', className)} {...props} />;
+}
+
+interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
+  icon?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  compact?: boolean;
+  surface?: boolean;
+}
+
+export function EmptyState({ icon, title, description, action, compact = false, surface = true, className, ...props }: EmptyStateProps) {
+  const content = (
+    <>
+      <span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary-soft text-primary" aria-hidden="true">
+        {icon || <Inbox size={19} />}
+      </span>
+      <h3 className="mt-3 text-title font-semibold text-foreground">{title}</h3>
+      {description && <p className="mt-1 max-w-md text-body text-muted-foreground">{description}</p>}
+      {action && <div className="mt-5">{action}</div>}
+    </>
+  );
+  const classes = cx('flex flex-col items-center justify-center text-center', compact ? 'min-h-40 p-6' : 'min-h-56 p-8', className);
+  return surface ? <Card className={classes} {...props}>{content}</Card> : <div className={classes} {...props}>{content}</div>;
+}
+
+export interface TabItem<T extends string> {
+  value: T;
+  label: ReactNode;
+  icon?: ElementType;
+  disabled?: boolean;
+  panelId?: string;
+}
+
+interface TabsProps<T extends string> extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange'> {
+  items: Array<TabItem<T>>;
+  value: T;
+  onValueChange: (value: T) => void;
+  ariaLabel: string;
+  tabClassName?: string;
+}
+
+export function Tabs<T extends string>({ items, value, onValueChange, ariaLabel, className, tabClassName, ...props }: TabsProps<T>) {
+  const baseId = useId();
+  const selectTab = (item: TabItem<T>) => {
+    if (!item.disabled) onValueChange(item.value);
+  };
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const enabledIndexes = items.map((item, itemIndex) => item.disabled ? -1 : itemIndex).filter(itemIndex => itemIndex >= 0);
+    if (!enabledIndexes.length) return;
+    const currentPosition = enabledIndexes.indexOf(index);
+    let nextIndex: number | undefined;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = enabledIndexes[(currentPosition + 1) % enabledIndexes.length];
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = enabledIndexes[(currentPosition - 1 + enabledIndexes.length) % enabledIndexes.length];
+    if (event.key === 'Home') nextIndex = enabledIndexes[0];
+    if (event.key === 'End') nextIndex = enabledIndexes[enabledIndexes.length - 1];
+    if (nextIndex === undefined) return;
+    event.preventDefault();
+    selectTab(items[nextIndex]);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role="tab"]')[nextIndex]?.focus();
+  };
+
+  return (
+    <div role="tablist" aria-label={ariaLabel} className={cx('flex min-w-0', className)} {...props}>
+      {items.map((item, index) => {
+        const active = item.value === value;
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.value}
+            id={`${baseId}-${item.value}-tab`}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            aria-controls={item.panelId}
+            tabIndex={active ? 0 : -1}
+            disabled={item.disabled}
+            onClick={() => selectTab(item)}
+            onKeyDown={event => handleKeyDown(event, index)}
+            className={cx(
+              'relative inline-flex h-10 shrink-0 items-center justify-center gap-1.5 px-4 text-body transition-colors disabled:pointer-events-none disabled:opacity-50',
+              active ? 'font-medium text-primary' : 'text-muted-foreground hover:text-foreground',
+              tabClassName,
+            )}
+          >
+            {Icon && <Icon size={14} aria-hidden="true" />}
+            {item.label}
+            {active && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-0.5 bg-primary" />}
+          </button>
+        );
+      })}
+    </div>
+  );
 }

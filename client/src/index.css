@@ -4,19 +4,49 @@
 
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #1a1a1a;
-  background: #f2f8f5;
-  --app-background: #f2f8f5;
-  --app-foreground: #1a1a1a;
-  --app-card: #ffffff;
-  --app-primary: #1b7a5a;
-  --app-primary-hover: #145f47;
-  --app-secondary: #e8f5ef;
-  --app-accent: #e8c040;
-  --app-muted: #eaf2ee;
-  --app-muted-foreground: #6b7280;
-  --app-border: #e2ede9;
-  --app-radius: 0.625rem;
+  color: var(--ui-foreground);
+  background: var(--ui-background);
+
+  /* UI_GUIDELINES.md is the source of truth for these semantic tokens. */
+  --ui-background: #f2f8f5;
+  --ui-foreground: #1a1a1a;
+  --ui-surface: #ffffff;
+  --ui-primary: #1b7a5a;
+  --ui-primary-hover: #145f47;
+  --ui-primary-soft: #e8f5ef;
+  --ui-accent: #e8c040;
+  --ui-accent-hover: #d9b138;
+  --ui-accent-soft: #fef9e7;
+  --ui-muted: #eaf2ee;
+  --ui-muted-foreground: #6b7280;
+  --ui-subtle-foreground: #4b5563;
+  --ui-border: #d2ded9;
+  --ui-border-strong: #c9d8d2;
+  --ui-success: #047857;
+  --ui-success-soft: #ecfdf5;
+  --ui-warning: #a16207;
+  --ui-warning-soft: #fffbeb;
+  --ui-danger: #b42318;
+  --ui-danger-soft: #fef2f2;
+  --ui-overlay: rgb(10 31 22 / 0.5);
+  --ui-radius-control: 0.625rem;
+  --ui-radius-card: 0.75rem;
+  --ui-shadow-card: 0 1px 2px rgb(15 77 56 / 0.08);
+  --ui-shadow-raised: 0 8px 24px rgb(15 77 56 / 0.12);
+  --ui-shadow-overlay: 0 20px 48px rgb(10 31 22 / 0.2);
+
+  /* Backwards-compatible aliases; do not use these in new code. */
+  --app-background: var(--ui-background);
+  --app-foreground: var(--ui-foreground);
+  --app-card: var(--ui-surface);
+  --app-primary: var(--ui-primary);
+  --app-primary-hover: var(--ui-primary-hover);
+  --app-secondary: var(--ui-primary-soft);
+  --app-accent: var(--ui-accent);
+  --app-muted: var(--ui-muted);
+  --app-muted-foreground: var(--ui-muted-foreground);
+  --app-border: var(--ui-border);
+  --app-radius: var(--ui-radius-control);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -48,7 +78,7 @@ button:not([class*="rounded-full"]),
 input:not([class*="rounded-full"]),
 select:not([class*="rounded-full"]),
 textarea:not([class*="rounded-full"]) {
-  border-radius: var(--app-radius);
+  border-radius: var(--ui-radius-control);
 }
 
 button {
@@ -77,8 +107,19 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #6bbfa0;
+  outline: 2px solid color-mix(in srgb, var(--ui-primary) 65%, white);
   outline-offset: 2px;
+}
+
+.app-toast {
+  max-width: min(420px, calc(100vw - 2rem));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control) !important;
+  background: var(--ui-surface) !important;
+  color: var(--ui-foreground) !important;
+  box-shadow: var(--ui-shadow-raised) !important;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
 }
 
 @layer components {
@@ -91,27 +132,27 @@ textarea:focus-visible {
   }
 
   .app-button {
-    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium shadow-sm transition-colors disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-control px-4 text-body font-medium shadow-card transition-colors disabled:pointer-events-none disabled:opacity-50;
   }
 
   .app-button-primary {
-    @apply bg-[#1B7A5A] text-white hover:bg-[#145F47];
+    @apply bg-primary text-white hover:bg-primary-hover;
   }
 
   .app-button-secondary {
-    @apply border border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF];
+    @apply border border-primary bg-surface text-primary hover:bg-primary-soft;
   }
 
   .app-icon-button {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#6B7280] transition-colors hover:bg-[#EAF2EE] hover:text-[#1B7A5A];
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted hover:text-primary;
   }
 
   .app-input {
-    @apply h-9 rounded-lg border border-[#E2EDE9] bg-white px-3 text-sm text-[#1A1A1A] outline-none placeholder:text-[#6B7280] focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20;
+    @apply h-9 rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20;
   }
 
   .app-modal {
-    @apply overflow-hidden rounded-xl border border-[#E2EDE9] bg-white shadow-2xl;
+    @apply overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay;
   }
 }
 

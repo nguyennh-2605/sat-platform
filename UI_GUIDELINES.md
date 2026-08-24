@@ -1,6 +1,12 @@
 # SAT Platform UI Guidelines
 
-Tài liệu này là nguồn quy tắc giao diện mặc định cho mọi thay đổi frontend về sau. Trước khi sửa UI, hãy đọc toàn bộ file này và đối chiếu với source trong `SAT Learning Management System UI.zip`.
+**Phiên bản:** 2.0
+**Cập nhật:** 24/08/2026
+**Trạng thái:** Nguồn quy chuẩn UI duy nhất và bắt buộc
+
+Tài liệu này là nguồn quy tắc giao diện duy nhất cho mọi thay đổi frontend. Khi tài liệu cũ, code cũ hoặc Figma mâu thuẫn với nhau, thứ tự ưu tiên là: yêu cầu hiện tại của người dùng → file này → shared UI primitives → màn hình cũ. Figma chỉ là tham chiếu cho bố cục cụ thể, không được tạo thêm một design system song song.
+
+Mọi UI mới phải dùng token trong `client/src/index.css`, alias trong `client/tailwind.config.js` và primitive trong `client/src/components/ui`. Không sao chép class của primitive sang feature.
 
 ## 1. Nguyên tắc chung
 
@@ -18,27 +24,58 @@ Tài liệu này là nguồn quy tắc giao diện mặc định cho mọi thay 
 - Mỗi background raster ưu tiên WebP/AVIF và mục tiêu dưới `200 KB` (giới hạn tối đa khoảng `500 KB`), không dùng GIF/video, parallax, `background-attachment: fixed` hoặc backdrop blur. Luôn có lớp overlay màu tĩnh để duy trì contrast.
 - Khi chuyển page trong dashboard, dùng progress bar mảnh ở đầu vùng nội dung và fade ngắn để tránh flash layout. Progress phải dựa trên route/request thật, có thời gian chờ tối đa để không khóa UI khi mạng chậm, không dùng backdrop/blur và phải tôn trọng `prefers-reduced-motion`.
 
-## 2. Design tokens
+## 2. Design tokens bắt buộc
 
 Sử dụng các token đã định nghĩa trong `client/src/index.css` và component trong `client/src/components/ui`.
 
-| Mục đích | Giá trị |
+### 2.1 Colors
+
+| Ý nghĩa | Tailwind alias | CSS token | Giá trị |
+| --- | --- | --- | --- |
+| Page background | `bg-background` | `--ui-background` | `#F2F8F5` |
+| Main text | `text-foreground` | `--ui-foreground` | `#1A1A1A` |
+| Card/surface | `bg-surface` | `--ui-surface` | `#FFFFFF` |
+| Primary | `bg-primary`, `text-primary` | `--ui-primary` | `#1B7A5A` |
+| Primary hover | `bg-primary-hover` | `--ui-primary-hover` | `#145F47` |
+| Primary soft | `bg-primary-soft` | `--ui-primary-soft` | `#E8F5EF` |
+| Accent | `bg-accent` | `--ui-accent` | `#E8C040` |
+| Muted surface | `bg-muted` | `--ui-muted` | `#EAF2EE` |
+| Muted text | `text-muted-foreground` | `--ui-muted-foreground` | `#6B7280` |
+| Secondary text | `text-subtle` | `--ui-subtle-foreground` | `#4B5563` |
+| Border | `border-ui-border` | `--ui-border` | `#D2DED9` |
+| Strong divider | `border-ui-border-strong` | `--ui-border-strong` | `#C9D8D2` |
+| Success | `text-success`, `bg-success-soft` | `--ui-success*` | semantic green |
+| Warning | `text-warning`, `bg-warning-soft` | `--ui-warning*` | semantic amber |
+| Danger | `text-danger`, `bg-danger-soft` | `--ui-danger*` | semantic red |
+
+Không viết hex trực tiếp trong feature mới. Chỉ được dùng inline color cho dữ liệu trực quan động như chart series hoặc avatar palette đã kiểm soát. Nếu thiếu màu, bổ sung semantic token tại nguồn thay vì thêm màu cục bộ.
+
+### 2.2 Spacing
+
+- Dùng thang Tailwind theo lưới `4px`: `1=4px`, `2=8px`, `3=12px`, `4=16px`, `5=20px`, `6=24px`, `8=32px`.
+- Control nội bộ: `gap-2` hoặc `gap-3`. Card: `p-4`, `p-5` hoặc `p-6`. Page: `p-6`, desktop `lg:p-8`.
+- Không dùng arbitrary spacing như `p-[17px]`, `gap-[13px]` nếu không phải kích thước layout phụ thuộc thiết kế hoặc phép tính viewport.
+
+### 2.3 Border radius
+
+| Thành phần | Class bắt buộc |
 | --- | --- |
-| Page background | `#F2F8F5` |
-| Card/background | `#FFFFFF` |
-| Primary green | `#1B7A5A` |
-| Primary hover | `#145F47` |
-| Dark green/sidebar | `#0F4D38` |
-| Green surface | `#E8F5EF` |
-| Green border | `#C2DDD4` |
-| Accent gold | `#E8C040` |
-| Main text | `#1A1A1A` |
-| Muted text | `#6B7280` |
-| Border | `#D2DED9` |
-| Strong divider | `#C9D8D2` |
-| Font | `Inter`, sau đó dùng system sans-serif |
-| Card radius | `rounded-xl` |
-| Button/input radius | `rounded-lg` |
+| Button, input, select, icon container | `rounded-control` |
+| Card, modal, table shell | `rounded-card` |
+| Badge/avatar/status dot | `rounded-full` |
+| Progress bar nhỏ | `rounded-sm` hoặc `rounded-full` |
+
+Không dùng radius tùy ý như `rounded-[11px]` trong feature mới.
+
+### 2.4 Shadow
+
+| Mức | Class | Dùng cho |
+| --- | --- | --- |
+| 1 | `shadow-card` | Card và table mặc định |
+| 2 | `shadow-raised` | Dropdown, popover, toast, card hover |
+| 3 | `shadow-overlay` | Modal/dialog |
+
+Không dùng `shadow-lg/xl/2xl` hoặc arbitrary shadow trong feature mới. Hover card chỉ nâng lên `shadow-raised`; không dịch card quá `-2px`.
 
 Không dùng indigo/purple làm màu primary. Màu đỏ, amber và emerald chỉ dùng cho trạng thái semantic như error, warning và success.
 
@@ -56,7 +93,7 @@ Nội dung đề Math dùng strict LaTeX trong toàn bộ luồng import, previe
 - Trạng thái Correct/Incorrect/Warning phải phân biệt được bằng cả icon hoặc label, không chỉ dựa vào màu.
 - Khi hoàn thành frontend, kiểm tra nhanh contrast ở màn hình thật và các state hover, disabled, loading.
 
-## 3. Component bắt buộc ưu tiên
+## 3. Component bắt buộc
 
 Ưu tiên tái sử dụng component từ:
 
@@ -65,7 +102,7 @@ client/src/components/ui/AppUI.tsx
 client/src/components/ui/styles.ts
 ```
 
-Các component hiện có:
+Các component chuẩn:
 
 - `AppHeader`
 - `Button`
@@ -75,9 +112,24 @@ Các component hiện có:
 - `Select`
 - `DateTimePicker`
 - `Modal`
-- `TableShell`
+- `Tabs`
+- `TableShell`, `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`
+- `EmptyState`
+- Toast toàn cục qua `APP_TOAST_OPTIONS`; feature mới gọi wrapper `appToast`
 
-Không tạo lại button, modal hoặc card bằng một bộ class mới nếu component dùng chung đã đáp ứng được yêu cầu. Nếu thiếu variant, mở rộng component dùng chung trước.
+Không tạo lại button, input, select, modal, tabs, card, table shell, badge, toast hoặc empty state bằng một bộ class mới. Nếu thiếu variant, mở rộng primitive dùng chung trước. Native element chỉ được dùng cho cấu trúc semantic bên trong primitive hoặc UI chuyên dụng của Exam Room/calculator/content renderer.
+
+### Contract của từng component
+
+- `Button`: chỉ dùng variant `primary`, `outline`, `accent`, `ghost`, `destructive`; size `sm`, `md`, `lg`, `icon`.
+- `Input` và `Select`: cao `36px`, focus ring primary; label/helper/error nằm ngoài control và dùng typography chuẩn.
+- `Modal`: dùng `presentation="content-dialog"` trong dashboard; có title, nút đóng, Escape, focus trap và restore focus. Không tự dựng overlay.
+- `Tabs`: bắt buộc cho chuyển đổi panel cùng trang; có `tablist/tab/tabpanel`, Arrow keys, Home/End. Link điều hướng sang route khác không phải Tabs.
+- `Card`: surface nội dung mặc định. Không biến mọi section thành card nếu hierarchy không cần.
+- `Table`: luôn đặt trong `TableShell`; table rộng có wrapper `overflow-x-auto`; dùng các table primitives cho header/row/cell.
+- `Badge`: chỉ thể hiện metadata/status, không dùng thay button.
+- `Toast`: success 3 giây, error 5 giây, mặc định 4 giây; không chứa thao tác nghiệp vụ bắt buộc.
+- `EmptyState`: luôn có title; description giải thích bước tiếp theo; action chỉ thêm khi người dùng có hành động hợp lệ.
 
 - Trong dashboard có sidebar cố định bên trái, modal/panel thuộc một page phải được giới hạn trong vùng nội dung bên phải và không phủ, làm tối hoặc dịch chuyển sidebar. Dùng `Modal` với `presentation="content-dialog"` cho popup của page; variant này phải portal vào `document.body` và offset theo chiều rộng sidebar để không bị ancestor có `transform`, animation hoặc overflow làm lệch vị trí. Popup vẫn phải có khoảng đệm, backdrop và kích thước dialog bình thường. Chỉ dùng `presentation="content-panel"` khi người dùng thực sự yêu cầu một màn hình chi tiết phủ kín vùng nội dung.
 
@@ -93,11 +145,15 @@ Không tạo lại button, modal hoặc card bằng một bộ class mới nếu
 
 ## 5. Typography
 
-- Page title: `text-base` hoặc `text-lg`, `font-semibold` tùy vị trí.
-- Section title: `text-sm` đến `text-lg`, `font-semibold`.
-- Body: `text-sm`.
-- Metadata/helper text: `text-xs`, màu `#6B7280`.
-- KPI value có thể dùng `text-2xl` hoặc `text-3xl`.
+| Vai trò | Class chuẩn |
+| --- | --- |
+| Display/KPI | `text-display font-semibold` hoặc `text-2xl/3xl` cho số liệu |
+| Page/section heading | `text-heading font-semibold` |
+| Card/title | `text-title font-semibold` |
+| Body/control | `text-body` |
+| Caption/metadata | `text-caption text-muted-foreground` |
+
+- Chỉ dùng `text-[Npx]` trong nội dung đề thi cần fidelity đặc biệt; UI thông thường phải dùng scale trên.
 - Không dùng `font-black` hoặc `font-bold` tràn lan. Chỉ dùng bold cho dữ liệu cần nhấn mạnh.
 - Không trộn nhiều font trong cùng trang.
 
@@ -113,6 +169,7 @@ Không tạo lại button, modal hoặc card bằng một bộ class mới nếu
 - Mọi trường chọn ngày hoặc ngày–giờ phải dùng shared `DateTimePicker` từ `client/src/components/ui/DateTimePicker.tsx`; không dùng trực tiếp native `date`, `datetime-local` hoặc tạo theme calendar riêng theo từng feature.
 - Calendar dùng định dạng 24 giờ, lưu datetime dưới dạng UTC ISO và chỉ chuyển sang timezone local khi hiển thị. Date-only giữ định dạng `YYYY-MM-DD` để tránh lệch ngày do timezone.
 - Không tạo checkbox hoặc tick button quá lớn.
+- Không dùng trực tiếp `<button>`, `<input>` hoặc `<select>` cho control thông thường. Dùng shared primitive. Ngoại lệ phải có comment giải thích vì sao primitive không phù hợp.
 
 ### Page-level Back button
 
@@ -150,6 +207,10 @@ Không tạo lại button, modal hoặc card bằng một bộ class mới nếu
 - Màu chữ phải đủ tương phản.
 - Button và input phải có focus state rõ ràng.
 - Icon trang trí dùng `aria-hidden`; icon action phải có accessible label.
+- Modal phải có `role="dialog"`, `aria-modal`, accessible title, Escape và focus trap.
+- Tabs phải hỗ trợ keyboard và liên kết tab với panel.
+- Không dùng màu là tín hiệu duy nhất cho status.
+- Target cảm ứng quan trọng tối thiểu `36×36px`; ưu tiên `40×40px` trên mobile.
 
 ## 10. Quy tắc dữ liệu và trạng thái
 
@@ -163,6 +224,8 @@ Không tạo lại button, modal hoặc card bằng một bộ class mới nếu
 
 - [ ] Đã đối chiếu màn hình tương ứng trong Figma ZIP.
 - [ ] Dùng đúng font, màu, radius và spacing trong tài liệu này.
+- [ ] Không thêm hex, arbitrary radius, arbitrary shadow hoặc type size cục bộ khi token hiện có đáp ứng được.
+- [ ] Không tự dựng lại Button/Input/Select/Modal/Tabs/Card/Table/Badge/Toast/EmptyState.
 - [ ] Không còn primary indigo/purple hoặc `rounded-2xl` ngoài trường hợp có chủ ý.
 - [ ] Nội dung hiển thị là tiếng Anh.
 - [ ] Không thêm feature hay dữ liệu giả ngoài yêu cầu.
@@ -175,8 +238,18 @@ Không tạo lại button, modal hoặc card bằng một bộ class mới nếu
 - [ ] Chạy `npm test` trong `server` nếu thay đổi API hoặc logic dữ liệu.
 - [ ] Chạy `git diff --check`.
 
-## 12. Prompt gợi ý cho lần sau
+## 12. Quy trình thay đổi design system
+
+1. Kiểm tra primitive hiện có trước khi viết UI.
+2. Nếu thiếu khả năng dùng chung, mở rộng `AppUI.tsx`, token CSS hoặc Tailwind alias trước.
+3. Cập nhật file guideline này trong cùng thay đổi nếu contract component/token thay đổi.
+4. Chuyển ít nhất màn hình đang yêu cầu sang API mới; không để hai pattern tương đương cùng xuất hiện trong phần code vừa sửa.
+5. Chạy audit nhanh bằng `rg` cho hex, native controls, custom overlay và arbitrary shadow/radius.
+
+Các pattern cũ chưa migrate không được dùng làm mẫu cho code mới. Chúng là technical debt cần chuyển dần khi feature tương ứng được chỉnh sửa.
+
+## 13. Prompt gợi ý cho lần sau
 
 Có thể dùng đoạn sau khi yêu cầu AI sửa giao diện:
 
-> Trước khi code, hãy đọc toàn bộ `UI_GUIDELINES.md` và đối chiếu màn hình tương ứng trong `SAT Learning Management System UI.zip`. Dùng các shared component trong `client/src/components/ui`, không tự tạo một design system khác. Giữ toàn bộ UI bằng tiếng Anh, dùng dữ liệu thật, không thêm feature ngoài yêu cầu và chạy build/test theo checklist trước khi hoàn thành.
+> Trước khi code, hãy đọc toàn bộ `UI_GUIDELINES.md`. Chỉ dùng semantic tokens và shared primitives trong `client/src/components/ui`; nếu thiếu variant, mở rộng primitive trước, không tạo pattern cục bộ. Giữ UI bằng tiếng Anh, dùng dữ liệu thật và chạy checklist của guideline trước khi hoàn thành.

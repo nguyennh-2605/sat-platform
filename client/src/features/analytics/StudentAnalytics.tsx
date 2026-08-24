@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, BarChart3, CheckCircle2, Clock3, Eye, FileText, Target, Trophy, Users } from 'lucide-react';
 import axiosClient from '../../lib/axios';
-import { BackButton, Badge, Button, Card, Modal, Select, TableShell } from '../../components/ui/AppUI';
+import { BackButton, Badge, Button, Card, EmptyState, Modal, Select, TableShell } from '../../components/ui/AppUI';
 import { capitalizeFirstLetter } from '../../utils/text';
 
 interface DeliveryListItem {
@@ -73,7 +73,7 @@ export default function StudentAnalytics({ classId, initialDeliveryId }: { class
   if (selectedDeliveryId) return <PerformanceDashboard report={report} loading={loading} onBack={closeReport} />;
   return <div className="space-y-5 animate-fade-in-up">
     <div><h2 className="text-lg font-semibold text-[#1A1A1A]">Test Performance</h2><p className="mt-1 text-xs text-[#6B7280]">Select an assigned test to review submissions and question-level performance.</p></div>
-    {loading ? <EmptyState text="Loading assigned tests…" /> : deliveries.length === 0 ? <EmptyState text="No tests have been assigned to this class yet." /> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{deliveries.map(delivery => <Card key={delivery.id} className="group cursor-pointer p-5 transition hover:border-[#A9CFC1] hover:shadow-md" onClick={() => openReport(delivery.id)}>
+    {loading ? <EmptyState title="Loading assigned tests…" compact /> : deliveries.length === 0 ? <EmptyState title="No assigned tests" description="Tests assigned to this class will appear here." /> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{deliveries.map(delivery => <Card key={delivery.id} className="group cursor-pointer p-5 transition hover:border-[#A9CFC1] hover:shadow-md" onClick={() => openReport(delivery.id)}>
       <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E8F5EF] text-[#1B7A5A]"><FileText size={19} /></div><div className="min-w-0"><h3 className="truncate text-sm font-semibold text-[#1A1A1A]">{capitalizeFirstLetter(delivery.title)}</h3><p className="mt-1 text-xs text-[#6B7280]">{delivery.lesson ? `${delivery.lesson.week.title} · ${delivery.lesson.title}` : 'Direct assignment'}</p></div></div><ArrowRight size={17} className="mt-1 shrink-0 text-[#9CA3AF] transition group-hover:translate-x-0.5 group-hover:text-[#1B7A5A]" /></div>
       <div className="mt-5 grid grid-cols-3 border-t border-[#D6E3DE] pt-4 text-center"><Metric value={`${delivery.stats.completed}/${delivery.stats.assigned}`} label="Submitted" /><Metric value={delivery.stats.averageScore === null ? '—' : `${delivery.stats.averageScore}%`} label="Average" bordered /><Metric value={String(delivery.stats.inProgress)} label="In progress" /></div>
       <div className="mt-4 flex items-center justify-between text-[11px] text-[#6B7280]"><Badge tone={delivery.test.mode === 'EXAM' ? 'green' : 'gold'}>{delivery.test.mode === 'EXAM' ? 'Test' : 'Practice'}</Badge><span>{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleDateString()}` : 'No deadline'}</span></div>
@@ -83,7 +83,7 @@ export default function StudentAnalytics({ classId, initialDeliveryId }: { class
 
 function PerformanceDashboard({ report, loading, onBack }: { report: PerformanceReport | null; loading: boolean; onBack: () => void }) {
   const [selectedStudent, setSelectedStudent] = useState<StudentRow | null>(null);
-  if (loading || !report) return <div className="space-y-5"><PageHeading title="Test Performance" subtitle="Loading report…" onBack={onBack} /><EmptyState text="Loading performance data…" /></div>;
+  if (loading || !report) return <div className="space-y-5"><PageHeading title="Test Performance" subtitle="Loading report…" onBack={onBack} /><EmptyState title="Loading performance data…" compact /></div>;
   const kpis = [
     { label: 'AVERAGE SCORE', value: correctScore(report.kpis.averageCorrect, report.delivery.test.questionCount), detail: `Median ${score(report.kpis.medianScore)}`, icon: Target },
     { label: 'HIGHEST SCORE', value: correctScore(report.kpis.highestCorrect, report.delivery.test.questionCount), detail: 'Top result', icon: Trophy },
@@ -204,7 +204,6 @@ function StudentDetailModal({ deliveryId, student, onClose }: { deliveryId: stri
   );
 }
 function PageHeading({ title, subtitle, onBack }: { title: string; subtitle: string; onBack: () => void }) { return <div className="flex items-center gap-3"><BackButton onClick={onBack} /><div><h2 className="text-lg font-semibold">{title}</h2><p className="mt-0.5 text-xs text-[#6B7280]">{subtitle}</p></div></div>; }
-function EmptyState({ text }: { text: string }) { return <Card className="flex min-h-40 items-center justify-center p-8 text-sm text-[#6B7280]">{text}</Card>; }
 function Metric({ value, label, bordered = false }: { value: string; label: string; bordered?: boolean }) { return <div className={bordered ? 'border-x border-[#D6E3DE]' : ''}><p className="text-base font-semibold text-[#1A1A1A]">{value}</p><p className="mt-0.5 text-[10px] text-[#6B7280]">{label}</p></div>; }
 function Legend({ color, label }: { color: string; label: string }) { return <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />{label}</span>; }
 function score(value: number | null | undefined) { return Number.isFinite(value) ? `${value}%` : '—'; }

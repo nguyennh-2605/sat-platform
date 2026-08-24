@@ -160,7 +160,7 @@ function ClassCardTabs({ classroomId, showPerformance }: { classroomId: string; 
     ...(showPerformance ? [{ id: 'performance', label: 'Performance', icon: BarChart3 }] : []),
   ];
 
-  return <div className={`grid rounded-b-[11px] border-t border-[#D8E4DF] bg-[#F9FCFA] ${showPerformance ? 'grid-cols-4' : 'grid-cols-3'}`}>
+  return <div className={`grid rounded-b-card border-t border-ui-border bg-background ${showPerformance ? 'grid-cols-4' : 'grid-cols-3'}`}>
     {tabs.map(({ id, label, icon: Icon }) => <button
       key={id}
       type="button"
@@ -169,7 +169,7 @@ function ClassCardTabs({ classroomId, showPerformance }: { classroomId: string; 
         event.stopPropagation();
         navigate(`/dashboard/class/${classroomId}?tab=${id}`);
       }}
-      className="group/tab relative flex h-10 min-w-0 items-center justify-center border-r border-[#D8E4DF] text-[#5E6B66] transition-colors first:rounded-bl-[11px] last:rounded-br-[11px] last:border-r-0 hover:bg-[#E8F5EF] hover:text-[#1B7A5A] focus-visible:z-10 focus-visible:bg-[#E8F5EF] focus-visible:text-[#1B7A5A]"
+      className="group/tab relative flex h-10 min-w-0 items-center justify-center border-r border-ui-border text-muted-foreground transition-colors first:rounded-bl-card last:rounded-br-card last:border-r-0 hover:bg-primary-soft hover:text-primary focus-visible:z-10 focus-visible:bg-primary-soft focus-visible:text-primary"
     >
       <Icon size={17} />
       <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#17352A] px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/tab:opacity-100 group-focus-visible/tab:opacity-100">

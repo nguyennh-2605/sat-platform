@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, BookOpenCheck, Check, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Pencil, Play, Plus, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { Bell, BookOpen, BookOpenCheck, Check, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Pencil, Play, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
-import { Button, Modal } from '../../components/ui/AppUI';
+import { Button, Input, Modal, Select } from '../../components/ui/AppUI';
 
 interface ClassInfo {
   id: string;
@@ -249,10 +249,10 @@ const PracticeTest = () => {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="whitespace-nowrap text-sm font-medium text-[#1A1A1A]">Sort by:</span>
-                  <select value={sortOrder} onChange={event => setSortOrder(event.target.value as 'NEWEST' | 'OLDEST')} className="app-input cursor-pointer">
+                  <Select value={sortOrder} onChange={event => setSortOrder(event.target.value as 'NEWEST' | 'OLDEST')}>
                     <option value="NEWEST">Newest</option>
                     <option value="OLDEST">Oldest</option>
-                  </select>
+                  </Select>
                 </div>
                 {canManage && (
                   selectionMode ? (
@@ -299,10 +299,10 @@ const PracticeTest = () => {
                 ))}
               </div>
               {classes.length > 0 && (
-                <select value={classFilter} onChange={event => setClassFilter(event.target.value)} className="app-input lg:ml-auto">
+                <Select value={classFilter} onChange={event => setClassFilter(event.target.value)} className="lg:ml-auto">
                   <option value="ALL">All classes</option>
                   {classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
+                </Select>
               )}
             </div>
           </section>
@@ -380,16 +380,22 @@ const PracticeTest = () => {
         </div>
       </main>
 
-      {assignmentOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0A1F16]/50 p-4">
-          <div className="app-modal w-full max-w-lg">
-            <div className="flex items-start justify-between border-b border-[#E2EDE9] px-6 py-5"><div><h3 className="text-lg font-semibold">Assign tests to classes</h3><p className="mt-1 text-sm text-[#6B7280]">{selectedTestIds.length} test(s) selected</p></div><button className="app-icon-button" onClick={() => setAssignmentOpen(false)}><X size={18} /></button></div>
-            <div className="max-h-[520px] space-y-5 overflow-y-auto p-6">
+      <Modal
+        open={assignmentOpen}
+        onClose={() => setAssignmentOpen(false)}
+        closeOnBackdrop
+        presentation="content-dialog"
+        title="Assign tests to classes"
+        subtitle={`${selectedTestIds.length} test(s) selected`}
+        className="!max-w-lg"
+        footer={<><Button variant="outline" onClick={() => setAssignmentOpen(false)}>Cancel</Button><Button disabled={assigning || selectedClassIds.length === 0} onClick={assignTests}>{assigning ? 'Assigning...' : `Assign to ${selectedClassIds.length} class(es)`}</Button></>}
+      >
+            <div className="max-h-[520px] space-y-5 overflow-y-auto">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Available from<DateTimePicker value={availableAt} onChange={setAvailableAt} placeholder="Choose availability" ariaLabel="Available from" /></label>
-                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Deadline<DateTimePicker value={dueAt} minDate={availableAt || undefined} onChange={setDueAt} placeholder="Choose deadline" ariaLabel="Assignment deadline" /></label>
-                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Attempts<input type="number" min={1} max={10} value={maxAttempts} onChange={event => setMaxAttempts(Math.min(10, Math.max(1, Number(event.target.value))))} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A]" /></label>
-                <label className="space-y-1.5 text-xs font-medium text-[#4B5563]">Score policy<select value={scorePolicy} onChange={event => setScorePolicy(event.target.value as typeof scorePolicy)} className="h-9 w-full rounded-lg border border-[#C9D8D2] bg-white px-3 text-sm outline-none focus:border-[#1B7A5A]"><option value="FIRST">First attempt</option><option value="BEST">Best attempt</option><option value="LATEST">Latest attempt</option></select></label>
+                <label className="space-y-1.5 text-xs font-medium text-subtle">Available from<DateTimePicker value={availableAt} onChange={setAvailableAt} placeholder="Choose availability" ariaLabel="Available from" /></label>
+                <label className="space-y-1.5 text-xs font-medium text-subtle">Deadline<DateTimePicker value={dueAt} minDate={availableAt || undefined} onChange={setDueAt} placeholder="Choose deadline" ariaLabel="Assignment deadline" /></label>
+                <label className="space-y-1.5 text-xs font-medium text-subtle">Attempts<Input type="number" min={1} max={10} value={maxAttempts} onChange={event => setMaxAttempts(Math.min(10, Math.max(1, Number(event.target.value))))} className="w-full" /></label>
+                <label className="space-y-1.5 text-xs font-medium text-subtle">Score policy<Select value={scorePolicy} onChange={event => setScorePolicy(event.target.value as typeof scorePolicy)} className="w-full"><option value="FIRST">First attempt</option><option value="BEST">Best attempt</option><option value="LATEST">Latest attempt</option></Select></label>
               </div>
               <div className="border-t border-[#D6E3DE] pt-5">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Classes</p>
@@ -398,21 +404,13 @@ const PracticeTest = () => {
                 return <button key={item.id} onClick={() => toggleClass(item.id)} className={`flex w-full items-center gap-4 rounded-lg border p-4 text-left transition-colors ${checked ? 'border-[#1B7A5A] bg-[#E8F5EF]' : 'border-[#E2EDE9] hover:bg-[#F2F8F5]'}`}><span className={`flex h-9 w-9 items-center justify-center rounded-lg ${checked ? 'bg-[#1B7A5A] text-white' : 'bg-[#EAF2EE] text-[#6B7280]'}`}>{checked ? <Check size={18} strokeWidth={3} /> : <GraduationCap size={18} />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-[#1A1A1A]">{item.name}</span><span className="mt-1 block text-xs text-[#6B7280]">{item._count?.students || 0} student(s)</span></span></button>;
               })}</div>
             </div>
-            <div className="flex justify-end gap-3 border-t border-[#E2EDE9] bg-[#F2F8F5] px-6 py-4"><button className="app-button app-button-secondary" onClick={() => setAssignmentOpen(false)}>Cancel</button><button className="app-button app-button-primary" disabled={assigning || selectedClassIds.length === 0} onClick={assignTests}>{assigning ? 'Assigning...' : `Assign to ${selectedClassIds.length} class(es)`}</button></div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {startClassTest && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0A1F16]/50 p-4 backdrop-blur-sm">
-          <div className="app-modal w-full max-w-md p-6">
-            <div className="mb-5 flex items-start justify-between gap-4"><div><h3 className="font-semibold text-[#1A1A1A]">Choose a class</h3><p className="mt-1 line-clamp-1 text-sm text-[#6B7280]">{startClassTest.title}</p></div><button className="app-icon-button" onClick={() => setStartClassTest(null)}><X size={18} /></button></div>
-            <div className="space-y-2">{(startClassTest.deliveries || []).length > 0
+      <Modal open={Boolean(startClassTest)} onClose={() => setStartClassTest(null)} closeOnBackdrop presentation="content-dialog" title="Choose a class" subtitle={startClassTest?.title} className="!max-w-md">
+            {startClassTest && <div className="space-y-2">{(startClassTest.deliveries || []).length > 0
               ? startClassTest.deliveries?.map(delivery => <button key={delivery.id} onClick={() => openTest(startClassTest, { deliveryId: delivery.id })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]"><span><span className="block">{capitalizeFirstLetter(delivery.class.name)}</span><span className="mt-1 block text-xs font-normal text-[#6B7280]">{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleString()}` : 'No deadline'}</span></span><ChevronRight size={17} /></button>)
-              : [...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <button key={classId} onClick={() => openTest(startClassTest, { classId })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></button>)}</div>
-          </div>
-        </div>
-      )}
+              : [...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <button key={classId} onClick={() => openTest(startClassTest, { classId })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></button>)}</div>}
+      </Modal>
 
       <Modal open={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)} closeOnBackdrop={!deleting} title="Delete exam?" subtitle={deleteTarget?.title} className="!max-w-md">
         <div className="space-y-5">

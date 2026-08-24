@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Toaster } from 'react-hot-toast';
+import { APP_TOAST_OPTIONS } from '../components/ui/toast';
 import HomePage from '../pages/home/HomePage';
 import AuthPage from '../pages/auth/AuthPage';
 import Dashboard from '../pages/dashboard/Dashboard';
@@ -33,7 +34,7 @@ function App() {
   return (
     <QuizToolProvider>
       <GoogleOAuthProvider clientId={googleClientId}>
-        <Toaster position="top-right" reverseOrder={false} />
+        <Toaster position="top-right" reverseOrder={false} gutter={8} toastOptions={APP_TOAST_OPTIONS} />
         <Router>
           <AuthSessionGuard />
           <Routes>

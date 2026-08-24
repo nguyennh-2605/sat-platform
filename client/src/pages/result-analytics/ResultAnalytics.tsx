@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { ArrowRight, BookmarkCheck, Calendar, CheckCircle2, PenTool } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
-import { AppHeader, Badge, Button, Card, TableShell } from '../../components/ui/AppUI';
+import { AppHeader, Badge, Button, Card, EmptyState, TableShell } from '../../components/ui/AppUI';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { ui } from '../../components/ui/styles';
 import { capitalizeFirstLetter } from '../../utils/text';
@@ -162,7 +162,7 @@ const ResultAnalytics = () => {
               {loading ? (
                 <div className="h-full w-full animate-pulse rounded-lg bg-[#F2F8F5]" />
               ) : scoreHistory.length === 0 ? (
-                <EmptyState label="Complete a test to see your score progress." />
+                <EmptyState title="No score history yet" description="Complete a test to see your score progress." compact surface={false} className="h-full" />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={scoreHistory} margin={{ top: 4, right: 12, bottom: 0, left: -10 }}>
@@ -257,10 +257,6 @@ function MetricCard({ label, value, suffix, icon, iconClassName, valueClassName,
 
 function Legend({ color, label }: { color: string; label: string }) {
   return <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-3 rounded-full" style={{ background: color }} />{label}</span>;
-}
-
-function EmptyState({ label }: { label: string }) {
-  return <div className="flex h-full items-center justify-center text-sm text-[#6B7280]">{label}</div>;
 }
 
 function ScoreTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: ScoreHistoryPoint; color: string }> }) {

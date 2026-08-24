@@ -4,7 +4,7 @@ import { compareAsc, format, formatDistanceToNow, isPast, isToday, isTomorrow } 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
-import { AppHeader, BackButton, Button, Card, Input, Modal, TableShell } from '../../components/ui/AppUI';
+import { AppHeader, BackButton, Button, Card, Input, Modal, TableShell, Tabs, type TabItem } from '../../components/ui/AppUI';
 import { ui } from '../../components/ui/styles';
 import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import NotificationBell from '../../features/notifications/NotificationBell';
@@ -124,11 +124,11 @@ export default function Classroom() {
   if (!currentUser || loading) return <ClassroomLoading />;
   if (!classDetail || loadError) return <ClassroomError message={loadError} onBack={() => navigate('/dashboard/classes')} onRetry={() => void fetchClassDetail()} />;
 
-  const tabs: Array<{ id: ClassroomTab; label: string; icon: ElementType }> = [
-    { id: 'NOTIFICATIONS', label: 'Notifications', icon: Bell },
-    { id: 'MEMBERS', label: 'Members', icon: Users },
-    { id: 'PROGRESS', label: 'Progress Timeline', icon: GitBranch },
-    ...(canManage ? [{ id: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3 }] : []),
+  const tabs: Array<TabItem<ClassroomTab>> = [
+    { value: 'NOTIFICATIONS', label: 'Notifications', icon: Bell, panelId: 'classroom-notifications-panel' },
+    { value: 'MEMBERS', label: 'Members', icon: Users, panelId: 'classroom-members-panel' },
+    { value: 'PROGRESS', label: 'Progress Timeline', icon: GitBranch, panelId: 'classroom-progress-panel' },
+    ...(canManage ? [{ value: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3, panelId: 'classroom-performance-panel' }] : []),
   ];
 
   return <div className={ui.page}>
@@ -142,10 +142,10 @@ export default function Classroom() {
     />
 
     <main className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto w-full max-w-[1200px]">
-      {activeTab === 'NOTIFICATIONS' && <NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} />}
-      {activeTab === 'MEMBERS' && <MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} />}
-      {activeTab === 'PROGRESS' && <div className="p-6 lg:p-8"><WeeklyProgress canManage={canManage} /></div>}
-      {activeTab === 'PERFORMANCE' && canManage && <div className="p-6 lg:p-8"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
+      {activeTab === 'NOTIFICATIONS' && <div id="classroom-notifications-panel" role="tabpanel"><NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} /></div>}
+      {activeTab === 'MEMBERS' && <div id="classroom-members-panel" role="tabpanel"><MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} /></div>}
+      {activeTab === 'PROGRESS' && <div id="classroom-progress-panel" role="tabpanel" className="p-6 lg:p-8"><WeeklyProgress canManage={canManage} /></div>}
+      {activeTab === 'PERFORMANCE' && canManage && <div id="classroom-performance-panel" role="tabpanel" className="p-6 lg:p-8"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
     </div></main>
 
     {announcementOpen && <AnnouncementCreator onClose={() => setAnnouncementOpen(false)} onSubmit={data => void createAnnouncement(data)} />}
@@ -154,7 +154,7 @@ export default function Classroom() {
   </div>;
 }
 
-function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack, currentUser }: { className: string; tabs: Array<{ id: ClassroomTab; label: string; icon: ElementType }>; activeTab: ClassroomTab; onSelectTab: (tab: ClassroomTab) => void; onBack: () => void; currentUser: CurrentUser }) {
+function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack, currentUser }: { className: string; tabs: Array<TabItem<ClassroomTab>>; activeTab: ClassroomTab; onSelectTab: (tab: ClassroomTab) => void; onBack: () => void; currentUser: CurrentUser }) {
   const profileInitials = initials(currentUser.name);
   return <header className="sticky top-0 z-30 grid h-[68px] shrink-0 grid-cols-[minmax(180px,1fr)_auto_minmax(88px,1fr)] items-center border-b border-[#B9CBC4] bg-white px-4 lg:px-6">
     <div className="flex min-w-0 items-center gap-2.5">
@@ -164,17 +164,13 @@ function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack, curr
         <p className="truncate text-xs leading-4 text-[#6B7280]">{className}</p>
       </div>
     </div>
-    <nav className="flex h-full min-w-0 overflow-x-auto" aria-label="Classroom sections">{tabs.map(tab => <ClassTabButton key={tab.id} {...tab} active={activeTab === tab.id} onSelect={onSelectTab} />)}</nav>
+    <Tabs items={tabs} value={activeTab} onValueChange={onSelectTab} ariaLabel="Classroom sections" className="h-full overflow-x-auto" tabClassName="h-full" />
     <div className="flex items-center justify-end gap-4">
       {currentUser.role === 'STUDENT' && <SatCountdown />}
       <NotificationBell currentUserId={currentUser.id} />
       <div className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white" title={currentUser.name}>{profileInitials}</div>
     </div>
   </header>;
-}
-
-function ClassTabButton({ id, label, icon: Icon, active, onSelect }: { id: ClassroomTab; label: string; icon: ElementType; active: boolean; onSelect: (tab: ClassroomTab) => void }) {
-  return <button type="button" onClick={() => onSelect(id)} className={`relative flex h-full shrink-0 items-center gap-1.5 border-0 px-4 text-sm transition-colors ${active ? 'font-medium text-[#1B7A5A]' : 'text-[#6B7280] hover:text-[#1A1A1A]'}`}><Icon size={14} />{label}{active && <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 bg-[#1B7A5A]" />}</button>;
 }
 
 function NotificationsTab({ classroom, canManage, onNewAnnouncement, onOpenAssignment }: { classroom: ClassDetail; canManage: boolean; onNewAnnouncement: () => void; onOpenAssignment: (assignmentId: string) => void }) {
