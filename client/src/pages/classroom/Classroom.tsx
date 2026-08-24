@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react';
-import { AlertTriangle, BarChart3, Bell, Calendar, Check, ClipboardList, Clock, Copy, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, BookOpenCheck, Calendar, Check, ClipboardList, Clock, Copy, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
 import { compareAsc, format, formatDistanceToNow, isPast, isToday, isTomorrow } from 'date-fns';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -11,10 +11,11 @@ import NotificationBell from '../../features/notifications/NotificationBell';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
+import ClassroomVocabularyPanel from '../../features/vocabulary/ClassroomVocabularyPanel';
 import { capitalizeFirstLetter } from '../../utils/text';
 
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-type ClassroomTab = 'NOTIFICATIONS' | 'MEMBERS' | 'PROGRESS' | 'PERFORMANCE';
+type ClassroomTab = 'NOTIFICATIONS' | 'COURSEWORK' | 'MEMBERS' | 'PROGRESS' | 'PERFORMANCE';
 type NotificationFilter = 'all' | 'assignment' | 'announcement';
 
 interface CurrentUser { id: string; name: string; role: UserRole }
@@ -83,7 +84,7 @@ export default function Classroom() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')?.toUpperCase();
-    if (requestedTab === 'NOTIFICATIONS' || requestedTab === 'MEMBERS' || requestedTab === 'PROGRESS') setActiveTab(requestedTab);
+    if (requestedTab === 'NOTIFICATIONS' || requestedTab === 'COURSEWORK' || requestedTab === 'MEMBERS' || requestedTab === 'PROGRESS') setActiveTab(requestedTab);
     if (canManage && requestedTab === 'PERFORMANCE') setActiveTab(requestedTab);
   }, [canManage, searchParams]);
 
@@ -126,6 +127,7 @@ export default function Classroom() {
 
   const tabs: Array<TabItem<ClassroomTab>> = [
     { value: 'NOTIFICATIONS', label: 'Notifications', icon: Bell, panelId: 'classroom-notifications-panel' },
+    { value: 'COURSEWORK', label: 'Coursework', icon: BookOpenCheck, panelId: 'classroom-coursework-panel' },
     { value: 'MEMBERS', label: 'Members', icon: Users, panelId: 'classroom-members-panel' },
     { value: 'PROGRESS', label: 'Progress Timeline', icon: GitBranch, panelId: 'classroom-progress-panel' },
     ...(canManage ? [{ value: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3, panelId: 'classroom-performance-panel' }] : []),
@@ -143,6 +145,7 @@ export default function Classroom() {
 
     <main className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto w-full max-w-[1200px]">
       {activeTab === 'NOTIFICATIONS' && <div id="classroom-notifications-panel" role="tabpanel"><NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} /></div>}
+      {activeTab === 'COURSEWORK' && <div id="classroom-coursework-panel" role="tabpanel" className="p-6 lg:p-8"><ClassroomVocabularyPanel classId={classId || ''} canManage={canManage} /></div>}
       {activeTab === 'MEMBERS' && <div id="classroom-members-panel" role="tabpanel"><MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} /></div>}
       {activeTab === 'PROGRESS' && <div id="classroom-progress-panel" role="tabpanel" className="p-6 lg:p-8"><WeeklyProgress canManage={canManage} /></div>}
       {activeTab === 'PERFORMANCE' && canManage && <div id="classroom-performance-panel" role="tabpanel" className="p-6 lg:p-8"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}

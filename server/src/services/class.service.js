@@ -222,6 +222,17 @@ exports.addStudentToClass = async ({ classId, email, currentUserId }) => {
     });
   }
 
+  const activeActivities = await prisma.classActivity.findMany({
+    where: { classId, status: 'PUBLISHED', audience: 'ALL_STUDENTS' },
+    select: { id: true },
+  });
+  if (activeActivities.length > 0) {
+    await prisma.activityAssignee.createMany({
+      data: activeActivities.map(activity => ({ activityId: activity.id, studentId: student.id })),
+      skipDuplicates: true,
+    });
+  }
+
   await sendNotificationToUser(
     student.id,
     `Bạn vừa được giáo viên thêm vào lớp học "${existingClass.name}".`,
@@ -254,6 +265,11 @@ exports.removeStudentFromClass = async ({ classId, studentId, currentUserId, use
   await prisma.deliveryAssignee.updateMany({
     where: { studentId: student.id, delivery: { classId } },
     data: { excusedAt: new Date() },
+  });
+
+  await prisma.activityAssignee.updateMany({
+    where: { studentId: student.id, activity: { classId } },
+    data: { status: 'EXCUSED', excusedAt: new Date() },
   });
 
   return { message: 'Student removed from class.', student };
@@ -294,6 +310,27 @@ exports.createAssignment = async ({ title, content, type, deadline, classId, dri
       await prisma.assignment.delete({ where: { id: newAssignment.id } });
       throw error;
     }
+  }
+
+  if (assignmentType === 'assignment') {
+    const canonicalActivity = await prisma.classActivity.create({
+      data: {
+        type: 'HOMEWORK',
+        status: 'PUBLISHED',
+        classId,
+        title: newAssignment.title,
+        instructions: newAssignment.content,
+        dueAt: newAssignment.deadline,
+        maxAttempts: 1,
+        scorePolicy: 'FIRST',
+        completionRule: 'SUBMIT',
+        audience: 'ALL_STUDENTS',
+        createdById: Number.parseInt(currentUserId, 10),
+        assignees: { create: classData.students.map(student => ({ studentId: student.id })) },
+      },
+      select: { id: true },
+    });
+    await prisma.$executeRaw`INSERT INTO "HomeworkActivity" ("activityId", "assignmentId") VALUES (${canonicalActivity.id}, ${newAssignment.id}) ON CONFLICT ("activityId") DO NOTHING`;
   }
 
   if (classData && classData.students.length > 0) {
@@ -366,6 +403,14 @@ exports.createSubmission = async ({ assignmentId, textResponse, fileUrl, student
       fileUrl: fileUrl || null,
     }
   });
+
+  const [homeworkActivity] = await prisma.$queryRaw`SELECT "activityId" FROM "HomeworkActivity" WHERE "assignmentId" = ${assignmentId} LIMIT 1`;
+  if (homeworkActivity) {
+    await prisma.activityAssignee.updateMany({
+      where: { activityId: homeworkActivity.activityId, studentId: currentStudentId },
+      data: { status: 'COMPLETED', startedAt: submission.submittedAt, completedAt: submission.submittedAt, attemptCount: 1 },
+    });
+  }
 
   const studentInfo = await prisma.user.findUnique({
     where: { id: currentStudentId }

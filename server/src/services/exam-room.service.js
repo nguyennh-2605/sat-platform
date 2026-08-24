@@ -385,6 +385,26 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
 
     const updatedSubmission = await tx.submission.findUnique({ where: { id: submission.id } });
 
+    if (submission.deliveryId) {
+      const [testActivity] = await tx.$queryRaw`SELECT "activityId" FROM "TestActivity" WHERE "testDeliveryId" = ${submission.deliveryId} LIMIT 1`;
+      if (testActivity) {
+        const currentAssignee = await tx.activityAssignee.findUnique({
+          where: { activityId_studentId: { activityId: testActivity.activityId, studentId: userId } },
+          select: { bestScore: true },
+        });
+        const percentage = allQuestions.length ? Math.round((correctCount / allQuestions.length) * 100) : 0;
+        await tx.activityAssignee.updateMany({
+          where: { activityId: testActivity.activityId, studentId: userId },
+          data: {
+            status: 'COMPLETED',
+            completedAt: new Date(),
+            bestScore: Math.max(currentAssignee?.bestScore || 0, percentage),
+            attemptCount: submission.attemptNo,
+          },
+        });
+      }
+    }
+
     // Nếu học sinh làm từ Practice Center theo lớp, tự động cập nhật các assignment chưa có dữ liệu
     if (!deliveryId && !assignmentId && classId) {
       const classAssignments = await tx.assignment.findMany({

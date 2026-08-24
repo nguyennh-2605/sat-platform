@@ -125,6 +125,25 @@ exports.createDeliveries = async ({ classIds, testIds, lessonId, title, availabl
           },
           include: { test: { select: { id: true, title: true, mode: true } }, class: { select: { id: true, name: true } } },
         });
+        const canonicalActivity = await tx.classActivity.create({
+          data: {
+            type: 'TEST',
+            status: 'PUBLISHED',
+            classId: classroom.id,
+            lessonId: lessonId ? String(lessonId) : null,
+            title: delivery.title,
+            availableAt: normalizedAvailableAt,
+            dueAt: normalizedDueAt,
+            maxAttempts: normalizedMaxAttempts,
+            scorePolicy: normalizedScorePolicy,
+            completionRule: 'SUBMIT',
+            audience: 'ALL_STUDENTS',
+            createdById: parseUserId(userId),
+            assignees: { create: classroom.students.map(student => ({ studentId: student.id })) },
+          },
+          select: { id: true },
+        });
+        await tx.$executeRaw`INSERT INTO "TestActivity" ("activityId", "testDeliveryId") VALUES (${canonicalActivity.id}, ${delivery.id}) ON CONFLICT ("activityId") DO NOTHING`;
         deliveries.push(delivery);
       }
     }
@@ -375,6 +394,20 @@ exports.syncClassAssignmentDeliveries = async ({ assignment, userId, userRole })
     where: { sourceAssignmentId: assignment.id, testId: { in: normalizedTestIds } },
     data: { title: assignment.title, dueAt: assignment.deadline || null, status: 'PUBLISHED' },
   });
+  const linkedActivities = await prisma.$queryRaw`
+    SELECT adapter."activityId", delivery."testId"
+    FROM "TestActivity" adapter
+    JOIN "TestDelivery" delivery ON delivery."id" = adapter."testDeliveryId"
+    WHERE delivery."sourceAssignmentId" = ${assignment.id}
+  `;
+  const activeActivityIds = linkedActivities.filter(item => normalizedTestIds.includes(item.testId)).map(item => item.activityId);
+  const closedActivityIds = linkedActivities.filter(item => !normalizedTestIds.includes(item.testId)).map(item => item.activityId);
+  if (activeActivityIds.length) {
+    await prisma.classActivity.updateMany({ where: { id: { in: activeActivityIds } }, data: { title: assignment.title, dueAt: assignment.deadline || null, status: 'PUBLISHED' } });
+  }
+  if (closedActivityIds.length) {
+    await prisma.classActivity.updateMany({ where: { id: { in: closedActivityIds } }, data: { status: 'CLOSED' } });
+  }
   const existingTestIds = new Set(existing.map(item => item.testId));
   const newTestIds = normalizedTestIds.filter(testId => !existingTestIds.has(testId));
   if (newTestIds.length === 0) return;

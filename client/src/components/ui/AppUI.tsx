@@ -131,6 +131,23 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cx(ui.card, className)} {...props} />;
 }
 
+export function LoadingBar({ active, className }: { active: boolean; className?: string }) {
+  return (
+    <div
+      role="progressbar"
+      aria-label="Loading content"
+      aria-hidden={!active}
+      className={cx(
+        'pointer-events-none absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden bg-primary/10 transition-opacity duration-150',
+        active ? 'opacity-100' : 'opacity-0',
+        className,
+      )}
+    >
+      <span className="page-loading-indicator block h-full rounded-full bg-primary" />
+    </div>
+  );
+}
+
 type BadgeTone = 'green' | 'gold' | 'neutral' | 'success' | 'warning' | 'danger';
 
 const badgeToneClasses: Record<BadgeTone, string> = {

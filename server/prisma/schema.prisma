@@ -9,27 +9,33 @@ datasource db {
 }
 
 model User {
-  id                  Int                  @id @default(autoincrement())
-  email               String               @unique
-  password            String?
-  createdAt           DateTime             @default(now())
-  name                String?
-  role                Role                 @default(STUDENT)
-  avatar              String?
-  satTestDate         DateTime?
-  dashboardBackground String?
-  taughtClasses       Class[]              @relation("TeacherClasses")
-  errorLogs           ErrorLog[]
-  homeworkSubmissions HomeworkSubmission[]
-  submissions         Submission[]
-  createdTests        Test[]
-  studyingClasses     Class[]              @relation("StudentClasses")
-  notifications       Notification[]
-  SubFolders          Folder[]
-  createdDeliveries   TestDelivery[]       @relation("DeliveryCreator")
-  deliveryAssignments DeliveryAssignee[]
-  todoStates          UserTodoState[]
-  refreshSessions     RefreshSession[]
+  id                    Int                      @id @default(autoincrement())
+  email                 String                   @unique
+  password              String?
+  createdAt             DateTime                 @default(now())
+  name                  String?
+  role                  Role                     @default(STUDENT)
+  avatar                String?
+  satTestDate           DateTime?
+  dashboardBackground   String?
+  taughtClasses         Class[]                  @relation("TeacherClasses")
+  errorLogs             ErrorLog[]
+  homeworkSubmissions   HomeworkSubmission[]
+  submissions           Submission[]
+  createdTests          Test[]
+  studyingClasses       Class[]                  @relation("StudentClasses")
+  notifications         Notification[]
+  SubFolders            Folder[]
+  createdDeliveries     TestDelivery[]           @relation("DeliveryCreator")
+  deliveryAssignments   DeliveryAssignee[]
+  todoStates            UserTodoState[]
+  refreshSessions       RefreshSession[]
+  ownedVocabularySets   VocabularySet[]          @relation("VocabularySetOwner")
+  createdVocabularySets VocabularySet[]          @relation("VocabularySetCreator")
+  vocabularyProgress    VocabularyTermProgress[]
+  vocabularySessions    VocabularyStudySession[]
+  createdActivities     ClassActivity[]          @relation("ActivityCreator")
+  activityAssignments   ActivityAssignee[]
 }
 
 model RefreshSession {
@@ -46,17 +52,18 @@ model RefreshSession {
 }
 
 model Class {
-  id          String         @id @default(uuid())
+  id          String          @id @default(uuid())
   name        String
-  color       String         @default("#1B7A5A")
-  createdAt   DateTime       @default(now())
+  color       String          @default("#1B7A5A")
+  createdAt   DateTime        @default(now())
   teacherId   Int
   assignments Assignment[]
-  teacher     User           @relation("TeacherClasses", fields: [teacherId], references: [id])
+  teacher     User            @relation("TeacherClasses", fields: [teacherId], references: [id])
   classTests  ClassTest[]
-  students    User[]         @relation("StudentClasses")
+  students    User[]          @relation("StudentClasses")
   weeks       Week[]
   deliveries  TestDelivery[]
+  activities  ClassActivity[]
 }
 
 model Assignment {
@@ -73,6 +80,7 @@ model Assignment {
   class           Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
   submissions     HomeworkSubmission[]
   testSubmissions Submission[]
+  activity        HomeworkActivity?
 }
 
 model HomeworkSubmission {
@@ -318,6 +326,60 @@ enum QuestionType {
   SPR // Tự luận điền số (Grid-in)
 }
 
+enum VocabularySetScope {
+  SYSTEM
+  PERSONAL
+}
+
+enum VocabularySetStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum VocabularyMastery {
+  NOT_STUDIED
+  LEARNING
+  MASTERED
+}
+
+enum VocabularyStudyMode {
+  FLASHCARD
+  QUIZ
+}
+
+enum VocabularySessionStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ClassActivityType {
+  TEST
+  VOCABULARY
+  HOMEWORK
+  RESOURCE
+}
+
+enum ActivityCompletionRule {
+  VIEW_ALL
+  SUBMIT
+  SCORE_AT_LEAST
+  MANUAL
+}
+
+enum ActivityAudience {
+  ALL_STUDENTS
+  SELECTED
+}
+
+enum ActivityAssigneeStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  MISSING
+  EXCUSED
+}
+
 model Week {
   id         String   @id @default(uuid())
   title      String
@@ -339,6 +401,7 @@ model Lesson {
   files       LessonFile[]
   assignments LessonAssignment[]
   deliveries  TestDelivery[]
+  activities  ClassActivity[]
 }
 
 model TestDelivery {
@@ -363,6 +426,7 @@ model TestDelivery {
   createdBy                User               @relation("DeliveryCreator", fields: [createdById], references: [id])
   assignees                DeliveryAssignee[]
   submissions              Submission[]
+  activity                 TestActivity?
 
   @@index([classId, dueAt])
   @@index([testId])
@@ -413,4 +477,193 @@ model LessonAssignment {
   createdAt DateTime  @default(now())
   lessonId  String    @unique
   lesson    Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model VocabularySet {
+  id                  String                   @id @default(uuid())
+  title               String
+  description         String?
+  scope               VocabularySetScope
+  status              VocabularySetStatus      @default(DRAFT)
+  sourceLanguage      String                   @default("en")
+  translationLanguage String                   @default("vi")
+  version             Int                      @default(1)
+  ownerId             Int?
+  createdById         Int
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  publishedAt         DateTime?
+  owner               User?                    @relation("VocabularySetOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdBy           User                     @relation("VocabularySetCreator", fields: [createdById], references: [id])
+  terms               VocabularyTerm[]
+  sessions            VocabularyStudySession[]
+  activities          VocabularyActivity[]
+
+  @@index([scope, status, publishedAt])
+  @@index([ownerId, updatedAt])
+}
+
+model VocabularyTerm {
+  id               String                      @id @default(uuid())
+  setId            String
+  word             String
+  normalizedWord   String
+  meaning          String
+  translation      String
+  exampleSentence  String?
+  order            Int
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  set              VocabularySet               @relation(fields: [setId], references: [id], onDelete: Cascade)
+  progress         VocabularyTermProgress[]
+  sessionQuestions VocabularySessionQuestion[]
+  activityItems    VocabularyActivityItem[]
+
+  @@unique([setId, normalizedWord])
+  @@unique([setId, order])
+  @@index([normalizedWord])
+}
+
+model VocabularyTermProgress {
+  userId         Int
+  termId         String
+  mastery        VocabularyMastery @default(NOT_STUDIED)
+  seenCount      Int               @default(0)
+  correctCount   Int               @default(0)
+  incorrectCount Int               @default(0)
+  correctStreak  Int               @default(0)
+  lastReviewedAt DateTime?
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  term           VocabularyTerm    @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@id([userId, termId])
+  @@index([userId, mastery])
+}
+
+model ClassActivity {
+  id                 String                   @id @default(uuid())
+  type               ClassActivityType
+  status             DeliveryStatus           @default(DRAFT)
+  classId            String
+  lessonId           String?
+  title              String
+  instructions       String?
+  availableAt        DateTime?
+  dueAt              DateTime?
+  maxAttempts        Int                      @default(1)
+  scorePolicy        ScorePolicy              @default(FIRST)
+  completionRule     ActivityCompletionRule   @default(SUBMIT)
+  passingScore       Int?
+  audience           ActivityAudience         @default(ALL_STUDENTS)
+  createdById        Int
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  class              Class                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  lesson             Lesson?                  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  createdBy          User                     @relation("ActivityCreator", fields: [createdById], references: [id])
+  assignees          ActivityAssignee[]
+  vocabulary         VocabularyActivity?
+  test               TestActivity?
+  homework           HomeworkActivity?
+  vocabularySessions VocabularyStudySession[]
+
+  @@index([classId, status, dueAt])
+  @@index([lessonId])
+}
+
+model TestActivity {
+  activityId     String        @id
+  testDeliveryId String        @unique
+  activity       ClassActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  testDelivery   TestDelivery  @relation(fields: [testDeliveryId], references: [id], onDelete: Cascade)
+}
+
+model HomeworkActivity {
+  activityId   String        @id
+  assignmentId String        @unique
+  activity     ClassActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  assignment   Assignment    @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+}
+
+model ActivityAssignee {
+  activityId   String
+  studentId    Int
+  status       ActivityAssigneeStatus @default(ASSIGNED)
+  assignedAt   DateTime               @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  bestScore    Int?
+  attemptCount Int                    @default(0)
+  excusedAt    DateTime?
+  activity     ClassActivity          @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  student      User                   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([activityId, studentId])
+  @@index([studentId, status])
+}
+
+model VocabularyActivity {
+  activityId       String                   @id
+  vocabularySetId  String
+  sourceSetVersion Int
+  questionCount    Int?
+  activity         ClassActivity            @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  vocabularySet    VocabularySet            @relation(fields: [vocabularySetId], references: [id])
+  items            VocabularyActivityItem[]
+}
+
+model VocabularyActivityItem {
+  id              String             @id @default(uuid())
+  activityId      String
+  sourceTermId    String?
+  word            String
+  meaning         String
+  translation     String
+  exampleSentence String?
+  order           Int
+  activity        VocabularyActivity @relation(fields: [activityId], references: [activityId], onDelete: Cascade)
+  sourceTerm      VocabularyTerm?    @relation(fields: [sourceTermId], references: [id], onDelete: SetNull)
+
+  @@unique([activityId, order])
+  @@index([sourceTermId])
+}
+
+model VocabularyStudySession {
+  id           String                      @id @default(uuid())
+  userId       Int
+  setId        String
+  activityId   String?
+  mode         VocabularyStudyMode
+  status       VocabularySessionStatus     @default(IN_PROGRESS)
+  totalItems   Int
+  correctCount Int                         @default(0)
+  startedAt    DateTime                    @default(now())
+  completedAt  DateTime?
+  user         User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  set          VocabularySet               @relation(fields: [setId], references: [id], onDelete: Cascade)
+  activity     ClassActivity?              @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  questions    VocabularySessionQuestion[]
+
+  @@index([userId, status, startedAt])
+  @@index([activityId, userId])
+}
+
+model VocabularySessionQuestion {
+  id              String                 @id @default(uuid())
+  sessionId       String
+  sourceTermId    String?
+  prompt          String
+  correctMeaning  String
+  translation     String
+  exampleSentence String?
+  options         Json
+  order           Int
+  selectedMeaning String?
+  isCorrect       Boolean?
+  answeredAt      DateTime?
+  session         VocabularyStudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sourceTerm      VocabularyTerm?        @relation(fields: [sourceTermId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, order])
+  @@index([sourceTermId])
 }

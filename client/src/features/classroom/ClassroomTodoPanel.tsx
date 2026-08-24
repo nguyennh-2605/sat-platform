@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BarChart3, ClipboardList, FileText, Megaphone } from 'lucide-react';
+import { BarChart3, BookA, ClipboardList, FileText, Megaphone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../../lib/axios';
 import { Button, Modal } from '../../components/ui/AppUI';
@@ -7,7 +7,7 @@ import { capitalizeFirstLetter } from '../../utils/text';
 
 export interface ClassroomTodoItem {
   key: string;
-  type: 'TEST_RESULT' | 'ANNOUNCEMENT' | 'ASSIGNMENT' | 'TEST';
+  type: 'TEST_RESULT' | 'ANNOUNCEMENT' | 'ASSIGNMENT' | 'TEST' | 'VOCABULARY';
   classId: string;
   className: string;
   title: string;
@@ -18,6 +18,8 @@ export interface ClassroomTodoItem {
   assignmentId?: string;
   deliveryId?: string;
   testId?: number;
+  activityId?: string;
+  setId?: string;
   submissionId?: number;
   testMode?: 'EXAM' | 'PRACTICE';
   attemptStatus?: 'NOT_STARTED' | 'DOING';
@@ -25,6 +27,9 @@ export interface ClassroomTodoItem {
   durationMs?: number | null;
   score?: number | null;
   totalQuestions?: number;
+  bestScore?: number | null;
+  attemptCount?: number;
+  maxAttempts?: number;
 }
 
 const relativeTime = (value: string) => {
@@ -67,6 +72,7 @@ const iconFor = (type: ClassroomTodoItem['type']) => {
   if (type === 'TEST_RESULT') return BarChart3;
   if (type === 'ANNOUNCEMENT') return Megaphone;
   if (type === 'ASSIGNMENT') return ClipboardList;
+  if (type === 'VOCABULARY') return BookA;
   return FileText;
 };
 
@@ -114,6 +120,10 @@ export function ClassroomTodoPanel() {
   };
 
   const openItem = (item: ClassroomTodoItem) => {
+    if (item.type === 'VOCABULARY' && item.activityId) {
+      navigate(`/dashboard/vocabulary?activity=${item.activityId}`);
+      return;
+    }
     if (item.type === 'TEST') {
       setSelectedTest(item);
       return;

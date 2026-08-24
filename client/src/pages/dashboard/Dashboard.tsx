@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   BarChart3,
+  BookA,
   BookOpenCheck,
   GraduationCap,
   LogOut,
@@ -98,6 +99,7 @@ const Dashboard = () => {
           <div className="space-y-1">
             <NavItem to="/dashboard/practice-test" label="Practice Center" icon={BookOpenCheck} />
             <NavItem to="/dashboard/classes" label="Classroom" icon={GraduationCap} activePrefixes={['/dashboard/class/']} />
+            <NavItem to="/dashboard/vocabulary" label="Vocabulary" icon={BookA} />
 
             <NavItem to="/dashboard/error-log" label="Error Log" icon={AlertCircle} />
             <NavItem to="/dashboard/results-analytics" label="Results & Analytics" icon={BarChart3} />

@@ -18,6 +18,7 @@ import ResultAnalytics from '../pages/result-analytics/ResultAnalytics';
 import ScoreReport from '../pages/score-report/ScoreReport';
 import CreateTestWizard from '../features/test-creation/CreateTestWizard';
 import AssignmentDetail from '../features/assignment/AssignmentDetail';
+import Vocabulary from '../pages/vocabulary/Vocabulary';
 import { AuthSessionGuard } from '../features/auth/AuthSessionGuard';
 import { getAuthStatus, subscribeAuthSession } from '../lib/authSession';
 
@@ -46,6 +47,7 @@ function App() {
               {/* Các đường dẫn con */}
               <Route path="practice-test" element={<PracticeTest />} />
               <Route path="classes" element={<ClassroomList />} />
+              <Route path="vocabulary" element={<Vocabulary />} />
               <Route path="class/:classId" element={<Classroom />} />
               <Route path="error-log" element={<ErrorLog />} />
               <Route path='results-analytics' element = {<ResultAnalytics />} />

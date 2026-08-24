@@ -108,7 +108,7 @@ const getTeacherTodos = async userId => {
 
 const getStudentTodos = async userId => {
   const handled = await handledKeysFor(userId);
-  const [posts, deliveries] = await Promise.all([
+  const [posts, deliveries, vocabularyActivities] = await Promise.all([
     prisma.assignment.findMany({
       where: { class: { students: { some: { id: userId } } } },
       orderBy: { createdAt: 'desc' },
@@ -156,6 +156,28 @@ const getStudentTodos = async userId => {
         },
       },
     }),
+    prisma.classActivity.findMany({
+      where: {
+        type: 'VOCABULARY',
+        status: 'PUBLISHED',
+        AND: [{ OR: [{ availableAt: null }, { availableAt: { lte: new Date() } }] }],
+        assignees: { some: { studentId: userId, excusedAt: null } },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        classId: true,
+        title: true,
+        instructions: true,
+        createdAt: true,
+        dueAt: true,
+        maxAttempts: true,
+        passingScore: true,
+        class: { select: { name: true } },
+        vocabulary: { select: { vocabularySetId: true, _count: { select: { items: true } } } },
+        assignees: { where: { studentId: userId }, select: { status: true, bestScore: true, attemptCount: true }, take: 1 },
+      },
+    }),
   ]);
 
   const items = [];
@@ -199,6 +221,28 @@ const getStudentTodos = async userId => {
       durationMinutes: delivery.test.duration,
       totalQuestions: questionCount(delivery.test),
       attemptStatus: doing ? 'DOING' : 'NOT_STARTED',
+    });
+  }
+
+  for (const activity of vocabularyActivities) {
+    const assignee = activity.assignees[0];
+    if (!assignee || assignee.status === 'COMPLETED') continue;
+    items.push({
+      key: `student-vocabulary:${activity.id}`,
+      type: 'VOCABULARY',
+      classId: activity.classId,
+      className: activity.class.name,
+      title: activity.title,
+      description: `${activity.vocabulary?._count.items || 0} words · ${activity.passingScore ? `Pass at ${activity.passingScore}%` : 'Review all cards'}`,
+      createdAt: activity.createdAt,
+      dueAt: activity.dueAt,
+      priority: priorityFor(activity.dueAt),
+      activityId: activity.id,
+      setId: activity.vocabulary?.vocabularySetId,
+      attemptStatus: assignee.status,
+      bestScore: assignee.bestScore,
+      attemptCount: assignee.attemptCount,
+      maxAttempts: activity.maxAttempts,
     });
   }
   return sortTodos(items);
