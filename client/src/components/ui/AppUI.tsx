@@ -57,7 +57,7 @@ export function AppHeader({
           <>
             {showNotifications && <NotificationBell currentUserId={localStorage.getItem('userId') || ''} />}
             <div
-              className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 select-none items-center justify-center rounded-full bg-primary text-caption font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-surface transition-[box-shadow] hover:ring-primary/30"
+              className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 select-none items-center justify-center rounded-full bg-primary text-caption font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-surface transition-shadow hover:ring-primary/30"
               title={userName}
             >
               {initials}
@@ -174,7 +174,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cx(
-        'h-10 rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20',
+        'h-10 rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-hidden placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20',
         className,
       )}
       {...props}
@@ -186,7 +186,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={cx(
-        'h-10 cursor-pointer rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20',
+        'h-10 cursor-pointer rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20',
         className,
       )}
       {...props}
@@ -266,10 +266,10 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
   const modal = (
     <div
       className={isContentPanel
-        ? 'absolute inset-0 z-[200] flex min-h-0 min-w-0 bg-white'
+        ? 'absolute inset-0 z-200 flex min-h-0 min-w-0 bg-white'
         : isContentDialog
-          ? 'fixed inset-0 z-[200] flex min-h-0 min-w-0 items-center justify-center bg-[var(--ui-overlay)] p-4 lg:left-60'
-          : 'fixed inset-0 z-[200] flex items-center justify-center bg-[var(--ui-overlay)] p-4'}
+          ? 'fixed inset-0 z-200 flex min-h-0 min-w-0 items-center justify-center bg-(--ui-overlay) p-4 lg:left-60'
+          : 'fixed inset-0 z-200 flex items-center justify-center bg-(--ui-overlay) p-4'}
       onMouseDown={event => { if (!isContentPanel && closeOnBackdrop && event.target === event.currentTarget) onClose(); }}
     >
       <div

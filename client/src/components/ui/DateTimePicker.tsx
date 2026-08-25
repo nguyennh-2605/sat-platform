@@ -65,7 +65,7 @@ export function DateTimePicker({
       disabled={disabled}
       placeholder={placeholder}
       aria-label={ariaLabel || placeholder}
-      className="h-10 w-full cursor-pointer rounded-control border border-ui-border-strong bg-surface py-2 pl-10 pr-10 text-body font-medium text-foreground outline-none transition-colors placeholder:font-normal placeholder:text-muted-foreground hover:border-primary/55 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+      className="h-10 w-full cursor-pointer rounded-control border border-ui-border-strong bg-surface py-2 pl-10 pr-10 text-body font-medium text-foreground outline-hidden transition-colors placeholder:font-normal placeholder:text-muted-foreground hover:border-primary/55 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
     />
     {clearable && value && !disabled && <button
       type="button"

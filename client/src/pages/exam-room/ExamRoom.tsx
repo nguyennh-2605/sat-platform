@@ -1019,7 +1019,7 @@ function ExamRoom() {
                   <input
                     type="text"
                     // 3. pb-1: Giảm padding bottom một chút để chữ nằm sát đường kẻ hơn
-                    className="w-full p-3 pb-3 text-xl border border-gray-800 rounded-lg outline-none text-center bg-transparent relative z-10"
+                    className="w-full p-3 pb-3 text-xl border border-gray-800 rounded-lg outline-hidden text-center bg-transparent relative z-10"
                     value={answers[currentQ.id] || ''}
                     onChange={(e) => handleSprChange(e.target.value)}
                     maxLength={5}
@@ -1072,7 +1072,7 @@ function ExamRoom() {
     <div className="flex flex-col h-screen bg-gray-50 font-sans relative overflow-hidden">
       {/* COMPONENT LOADING */}
       {isTransitioning && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-xs">
           {/* Icon Spinner xoay xoay */}
           <div className="w-16 h-16 border-4 border-[#C2DDD4] border-t-indigo-600 rounded-full animate-spin mb-4"></div>
           
@@ -1107,7 +1107,7 @@ function ExamRoom() {
                     onClick={() => setIsTimeVisible(false)}
                     className="
                       text-xs font-medium text-slate-700
-                      border border-gray-500 bg-white rounded-full px-3 py-0.5 shadow-sm
+                      border border-gray-500 bg-white rounded-full px-3 py-0.5 shadow-xs
                       active:scale-90 transition-transform duration-100 ease-in-out
                       hover:ring-1 hover:ring-black
                     "
@@ -1136,7 +1136,7 @@ function ExamRoom() {
                     {/* Nút Show: Style giống nút Hide */}
                     <span className="
                       text-xs font-medium text-slate-700
-                      border border-gray-500 bg-white rounded-full px-3 py-0.5 shadow-sm
+                      border border-gray-500 bg-white rounded-full px-3 py-0.5 shadow-xs
                       active:scale-90 transition-transform duration-100 ease-in-out
                       hover:ring-1 hover:ring-black
                     ">
@@ -1159,7 +1159,7 @@ function ExamRoom() {
 
           {/* ĐƯỜNG KẺ NÉT ĐỨT (Gradient Style) */}
           {/* Nằm ngay dưới header, dùng chung wrapper div */}
-          <div className="w-full h-[2px] bg-[linear-gradient(90deg,#374151_90%,transparent_90%)] bg-[length:25px_2px]"></div>
+          <div className="w-full h-[2px] bg-[linear-gradient(90deg,#374151_90%,transparent_90%)] bg-size-[25px_2px]"></div>
         </div>
       
       {/* === TRƯỜNG HỢP 1: GIAO DIỆN REVIEW (FULL SCREEN) === */}
@@ -1228,7 +1228,7 @@ function ExamRoom() {
 
               {/* Unanswered */}
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border border-dashed border-gray-600 rounded-sm"></div>
+                <div className="w-5 h-5 border border-dashed border-gray-600 rounded-xs"></div>
                 <span>Unanswered</span>
               </div>
 
@@ -1280,7 +1280,7 @@ function ExamRoom() {
                           }}
                           className={`
                             w-full h-full flex items-center justify-center text-sm font-semibold transition-all
-                            rounded-sm
+                            rounded-xs
                             ${/* Style cho câu HIỆN TẠI (viền xanh đậm) */
                               isCurrent
                               ? isAnswered
@@ -1361,7 +1361,7 @@ function ExamRoom() {
 
       {/* FOOTER */}
       <div className="fixed bottom-0 left-0 right-0 z-50">
-        <div className="w-full h-[2px] bg-[linear-gradient(90deg,#374151_90%,transparent_90%)] bg-[length:25px_2px]"></div>
+        <div className="w-full h-[2px] bg-[linear-gradient(90deg,#374151_90%,transparent_90%)] bg-size-[25px_2px]"></div>
 
         <footer className="bg-blue-50 h-auto py-3 px-8 flex items-center justify-between z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <div className="flex items-center gap-2 text-slate-600">
@@ -1498,7 +1498,7 @@ function ExamRoom() {
 
       {/* --- MODAL XÁC NHẬN NỘP BÀI --- */}
       {showSubmitModal && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-60 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 transform transition-all scale-100">
             <div className="text-center">
               <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1523,7 +1523,7 @@ function ExamRoom() {
                     setShowSubmitModal(false); // Tắt modal
                     finishTest(); // Gọi hàm nộp thật
                   }}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition shadow-sm"
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition shadow-xs"
                 >
                   Submit test
                 </button>
@@ -1535,7 +1535,7 @@ function ExamRoom() {
       
       {/* MODAL START */}
       {showStartModal && (
-        <div className="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl max-w-md w-full p-8 text-center shadow-2xl">
             <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
@@ -1545,7 +1545,7 @@ function ExamRoom() {
                 This test will run in full-screen mode.
                 <br/>⚠️ Each full-screen exit counts as one violation.
             </p>
-            <button onClick={handleStartTest} className="w-full bg-[#1B7A5A] text-white font-medium py-3.5 rounded-lg hover:bg-[#145F47] transition shadow-sm">
+            <button onClick={handleStartTest} className="w-full bg-[#1B7A5A] text-white font-medium py-3.5 rounded-lg hover:bg-[#145F47] transition shadow-xs">
               Start test
             </button>
           </div>
@@ -1556,7 +1556,7 @@ function ExamRoom() {
      {isFullscreenBlocked && (
       <div className="fixed inset-0 z-50 bg-white/80 flex items-center justify-center p-4 animate-in fade-in duration-200">
         <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full text-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-rose-500"></div>
+          <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-orange-400 to-rose-500"></div>
           <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-6 text-orange-600">
             <AlertTriangle size={32} />
           </div>
@@ -1577,7 +1577,7 @@ function ExamRoom() {
                   key={index}
                   className={`h-3 w-3 rounded-full transition-all duration-300 ${
                     index <= violationCount 
-                      ? 'bg-rose-500 scale-110 shadow-sm' // Đã vi phạm
+                      ? 'bg-rose-500 scale-110 shadow-xs' // Đã vi phạm
                       : 'bg-gray-200' // Chưa vi phạm
                   }`}
                 />
@@ -1591,7 +1591,7 @@ function ExamRoom() {
           </div>
           <button 
             onClick={handleReturnToFullscreen}
-            className="w-full bg-[#1B7A5A] text-white font-medium py-3.5 px-6 rounded-lg hover:bg-[#145F47] transition-all flex items-center justify-center gap-2 shadow-sm"
+            className="w-full bg-[#1B7A5A] text-white font-medium py-3.5 px-6 rounded-lg hover:bg-[#145F47] transition-all flex items-center justify-center gap-2 shadow-xs"
           >
             <Maximize size={18} />
             Return to test

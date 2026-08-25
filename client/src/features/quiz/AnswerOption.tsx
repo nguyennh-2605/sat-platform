@@ -59,7 +59,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
         {/* Đổi màu đỏ thành màu xám đậm (bg-slate-500) và làm dày hơn chút */}
         <div className={`
           h-[3px] bg-slate-600/80 w-[95%] rounded-full
-          transition-all duration-300 origin-left shadow-sm
+          transition-all duration-300 origin-left shadow-xs
           ${isEliminated ? 'scale-x-100' : 'scale-x-0'} 
         `}></div>
       </div>
@@ -71,7 +71,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
         onClick={onEliminate}
         className={`
           flex items-start justify-end shrink-0 cursor-pointer overflow-hidden mt-1
-          transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+          transition-all duration-300 ease-in-out
           ${showActionColumn 
             ? 'w-[50px] opacity-100 ml-1' 
             : 'w-0 opacity-0 ml-0'
@@ -92,7 +92,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
               text-slate-500 border-slate-500
             `}>
               {/* Chữ cái A, B, C... */}
-              <span className="pb-[1px]">{label}</span>
+              <span className="pb-px">{label}</span>
 
               {/* Đường gạch ngang đè lên */}
               <div className="absolute inset-0 flex items-center justify-center">

@@ -157,7 +157,7 @@ const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, cla
       return (
         <div className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} max-w-full space-y-2 text-gray-800 ${className}`}>
           {noteLines.map((line, index) => (
-            <div key={index} className="whitespace-normal break-words leading-relaxed">
+            <div key={index} className="whitespace-normal wrap-break-word leading-relaxed">
               {renderWrappedLatex(line)}
             </div>
           ))}
@@ -166,7 +166,7 @@ const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, cla
     }
 
     return (
-      <div className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} max-w-full whitespace-normal break-words text-gray-800 ${className}`}>
+      <div className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} max-w-full whitespace-normal wrap-break-word text-gray-800 ${className}`}>
         {renderWrappedLatex(normalizedLatex)}
       </div>
     );

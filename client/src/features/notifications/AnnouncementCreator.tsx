@@ -138,10 +138,10 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
   };
 
   return (
-    <div className="absolute inset-0 z-[50] flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+    <div className="absolute inset-0 z-50 flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
 
       {/* HEADER SECTION */}
-      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-between z-30 shadow-sm w-full">
+      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-between z-30 shadow-xs w-full">
         <div className="flex items-center gap-2 md:gap-4">
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition">
             <X size={24} className="text-gray-500" />
@@ -169,19 +169,19 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
             <div className="lg:col-span-2 space-y-6">
 
               {/* 1. Ô NHẬP TIÊU ĐỀ */}
-              <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-300 focus-within:border-indigo-600 font-['Helvetica',Arial,sans-serif]">
+              <div className="bg-white p-3 rounded-lg shadow-xs border border-gray-300 focus-within:border-indigo-600 font-['Helvetica',Arial,sans-serif]">
                 <div className="relative w-full">
                   <input
                     type="text"
                     id="post-title"
                     placeholder=" "
-                    className="block w-full pt-4 pb-1 text-base text-gray-700 bg-transparent border-none appearance-none focus:outline-none focus:ring-0 peer"
+                    className="block w-full pt-4 pb-1 text-base text-gray-700 bg-transparent border-none appearance-none focus:outline-hidden focus:ring-0 peer"
                     value={form.title}
                     onChange={e => setForm({ ...form, title: e.target.value })}
                   />
                   <label
                     htmlFor="post-title"
-                    className="absolute text-base text-gray-500 italic font-medium duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0]
+                    className="absolute text-base text-gray-500 italic font-medium duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-left
                                peer-focus:text-[#1B7A5A]
                                peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2
                                peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-0 cursor-text"
@@ -197,7 +197,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                   Content
                 </label>
                 <div className="
-                  bg-white rounded-lg shadow-sm border border-gray-300 focus-within:border-indigo-600 transition-colors overflow-hidden
+                  bg-white rounded-lg shadow-xs border border-gray-300 focus-within:border-indigo-600 transition-colors overflow-hidden
                   [&_.ql-container.ql-snow]:border-none
                   [&_.ql-toolbar.ql-snow]:border-b [&_.ql-toolbar.ql-snow]:border-gray-200
                   [&_.ql-editor]:font-sans [&_.ql-editor]:text-base [&_.ql-editor]:text-gray-700
@@ -224,7 +224,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
             {/* CỘT PHẢI: Cài đặt & Đính kèm */}
             <div className="space-y-6">
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-300">
+              <div className="bg-white p-6 rounded-xl shadow-xs border border-gray-300">
                 <h3 className="text-base font-bold text-gray-700 mb-2 flex items-center gap-2">
                   Due date
                 </h3>
@@ -237,7 +237,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                 />
               </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-300">
+              <div className="bg-white p-6 rounded-xl shadow-xs border border-gray-300">
                 <h3 className="text-base font-bold text-gray-700 mb-6 flex items-center gap-2">
                   Attach resources
                 </h3>
@@ -269,7 +269,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                       value={linkUrl}
                       onChange={(e) => setLinkUrl(e.target.value)}
                       placeholder="Paste a link…"
-                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#1B7A5A]"
+                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-hidden focus:border-[#1B7A5A]"
                     />
                     <button
                       type="button"
@@ -289,7 +289,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                       {driveFiles.map((file, index) => (
                         <div key={index} className="flex items-center justify-between bg-gray-50 p-2.5 rounded-lg border border-gray-100 group">
                           <div className="flex items-center space-x-2 overflow-hidden">
-                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
+                            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
                             <a href={file.url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline truncate">{file.name}</a>
                           </div>
                           <button type="button" onClick={() => removeDriveFile(index)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -309,7 +309,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                       {links.map((link, index) => (
                         <div key={index} className="flex items-center justify-between bg-blue-50/50 p-2.5 rounded-lg border border-blue-100 group">
                           <div className="flex items-center space-x-2 overflow-hidden">
-                            <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                            <svg className="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                             <a href={link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate">{link}</a>
                           </div>
                           <button type="button" onClick={() => removeLink(index)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -233,7 +233,7 @@ const PracticeTest = () => {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <label className="flex h-10 min-w-0 max-w-md flex-1 items-center gap-2.5 rounded-control border border-ui-border bg-surface-subtle px-3 focus-within:border-primary focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20">
                 <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-                <input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Search tests..." aria-label="Search tests" className="h-full w-full bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground" />
+                <input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Search tests..." aria-label="Search tests" className="h-full w-full bg-transparent text-body text-foreground outline-hidden placeholder:text-muted-foreground" />
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -297,7 +297,7 @@ const PracticeTest = () => {
 
           {loading ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-[280px] animate-pulse p-5"><div className="mb-8 h-8 w-20 rounded-full bg-muted" /><div className="mb-3 h-5 w-2/3 rounded bg-muted" /><div className="h-4 w-full rounded bg-muted" /></Card>)}
+              {[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-[280px] animate-pulse p-5"><div className="mb-8 h-8 w-20 rounded-full bg-muted" /><div className="mb-3 h-5 w-2/3 rounded-sm bg-muted" /><div className="h-4 w-full rounded-sm bg-muted" /></Card>)}
             </div>
           ) : tests.length === 0 ? (
             <EmptyState icon={<BookOpenCheck size={22} />} title="No matching tests" description={canManage ? 'Create your first exam or adjust the current filters.' : 'Your teacher has not assigned a test to your class yet. Admin tests appear here automatically.'} className="min-h-[360px]" />
@@ -379,7 +379,7 @@ const PracticeTest = () => {
         presentation="content-dialog"
         title="Assign tests to classes"
         subtitle={`${selectedTestIds.length} test(s) selected`}
-        className="!max-w-lg"
+        className="max-w-lg!"
         footer={<><Button variant="outline" onClick={() => setAssignmentOpen(false)}>Cancel</Button><Button disabled={assigning || selectedClassIds.length === 0} onClick={assignTests}>{assigning ? 'Assigning...' : `Assign to ${selectedClassIds.length} class(es)`}</Button></>}
       >
             <div className="max-h-[520px] space-y-5 overflow-y-auto">
@@ -398,13 +398,13 @@ const PracticeTest = () => {
             </div>
       </Modal>
 
-      <Modal open={Boolean(startClassTest)} onClose={() => setStartClassTest(null)} closeOnBackdrop presentation="content-dialog" title="Choose a class" subtitle={startClassTest?.title} className="!max-w-md">
+      <Modal open={Boolean(startClassTest)} onClose={() => setStartClassTest(null)} closeOnBackdrop presentation="content-dialog" title="Choose a class" subtitle={startClassTest?.title} className="max-w-md!">
             {startClassTest && <div className="space-y-2">{(startClassTest.deliveries || []).length > 0
               ? startClassTest.deliveries?.map(delivery => <button key={delivery.id} onClick={() => openTest(startClassTest, { deliveryId: delivery.id })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]"><span><span className="block">{capitalizeFirstLetter(delivery.class.name)}</span><span className="mt-1 block text-xs font-normal text-[#6B7280]">{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleString()}` : 'No deadline'}</span></span><ChevronRight size={17} /></button>)
               : [...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <button key={classId} onClick={() => openTest(startClassTest, { classId })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></button>)}</div>}
       </Modal>
 
-      <Modal open={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)} closeOnBackdrop={!deleting} title="Delete exam?" subtitle={deleteTarget?.title} className="!max-w-md">
+      <Modal open={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)} closeOnBackdrop={!deleting} title="Delete exam?" subtitle={deleteTarget?.title} className="max-w-md!">
         <div className="space-y-5">
           <p className="text-sm leading-6 text-[#4B5563]">This permanently deletes the exam, its assignments, and any student attempt data associated with it. This action cannot be undone.</p>
           <div className="flex justify-end gap-2 border-t border-[#E2EDE9] pt-4"><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={deleteTest}>{deleting ? 'Deleting…' : 'Delete exam'}</Button></div>

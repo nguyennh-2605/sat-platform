@@ -1,246 +1,348 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-:root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: var(--ui-foreground);
-  background: var(--ui-background);
+@plugin '@tailwindcss/typography';
 
-  /* UI_GUIDELINES.md is the source of truth for these semantic tokens. */
-  --ui-background: #f2f8f5;
-  --ui-foreground: #1a1a1a;
-  --ui-surface: #ffffff;
-  --ui-surface-subtle: #f8fbf9;
-  --ui-surface-raised: #ffffff;
-  --ui-primary: #1b7a5a;
-  --ui-primary-hover: #145f47;
-  --ui-primary-soft: #e8f5ef;
-  --ui-accent: #e8c040;
-  --ui-accent-hover: #d9b138;
-  --ui-accent-soft: #fef9e7;
-  --ui-muted: #eaf2ee;
-  --ui-muted-foreground: #6b7280;
-  --ui-subtle-foreground: #4b5563;
-  --ui-info: #2563eb;
-  --ui-info-soft: #eff6ff;
-  --ui-border: #d2ded9;
-  --ui-border-strong: #c9d8d2;
-  --ui-success: #047857;
-  --ui-success-soft: #ecfdf5;
-  --ui-warning: #a16207;
-  --ui-warning-soft: #fffbeb;
-  --ui-danger: #b42318;
-  --ui-danger-soft: #fef2f2;
-  --ui-overlay: rgb(10 31 22 / 0.5);
-  --ui-focus: #53a889;
-  --ui-sidebar: #0f4d38;
-  --ui-sidebar-hover: #174030;
-  --ui-sidebar-border: #245d49;
-  --ui-sidebar-foreground: #d6ede4;
-  --ui-sidebar-muted: #a3c9b8;
-  --ui-radius-control: 0.625rem;
-  --ui-radius-card: 0.75rem;
-  --ui-shadow-card: 0 1px 2px rgb(15 77 56 / 0.08);
-  --ui-shadow-raised: 0 8px 24px rgb(15 77 56 / 0.12);
-  --ui-shadow-overlay: 0 20px 48px rgb(10 31 22 / 0.2);
+@theme {
+  --color-background: var(--ui-background);
+  --color-foreground: var(--ui-foreground);
+  --color-surface: var(--ui-surface);
+  --color-surface-subtle: var(--ui-surface-subtle);
+  --color-surface-raised: var(--ui-surface-raised);
 
-  /* Backwards-compatible aliases; do not use these in new code. */
-  --app-background: var(--ui-background);
-  --app-foreground: var(--ui-foreground);
-  --app-card: var(--ui-surface);
-  --app-primary: var(--ui-primary);
-  --app-primary-hover: var(--ui-primary-hover);
-  --app-secondary: var(--ui-primary-soft);
-  --app-accent: var(--ui-accent);
-  --app-muted: var(--ui-muted);
-  --app-muted-foreground: var(--ui-muted-foreground);
-  --app-border: var(--ui-border);
-  --app-radius: var(--ui-radius-control);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  --color-primary: var(--ui-primary);
+  --color-primary-hover: var(--ui-primary-hover);
+  --color-primary-soft: var(--ui-primary-soft);
+
+  --color-accent: var(--ui-accent);
+  --color-accent-hover: var(--ui-accent-hover);
+  --color-accent-soft: var(--ui-accent-soft);
+
+  --color-muted: var(--ui-muted);
+  --color-muted-foreground: var(--ui-muted-foreground);
+
+  --color-subtle: var(--ui-subtle-foreground);
+
+  --color-ui-border: var(--ui-border);
+  --color-ui-border-strong: var(--ui-border-strong);
+
+  --color-success: var(--ui-success);
+  --color-success-soft: var(--ui-success-soft);
+
+  --color-warning: var(--ui-warning);
+  --color-warning-soft: var(--ui-warning-soft);
+
+  --color-danger: var(--ui-danger);
+  --color-danger-soft: var(--ui-danger-soft);
+
+  --color-info: var(--ui-info);
+  --color-info-soft: var(--ui-info-soft);
+
+  --color-sidebar: var(--ui-sidebar);
+  --color-sidebar-hover: var(--ui-sidebar-hover);
+  --color-sidebar-border: var(--ui-sidebar-border);
+  --color-sidebar-foreground: var(--ui-sidebar-foreground);
+  --color-sidebar-muted: var(--ui-sidebar-muted);
+
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-body-lg: 1rem;
+  --text-body-lg--line-height: 1.5rem;
+  --text-title: 1rem;
+  --text-title--line-height: 1.5rem;
+  --text-heading: 1.125rem;
+  --text-heading--line-height: 1.75rem;
+  --text-display: 1.5rem;
+  --text-display--line-height: 2rem;
+  --text-hero: 3rem;
+  --text-hero--line-height: 3.5rem;
+
+  --radius-control: var(--ui-radius-control);
+  --radius-card: var(--ui-radius-card);
+
+  --shadow-card: var(--ui-shadow-card);
+  --shadow-raised: var(--ui-shadow-raised);
+  --shadow-overlay: var(--ui-shadow-overlay);
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
 }
 
-html {
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility exam-content {
+  font-family:
+    Arial, 'Helvetica Neue', Helvetica, 'Liberation Sans', sans-serif;
   font-size: 16px;
-  scroll-behavior: smooth;
+  line-height: 1.55;
+  letter-spacing: 0;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
-body {
-  margin: 0;
-  background: var(--app-background);
-  color: var(--app-foreground);
+@utility app-button {
+  @apply inline-flex h-9 items-center justify-center gap-2 rounded-control px-4 text-body font-medium shadow-card transition-colors disabled:pointer-events-none disabled:opacity-50;
 }
 
-body,
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
+@utility app-button-primary {
+  @apply bg-primary text-white hover:bg-primary-hover;
 }
 
-button,
-[role="button"] {
-  -webkit-tap-highlight-color: transparent;
+@utility app-button-secondary {
+  @apply border border-primary bg-surface text-primary hover:bg-primary-soft;
 }
 
-button:not([class*="rounded-full"]),
-input:not([class*="rounded-full"]),
-select:not([class*="rounded-full"]),
-textarea:not([class*="rounded-full"]) {
-  border-radius: var(--ui-radius-control);
+@utility app-icon-button {
+  @apply inline-flex h-9 w-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted hover:text-primary;
 }
 
-button {
-  font-weight: 500;
+@utility app-input {
+  @apply h-9 rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-hidden placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20;
 }
 
-@keyframes wizard-step-enter {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@utility app-modal {
+  @apply overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay;
 }
 
-@keyframes tab-panel-enter {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+@layer utilities {
+  :root {
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    color: var(--ui-foreground);
+    background: var(--ui-background);
 
-@keyframes page-loading-progress {
-  0% {
-    transform: translateX(-140%) scaleX(0.55);
-  }
-  55% {
-    transform: translateX(105%) scaleX(0.85);
-  }
-  100% {
-    transform: translateX(310%) scaleX(0.45);
-  }
-}
+    /* UI_GUIDELINES.md is the source of truth for these semantic tokens. */
+    --ui-background: #f2f8f5;
+    --ui-foreground: #1a1a1a;
+    --ui-surface: #ffffff;
+    --ui-surface-subtle: #f8fbf9;
+    --ui-surface-raised: #ffffff;
+    --ui-primary: #1b7a5a;
+    --ui-primary-hover: #145f47;
+    --ui-primary-soft: #e8f5ef;
+    --ui-accent: #e8c040;
+    --ui-accent-hover: #d9b138;
+    --ui-accent-soft: #fef9e7;
+    --ui-muted: #eaf2ee;
+    --ui-muted-foreground: #6b7280;
+    --ui-subtle-foreground: #4b5563;
+    --ui-info: #2563eb;
+    --ui-info-soft: #eff6ff;
+    --ui-border: #d2ded9;
+    --ui-border-strong: #c9d8d2;
+    --ui-success: #047857;
+    --ui-success-soft: #ecfdf5;
+    --ui-warning: #a16207;
+    --ui-warning-soft: #fffbeb;
+    --ui-danger: #b42318;
+    --ui-danger-soft: #fef2f2;
+    --ui-overlay: rgb(10 31 22 / 0.5);
+    --ui-focus: #53a889;
+    --ui-sidebar: #0f4d38;
+    --ui-sidebar-hover: #174030;
+    --ui-sidebar-border: #245d49;
+    --ui-sidebar-foreground: #d6ede4;
+    --ui-sidebar-muted: #a3c9b8;
+    --ui-radius-control: 0.625rem;
+    --ui-radius-card: 0.75rem;
+    --ui-shadow-card: 0 1px 2px rgb(15 77 56 / 0.08);
+    --ui-shadow-raised: 0 8px 24px rgb(15 77 56 / 0.12);
+    --ui-shadow-overlay: 0 20px 48px rgb(10 31 22 / 0.2);
 
-.page-loading-indicator {
-  width: 38%;
-  transform-origin: center;
-  animation: page-loading-progress 1050ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-.flashcard-perspective {
-  perspective: 1200px;
-}
-
-.flashcard-inner {
-  position: absolute;
-  inset: 0;
-  transform-style: preserve-3d;
-  transition: transform 420ms cubic-bezier(0.2, 0.75, 0.25, 1);
-}
-
-.flashcard-inner.is-flipped {
-  transform: rotateY(180deg);
-}
-
-.flashcard-face {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.flashcard-back {
-  transform: rotateY(180deg);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .wizard-step-enter {
-    animation: wizard-step-enter 180ms ease-out both;
+    /* Backwards-compatible aliases; do not use these in new code. */
+    --app-background: var(--ui-background);
+    --app-foreground: var(--ui-foreground);
+    --app-card: var(--ui-surface);
+    --app-primary: var(--ui-primary);
+    --app-primary-hover: var(--ui-primary-hover);
+    --app-secondary: var(--ui-primary-soft);
+    --app-accent: var(--ui-accent);
+    --app-muted: var(--ui-muted);
+    --app-muted-foreground: var(--ui-muted-foreground);
+    --app-border: var(--ui-border);
+    --app-radius: var(--ui-radius-control);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
   }
 
-  [role="tabpanel"] {
-    animation: tab-panel-enter 240ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+  html {
+    font-size: 16px;
+    scroll-behavior: smooth;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .flashcard-inner {
-    transition-duration: 1ms;
+  body {
+    margin: 0;
+    background: var(--app-background);
+    color: var(--app-foreground);
+  }
+
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  button,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:not([class*='rounded-full']),
+  input:not([class*='rounded-full']),
+  select:not([class*='rounded-full']),
+  textarea:not([class*='rounded-full']) {
+    border-radius: var(--ui-radius-control);
+  }
+
+  button {
+    font-weight: 500;
+  }
+
+  @keyframes wizard-step-enter {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes tab-panel-enter {
+    from {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes page-loading-progress {
+    0% {
+      transform: translateX(-140%) scaleX(0.55);
+    }
+    55% {
+      transform: translateX(105%) scaleX(0.85);
+    }
+    100% {
+      transform: translateX(310%) scaleX(0.45);
+    }
   }
 
   .page-loading-indicator {
-    width: 100%;
-    animation: none;
-    transform: scaleX(0.65);
-    transform-origin: left;
-  }
-}
-
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: 2px;
-}
-
-.app-toast {
-  max-width: min(420px, calc(100vw - 2rem));
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control) !important;
-  background: var(--ui-surface) !important;
-  color: var(--ui-foreground) !important;
-  box-shadow: var(--ui-shadow-raised) !important;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-}
-
-@layer components {
-  .exam-content {
-    font-family: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
-    font-size: 16px;
-    line-height: 1.55;
-    letter-spacing: 0;
-    font-variant-numeric: lining-nums tabular-nums;
+    width: 38%;
+    transform-origin: center;
+    animation: page-loading-progress 1050ms cubic-bezier(0.4, 0, 0.2, 1)
+      infinite;
   }
 
-  .app-button {
-    @apply inline-flex h-9 items-center justify-center gap-2 rounded-control px-4 text-body font-medium shadow-card transition-colors disabled:pointer-events-none disabled:opacity-50;
+  .flashcard-perspective {
+    perspective: 1200px;
   }
 
-  .app-button-primary {
-    @apply bg-primary text-white hover:bg-primary-hover;
+  .flashcard-inner {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transition: transform 420ms cubic-bezier(0.2, 0.75, 0.25, 1);
   }
 
-  .app-button-secondary {
-    @apply border border-primary bg-surface text-primary hover:bg-primary-soft;
+  .flashcard-inner.is-flipped {
+    transform: rotateY(180deg);
   }
 
-  .app-icon-button {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted hover:text-primary;
+  .flashcard-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
 
-  .app-input {
-    @apply h-9 rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20;
+  .flashcard-back {
+    transform: rotateY(180deg);
   }
 
-  .app-modal {
-    @apply overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay;
+  @media (prefers-reduced-motion: no-preference) {
+    .wizard-step-enter {
+      animation: wizard-step-enter 180ms ease-out both;
+    }
+
+    [role='tabpanel'] {
+      animation: tab-panel-enter 240ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flashcard-inner {
+      transition-duration: 1ms;
+    }
+
+    .page-loading-indicator {
+      width: 100%;
+      animation: none;
+      transform: scaleX(0.65);
+      transform-origin: left;
+    }
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 2px;
+  }
+
+  .app-toast {
+    max-width: min(420px, calc(100vw - 2rem));
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-control) !important;
+    background: var(--ui-surface) !important;
+    color: var(--ui-foreground) !important;
+    box-shadow: var(--ui-shadow-raised) !important;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 }
 

@@ -104,7 +104,7 @@ export default function ClassroomList() {
                 >
                   <div className="relative h-20 rounded-t-[11px] border-b border-black/10 px-5 py-3.5 text-white" style={{ backgroundColor: classroom.color || CLASS_COLORS[0] }}>
                     <div className="pr-10">
-                      <h2 className="line-clamp-2 text-heading font-semibold leading-6"><button type="button" onClick={() => navigate(`/dashboard/class/${classroom.id}?tab=notifications`)} className="rounded text-left underline-offset-4 hover:underline">{classroom.name}</button></h2>
+                      <h2 className="line-clamp-2 text-heading font-semibold leading-6"><button type="button" onClick={() => navigate(`/dashboard/class/${classroom.id}?tab=notifications`)} className="rounded-sm text-left underline-offset-4 hover:underline">{classroom.name}</button></h2>
                       <p className="mt-1 truncate text-xs text-white/85">{classroom.teacher?.name || 'Teacher'}</p>
                     </div>
                     {classroom.canManage && (
@@ -241,5 +241,5 @@ function DeleteClassModal({ target, onClose, onDeleted }: { target: ClassSummary
 }
 
 function ClassGridSkeleton() {
-  return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} className="h-[218px] animate-pulse overflow-hidden p-0"><div className="h-20 bg-muted" /><div className="space-y-2.5 px-5 pb-2.5 pt-4"><div className="h-4 w-2/3 rounded bg-muted" /><div className="h-4 w-1/2 rounded bg-muted" /><div className="h-3 w-1/3 rounded bg-muted" /></div><div className="mt-auto h-10 border-t border-ui-border bg-surface-subtle" /></Card>)}</div>;
+  return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} className="h-[218px] animate-pulse overflow-hidden p-0"><div className="h-20 bg-muted" /><div className="space-y-2.5 px-5 pb-2.5 pt-4"><div className="h-4 w-2/3 rounded-sm bg-muted" /><div className="h-4 w-1/2 rounded-sm bg-muted" /><div className="h-3 w-1/3 rounded-sm bg-muted" /></div><div className="mt-auto h-10 border-t border-ui-border bg-surface-subtle" /></Card>)}</div>;
 }

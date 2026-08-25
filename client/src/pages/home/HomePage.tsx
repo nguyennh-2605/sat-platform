@@ -24,7 +24,7 @@ export default function HomePage() {
 
   return <div className="min-h-screen overflow-hidden bg-background text-foreground">
     <a href="#main-content" className="fixed left-3 top-3 z-50 -translate-y-20 rounded-control bg-surface px-4 py-2 text-body font-semibold text-primary shadow-elevated transition-transform focus:translate-y-0">Skip to content</a>
-    <header className="relative z-20 border-b border-ui-border bg-surface/90 backdrop-blur">
+    <header className="relative z-20 border-b border-ui-border bg-surface/90 backdrop-blur-sm">
       <div className="mx-auto flex min-h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2.5 rounded-control">
           <span className="flex h-9 w-9 items-center justify-center rounded-control bg-primary text-white"><BookOpenCheck size={19} aria-hidden="true" /></span>
@@ -48,7 +48,7 @@ export default function HomePage() {
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_80%_20%,rgba(27,122,90,0.16),transparent_32%),radial-gradient(circle_at_15%_70%,rgba(232,192,64,0.14),transparent_28%)]" />
         <div className="mx-auto grid max-w-[1280px] items-center gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(24rem,0.9fr)]">
           <div className="max-w-3xl">
-            <span className="inline-flex rounded-full border border-primary/25 bg-primary-soft px-3 py-1 text-caption font-semibold uppercase tracking-[0.1em] text-primary">Digital SAT preparation</span>
+            <span className="inline-flex rounded-full border border-primary/25 bg-primary-soft px-3 py-1 text-caption font-semibold uppercase tracking-widest text-primary">Digital SAT preparation</span>
             <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.035em] text-foreground sm:text-5xl lg:text-6xl lg:leading-[1.08]">A calmer, clearer path to your target SAT score.</h1>
             <p className="mt-6 max-w-2xl text-body-lg leading-7 text-subtle-foreground sm:text-lg sm:leading-8">Practice, learn from mistakes, build vocabulary, and follow your progress in one focused learning workspace.</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -69,7 +69,7 @@ export default function HomePage() {
                 <PreviewRow number="02" title="Review vocabulary" meta="24 words" />
                 <PreviewRow number="03" title="Analyze recent mistakes" meta="5 entries" />
               </div>
-              <div className="border-t border-ui-border bg-sidebar p-5 text-white"><p className="text-caption uppercase tracking-[0.1em] text-sidebar-muted">One workspace</p><p className="mt-2 text-heading font-semibold">Practice → Review → Improve</p></div>
+              <div className="border-t border-ui-border bg-sidebar p-5 text-white"><p className="text-caption uppercase tracking-widest text-sidebar-muted">One workspace</p><p className="mt-2 text-heading font-semibold">Practice → Review → Improve</p></div>
             </Card>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function HomePage() {
 
       <section className="border-y border-ui-border bg-surface px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="features-title">
         <div className="mx-auto max-w-[1280px]">
-          <div className="max-w-2xl"><p className="text-caption font-semibold uppercase tracking-[0.1em] text-primary">Built for focused progress</p><h2 id="features-title" className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Everything you need, without the noise.</h2></div>
+          <div className="max-w-2xl"><p className="text-caption font-semibold uppercase tracking-widest text-primary">Built for focused progress</p><h2 id="features-title" className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Everything you need, without the noise.</h2></div>
           <div className="mt-8 grid gap-4 md:grid-cols-3">{features.map(({ icon: Icon, title, description }) => <Card key={title} className="p-6"><span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary-soft text-primary"><Icon size={20} aria-hidden="true" /></span><h3 className="mt-4 text-title font-semibold">{title}</h3><p className="mt-2 text-body leading-6 text-muted-foreground">{description}</p></Card>)}</div>
         </div>
       </section>

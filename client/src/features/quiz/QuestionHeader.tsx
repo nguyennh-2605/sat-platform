@@ -28,8 +28,8 @@ const StrikethroughIcon = () => (
     </span>
     {/* Tạo đường gạch chéo bằng thẻ div tuyệt đối */}
     <div className="
-        absolute w-[150%] h-[1px] bg-gray-600 
-        rotate-[150deg]              /* Xoay chéo */
+        absolute w-[150%] h-px bg-gray-600 
+        rotate-150              /* Xoay chéo */
         top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
     "></div>
   </div>
@@ -62,7 +62,7 @@ const QuestionHeader: React.FC<Props> = ({
         {/* 2. NÚT MARK FOR REVIEW */}
         <button 
           onClick={onToggleMark}
-          className="flex items-center gap-1 px-3 h-full hover:bg-gray-200 transition-colors text-gray-800 font-medium focus:outline-none"
+          className="flex items-center gap-1 px-3 h-full hover:bg-gray-200 transition-colors text-gray-800 font-medium focus:outline-hidden"
         >
           <BookmarkIcon filled={isMarked} />
           <span className={`text-sm transition-all ${
@@ -93,7 +93,7 @@ const QuestionHeader: React.FC<Props> = ({
           </div>
         )}
       </div>
-      <div className="w-full h-[2px] bg-[linear-gradient(90deg,#374151_90%,transparent_90%)] bg-[length:20px_2px] -mt-[15px] relative z-10"></div>
+      <div className="w-full h-[2px] bg-[linear-gradient(90deg,#374151_90%,transparent_90%)] bg-size-[20px_2px] mt-[-15px] relative z-10"></div>
     </div>
   );
 };

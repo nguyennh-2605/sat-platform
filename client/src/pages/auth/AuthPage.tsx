@@ -76,7 +76,7 @@ export default function AuthPage() {
 
   return <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(22rem,0.85fr)_minmax(32rem,1.15fr)]">
     <aside className="relative hidden overflow-hidden bg-sidebar p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14">
-      <div className="pointer-events-none absolute -right-24 -top-20 h-80 w-80 rounded-full border-[50px] border-white/5" />
+      <div className="pointer-events-none absolute -right-24 -top-20 h-80 w-80 rounded-full border-50 border-white/5" />
       <button type="button" onClick={() => navigate('/')} className="relative flex w-fit items-center gap-2.5 rounded-control text-body font-semibold"><span className="flex h-9 w-9 items-center justify-center rounded-control bg-primary"><BookOpenCheck size={19} /></span>SAT MASTER</button>
       <div className="relative max-w-lg"><p className="text-caption font-semibold uppercase tracking-[0.12em] text-sidebar-muted">Your learning workspace</p><h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight">Practice with purpose. Learn from every attempt.</h1><p className="mt-5 text-body-lg leading-7 text-sidebar-foreground">Keep tests, vocabulary, classes, mistakes, and progress connected in one focused SAT platform.</p></div>
       <p className="relative text-caption text-sidebar-muted">Digital SAT preparation</p>

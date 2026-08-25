@@ -162,7 +162,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
     if (showCorrectAnswer) {
       if (isActualCorrect) {
         return {
-          wrapper: "bg-green-50 border-green-500 ring-1 ring-green-500 shadow-sm",
+          wrapper: "bg-green-50 border-green-500 ring-1 ring-green-500 shadow-xs",
           circle: "bg-green-600 text-white border-green-600",
         };
       }
@@ -375,10 +375,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
                 
                 return (
                   <div key={index} className={`relative flex items-center p-3 border rounded-xl ${styleClass.wrapper}`}>
-                    <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full border-[1.5px] text-sm font-bold mr-4 ${styleClass.circle}`}>
+                    <div className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-full border-[1.5px] text-sm font-bold mr-4 ${styleClass.circle}`}>
                       {label}
                     </div>
-                    <div className="font-['Source_Serif_4',_'Georgia',_serif] text-[16px] text-[#1a1a1a] lining-nums leading-relaxed">
+                    <div className="font-['Source_Serif_4','Georgia',serif] text-[16px] text-[#1a1a1a] lining-nums leading-relaxed">
                       {examSubject === 'MATH' 
                         ? <FormattedTextRenderer text={opt.text} latexOnly />
                         : <InteractiveText content={opt.text} readOnly={true}/>
@@ -425,7 +425,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
       role="dialog"
       aria-modal="true"
       aria-label={`Review question ${data.questionNumber}`}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ui-overlay)] px-2 py-2 animate-in fade-in duration-200 sm:px-14 sm:py-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-(--ui-overlay) px-2 py-2 animate-in fade-in duration-200 sm:px-14 sm:py-4"
       onMouseDown={event => { if (event.target === event.currentTarget) closeModal(); }}
     >
       <div className={`relative h-[90vh] w-full transition-[max-width] duration-300 ease-in-out ${isAiOpen ? 'max-w-7xl' : 'max-w-5xl'}`}>
@@ -495,7 +495,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
         <div className={`absolute inset-0 z-20 flex h-full flex-col bg-surface-subtle transition-all duration-300 ease-in-out sm:relative sm:inset-auto sm:z-auto ${isAiOpen ? 'w-full opacity-100 sm:w-[450px] sm:border-l sm:border-ui-border' : 'w-0 overflow-hidden opacity-0'}`}>
           <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-ui-border bg-surface/90 px-5 py-4 backdrop-blur-md">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-white shadow-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-white shadow-xs">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
               </div>
               <div>
@@ -582,7 +582,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
               <div className="flex justify-start">
                 <div className="bg-transparent px-2 py-1 flex items-center gap-2">
                   <svg className="animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                  <span className="text-sm font-medium bg-clip-text text-transparent bg-gradient-to-r from-gray-400 via-gray-800 to-gray-400 bg-[length:200%_100%] animate-[shimmer_2s_infinite]">
+                  <span className="text-sm font-medium bg-clip-text text-transparent bg-linear-to-r from-gray-400 via-gray-800 to-gray-400 bg-size-[200%_100%] animate-[shimmer_2s_infinite]">
                     Thinking...
                   </span>
                 </div>
@@ -620,13 +620,13 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
                 disabled={isTyping || !!streamingContent} // Khóa gõ chữ lúc AI đang trả lời
                 placeholder="Ask AI about this question..."
                 aria-label="Message AI tutor"
-                className="w-full rounded-card border border-ui-border bg-surface-subtle py-3.5 pl-4 pr-12 text-body text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                className="w-full rounded-card border border-ui-border bg-surface-subtle py-3.5 pl-4 pr-12 text-body text-foreground outline-hidden transition-all placeholder:text-muted-foreground focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
               />
               <button 
                 type="submit"
                 disabled={!chatInput.trim() || isTyping || !!streamingContent}
                 aria-label="Send message"
-                className="absolute right-2 flex h-9 w-9 items-center justify-center rounded-control bg-primary text-white shadow-sm transition-colors hover:bg-primary-hover disabled:bg-muted disabled:text-muted-foreground"
+                className="absolute right-2 flex h-9 w-9 items-center justify-center rounded-control bg-primary text-white shadow-xs transition-colors hover:bg-primary-hover disabled:bg-muted disabled:text-muted-foreground"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
               </button>

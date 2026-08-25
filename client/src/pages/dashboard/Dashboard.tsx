@@ -37,7 +37,7 @@ const NavItem = ({ to, label, icon: Icon, activePrefixes = [], exact = false, on
     to={to}
     end={exact}
     onClick={onNavigate}
-    className={({ isActive }) => `flex min-h-10 items-center gap-3 rounded-control px-3 text-body transition-colors ${isActive || exactActive || sectionActive ? 'bg-primary font-semibold text-white shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-white'}`}
+    className={({ isActive }) => `flex min-h-10 items-center gap-3 rounded-control px-3 text-body transition-colors ${isActive || exactActive || sectionActive ? 'bg-primary font-semibold text-white shadow-xs' : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-white'}`}
   >
     <Icon size={19} className="shrink-0" aria-hidden="true" />
     <span className="truncate">{label}</span>
@@ -56,7 +56,7 @@ function SidebarContent({ onNavigate, onBackground, onLogout }: { onNavigate?: (
       className="flex min-h-[72px] shrink-0 items-center gap-3 border-b border-sidebar-border px-5 text-left"
       aria-label="Go to dashboard home"
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-primary text-white shadow-sm">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-primary text-white shadow-xs">
         <BookOpenCheck size={21} aria-hidden="true" />
       </span>
       <span className="min-w-0">
@@ -158,7 +158,7 @@ const Dashboard = () => {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background font-sans text-foreground">
-      <a href="#dashboard-content" className="fixed left-3 top-3 z-[300] -translate-y-20 rounded-control bg-surface px-4 py-2 text-body font-semibold text-primary shadow-elevated transition-transform focus:translate-y-0">Skip to content</a>
+      <a href="#dashboard-content" className="fixed left-3 top-3 z-300 -translate-y-20 rounded-control bg-surface px-4 py-2 text-body font-semibold text-primary shadow-elevated transition-transform focus:translate-y-0">Skip to content</a>
 
       <aside className="z-40 hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
         <SidebarContent onBackground={openBackground} onLogout={() => void logout()} />
@@ -179,8 +179,8 @@ const Dashboard = () => {
         ><Menu size={22} aria-hidden="true" /></button>
       </header>
 
-      {mobileNavOpen && <div className="fixed inset-0 z-[100] lg:hidden">
-        <button type="button" className="absolute inset-0 bg-[var(--ui-overlay)]" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation" />
+      {mobileNavOpen && <div className="fixed inset-0 z-100 lg:hidden">
+        <button type="button" className="absolute inset-0 bg-(--ui-overlay)" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation" />
         <aside id={drawerId} role="dialog" aria-modal="true" aria-label="Navigation" className="relative flex h-full w-[min(20rem,88vw)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elevated">
           <button type="button" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation" className="absolute right-3 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-control text-sidebar-foreground hover:bg-sidebar-hover hover:text-white">
             <X size={20} aria-hidden="true" />
@@ -192,7 +192,7 @@ const Dashboard = () => {
       <main
         id="dashboard-content"
         tabIndex={-1}
-        className="dashboard-surface relative min-w-0 flex-1 overflow-hidden bg-background bg-cover bg-center pt-14 outline-none lg:pt-0"
+        className="dashboard-surface relative min-w-0 flex-1 overflow-hidden bg-background bg-cover bg-center pt-14 outline-hidden lg:pt-0"
         data-background-active={selectedBackground ? 'true' : 'false'}
         style={selectedBackground ? { backgroundImage: `linear-gradient(rgba(232,245,239,.64), rgba(242,248,245,.78)), url(${selectedBackground.image})` } : undefined}
       ><DashboardRouteViewport /></main>

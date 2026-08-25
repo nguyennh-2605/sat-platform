@@ -30,7 +30,7 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
           onClick={toggleHighlightMode}
           className={`
             relative top-[3px]
-            group flex flex-col items-center gap-1 focus:outline-none
+            group flex flex-col items-center gap-1 focus:outline-hidden
             transition-colors duration-200 
             rounded-lg px-2 py-1 -my-1
             hover:bg-green-50      
@@ -89,7 +89,7 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
           onClick={toggleCalculator}
           className={`
             relative top-[3px]
-            group flex flex-col items-center gap-1 focus:outline-none
+            group flex flex-col items-center gap-1 focus:outline-hidden
             transition-colors duration-200 
             rounded-lg px-2 py-1 -my-1 
             hover:bg-green-50      
@@ -145,7 +145,7 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
           disabled={isSaving}
           className={`
             relative top-[3px]
-            group flex flex-col items-center gap-1 focus:outline-none
+            group flex flex-col items-center gap-1 focus:outline-hidden
             transition-colors duration-200 
             rounded-lg px-2 py-1 -my-1
             hover:bg-green-50

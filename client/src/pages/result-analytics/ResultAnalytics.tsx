@@ -222,7 +222,7 @@ const ResultAnalytics = () => {
                 </thead>
                 <tbody className="divide-y divide-[#E2EDE9]">
                   {loading ? (
-                    [1, 2, 3].map(row => <tr key={row}><td colSpan={4} className="px-5 py-4"><div className="h-8 animate-pulse rounded bg-[#F2F8F5]" /></td></tr>)
+                    [1, 2, 3].map(row => <tr key={row}><td colSpan={4} className="px-5 py-4"><div className="h-8 animate-pulse rounded-sm bg-[#F2F8F5]" /></td></tr>)
                   ) : history.length === 0 ? (
                     <tr><td colSpan={4} className="px-5 py-12 text-center text-sm text-[#6B7280]">No recent activity yet.</td></tr>
                   ) : history.map(item => (
@@ -249,7 +249,7 @@ function MetricCard({ label, value, suffix, icon, iconClassName, valueClassName,
       <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconClassName}`}>{icon}</div>
       <div className="min-w-0">
         <p className="mb-0.5 text-xs font-medium text-[#6B7280]">{label}</p>
-        {loading ? <div className="mt-1 h-8 w-24 animate-pulse rounded bg-[#EAF2EE]" /> : <div className="flex items-baseline gap-1.5"><span className={`font-mono text-3xl font-extrabold ${valueClassName}`}>{value}</span>{suffix && <span className="truncate text-xs text-[#6B7280]">{suffix}</span>}</div>}
+        {loading ? <div className="mt-1 h-8 w-24 animate-pulse rounded-sm bg-[#EAF2EE]" /> : <div className="flex items-baseline gap-1.5"><span className={`font-mono text-3xl font-extrabold ${valueClassName}`}>{value}</span>{suffix && <span className="truncate text-xs text-[#6B7280]">{suffix}</span>}</div>}
       </div>
     </Card>
   );

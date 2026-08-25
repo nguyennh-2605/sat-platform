@@ -130,7 +130,7 @@ const AssignmentDetail = () => {
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-4 w-full">
             {/* Vòng tròn icon */}
-            <div className="w-12 h-12 bg-slate-200 rounded-full flex-shrink-0"></div>
+            <div className="w-12 h-12 bg-slate-200 rounded-full shrink-0"></div>
             <div className="w-full max-w-2xl">
               {/* Tiêu đề */}
               <div className="h-8 bg-slate-200 rounded-lg w-3/4 mb-3"></div>
@@ -145,10 +145,10 @@ const AssignmentDetail = () => {
 
         {/* Khung Nội dung */}
         <div className="space-y-4 mb-10">
-          <div className="h-4 bg-slate-200 rounded w-full"></div>
-          <div className="h-4 bg-slate-200 rounded w-full"></div>
-          <div className="h-4 bg-slate-200 rounded w-5/6"></div>
-          <div className="h-4 bg-slate-200 rounded w-4/6"></div>
+          <div className="h-4 bg-slate-200 rounded-sm w-full"></div>
+          <div className="h-4 bg-slate-200 rounded-sm w-full"></div>
+          <div className="h-4 bg-slate-200 rounded-sm w-5/6"></div>
+          <div className="h-4 bg-slate-200 rounded-sm w-4/6"></div>
         </div>
 
         {/* Khung File đính kèm (nếu có) */}
@@ -181,7 +181,7 @@ const AssignmentDetail = () => {
             
             {/* --- Phần bên trái: Icon và Thông tin bài tập --- */}
             <div className="flex gap-4 items-start flex-1">
-              <div className="w-12 h-12 rounded-full bg-[#C2DDD4] text-[#1B7A5A] flex items-center justify-center flex-shrink-0 mt-1">
+              <div className="w-12 h-12 rounded-full bg-[#C2DDD4] text-[#1B7A5A] flex items-center justify-center shrink-0 mt-1">
                 <FileText size={24} />
               </div>
               <div>
@@ -210,7 +210,7 @@ const AssignmentDetail = () => {
               <div className="relative mt-7">
                 <button 
                   onClick={() => setShowActionMenu(!showActionMenu)}
-                  className="p-2 text-slate-700 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors focus:outline-none"
+                  className="p-2 text-slate-700 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors focus:outline-hidden"
                 >
                   <MoreVertical size={22} />
                 </button>
@@ -271,7 +271,7 @@ const AssignmentDetail = () => {
 
                 {/* 2. Phần Attachments */}
                 {hasAttachments && (
-                  <div className={`${!isStudent ? 'w-full lg:w-80 flex-shrink-0' : 'w-full mt-4'} space-y-4`}>
+                  <div className={`${!isStudent ? 'w-full lg:w-80 shrink-0' : 'w-full mt-4'} space-y-4`}>
                     <h3 className="font-semibold text-slate-800 border-b border-slate-300 pb-2 uppercase text-sm tracking-wider">
                       Attachments
                     </h3>
@@ -303,8 +303,8 @@ const AssignmentDetail = () => {
 
                         return (
                           <a key={`file-${idx}`} href={cleanUrl} target="_blank" rel="noreferrer" 
-                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-[#A9CFC1] hover:shadow-sm transition group">
-                            <div className="w-11 h-11 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-[#A9CFC1] hover:shadow-xs transition group">
+                            <div className="w-11 h-11 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                               <img 
                                 src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" 
                                 alt="Google Drive" 
@@ -327,8 +327,8 @@ const AssignmentDetail = () => {
                       {assignment.links?.map((link: string, idx: number) => {
                         return (
                           <a key={`link-${idx}`} href={link} target="_blank" rel="noreferrer" 
-                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-[#A9CFC1] hover:shadow-sm transition group">
-                            <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-[#A9CFC1] hover:shadow-xs transition group">
+                            <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                               {getLinkIcon(link)}
                             </div>
                             <div className="flex flex-col overflow-hidden justify-center">
@@ -378,8 +378,8 @@ const AssignmentDetail = () => {
 
         {/* ============ CỘT PHẢI: KHU VỰC NỘP BÀI (Chỉ dành cho Học sinh) ============ */}
         {userRole === 'STUDENT' && assignment.deadline && (
-          <div className="w-full lg:w-80 flex-shrink-0">
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-6">
+          <div className="w-full lg:w-80 shrink-0">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs sticky top-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-800">Your assignment</h2>
                 <span className="text-sm font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
@@ -391,13 +391,13 @@ const AssignmentDetail = () => {
               <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
                 <button 
                   onClick={() => setSubmissionType('TEXT')}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'TEXT' ? 'bg-white shadow text-[#1B7A5A]' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'TEXT' ? 'bg-white shadow-sm text-[#1B7A5A]' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   Write response
                 </button>
                 <button 
                   onClick={() => setSubmissionType('FILE')}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'FILE' ? 'bg-white shadow text-[#1B7A5A]' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'FILE' ? 'bg-white shadow-sm text-[#1B7A5A]' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   Share link or file
                 </button>
@@ -407,7 +407,7 @@ const AssignmentDetail = () => {
               {submissionType === 'TEXT' ? (
                 <textarea 
                   rows={5}
-                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition text-sm mb-4"
+                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-hidden transition text-sm mb-4"
                   placeholder="Write your response here…"
                   value={submissionContent}
                   onChange={(e) => setSubmissionContent(e.target.value)}
@@ -419,7 +419,7 @@ const AssignmentDetail = () => {
                   </div>
                   <input 
                     type="text"
-                    className="w-full pl-10 p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition text-sm"
+                    className="w-full pl-10 p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-hidden transition text-sm"
                     placeholder="Paste a Google Drive or Docs link…"
                     value={submissionContent}
                     onChange={(e) => setSubmissionContent(e.target.value)}
@@ -443,7 +443,7 @@ const AssignmentDetail = () => {
         )}
       </div>
       {showDeleteModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl scale-in-95 duration-200">
             <h3 className="text-xl font-bold text-slate-800 mb-2">Delete assignment?</h3>
             <p className="text-slate-500 mb-6 text-sm">
@@ -458,7 +458,7 @@ const AssignmentDetail = () => {
               </button>
               <button 
                 onClick={handleDelete}
-                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors shadow-xs"
               >
                 Delete permanently
               </button>
@@ -474,7 +474,7 @@ const AssignmentDetail = () => {
         />
       )}
       {showTestsModal && assignment.selectedTests && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-110 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-xl w-full max-w-3xl max-h-[80vh] overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <h3 className="text-lg font-bold text-slate-800">
@@ -496,7 +496,7 @@ const AssignmentDetail = () => {
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <h4 className="font-semibold text-slate-800">{capitalizeFirstLetter(test.title)}</h4>
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${test.mode === 'EXAM' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                    <span className={`px-2 py-1 rounded-sm text-xs font-bold ${test.mode === 'EXAM' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                       {test.mode}
                     </span>
                   </div>

@@ -19,7 +19,7 @@ const ResizableSplitLayout = ({ containerRef, leftWidth, handleMouseDown, leftCo
       >
         <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-6 md:px-8 md:py-8">
           <div className="
-            font-['Source_Serif_4',_'Georgia',_serif] lining-nums tabular-nums
+            font-['Source_Serif_4','Georgia',serif] lining-nums tabular-nums
             font-normal text-[#1a1a1a] leading-relaxed tracking-normal
             text-[16px]           /* Set cho h3 */
           ">

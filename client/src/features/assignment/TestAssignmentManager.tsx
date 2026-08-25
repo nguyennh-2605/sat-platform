@@ -183,10 +183,10 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
   };
 
   return (
-    <div className="absolute inset-0 z-[50] flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+    <div className="absolute inset-0 z-50 flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
 
       {/* HEADER SECTION */}
-      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-between z-30 shadow-sm w-full">
+      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-between z-30 shadow-xs w-full">
         <div className="flex items-center gap-2 md:gap-4">
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition">
             <X size={24} className="text-gray-500" />
@@ -214,19 +214,19 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
             <div className="lg:col-span-2 space-y-6">
 
               {/* 1. Ô NHẬP TIÊU ĐỀ */}
-              <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-300 focus-within:border-indigo-600 font-['Helvetica',Arial,sans-serif]">
+              <div className="bg-white p-3 rounded-lg shadow-xs border border-gray-300 focus-within:border-indigo-600 font-['Helvetica',Arial,sans-serif]">
                 <div className="relative w-full">
                   <input
                     type="text"
                     id="test-title"
                     placeholder=" "
-                    className="block w-full pt-4 pb-1 text-base text-gray-700 bg-transparent border-none appearance-none focus:outline-none focus:ring-0 peer"
+                    className="block w-full pt-4 pb-1 text-base text-gray-700 bg-transparent border-none appearance-none focus:outline-hidden focus:ring-0 peer"
                     value={form.title}
                     onChange={e => setForm({ ...form, title: e.target.value })}
                   />
                   <label
                     htmlFor="test-title"
-                    className="absolute text-base text-gray-500 italic font-medium duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0]
+                    className="absolute text-base text-gray-500 italic font-medium duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-left
                                peer-focus:text-[#1B7A5A]
                                peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2
                                peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-0 cursor-text"
@@ -242,7 +242,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                   Instructions
                 </label>
                 <div className="
-                  bg-white rounded-lg shadow-sm border border-gray-300 focus-within:border-indigo-600 transition-colors overflow-hidden
+                  bg-white rounded-lg shadow-xs border border-gray-300 focus-within:border-indigo-600 transition-colors overflow-hidden
                   [&_.ql-container.ql-snow]:border-none
                   [&_.ql-toolbar.ql-snow]:border-b [&_.ql-toolbar.ql-snow]:border-gray-200
                   [&_.ql-editor]:font-sans [&_.ql-editor]:text-base [&_.ql-editor]:text-gray-700
@@ -275,7 +275,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                 ) : (
                   <div onClick={openTestModal} className="flex items-center justify-between p-4 bg-[#E8F5EF] border border-[#C2DDD4] rounded-xl cursor-pointer hover:bg-[#C2DDD4]/70 transition">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-[#1B7A5A] rounded-full flex items-center justify-center text-white font-bold shadow-sm">
+                      <div className="w-10 h-10 bg-[#1B7A5A] rounded-full flex items-center justify-center text-white font-bold shadow-xs">
                         {selectedTests.length}
                       </div>
                       <div>
@@ -283,7 +283,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                         <p className="text-sm text-[#1B7A5A]/80">Open to review or change the selection</p>
                       </div>
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white text-[#1B7A5A] text-sm font-bold rounded-lg border border-[#C2DDD4] shadow-sm hover:bg-gray-50">
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white text-[#1B7A5A] text-sm font-bold rounded-lg border border-[#C2DDD4] shadow-xs hover:bg-gray-50">
                       <Edit2 size={16} /> Edit
                     </button>
                   </div>
@@ -294,7 +294,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
             {/* CỘT PHẢI: Cài đặt */}
             <div className="space-y-6">
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-300">
+              <div className="bg-white p-6 rounded-xl shadow-xs border border-gray-300">
                 <h3 className="text-base font-bold text-gray-700 mb-2 flex items-center gap-2">
                   Due date
                 </h3>
@@ -315,7 +315,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
 
       {/* TEST MODAL */}
       {isTestModalOpen && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 md:p-8 animate-in fade-in duration-200">
+        <div className="absolute inset-0 z-60 flex items-center justify-center bg-slate-900/50 p-4 md:p-8 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl flex flex-col h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
 
             {/* Modal Header & Breadcrumb */}
@@ -348,7 +348,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                   placeholder="Search tests or folders…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none transition text-sm"
+                  className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-hidden transition text-sm"
                 />
               </div>
             </div>
@@ -402,7 +402,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                         className={`flex items-center px-6 py-3 border-b transition cursor-pointer ${isSelected ? 'bg-[#E8F5EF]/50 border-indigo-100' : 'border-gray-100 hover:bg-gray-50'}`}
                       >
                         <div className="w-10 flex justify-center">
-                          <div className={`w-5 h-5 rounded flex items-center justify-center border transition ${isSelected ? 'bg-[#1B7A5A] border-indigo-600' : 'bg-white border-gray-300'}`}>
+                          <div className={`w-5 h-5 rounded-sm flex items-center justify-center border transition ${isSelected ? 'bg-[#1B7A5A] border-indigo-600' : 'bg-white border-gray-300'}`}>
                             {isSelected && <Check size={14} className="text-white" />}
                           </div>
                         </div>
@@ -413,11 +413,11 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                         </div>
 
                         <div className="w-28 text-center hidden md:flex justify-center">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium">{test.subject}</span>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-sm text-xs font-medium">{test.subject}</span>
                         </div>
 
                         <div className="w-24 text-center hidden sm:flex justify-center">
-                          <span className={`px-2 py-1 rounded text-xs font-bold ${test.mode === 'EXAM' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{test.mode}</span>
+                          <span className={`px-2 py-1 rounded-sm text-xs font-bold ${test.mode === 'EXAM' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{test.mode}</span>
                         </div>
 
                         <div className="w-24 text-center hidden sm:block text-sm text-gray-600">{test.duration}p</div>

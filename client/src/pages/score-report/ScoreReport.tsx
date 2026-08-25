@@ -195,7 +195,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
             </div>
           </Card>
 
-          <Card className="relative flex min-h-[190px] flex-col items-center justify-center overflow-hidden !border-[#063D2D] !bg-[#063D2D] p-6 !text-white shadow-md lg:col-span-1">
+          <Card className="relative flex min-h-[190px] flex-col items-center justify-center overflow-hidden border-[#063D2D]! bg-[#063D2D]! p-6 text-white! shadow-md lg:col-span-1">
             <CheckCircle2 size={120} className="absolute -right-8 -top-8 text-[#53B892] opacity-20" aria-hidden="true" />
             <p className="relative z-10 mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#BDE8D7]">Accuracy</p>
             <div className="relative z-10 font-mono text-5xl font-bold text-white">{accuracy}%</div>

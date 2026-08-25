@@ -59,8 +59,8 @@ const Calculator: React.FC<CalculatorProps> = ({ isOpen, onClose }) => {
       ref={nodeRef}
       className={`bg-white flex flex-col overflow-hidden pointer-events-auto transition-all duration-200 gpu-boost
         ${isMaximized 
-          ? 'maximized-calculator shadow-[0_0_50px_rgba(0,0,0,0.5)] z-[10000]' // Phóng to Full màn
-          : 'absolute top-24 right-10 w-[550px] h-[600px] rounded-lg shadow-2xl border border-gray-400 z-[9999]'
+          ? 'maximized-calculator shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10000' // Phóng to Full màn
+          : 'absolute top-24 right-10 w-[550px] h-[600px] rounded-lg shadow-2xl border border-gray-400 z-9999'
         }
       `}
     >
@@ -117,7 +117,7 @@ const Calculator: React.FC<CalculatorProps> = ({ isOpen, onClose }) => {
 
   // 4. Lớp bọc ngoài cùng: Dùng class hidden như bình thường cho an toàn
   return (
-    <div className={`${isOpen ? 'block' : 'hidden'} absolute inset-0 z-[9999] pointer-events-none`}>
+    <div className={`${isOpen ? 'block' : 'hidden'} absolute inset-0 z-9999 pointer-events-none`}>
       <Draggable 
         nodeRef={nodeRef} 
         handle=".drag-header" 

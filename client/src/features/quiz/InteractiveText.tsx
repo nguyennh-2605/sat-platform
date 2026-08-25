@@ -129,7 +129,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
 
     // Áp dụng CSS tùy theo công cụ được chọn
     if (type === 'highlight') {
-      span.className = `${colorClass} cursor-pointer rounded-[2px] px-[1px] sat-highlight transition-colors`;
+      span.className = `${colorClass} cursor-pointer rounded-[2px] px-px sat-highlight transition-colors`;
     } else if (type === 'underline') {
       span.className = `underline decoration-2 underline-offset-4 cursor-pointer sat-highlight`;
     } else if (type === 'note') {
@@ -266,23 +266,23 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
           {/* Nút Vàng */}
           <button 
             onClick={() => applyFormat('highlight', 'bg-[rgba(253,224,71,0.6)]')} // Vàng
-            className="w-6 h-6 rounded-full bg-[#fce074] border-[2px] border-gray-800 hover:scale-110 transition-transform shadow-sm flex-shrink-0"
+            className="w-6 h-6 rounded-full bg-[#fce074] border-2 border-gray-800 hover:scale-110 transition-transform shadow-xs shrink-0"
             title="Highlight Vàng"
           />
           {/* Nút Xanh */}
           <button 
             onClick={() => applyFormat('highlight', 'bg-[rgba(147,197,253,0.6)]')} // Xanh blue
-            className="w-6 h-6 rounded-full bg-[#bde0fe] border border-transparent hover:border-gray-400 hover:scale-110 transition-all shadow-sm flex-shrink-0"
+            className="w-6 h-6 rounded-full bg-[#bde0fe] border border-transparent hover:border-gray-400 hover:scale-110 transition-all shadow-xs shrink-0"
             title="Highlight Xanh"
           />
           {/* Nút Hồng */}
           <button 
             onClick={() => applyFormat('highlight', 'bg-[rgba(249,168,212,0.6)]')} // Hồng pink
-            className="w-6 h-6 rounded-full bg-[#ffc8dd] border border-transparent hover:border-gray-400 hover:scale-110 transition-all shadow-sm flex-shrink-0"
+            className="w-6 h-6 rounded-full bg-[#ffc8dd] border border-transparent hover:border-gray-400 hover:scale-110 transition-all shadow-xs shrink-0"
             title="Highlight Hồng"
           />
 
-          <div className="w-[1px] h-5 bg-gray-300 mx-0.5"></div>
+          <div className="w-px h-5 bg-gray-300 mx-0.5"></div>
 
           {/* Nút Gạch Chân (Underline) */}
           <button 
@@ -307,7 +307,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
             </svg>
           </button>
 
-          <div className="w-[1px] h-5 bg-gray-300 mx-0.5"></div>
+          <div className="w-px h-5 bg-gray-300 mx-0.5"></div>
 
           {/* Nút Xóa (Remove) */}
           <button 
@@ -329,7 +329,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
       {/* --- MODAL EDIT NOTE (Giữ nguyên) --- */}
       {activeNoteId && (
         <div 
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/5" 
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/5" 
           onClick={() => setActiveNoteId(null)}
         >
           <div 
@@ -364,7 +364,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
             
             {/* Textarea */}
             <textarea
-              className="w-full border border-gray-300 rounded-lg p-3.5 text-[15px] text-gray-800 leading-relaxed focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none bg-gray-50/50 hover:bg-white transition-all placeholder:text-gray-400"
+              className="w-full border border-gray-300 rounded-lg p-3.5 text-[15px] text-gray-800 leading-relaxed focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none bg-gray-50/50 hover:bg-white transition-all placeholder:text-gray-400"
               rows={4}
               placeholder="Nhập nội dung ghi chú..."
               value={notes[activeNoteId] || ''}
@@ -382,7 +382,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
               </button>
               <button 
                 onClick={() => setActiveNoteId(null)}
-                className="px-5 py-2 text-[14px] font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-sm transition-colors"
+                className="px-5 py-2 text-[14px] font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-xs transition-colors"
               >
                 Lưu lại
               </button>

@@ -56,7 +56,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({
           {/* Legend */}
           <div className="flex gap-4 mt-2 md:mt-0 text-sm text-gray-700 font-medium">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border border-dashed border-gray-600 rounded-sm"></div>
+                <div className="w-5 h-5 border border-dashed border-gray-600 rounded-xs"></div>
                 <span>Unanswered</span>
               </div>
               <div className="flex items-center gap-1">
@@ -84,7 +84,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({
                 key={q.id}
                 onClick={() => onQuestionClick(realIndex)}
                 className={
-                  `w-full aspect-square flex items-center justify-center text-2xl font-semibold transition-all rounded-sm
+                  `w-full aspect-square flex items-center justify-center text-2xl font-semibold transition-all rounded-xs
                   ${hasAnswer
                     ? 'text-white font-bold hover:border-gray-600 bg-blue-700 hover:bg-blue-800'
                     : 'border border-dashed border-gray-600 text-blue-700 font-bold hover:bg-gray-100'

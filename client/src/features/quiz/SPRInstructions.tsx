@@ -11,7 +11,7 @@ const SPRInstructions = () => {
         <li>If your answer is a <strong>fraction</strong> that doesn't fit in the provided space, enter the decimal equivalent.</li>
         <li>If your answer is a <strong>decimal</strong> that doesn't fit in the provided space, enter it by truncating or rounding at the fourth digit.</li>
         <li>
-          If your answer is a <strong>mixed number</strong> (such as 3<span className="inline-flex flex-col align-middle text-[0.9em] ml-0.5"><span className="border-b border-black leading-none pb-[1px]">1</span><span className="leading-none pt-[1px]">2</span></span>), enter it as an improper fraction (7/2) or its decimal equivalent (3.5).
+          If your answer is a <strong>mixed number</strong> (such as 3<span className="inline-flex flex-col align-middle text-[0.9em] ml-0.5"><span className="border-b border-black leading-none pb-px">1</span><span className="leading-none pt-px">2</span></span>), enter it as an improper fraction (7/2) or its decimal equivalent (3.5).
         </li>
         <li>Don't enter <strong>symbols</strong> such as a percent sign, comma, or dollar sign.</li>
       </ul>

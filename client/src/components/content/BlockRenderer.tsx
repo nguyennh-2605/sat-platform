@@ -12,7 +12,7 @@ interface Props {
 
 // --- 1. Component hiển thị Bảng (Table) ---
 const TableRenderer = ({ block, isMath, readOnly, preview, exam }: { block: TableBlock, isMath: boolean, readOnly: boolean, preview: boolean, exam: boolean }) => (
-  <div className={`my-5 w-full max-w-full overflow-hidden border bg-white text-[#1A1A1A] ${exam ? 'rounded-none border-[#4B5563]' : 'rounded-xl border-[#B9CBC4]'} ${preview ? 'font-sans text-[15px] leading-6' : exam ? 'exam-content' : "font-['Source_Serif_4',_'Georgia',_serif] text-[16px] leading-relaxed"}`}>
+  <div className={`my-5 w-full max-w-full overflow-hidden border bg-white text-[#1A1A1A] ${exam ? 'rounded-none border-[#4B5563]' : 'rounded-xl border-[#B9CBC4]'} ${preview ? 'font-sans text-[15px] leading-6' : exam ? 'exam-content' : "font-['Source_Serif_4','Georgia',serif] text-[16px] leading-relaxed"}`}>
     {/* Tiêu đề bảng */}
     {block.title && (
       <div className={`border-b px-4 py-3 text-sm font-semibold ${exam ? 'border-[#4B5563] bg-white text-center text-black' : 'border-[#B9CBC4] bg-[#E8F5EF] text-left text-[#145F47]'}`}>
@@ -67,7 +67,7 @@ const PoemRenderer = ({ block, isMath, readOnly, preview, exam }: { block: PoemB
     )}
     
     {/* Nội dung thơ (Font sans cho nghệ thuật) */}
-    <div className={`${preview ? 'font-sans text-[15px] leading-6' : exam ? 'exam-content' : "font-['Source_Serif_4',_'Georgia',_serif] text-[16px] leading-relaxed"} lining-nums tabular-nums font-normal text-[#1a1a1a] tracking-normal`}>
+    <div className={`${preview ? 'font-sans text-[15px] leading-6' : exam ? 'exam-content' : "font-['Source_Serif_4','Georgia',serif] text-[16px] leading-relaxed"} lining-nums tabular-nums font-normal text-[#1a1a1a] tracking-normal`}>
       {block.lines.map((line, idx) => (
         // Thêm padding-left cho các dòng chẵn để tạo hiệu ứng thụt đầu dòng thơ
         <div key={idx} className={idx % 2 !== 0 ? "pl-4" : ""}>
@@ -99,7 +99,7 @@ const NotesRenderer = ({ lines, isMath, readOnly, preview, exam }: { lines: stri
     const numberedLines = lines.slice(firstRomanItem);
 
     return (
-      <div className={`${preview ? 'font-sans text-[15px] leading-6' : exam ? 'exam-content' : "font-['Source_Serif_4',_'Georgia',_serif] text-[16px] leading-relaxed"} lining-nums tabular-nums font-normal text-[#1a1a1a] tracking-normal`}>
+      <div className={`${preview ? 'font-sans text-[15px] leading-6' : exam ? 'exam-content' : "font-['Source_Serif_4','Georgia',serif] text-[16px] leading-relaxed"} lining-nums tabular-nums font-normal text-[#1a1a1a] tracking-normal`}>
         {introLines.length > 0 && (
           <div className="mb-3 space-y-2">
             {introLines.map((line, idx) => (
@@ -124,7 +124,7 @@ const NotesRenderer = ({ lines, isMath, readOnly, preview, exam }: { lines: stri
   const [introLine, ...bulletLines] = lines;
 
   return (
-    <div className={`${preview ? 'font-sans text-[15px] leading-6' : exam ? 'exam-content' : "font-['Source_Serif_4',_'Georgia',_serif] text-[16px] leading-relaxed"} lining-nums tabular-nums font-normal text-[#1a1a1a] tracking-normal`}>
+    <div className={`${preview ? 'font-sans text-[15px] leading-6' : exam ? 'exam-content' : "font-['Source_Serif_4','Georgia',serif] text-[16px] leading-relaxed"} lining-nums tabular-nums font-normal text-[#1a1a1a] tracking-normal`}>
       
       <div className="mb-3 leading-relaxed">
         <InteractiveText content={introLine} isMath={isMath} readOnly={readOnly} inheritTypography={preview || exam} />
@@ -169,7 +169,7 @@ const BlockRenderer: React.FC<Props> = ({ blocks, subject, readOnly = false, var
                 <img 
                   src={block.src} 
                   alt={block.alt || 'Question image'} 
-                  className="max-w-lg max-h-80 w-auto h-auto object-contain rounded-md shadow-sm border border-gray-200"
+                  className="max-w-lg max-h-80 w-auto h-auto object-contain rounded-md shadow-xs border border-gray-200"
                 />
                 {block.caption && <div className="mt-2 max-w-lg text-center text-sm text-gray-500">{isMath ? <InteractiveText content={block.caption} isMath readOnly={readOnly} inheritTypography /> : block.caption}</div>}
               </div>
