@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { getRequestActivityCursor, hasPendingRequestsAfter, subscribeRequestActivity } from '../../lib/requestActivity';
 
@@ -55,7 +55,9 @@ export function DashboardRouteViewport() {
         className={`dashboard-route-content h-full transition-opacity duration-150 motion-reduce:transition-none ${transitioning ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
         aria-busy={transitioning}
       >
-        <Outlet />
+        <Suspense fallback={<div className="h-full" aria-label="Loading page" />}>
+          <Outlet />
+        </Suspense>
       </div>
       <div
         aria-hidden="true"

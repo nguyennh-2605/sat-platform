@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import type { ContentBlock } from '../../types/quiz';
 import ReviewModal from '../../features/quiz/ReviewModal';
 import axiosClient from '../../lib/axios';
+import { invalidateQueryCache } from '../../lib/queryCache';
 import { AppHeader, BackButton, Badge, Button, Card, Select, TableShell } from '../../components/ui/AppUI';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { capitalizeFirstLetter } from '../../utils/text';
@@ -135,6 +136,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
         whyWrong: '',
         whyRight: '',
       });
+      invalidateQueryCache('/api/error-logs');
       setLoggedQuestions(current => new Set(current).add(question.id));
       toast.success(`Question ${question.questionNumber} added to Error Log`);
     } catch (error) {

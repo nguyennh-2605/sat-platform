@@ -3,9 +3,15 @@ const ApiError = require('../utils/ApiError');
 const { buildAnalyticsPayload } = require('../utils/analytics-transform');
 
 exports.getData = async ({ userId, days }) => {
+  const requestedDays = Number.parseInt(days, 10);
+  const normalizedDays = Number.isInteger(requestedDays) ? Math.min(365, Math.max(1, requestedDays)) : 84;
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - normalizedDays);
+  cutoff.setUTCHours(0, 0, 0, 0);
   const rawData = await prisma.submission.findMany({
     where: {
       userId: userId,
+      startedAt: { gte: cutoff },
     },
     orderBy: { startedAt: 'asc' },
     select: {
@@ -28,7 +34,7 @@ exports.getData = async ({ userId, days }) => {
     }
   });
 
-  return buildAnalyticsPayload(rawData, { days });
+  return buildAnalyticsPayload(rawData, { days: normalizedDays });
 };
 
 exports.getSubmissionDetail = async ({ id, userId }) => {

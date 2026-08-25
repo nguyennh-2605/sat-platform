@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const { buildAttemptSummary } = require('../utils/practice-test-progress');
 const { getTaxonomy, validateClassification } = require('../utils/question-taxonomy');
 const testDeliveryService = require('./test-delivery.service');
+const { parsePagination, paginationMeta } = require('../utils/pagination');
 
 exports.getClasses = ({ userId, userRole }) => {
   let whereCondition = {};
@@ -26,7 +27,7 @@ exports.getClasses = ({ userId, userRole }) => {
   });
 };
 
-exports.getTests = async ({ userId, userRole }) => {
+exports.getTests = async ({ userId, userRole, query = {} }) => {
   const hasUser = !isNaN(userId);
 
   let whereCondition;
@@ -53,9 +54,25 @@ exports.getTests = async ({ userId, userRole }) => {
     whereCondition = { authorId: userId };
   }
 
-  const tests = await prisma.test.findMany({
-    where: whereCondition,
-    orderBy: { id: 'desc' },
+  const search = String(query.search || '').trim().slice(0, 100);
+  const requestedSubject = String(query.subject || '').toUpperCase();
+  const requestedMode = String(query.mode || '').toUpperCase();
+  const classId = String(query.classId || '').trim();
+  const pagination = parsePagination(query, { defaultPageSize: 24, maxPageSize: 48 });
+  const filters = [whereCondition];
+  if (search) filters.push({ OR: [{ title: { contains: search, mode: 'insensitive' } }, { description: { contains: search, mode: 'insensitive' } }] });
+  if (['RW', 'MATH'].includes(requestedSubject)) filters.push({ subject: requestedSubject });
+  if (['PRACTICE', 'EXAM'].includes(requestedMode)) filters.push({ mode: requestedMode });
+  if (classId && classId !== 'ALL') filters.push({ OR: [{ classTests: { some: { classId } } }, { deliveries: { some: { classId, status: 'PUBLISHED' } } }] });
+  const pagedWhere = { AND: filters };
+
+  const [total, tests] = await prisma.$transaction([
+    prisma.test.count({ where: pagedWhere }),
+    prisma.test.findMany({
+    where: pagedWhere,
+    orderBy: { id: String(query.sort || '').toUpperCase() === 'OLDEST' ? 'asc' : 'desc' },
+    skip: pagination.skip,
+    take: pagination.pageSize,
     select: {
       id: true,
       title: true,
@@ -117,10 +134,11 @@ exports.getTests = async ({ userId, userRole }) => {
         }
       })
     }
-  });
+    }),
+  ]);
 
   // Map dữ liệu để trả về format gọn gàng cho Frontend
-  return tests.map(test => {
+  const items = tests.map(test => {
     const { submissions, sections, ...rest } = test;
     const questionCount = sections.reduce(
       (total, section) => total + section._count.questions,
@@ -135,6 +153,8 @@ exports.getTests = async ({ userId, userRole }) => {
       ...attemptSummary
     };
   });
+
+  return { items, pagination: paginationMeta({ ...pagination, total }) };
 };
 
 exports.assignTestsToClasses = async ({ testIds, classIds, availableAt, dueAt, maxAttempts, scorePolicy, userId, userRole }) => {

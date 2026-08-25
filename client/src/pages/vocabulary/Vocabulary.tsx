@@ -7,6 +7,7 @@ import { DateTimePicker } from '../../components/ui/DateTimePicker';
 import { appToast } from '../../components/ui/toast';
 import { ui } from '../../components/ui/styles';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
+import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 
 type DetailTab = 'TERMS' | 'FLASHCARDS' | 'QUIZ';
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
@@ -29,15 +30,15 @@ const PAGE_SIZE = 40;
 const collectionKey = (set: SetSummary) => set.assignedActivityId ? `activity:${set.assignedActivityId}` : `set:${set.id}`;
 const createDraftTerm = (): Term => ({ id: crypto.randomUUID(), word: '', meaning: '', translation: '', exampleSentence: '' });
 
-const loadCollection = async (set: SetSummary) => {
+const loadCollection = async (set: SetSummary, force = false) => {
   if (!set.assignedActivityId) {
     return {
-      detail: await axiosClient.get<SetDetail, SetDetail>(`/api/vocabulary/sets/${set.id}`),
+      detail: await cachedGet<SetDetail>(`/api/vocabulary/sets/${set.id}`, { ttlMs: 30_000, force }),
       activity: null as VocabularyActivity | null,
     };
   }
-  const activity = await axiosClient.get<VocabularyActivity, VocabularyActivity>(`/api/vocabulary/activities/${set.assignedActivityId}`);
-  const detail = await axiosClient.get<SetDetail, SetDetail>(`/api/vocabulary/sets/${set.id}?activityId=${set.assignedActivityId}`);
+  const activity = await cachedGet<VocabularyActivity>(`/api/vocabulary/activities/${set.assignedActivityId}`, { ttlMs: 30_000, force });
+  const detail = await cachedGet<SetDetail>(`/api/vocabulary/sets/${set.id}?activityId=${set.assignedActivityId}`, { ttlMs: 30_000, force });
   return { detail: { ...detail, termCount: activity.vocabulary.items.length, terms: activity.vocabulary.items }, activity };
 };
 
@@ -66,14 +67,14 @@ export default function Vocabulary() {
   const requestIdRef = useRef(0);
   const currentCollectionKeyRef = useRef('');
 
-  const loadSets = useCallback(async () => {
+  const loadSets = useCallback(async (force = false) => {
     const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const [system, personal, assigned] = await Promise.all([
-        axiosClient.get<SetSummary[], SetSummary[]>('/api/vocabulary/sets?scope=SYSTEM'),
-        axiosClient.get<SetSummary[], SetSummary[]>('/api/vocabulary/sets?scope=MINE'),
-        role === 'STUDENT' ? axiosClient.get<SetSummary[], SetSummary[]>('/api/vocabulary/sets?scope=ASSIGNED') : Promise.resolve([]),
+        cachedGet<SetSummary[]>('/api/vocabulary/sets?scope=SYSTEM', { ttlMs: 60_000, force }),
+        cachedGet<SetSummary[]>('/api/vocabulary/sets?scope=MINE', { ttlMs: 60_000, force }),
+        role === 'STUDENT' ? cachedGet<SetSummary[]>('/api/vocabulary/sets?scope=ASSIGNED', { ttlMs: 60_000, force }) : Promise.resolve([]),
       ]);
       if (requestId !== requestIdRef.current) return;
       setSystemSets(system);
@@ -86,7 +87,7 @@ export default function Vocabulary() {
         || personal[0]
         || assigned[0];
       if (preferred) {
-        const result = await loadCollection(preferred);
+        const result = await loadCollection(preferred, force);
         if (requestId !== requestIdRef.current) return;
         currentCollectionKeyRef.current = collectionKey(preferred);
         setCurrentSet(result.detail);
@@ -264,8 +265,8 @@ function SetWorkspace({ set, activity, tab, onTab, role, quizConfig, onBack, onE
   if (tab === 'FLASHCARDS') return <FlashcardWorkspace set={set} activityId={activity?.id} onBack={onBack} />;
   if (tab === 'QUIZ') return <QuizWorkspace set={set} activityId={activity?.id} config={quizConfig} onBack={onBack} />;
   const tabs: Array<TabItem<DetailTab>> = [{ value: 'TERMS', label: 'Terms', icon: BookOpen }, { value: 'FLASHCARDS', label: 'Flashcards', icon: RotateCcw }, { value: 'QUIZ', label: 'Test', icon: ClipboardCheck, disabled: set.terms.length < 4 }];
-  const publish = async () => { try { await axiosClient.post(`/api/vocabulary/sets/${set.id}/publish`); appToast.success('Vocabulary set published.'); await onRefresh(); } catch (error) { appToast.error(errorMessage(error, 'Unable to publish the set.')); } };
-  const archive = async () => { try { await axiosClient.post(`/api/vocabulary/sets/${set.id}/archive`); appToast.success('Vocabulary set archived.'); onBack(); } catch (error) { appToast.error(errorMessage(error, 'Unable to archive the set.')); } };
+  const publish = async () => { try { await axiosClient.post(`/api/vocabulary/sets/${set.id}/publish`); invalidateQueryCache('/api/vocabulary'); appToast.success('Vocabulary set published.'); await onRefresh(); } catch (error) { appToast.error(errorMessage(error, 'Unable to publish the set.')); } };
+  const archive = async () => { try { await axiosClient.post(`/api/vocabulary/sets/${set.id}/archive`); invalidateQueryCache('/api/vocabulary'); appToast.success('Vocabulary set archived.'); onBack(); } catch (error) { appToast.error(errorMessage(error, 'Unable to archive the set.')); } };
   return <div className={ui.page}>
     <AppHeader title={set.title} subtitle={`${set.termCount} words${activity ? ` · ${activity.class.name}` : ''}`} showProfile={false} rightContent={<div className="flex gap-2">{set.canEdit && <Button variant="outline" size="sm" onClick={onEdit}><Edit3 size={14} />Edit</Button>}{role === 'ADMIN' && set.scope === 'SYSTEM' && set.status !== 'PUBLISHED' && <Button size="sm" onClick={() => void publish()}><Sparkles size={14} />Publish</Button>}{(role === 'TEACHER' || role === 'ADMIN') && set.status === 'PUBLISHED' && <Button size="sm" onClick={onAssign}><Send size={14} />Assign</Button>}{set.canEdit && <Button variant="ghost" size="icon" onClick={() => void archive()} aria-label="Archive set"><Archive size={16} /></Button>}</div>} />
     <main className="min-h-0 flex-1 overflow-y-auto"><div className={ui.content}>
@@ -339,7 +340,7 @@ function FlashcardWorkspace({ set, activityId, onBack }: { set: SetDetail; activ
   const answer = async (mastery: 'LEARNING' | 'KNOW') => {
     if (!session || !current || saving || current.selectedMeaning) return;
     setSaving(true);
-    try { setSession(await axiosClient.post<StudySession, StudySession>(`/api/vocabulary/sessions/${session.id}/questions/${current.id}/answer`, { mastery })); }
+    try { setSession(await axiosClient.post<StudySession, StudySession>(`/api/vocabulary/sessions/${session.id}/questions/${current.id}/answer`, { mastery })); invalidateQueryCache('/api/vocabulary'); }
     catch (error) { appToast.error(errorMessage(error, 'Unable to save your progress.')); }
     finally { setSaving(false); }
   };
@@ -425,6 +426,7 @@ function QuizWorkspace({ set, activityId, config, onBack }: { set: SetDetail; ac
     try {
       const result = await axiosClient.post<StudySession, StudySession>(`/api/vocabulary/sessions/${session.id}/questions/${current.id}/answer`, { selectedMeaning: selectedAnswer });
       setSession(result);
+      invalidateQueryCache('/api/vocabulary');
       if (result.status === 'COMPLETED') setElapsedSeconds(Math.max(1, Math.round((Date.now() - startedAt) / 1000)));
     } catch (error) { appToast.error(errorMessage(error, 'Unable to check your answer.')); }
     finally { setSaving(false); }
@@ -476,6 +478,7 @@ function CreateSetScreen({ role, onBack, onSaved }: { role: UserRole; onBack: ()
     setSaving(true);
     try {
       const detail = await axiosClient.post<SetDetail, SetDetail>('/api/vocabulary/sets', { title, description, scope, terms });
+      invalidateQueryCache('/api/vocabulary');
       appToast.success('Vocabulary set created.');
       onSaved(detail);
     } catch (error) { appToast.error(errorMessage(error, 'Unable to create the vocabulary set.')); }
@@ -523,7 +526,7 @@ function SetEditor({ open, set, role, onClose, onSaved }: { open: boolean; set?:
   const [title, setTitle] = useState(''); const [description, setDescription] = useState(''); const [scope, setScope] = useState<'PERSONAL' | 'SYSTEM'>('PERSONAL'); const [terms, setTerms] = useState<Term[]>([]); const [saving, setSaving] = useState(false);
   useEffect(() => { if (!open) return; setTitle(set?.title || ''); setDescription(set?.description || ''); setScope(set?.scope || 'PERSONAL'); setTerms(set?.terms.length ? set.terms.map(term => ({ ...term })) : [{ word: '', meaning: '', translation: '', exampleSentence: '' }]); }, [open, set]);
   const update = (index: number, field: keyof Term, value: string) => setTerms(current => current.map((term, termIndex) => termIndex === index ? { ...term, [field]: value } : term));
-  const save = async () => { setSaving(true); try { let detail: SetDetail; if (set) { await axiosClient.patch(`/api/vocabulary/sets/${set.id}`, { title, description }); detail = await axiosClient.put<SetDetail, SetDetail>(`/api/vocabulary/sets/${set.id}/terms`, { terms }); } else { detail = await axiosClient.post<SetDetail, SetDetail>('/api/vocabulary/sets', { title, description, scope, terms }); } appToast.success(set ? 'Vocabulary set updated.' : 'Vocabulary set created.'); onSaved(detail); } catch (error) { appToast.error(errorMessage(error, 'Unable to save the vocabulary set.')); } finally { setSaving(false); } };
+  const save = async () => { setSaving(true); try { let detail: SetDetail; if (set) { await axiosClient.patch(`/api/vocabulary/sets/${set.id}`, { title, description }); detail = await axiosClient.put<SetDetail, SetDetail>(`/api/vocabulary/sets/${set.id}/terms`, { terms }); } else { detail = await axiosClient.post<SetDetail, SetDetail>('/api/vocabulary/sets', { title, description, scope, terms }); } invalidateQueryCache('/api/vocabulary'); appToast.success(set ? 'Vocabulary set updated.' : 'Vocabulary set created.'); onSaved(detail); } catch (error) { appToast.error(errorMessage(error, 'Unable to save the vocabulary set.')); } finally { setSaving(false); } };
   return <Modal open={open} onClose={onClose} presentation="content-dialog" title={set ? 'Edit vocabulary set' : 'Create vocabulary set'} subtitle="Every term needs an English meaning and translation." className="!max-w-5xl" footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !title.trim()} onClick={() => void save()}>{saving ? 'Saving…' : 'Save set'}</Button></>}><div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1"><div className="grid gap-4 sm:grid-cols-2"><label className="text-caption font-medium">Set title<Input className="mt-1 w-full" value={title} onChange={event => setTitle(event.target.value)} /></label>{role === 'ADMIN' && !set && <label className="text-caption font-medium">Collection<Select className="mt-1 w-full" value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="PERSONAL">My Vocabulary</option><option value="SYSTEM">System Library</option></Select></label>}</div><label className="block text-caption font-medium">Description<Input className="mt-1 w-full" value={description} onChange={event => setDescription(event.target.value)} /></label><div className="space-y-3">{terms.map((term, index) => <Card key={index} className="relative grid gap-3 p-4 md:grid-cols-2"><span className="absolute right-3 top-3 text-caption text-muted-foreground">#{index + 1}</span><Input placeholder="Word" value={term.word} onChange={event => update(index, 'word', event.target.value)} /><Input placeholder="English meaning" value={term.meaning} onChange={event => update(index, 'meaning', event.target.value)} /><Input placeholder="Translation" value={term.translation} onChange={event => update(index, 'translation', event.target.value)} /><div className="flex gap-2"><Input className="flex-1" placeholder="Example sentence (optional)" value={term.exampleSentence || ''} onChange={event => update(index, 'exampleSentence', event.target.value)} /><Button variant="ghost" size="icon" disabled={terms.length === 1} onClick={() => setTerms(current => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove term ${index + 1}`}><X size={16} /></Button></div></Card>)}</div><Button variant="outline" onClick={() => setTerms(current => [...current, { word: '', meaning: '', translation: '', exampleSentence: '' }])}><Plus size={15} />Add term</Button></div></Modal>;
 }
 

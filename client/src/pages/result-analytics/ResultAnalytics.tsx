@@ -12,9 +12,9 @@ import {
 import { format } from 'date-fns';
 import { ArrowRight, BookmarkCheck, Calendar, CheckCircle2, PenTool } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axiosClient from '../../lib/axios';
 import { AppHeader, Badge, Button, Card, EmptyState, TableShell } from '../../components/ui/AppUI';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
+import { cachedGet } from '../../lib/queryCache';
 import { ui } from '../../components/ui/styles';
 import { capitalizeFirstLetter } from '../../utils/text';
 
@@ -107,7 +107,7 @@ const ResultAnalytics = () => {
     const fetchAnalytics = async () => {
       setLoading(true);
       try {
-        const response = await axiosClient.get<AnalyticsResponse, AnalyticsResponse>('/api/results-analytics?days=84');
+        const response = await cachedGet<AnalyticsResponse>('/api/results-analytics?days=84', { ttlMs: 60_000 });
         setSummary(response.summary || emptySummary);
         setScoreHistory(Array.isArray(response.scoreHistory) ? response.scoreHistory : []);
         setHeatmapData(Array.isArray(response.heatmapData) ? response.heatmapData : []);

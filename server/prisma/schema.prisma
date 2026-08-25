@@ -65,6 +65,8 @@ model Class {
   weeks       Week[]
   deliveries  TestDelivery[]
   activities  ClassActivity[]
+
+  @@index([teacherId, createdAt])
 }
 
 model Assignment {
@@ -135,6 +137,9 @@ model Test {
   folder      Folder?        @relation(fields: [folderId], references: [id], onDelete: Cascade)
   author      User?          @relation(fields: [authorId], references: [id])
   deliveries  TestDelivery[]
+
+  @@index([authorId, id])
+  @@index([isPublic, id])
 }
 
 model ClassTest {
@@ -234,6 +239,8 @@ model Submission {
 
   @@unique([deliveryId, userId, attemptNo])
   @@index([deliveryId, status])
+  @@index([userId, startedAt])
+  @@index([testId, status])
 }
 
 model Answer {
@@ -260,6 +267,8 @@ model ErrorLog {
   updatedAt     DateTime @updatedAt
   userId        Int
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model Notification {
@@ -271,6 +280,8 @@ model Notification {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model UserTodoState {

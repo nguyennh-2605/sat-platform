@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, BookOpenCheck, Check, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Pencil, Play, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Bell, BookOpen, BookOpenCheck, Check, ChevronLeft, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Pencil, Play, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
 import { Button, Input, Modal, Select } from '../../components/ui/AppUI';
+import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
+import { useDebounce } from '../../hooks/useDebounce';
 
 interface ClassInfo {
   id: string;
@@ -34,6 +36,8 @@ interface TestItem {
 }
 
 type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT';
+interface PaginationMeta { page: number; pageSize: number; total: number; totalPages: number }
+interface TestPage { items: TestItem[]; pagination: PaginationMeta }
 
 const subjectLabel: Record<TestItem['subject'], string> = {
   RW: 'RW',
@@ -75,6 +79,8 @@ const PracticeTest = () => {
   const [type, setType] = useState<'ALL' | TestItem['mode']>('ALL');
   const [sortOrder, setSortOrder] = useState<'NEWEST' | 'OLDEST'>('NEWEST');
   const [classFilter, setClassFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationMeta>({ page: 1, pageSize: 24, total: 0, totalPages: 1 });
   const [selectedTestIds, setSelectedTestIds] = useState<number[]>([]);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
@@ -89,6 +95,7 @@ const PracticeTest = () => {
   const [deleteTarget, setDeleteTarget] = useState<TestItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const actionMenuRef = useRef<HTMLDivElement>(null);
+  const debouncedSearch = useDebounce(search, 250);
 
   useEffect(() => {
     if (openActionTestId === null) return;
@@ -99,14 +106,20 @@ const PracticeTest = () => {
     return () => document.removeEventListener('pointerdown', closeMenu);
   }, [openActionTestId]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (force = false) => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({ page: String(page), pageSize: '24', sort: sortOrder });
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      if (subject !== 'ALL') params.set('subject', subject);
+      if (type !== 'ALL') params.set('mode', type);
+      if (classFilter !== 'ALL') params.set('classId', classFilter);
       const [testData, classData] = await Promise.all([
-        axiosClient.get<TestItem[], TestItem[]>('/api/tests'),
-        axiosClient.get<ClassInfo[], ClassInfo[]>('/api/tests/classes'),
+        cachedGet<TestPage>(`/api/tests?${params}`, { ttlMs: 30_000, force }),
+        cachedGet<ClassInfo[]>('/api/tests/classes', { ttlMs: 5 * 60_000, force }),
       ]);
-      setTests(testData.map(test => ({ ...test, title: capitalizeFirstLetter(test.title) })));
+      setTests(testData.items.map(test => ({ ...test, title: capitalizeFirstLetter(test.title) })));
+      setPagination(testData.pagination);
       setClasses(classData.map(classroom => ({ ...classroom, name: capitalizeFirstLetter(classroom.name) })));
     } catch (error) {
       console.error(error);
@@ -114,22 +127,11 @@ const PracticeTest = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [classFilter, debouncedSearch, page, sortOrder, subject, type]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  const filteredTests = useMemo(() => {
-    const keyword = search.trim().toLocaleLowerCase();
-    return tests.filter(test => {
-      if (keyword && !`${test.title} ${test.description || ''}`.toLocaleLowerCase().includes(keyword)) return false;
-      if (subject !== 'ALL' && test.subject !== subject) return false;
-      if (type !== 'ALL' && test.mode !== type) return false;
-      if (classFilter !== 'ALL' && !test.classTests?.some(item => item.classId === classFilter)) return false;
-      return true;
-    }).sort((first, second) => sortOrder === 'NEWEST' ? second.id - first.id : first.id - second.id);
-  }, [classFilter, search, sortOrder, subject, tests, type]);
 
   const openTest = useCallback((test: TestItem, context?: { classId?: string; deliveryId?: string }) => {
     localStorage.setItem('current_exam_info', JSON.stringify({
@@ -194,7 +196,8 @@ const PracticeTest = () => {
       setDueAt('');
       setMaxAttempts(1);
       setScorePolicy('FIRST');
-      await loadData();
+      invalidateQueryCache('/api/tests');
+      await loadData(true);
     } catch (error: unknown) {
       const requestError = error as { response?: { data?: { error?: string } } };
       toast.error(requestError.response?.data?.error || 'Unable to assign tests');
@@ -208,9 +211,11 @@ const PracticeTest = () => {
     setDeleting(true);
     try {
       await axiosClient.delete(`/api/tests/${deleteTarget.id}`);
-      setTests(current => current.filter(test => test.id !== deleteTarget.id));
       setDeleteTarget(null);
       toast.success('Exam deleted');
+      invalidateQueryCache('/api/tests');
+      if (tests.length === 1 && page > 1) setPage(current => current - 1);
+      else await loadData(true);
     } catch (error: unknown) {
       const requestError = error as { response?: { data?: { error?: string } } };
       toast.error(requestError.response?.data?.error || 'Unable to delete this exam');
@@ -244,12 +249,12 @@ const PracticeTest = () => {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <label className="flex h-9 min-w-0 max-w-md flex-1 items-center gap-2.5 rounded-lg border border-[#E2EDE9] bg-[#F2F8F5] px-3 focus-within:border-[#1B7A5A] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#1B7A5A]/20">
                 <Search size={15} className="shrink-0 text-[#6B7280]" />
-                <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search tests..." className="h-full w-full bg-transparent text-sm outline-none placeholder:text-[#6B7280]" />
+                <input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Search tests..." className="h-full w-full bg-transparent text-sm outline-none placeholder:text-[#6B7280]" />
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="whitespace-nowrap text-sm font-medium text-[#1A1A1A]">Sort by:</span>
-                  <Select value={sortOrder} onChange={event => setSortOrder(event.target.value as 'NEWEST' | 'OLDEST')}>
+                  <Select value={sortOrder} onChange={event => { setSortOrder(event.target.value as 'NEWEST' | 'OLDEST'); setPage(1); }}>
                     <option value="NEWEST">Newest</option>
                     <option value="OLDEST">Oldest</option>
                   </Select>
@@ -285,7 +290,7 @@ const PracticeTest = () => {
                 <SlidersHorizontal size={15} className="mr-1 shrink-0 text-[#6B7280]" />
                 <span className="mr-1 text-xs font-medium text-[#6B7280]">Subject:</span>
                 {(['ALL', 'RW', 'MATH'] as const).map(value => (
-                  <button key={value} onClick={() => setSubject(value)} className={`h-7 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors ${subject === value ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]'}`}>
+                  <button key={value} onClick={() => { setSubject(value); setPage(1); }} className={`h-7 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors ${subject === value ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]'}`}>
                     {value === 'ALL' ? 'All' : subjectLabel[value]}
                   </button>
                 ))}
@@ -293,13 +298,13 @@ const PracticeTest = () => {
               <div className="flex items-center gap-1.5 overflow-x-auto">
                 <span className="mr-1 text-xs font-medium text-[#6B7280]">Type:</span>
                 {(['ALL', 'EXAM', 'PRACTICE'] as const).map(value => (
-                  <button key={value} onClick={() => setType(value)} className={`h-7 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors ${type === value ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]'}`}>
+                  <button key={value} onClick={() => { setType(value); setPage(1); }} className={`h-7 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors ${type === value ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]'}`}>
                     {value === 'ALL' ? 'All' : typeLabel[value]}
                   </button>
                 ))}
               </div>
               {classes.length > 0 && (
-                <Select value={classFilter} onChange={event => setClassFilter(event.target.value)} className="lg:ml-auto">
+                <Select value={classFilter} onChange={event => { setClassFilter(event.target.value); setPage(1); }} className="lg:ml-auto">
                   <option value="ALL">All classes</option>
                   {classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </Select>
@@ -311,7 +316,7 @@ const PracticeTest = () => {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {[1, 2, 3, 4, 5, 6].map(item => <div key={item} className="h-[280px] animate-pulse rounded-xl border border-[#E2EDE9] bg-white p-5"><div className="mb-8 h-8 w-20 rounded-full bg-[#EAF2EE]" /><div className="mb-3 h-5 w-2/3 rounded bg-[#EAF2EE]" /><div className="h-4 w-full rounded bg-[#EAF2EE]" /></div>)}
             </div>
-          ) : filteredTests.length === 0 ? (
+          ) : tests.length === 0 ? (
             <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-[#C2DDD4] bg-white px-6 text-center">
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-[#E8F5EF] text-[#1B7A5A]"><BookOpenCheck size={26} /></div>
               <h3 className="font-semibold text-[#1A1A1A]">No matching tests</h3>
@@ -319,7 +324,7 @@ const PracticeTest = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredTests.map(test => {
+              {tests.map(test => {
                 const selected = selectedTestIds.includes(test.id);
                 const hasPartialProgress = test.progress > 0 && test.progress < 100;
                 return (
@@ -375,6 +380,18 @@ const PracticeTest = () => {
                   </article>
                 );
               })}
+            </div>
+          )}
+          {!loading && pagination.total > 0 && (
+            <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-ui-border pt-4 sm:flex-row">
+              <p className="text-caption text-muted-foreground">
+                Showing {(pagination.page - 1) * pagination.pageSize + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} tests
+              </p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(current => Math.max(1, current - 1))}><ChevronLeft size={15} />Previous</Button>
+                <span className="min-w-20 text-center text-caption font-medium text-subtle">Page {pagination.page} of {pagination.totalPages}</span>
+                <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage(current => current + 1)}>Next<ChevronRight size={15} /></Button>
+              </div>
             </div>
           )}
         </div>

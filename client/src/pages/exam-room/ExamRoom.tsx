@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, Maximize } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
+import { invalidateQueryCache } from '../../lib/queryCache';
 // import cac component
 import QuestionHeader from '../../features/quiz/QuestionHeader';
 import AnswerOption from '../../features/quiz/AnswerOption';
@@ -451,6 +452,7 @@ function ExamRoom() {
         localStorage.removeItem(`violations_${userId}_${id}_${contextKey}`);
         setApiResult(response);
         setIsSubmitted(true);
+        invalidateQueryCache('/api/tests', '/api/results-analytics');
         toast.success("Test submitted");
     } catch (error) {
         console.error("Lỗi mạng:", error);

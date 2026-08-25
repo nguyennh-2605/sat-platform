@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { 
   Plus, Search, Trash2, Edit3, 
   XCircle, Save, FileText, ChevronLeft, ChevronRight, AlertCircle, Loader2
@@ -9,6 +9,8 @@ import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { AppHeader, Button, Input } from '../../components/ui/AppUI';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
+import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
+import { useDebounce } from '../../hooks/useDebounce';
 
 interface ErrorEntry {
   id: string; // Prisma UUID
@@ -20,6 +22,8 @@ interface ErrorEntry {
   whyRight: string;
   createdAt?: string; 
 }
+interface ErrorLogPage { items: ErrorEntry[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }
+const ERROR_LOG_PAGE_SIZE = 10;
 
 // --- HELPER: MODERN BADGE COLORS ---
 const getCategoryStyle = (category: string) => {
@@ -46,7 +50,9 @@ const ErrorLog = () => {
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; 
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const debouncedSearch = useDebounce(searchTerm, 250);
 
   // Form State
   const [formData, setFormData] = useState<Partial<ErrorEntry>>({
@@ -54,22 +60,26 @@ const ErrorLog = () => {
   });
 
   // -- 1. LOAD DATA TỪ API --
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async (force = false) => {
     try {
       setIsLoading(true);
-      const data = await axiosClient.get<ErrorEntry[], ErrorEntry[]>(`/api/error-logs`);
-      setLogs(data);
+      const params = new URLSearchParams({ page: String(currentPage), pageSize: String(ERROR_LOG_PAGE_SIZE) });
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      const data = await cachedGet<ErrorLogPage>(`/api/error-logs?${params}`, { ttlMs: 20_000, force });
+      setLogs(data.items);
+      setTotalEntries(data.pagination.total);
+      setTotalPages(data.pagination.totalPages);
     } catch (error) {
       console.error("Failed to fetch logs:", error);
       toast.error("Unable to load error log");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, debouncedSearch]);
 
   useEffect(() => {
-    fetchLogs(); // Gọi API khi vào trang
-  }, []);
+    void fetchLogs();
+  }, [fetchLogs]);
 
   // -- 2. ACTIONS (CREATE / UPDATE) --
   const handleSave = async () => {
@@ -102,9 +112,12 @@ const ErrorLog = () => {
       }
       
       // Reset form & Reload data
+      const created = !formData.id;
       setShowModal(false);
       resetForm();
-      await fetchLogs(); // Tải lại danh sách mới nhất từ server
+      invalidateQueryCache('/api/error-logs');
+      if (created && currentPage !== 1) setCurrentPage(1);
+      else await fetchLogs(true);
 
     } catch (error) {
       console.error(error);
@@ -122,12 +135,12 @@ const ErrorLog = () => {
         setLogs(prev => prev.filter(l => l.id !== id));
         await axiosClient.delete(`/api/error-logs/${id}`);
         toast.success("Entry deleted");
-        if (currentItems.length === 1 && currentPage > 1) {
-            setCurrentPage(prev => prev - 1);
-        }
+        invalidateQueryCache('/api/error-logs');
+        if (logs.length === 1 && currentPage > 1) setCurrentPage(prev => prev - 1);
+        else await fetchLogs(true);
       } catch {
         toast.error("Unable to delete entry");
-        fetchLogs(); // Rollback lại data nếu lỗi
+        void fetchLogs(true);
       }
     }
   };
@@ -143,17 +156,9 @@ const ErrorLog = () => {
     });
   };
 
-  // -- FILTER & PAGINATION (Giữ nguyên logic) --
-  const filteredLogs = logs.filter(log => 
-    (log.source?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (log.category?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (log.whyWrong?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  );
-
-  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
+  const indexOfLastItem = currentPage * ERROR_LOG_PAGE_SIZE;
+  const indexOfFirstItem = indexOfLastItem - ERROR_LOG_PAGE_SIZE;
+  const currentItems = logs;
 
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
@@ -170,7 +175,7 @@ const ErrorLog = () => {
                 <AlertCircle className="text-rose-500" /> Error Log
               </h2>
               <p className="text-xs text-slate-500 font-medium">
-                {isLoading ? "Syncing…" : `${logs.length} ${logs.length === 1 ? 'entry' : 'entries'}`}
+                {isLoading ? "Syncing…" : `${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'}`}
               </p>
             </div>
             
@@ -303,10 +308,10 @@ const ErrorLog = () => {
             </div>
 
             {/* --- PAGINATION FOOTER --- */}
-            {filteredLogs.length > 0 && (
+            {totalEntries > 0 && (
                 <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
                     <div className="text-xs text-slate-500">
-                        Showing <b>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredLogs.length)}</b> of <b>{filteredLogs.length}</b> entries
+                        Showing <b>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalEntries)}</b> of <b>{totalEntries}</b> entries
                     </div>
                     <div className="flex items-center gap-2">
                         <button 

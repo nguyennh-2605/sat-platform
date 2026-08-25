@@ -1,11 +1,24 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const { parsePagination, paginationMeta } = require('../utils/pagination');
 
-exports.getErrorLogs = ({ userId }) =>
-  prisma.errorLog.findMany({
-    where: { userId: userId },
-    orderBy: { createdAt: 'desc' } // Mới nhất lên đầu
-  });
+exports.getErrorLogs = async ({ userId, query = {} }) => {
+  const pagination = parsePagination(query, { defaultPageSize: 10, maxPageSize: 50 });
+  const search = String(query.search || '').trim().slice(0, 100);
+  const where = {
+    userId,
+    ...(search ? { OR: [
+      { source: { contains: search, mode: 'insensitive' } },
+      { category: { contains: search, mode: 'insensitive' } },
+      { whyWrong: { contains: search, mode: 'insensitive' } },
+    ] } : {}),
+  };
+  const [total, items] = await prisma.$transaction([
+    prisma.errorLog.count({ where }),
+    prisma.errorLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip: pagination.skip, take: pagination.pageSize }),
+  ]);
+  return { items, pagination: paginationMeta({ ...pagination, total }) };
+};
 
 exports.createErrorLog = ({ userId, source, category, userAnswer, correctAnswer, whyWrong, whyRight }) =>
   prisma.errorLog.create({

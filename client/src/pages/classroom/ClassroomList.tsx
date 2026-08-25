@@ -9,6 +9,7 @@ import { ui } from '../../components/ui/styles';
 import { capitalizeFirstLetter } from '../../utils/text';
 import { ClassroomTodoPanel } from '../../features/classroom/ClassroomTodoPanel';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
+import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 
 const CLASS_COLORS = ['#1B7A5A', '#0F4D38', '#2563EB', '#A16207', '#B45309', '#8B3A62', '#475569'] as const;
 
@@ -38,11 +39,11 @@ export default function ClassroomList() {
   const [editor, setEditor] = useState<{ mode: 'create' | 'edit'; classroom?: ClassSummary } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClassSummary | null>(null);
 
-  const fetchClasses = useCallback(async () => {
+  const fetchClasses = useCallback(async (force = false) => {
     setLoading(true);
     setLoadError('');
     try {
-      const result = await axiosClient.get<ClassSummary[], ClassSummary[]>('/api/classes');
+      const result = await cachedGet<ClassSummary[]>('/api/classes', { ttlMs: 60_000, force });
       setClasses(result.map(classroom => ({ ...classroom, name: capitalizeFirstLetter(classroom.name) })));
     } catch (error) {
       console.error(error);
@@ -145,8 +146,12 @@ export default function ClassroomList() {
         </div>
       </main>
 
-      <ClassEditorModal state={editor} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await fetchClasses(); }} />
-      <DeleteClassModal target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={classId => { setClasses(current => current.filter(item => item.id !== classId)); setDeleteTarget(null); }} />
+      <ClassEditorModal state={editor} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); invalidateQueryCache('/api/classes', '/api/tests/classes'); await fetchClasses(true); }} />
+      <DeleteClassModal target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={classId => {
+        setClasses(current => current.filter(item => item.id !== classId));
+        invalidateQueryCache('/api/classes', '/api/tests/classes', '/api/tests?');
+        setDeleteTarget(null);
+      }} />
     </div>
   );
 }

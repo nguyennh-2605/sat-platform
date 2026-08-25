@@ -4,7 +4,7 @@ const errorLogService = require('../services/error-log.service');
 // 1. Lấy danh sách Error Log của User đang đăng nhập
 exports.getErrorLogs = async (req, res) => {
   try {
-    const logs = await errorLogService.getErrorLogs({ userId: req.user.userId });
+    const logs = await errorLogService.getErrorLogs({ userId: req.user.userId, query: req.query });
     res.json(logs);
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);

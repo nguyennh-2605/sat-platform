@@ -21,6 +21,7 @@ exports.getTests = async (req, res) => {
     const result = await practiceTestService.getTests({
       userId: req.user.userId,
       userRole: req.user.role,
+      query: req.query,
     });
     res.json(result);
   } catch (error) {

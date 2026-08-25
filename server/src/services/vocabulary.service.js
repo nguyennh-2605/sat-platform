@@ -91,7 +91,6 @@ exports.listSets = async ({ scope = 'SYSTEM', query, userId, userRole }) => {
     orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
     include: {
       _count: { select: { terms: true } },
-      terms: { select: { progress: { where: { userId: intId(userId) }, select: { mastery: true } } } },
       ...(normalizedScope === 'ASSIGNED' ? {
         activities: {
           where: { activity: { status: 'PUBLISHED', assignees: { some: { studentId: intId(userId), excusedAt: null } } } },
@@ -103,8 +102,17 @@ exports.listSets = async ({ scope = 'SYSTEM', query, userId, userRole }) => {
     },
     take: 100,
   });
+  const masteredProgress = sets.length ? await prisma.vocabularyTermProgress.findMany({
+    where: { userId: intId(userId), mastery: 'MASTERED', term: { setId: { in: sets.map(set => set.id) } } },
+    select: { term: { select: { setId: true } } },
+  }) : [];
+  const masteredBySet = masteredProgress.reduce((counts, item) => {
+    counts.set(item.term.setId, (counts.get(item.term.setId) || 0) + 1);
+    return counts;
+  }, new Map());
   return sets.map(set => ({
-    ...setSummary(set, set.terms.flatMap(term => term.progress)),
+    ...setSummary(set),
+    masteredCount: masteredBySet.get(set.id) || 0,
     ...(set.activities?.[0] ? { assignedActivityId: set.activities[0].activityId } : {}),
   }));
 };
