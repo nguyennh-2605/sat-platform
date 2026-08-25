@@ -165,18 +165,18 @@ export function SatCountdown() {
     <button
       type="button"
       onClick={openEditor}
-      className="group flex h-11 min-w-[218px] shrink-0 items-center gap-2.5 rounded-lg border border-[#B9CBC4] bg-[#F8FBF9] px-3 text-left transition-colors hover:border-[#1B7A5A] hover:bg-[#E8F5EF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B7A5A]/25"
+      className="group flex h-9 min-w-[218px] shrink-0 items-center gap-2.5 rounded-lg border bg-card px-3 text-left shadow-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       aria-label={`Next SAT in ${time.days} days, ${time.hours} hours, and ${time.minutes} minutes. Change test date.`}
     >
-      <CalendarDays size={19} className="shrink-0 text-[#1B7A5A]" aria-hidden="true" />
-      <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.1em] text-[#4F5F59]">Next SAT</span>
-      <span aria-hidden="true" className="h-6 w-px shrink-0 bg-[#C9D8D2]" />
-      <span className="flex flex-1 items-baseline justify-end gap-1 text-lg font-bold leading-none tabular-nums text-[#145F47]">
-        <span>{time.days}<small className="ml-0.5 text-[10px] font-semibold text-[#5E6B66]">d</small></span>
-        <span className="text-sm text-[#8AA299]">:</span>
-        <span>{String(time.hours).padStart(2, '0')}<small className="ml-0.5 text-[10px] font-semibold text-[#5E6B66]">h</small></span>
-        <span className="text-sm text-[#8AA299]">:</span>
-        <span>{String(time.minutes).padStart(2, '0')}<small className="ml-0.5 text-[10px] font-semibold text-[#5E6B66]">m</small></span>
+      <CalendarDays size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Next SAT</span>
+      <span aria-hidden="true" className="h-4 w-px shrink-0 bg-border" />
+      <span className="flex flex-1 items-baseline justify-end gap-1 text-sm font-medium leading-none tabular-nums text-foreground">
+        <span>{time.days}<small className="ml-0.5 text-[10px] font-normal text-muted-foreground">d</small></span>
+        <span className="text-xs text-muted-foreground">:</span>
+        <span>{String(time.hours).padStart(2, '0')}<small className="ml-0.5 text-[10px] font-normal text-muted-foreground">h</small></span>
+        <span className="text-xs text-muted-foreground">:</span>
+        <span>{String(time.minutes).padStart(2, '0')}<small className="ml-0.5 text-[10px] font-normal text-muted-foreground">m</small></span>
       </span>
     </button>
 
@@ -191,7 +191,7 @@ export function SatCountdown() {
       footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button disabled={saving} onClick={() => void save()}>{saving ? 'Saving...' : 'Save date'}</Button></>}
     >
       <div className="max-h-[min(620px,70vh)] overflow-y-auto pr-1">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-[#4B5563]">Upcoming SAT weekends</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Upcoming SAT weekends</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {options.map(option => {
             const date = atTestTime(option.date);
@@ -200,22 +200,22 @@ export function SatCountdown() {
               key={option.date}
               type="button"
               onClick={() => { setDraftDate(option.date); setCustomDate(''); }}
-              className={`flex items-center justify-between rounded-lg border p-3 text-left transition-colors ${selected ? 'border-[#1B7A5A] bg-[#E8F5EF]' : 'border-[#C9D8D2] bg-white hover:bg-[#F2F8F5]'}`}
+              className={`flex items-center justify-between rounded-lg border p-3 text-left transition-colors ${selected ? 'border-primary bg-muted' : 'border-border bg-card hover:bg-muted/45'}`}
             >
               <span>
-                <span className="block text-sm font-semibold text-[#1A1A1A]">{formatDate(date)}</span>
-                <span className="mt-0.5 block text-xs text-[#6B7280]">{option.anticipated ? 'Anticipated date' : 'Confirmed date'}</span>
+                <span className="block text-sm font-semibold text-foreground">{formatDate(date)}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">{option.anticipated ? 'Anticipated date' : 'Confirmed date'}</span>
               </span>
-              {selected && <Check size={17} className="text-[#1B7A5A]" aria-hidden="true" />}
+              {selected && <Check size={17} className="text-primary" aria-hidden="true" />}
             </button>;
           })}
         </div>
 
-        <div className="my-5 flex items-center gap-3"><span className="h-px flex-1 bg-[#C9D8D2]" /><span className="text-xs font-medium text-[#6B7280]">OR</span><span className="h-px flex-1 bg-[#C9D8D2]" /></div>
+        <div className="my-5 flex items-center gap-3"><span className="h-px flex-1 bg-border" /><span className="text-xs font-medium text-muted-foreground">OR</span><span className="h-px flex-1 bg-border" /></div>
 
         <label className="block">
-          <span className="text-sm font-semibold text-[#1A1A1A]">Custom test date</span>
-          <span className="mt-1 block text-xs text-[#6B7280]">Choose another upcoming date if you are taking an SAT School Day or a different administration.</span>
+          <span className="text-sm font-semibold text-foreground">Custom test date</span>
+          <span className="mt-1 block text-xs text-muted-foreground">Choose another upcoming date if you are taking an SAT School Day or a different administration.</span>
           <DateTimePicker
             mode="date"
             minDate={toDateInput(new Date(Date.now() + 86_400_000))}
@@ -226,7 +226,7 @@ export function SatCountdown() {
             className="mt-3 w-full"
           />
         </label>
-        <p className="mt-4 text-xs leading-5 text-[#6B7280]">Weekend dates are based on the <a href="https://satsuite.collegeboard.org/sat/dates-deadlines" target="_blank" rel="noreferrer" className="font-medium text-[#1B7A5A] underline underline-offset-2">College Board schedule</a>. Anticipated dates may change.</p>
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">Weekend dates are based on the <a href="https://satsuite.collegeboard.org/sat/dates-deadlines" target="_blank" rel="noreferrer" className="font-medium text-foreground underline underline-offset-2">College Board schedule</a>. Anticipated dates may change.</p>
       </div>
     </Modal>
   </>;

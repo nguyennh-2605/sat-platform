@@ -1,109 +1,210 @@
-import { useEffect, useId, useState, type ElementType } from 'react';
+import { useEffect, useState, type CSSProperties, type ElementType } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   BarChart3,
   BookA,
   BookOpenCheck,
+  ChevronsUpDown,
   GraduationCap,
   LayoutDashboard,
   LogOut,
-  Menu,
+  Moon,
   Palette,
-  X,
+  Sun,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axiosClient from '../../lib/axios';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+  useSidebar,
+} from '@/components/ui/sidebar';
 import { BackgroundPicker } from '../../features/backgrounds/BackgroundPicker';
 import { backgroundById, normalizeBackgroundId, type BackgroundId } from '../../features/backgrounds/backgroundPresets';
 import { DashboardRouteViewport } from '../../features/navigation/DashboardRouteViewport';
+import NotificationBell from '../../features/notifications/NotificationBell';
+import axiosClient from '../../lib/axios';
 import { logoutAuthSession } from '../../lib/authSession';
 
-interface NavItemProps {
+const navigation = [
+  { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true },
+  { to: '/dashboard/practice-test', label: 'Practice Center', icon: BookOpenCheck },
+  { to: '/dashboard/classes', label: 'Classroom', icon: GraduationCap, activePrefixes: ['/dashboard/class/'] },
+  { to: '/dashboard/vocabulary', label: 'Vocabulary', icon: BookA },
+  { to: '/dashboard/error-log', label: 'Error Log', icon: AlertCircle },
+  { to: '/dashboard/results-analytics', label: 'Results & Analytics', icon: BarChart3 },
+] as const;
+
+const pageTitle = (pathname: string) => {
+  if (pathname === '/dashboard') return 'Overview';
+  if (pathname.startsWith('/dashboard/practice-test')) return 'Practice Center';
+  if (pathname.startsWith('/dashboard/class')) return 'Classroom';
+  if (pathname.startsWith('/dashboard/vocabulary')) return 'Vocabulary';
+  if (pathname.startsWith('/dashboard/error-log')) return 'Error Log';
+  if (pathname.startsWith('/dashboard/results-analytics')) return 'Results & Analytics';
+  if (pathname.startsWith('/dashboard/score-report')) return 'Score Report';
+  return 'SAT Master';
+};
+
+interface NavigationItemProps {
   to: string;
   label: string;
   icon: ElementType;
-  activePrefixes?: string[];
   exact?: boolean;
-  onNavigate?: () => void;
+  activePrefixes?: readonly string[];
 }
 
-const NavItem = ({ to, label, icon: Icon, activePrefixes = [], exact = false, onNavigate }: NavItemProps) => {
+function NavigationItem({ to, label, icon: Icon, exact = false, activePrefixes = [] }: NavigationItemProps) {
   const location = useLocation();
-  const sectionActive = activePrefixes.some(prefix => location.pathname.startsWith(prefix));
-  const exactActive = exact && location.pathname === to;
+  const { setOpenMobile } = useSidebar();
+  const active = exact
+    ? location.pathname === to
+    : location.pathname === to || location.pathname.startsWith(`${to}/`) || activePrefixes.some(prefix => location.pathname.startsWith(prefix));
 
-  return <NavLink
-    to={to}
-    end={exact}
-    onClick={onNavigate}
-    className={({ isActive }) => `flex min-h-10 items-center gap-3 rounded-control px-3 text-body transition-colors ${isActive || exactActive || sectionActive ? 'bg-primary font-semibold text-white shadow-xs' : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-white'}`}
-  >
-    <Icon size={19} className="shrink-0" aria-hidden="true" />
-    <span className="truncate">{label}</span>
-  </NavLink>;
-};
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={active} tooltip={label}>
+        <NavLink to={to} end={exact} onClick={() => setOpenMobile(false)}>
+          <Icon aria-hidden="true" />
+          <span>{label}</span>
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
 
-function SidebarContent({ onNavigate, onBackground, onLogout }: { onNavigate?: () => void; onBackground: () => void; onLogout: () => void }) {
-  const navigate = useNavigate();
+function AppSidebar({ onBackground, onLogout }: { onBackground: () => void; onLogout: () => void }) {
   const userName = localStorage.getItem('userName') || 'Student';
+  const userAvatar = localStorage.getItem('userAvatar') || '';
   const role = localStorage.getItem('userRole') || 'STUDENT';
+  const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'S';
+  const { isMobile } = useSidebar();
 
-  return <>
-    <button
-      type="button"
-      onClick={() => { navigate('/dashboard'); onNavigate?.(); }}
-      className="flex min-h-[72px] shrink-0 items-center gap-3 border-b border-sidebar-border px-5 text-left"
-      aria-label="Go to dashboard home"
-    >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-primary text-white shadow-xs">
-        <BookOpenCheck size={21} aria-hidden="true" />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-body font-semibold tracking-[0.04em] text-white">SAT MASTER</span>
-        <span className="mt-0.5 block truncate text-[0.6875rem] text-sidebar-muted">Learning workspace</span>
-      </span>
-    </button>
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild size="lg" tooltip="SAT Master">
+              <NavLink to="/dashboard">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  <BookOpenCheck className="size-4" aria-hidden="true" />
+                </span>
+                <span className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">SAT Master</span>
+                  <span className="truncate text-xs text-sidebar-foreground/65">Learning workspace</span>
+                </span>
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
 
-    <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-5" aria-label="Main navigation">
-      <p className="mb-2 px-3 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-sidebar-muted">Workspace</p>
-      <div className="space-y-1">
-        <NavItem to="/dashboard" label="Overview" icon={LayoutDashboard} exact onNavigate={onNavigate} />
-        <NavItem to="/dashboard/practice-test" label="Practice Center" icon={BookOpenCheck} onNavigate={onNavigate} />
-        <NavItem to="/dashboard/classes" label="Classroom" icon={GraduationCap} activePrefixes={['/dashboard/class/']} onNavigate={onNavigate} />
-        <NavItem to="/dashboard/vocabulary" label="Vocabulary" icon={BookA} onNavigate={onNavigate} />
-        <NavItem to="/dashboard/error-log" label="Error Log" icon={AlertCircle} onNavigate={onNavigate} />
-        <NavItem to="/dashboard/results-analytics" label="Results & Analytics" icon={BarChart3} onNavigate={onNavigate} />
-      </div>
-    </nav>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navigation.map(item => <NavigationItem key={item.to} {...item} />)}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
 
-    <div className="border-t border-sidebar-border p-3">
-      <div className="mb-2 px-3 py-2">
-        <p className="truncate text-body font-medium text-white">{userName}</p>
-        <p className="mt-0.5 text-[0.6875rem] uppercase tracking-wide text-sidebar-muted">{role.toLowerCase()}</p>
-      </div>
-      <button type="button" onClick={onBackground} className="mb-1 flex min-h-10 w-full items-center gap-3 rounded-control px-3 text-body text-sidebar-foreground transition-colors hover:bg-sidebar-hover hover:text-white">
-        <Palette size={19} aria-hidden="true" />
-        <span>Background</span>
-      </button>
-      <button type="button" onClick={onLogout} className="flex min-h-10 w-full items-center gap-3 rounded-control px-3 text-body text-sidebar-foreground transition-colors hover:bg-sidebar-hover hover:text-white">
-        <LogOut size={19} aria-hidden="true" />
-        <span>Log out</span>
-      </button>
-    </div>
-  </>;
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+                  <Avatar className="size-8 rounded-lg grayscale">
+                    <AvatarImage src={userAvatar || undefined} alt={userName} />
+                    <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                  </Avatar>
+                  <span className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{userName}</span>
+                    <span className="truncate text-xs text-sidebar-foreground/65">{role.toLowerCase()}</span>
+                  </span>
+                  <ChevronsUpDown className="ml-auto size-4" aria-hidden="true" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-(--radix-dropdown-menu-trigger-width) min-w-56"
+                side={isMobile ? 'bottom' : 'right'}
+                align="end"
+                sideOffset={4}
+              >
+                <DropdownMenuLabel>
+                  <p className="truncate text-sm font-medium">{userName}</p>
+                  <p className="truncate text-xs font-normal text-muted-foreground">{role.toLowerCase()}</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={onBackground}>
+                  <Palette aria-hidden="true" />
+                  Background
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={onLogout}>
+                  <LogOut aria-hidden="true" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
+  );
 }
 
-const Dashboard = () => {
+function ThemeToggle() {
+  const [dark, setDark] = useState(() => localStorage.getItem('dashboardTheme') === 'dark');
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    localStorage.setItem('dashboardTheme', dark ? 'dark' : 'light');
+  }, [dark]);
+
+  return (
+    <Button variant="ghost" size="icon" onClick={() => setDark(value => !value)} aria-label={dark ? 'Use light theme' : 'Use dark theme'}>
+      {dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+    </Button>
+  );
+}
+
+export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const drawerId = useId();
   const userId = localStorage.getItem('userId') || 'guest';
   const storageKey = `dashboardBackground:${userId}`;
   const [backgroundId, setBackgroundId] = useState<BackgroundId>(() => normalizeBackgroundId(localStorage.getItem(storageKey)));
   const [backgroundOpen, setBackgroundOpen] = useState(false);
   const [backgroundSaving, setBackgroundSaving] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -118,18 +219,12 @@ const Dashboard = () => {
     return () => { active = false; };
   }, [storageKey]);
 
-  useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
   useEffect(() => {
-    if (!mobileNavOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileNavOpen(false); };
-    document.body.style.overflow = 'hidden';
-    document.addEventListener('keydown', closeOnEscape);
+    document.documentElement.style.setProperty('--dashboard-sidebar-offset', sidebarOpen ? '17rem' : '3rem');
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', closeOnEscape);
+      document.documentElement.style.removeProperty('--dashboard-sidebar-offset');
     };
-  }, [mobileNavOpen]);
+  }, [sidebarOpen]);
 
   const chooseBackground = async (nextId: BackgroundId) => {
     const previousId = backgroundId;
@@ -154,52 +249,51 @@ const Dashboard = () => {
   };
 
   const selectedBackground = backgroundById(backgroundId);
-  const openBackground = () => { setMobileNavOpen(false); setBackgroundOpen(true); };
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background font-sans text-foreground">
-      <a href="#dashboard-content" className="fixed left-3 top-3 z-300 -translate-y-20 rounded-control bg-surface px-4 py-2 text-body font-semibold text-primary shadow-elevated transition-transform focus:translate-y-0">Skip to content</a>
+    <SidebarProvider
+      open={sidebarOpen}
+      onOpenChange={setSidebarOpen}
+      style={{ '--sidebar-width': '17rem' } as CSSProperties}
+      className="h-dvh min-h-0 overflow-hidden bg-background font-sans text-foreground"
+    >
+      <a href="#dashboard-content" className="fixed left-3 top-3 z-300 -translate-y-20 rounded-lg bg-popover px-3 py-2 text-sm font-medium text-popover-foreground shadow-md focus:translate-y-0">
+        Skip to content
+      </a>
+      <AppSidebar onBackground={() => setBackgroundOpen(true)} onLogout={() => void logout()} />
+      <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b bg-background/80 px-4 backdrop-blur-sm">
+          <div className="flex min-w-0 items-center gap-2">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mx-1 h-4" />
+            <p className="truncate text-sm font-medium">{pageTitle(location.pathname)}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <NotificationBell currentUserId={userId} />
+          </div>
+        </header>
 
-      <aside className="z-40 hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
-        <SidebarContent onBackground={openBackground} onLogout={() => void logout()} />
-      </aside>
+        <div
+          id="dashboard-content"
+          tabIndex={-1}
+          className="dashboard-surface relative min-h-0 min-w-0 flex-1 overflow-hidden bg-background bg-cover bg-center outline-hidden"
+          data-background-active={selectedBackground ? 'true' : 'false'}
+          style={selectedBackground ? {
+            backgroundImage: `linear-gradient(color-mix(in oklch, var(--background) 84%, transparent), color-mix(in oklch, var(--background) 90%, transparent)), url(${selectedBackground.image})`,
+          } : undefined}
+        >
+          <DashboardRouteViewport />
+        </div>
+      </SidebarInset>
 
-      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-ui-border-strong bg-sidebar px-4 text-white lg:hidden">
-        <button type="button" onClick={() => navigate('/dashboard')} className="flex min-w-0 items-center gap-2" aria-label="Go to dashboard home">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-primary"><BookOpenCheck size={18} aria-hidden="true" /></span>
-          <span className="truncate text-body font-semibold tracking-wide">SAT MASTER</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileNavOpen(true)}
-          aria-label="Open navigation"
-          aria-expanded={mobileNavOpen}
-          aria-controls={drawerId}
-          className="flex h-10 w-10 items-center justify-center rounded-control text-sidebar-foreground hover:bg-sidebar-hover hover:text-white"
-        ><Menu size={22} aria-hidden="true" /></button>
-      </header>
-
-      {mobileNavOpen && <div className="fixed inset-0 z-100 lg:hidden">
-        <button type="button" className="absolute inset-0 bg-(--ui-overlay)" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation" />
-        <aside id={drawerId} role="dialog" aria-modal="true" aria-label="Navigation" className="relative flex h-full w-[min(20rem,88vw)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elevated">
-          <button type="button" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation" className="absolute right-3 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-control text-sidebar-foreground hover:bg-sidebar-hover hover:text-white">
-            <X size={20} aria-hidden="true" />
-          </button>
-          <SidebarContent onNavigate={() => setMobileNavOpen(false)} onBackground={openBackground} onLogout={() => void logout()} />
-        </aside>
-      </div>}
-
-      <main
-        id="dashboard-content"
-        tabIndex={-1}
-        className="dashboard-surface relative min-w-0 flex-1 overflow-hidden bg-background bg-cover bg-center pt-14 outline-hidden lg:pt-0"
-        data-background-active={selectedBackground ? 'true' : 'false'}
-        style={selectedBackground ? { backgroundImage: `linear-gradient(rgba(232,245,239,.64), rgba(242,248,245,.78)), url(${selectedBackground.image})` } : undefined}
-      ><DashboardRouteViewport /></main>
-
-      <BackgroundPicker open={backgroundOpen} selectedId={backgroundId} saving={backgroundSaving} onSelect={id => void chooseBackground(id)} onClose={() => setBackgroundOpen(false)} />
-    </div>
+      <BackgroundPicker
+        open={backgroundOpen}
+        selectedId={backgroundId}
+        saving={backgroundSaving}
+        onSelect={id => void chooseBackground(id)}
+        onClose={() => setBackgroundOpen(false)}
+      />
+    </SidebarProvider>
   );
-};
-
-export default Dashboard;
+}

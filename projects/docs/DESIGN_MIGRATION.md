@@ -38,10 +38,10 @@ This is a presentation-layer migration, not a Next.js migration.
 
 | SAT Platform surface | Primary reference | Secondary reference | Status |
 | --- | --- | --- | --- |
-| Design tokens and primitives | `src/app/globals.css`, `src/components/ui/` | `components.json` | In progress |
-| Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | In progress |
-| Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | In progress |
-| Authentication | `auth/v2` | `auth/v1` | In progress |
+| Design tokens and primitives | `src/app/globals.css`, `src/components/ui/` | `components.json` | Foundation complete |
+| Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | Implemented; visual QA pending |
+| Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | Implemented; visual QA pending |
+| Authentication | `auth/v2` | `auth/v1` | Implemented; visual QA pending |
 | Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Pending |
 | Practice Center | `dashboard/tasks` | `dashboard/file-manager` | Pending |
 | Test Bank | `dashboard/file-manager` | `dashboard/tasks` | Pending |
@@ -65,17 +65,17 @@ This is a presentation-layer migration, not a Next.js migration.
 
 ### Phase 1 — Design-system foundation
 
-- [ ] Align neutral semantic tokens, typography, radius, border, and shadow.
-- [ ] Add or align core shared primitives.
-- [ ] Keep `AppUI.tsx` as a compatibility facade.
-- [ ] Add theme infrastructure without requiring a custom SAT preset.
-- [ ] Validate existing screens still build.
+- [x] Align neutral semantic tokens, typography, radius, border, and shadow.
+- [x] Add or align core shared primitives.
+- [x] Keep `AppUI.tsx` as a compatibility facade.
+- [x] Add theme infrastructure without requiring a custom SAT preset.
+- [x] Validate existing screens still build.
 
 ### Phase 2 — Proof of concept
 
-- [ ] Migrate dashboard shell.
-- [ ] Migrate Dashboard Home using real role-aware content.
-- [ ] Migrate authentication without changing auth behavior.
+- [x] Migrate dashboard shell.
+- [x] Migrate Dashboard Home using real role-aware content.
+- [x] Migrate authentication without changing auth behavior.
 - [ ] Verify desktop and mobile layouts.
 
 ### Phase 3 — Feature migration

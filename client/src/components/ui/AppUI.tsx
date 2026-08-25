@@ -30,8 +30,8 @@ export function AppHeader({
   subtitle,
   centerContent,
   rightContent,
-  showProfile = true,
-  showNotifications = true,
+  showProfile = false,
+  showNotifications = false,
 }: AppHeaderProps) {
   const userName = localStorage.getItem('userName') || 'Student';
   const initials = userName
@@ -268,7 +268,7 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
       className={isContentPanel
         ? 'absolute inset-0 z-200 flex min-h-0 min-w-0 bg-white'
         : isContentDialog
-          ? 'fixed inset-0 z-200 flex min-h-0 min-w-0 items-center justify-center bg-(--ui-overlay) p-4 lg:left-60'
+          ? 'fixed inset-0 z-200 flex min-h-0 min-w-0 items-center justify-center bg-(--ui-overlay) p-4 md:left-(--dashboard-sidebar-offset)'
           : 'fixed inset-0 z-200 flex items-center justify-center bg-(--ui-overlay) p-4'}
       onMouseDown={event => { if (!isContentPanel && closeOnBackdrop && event.target === event.currentTarget) onClose(); }}
     >

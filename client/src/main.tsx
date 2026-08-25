@@ -4,6 +4,8 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import './index.css'
 import App from './app/App.tsx'
 
+document.documentElement.classList.toggle('dark', localStorage.getItem('dashboardTheme') === 'dark')
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TooltipProvider>
