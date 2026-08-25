@@ -11,6 +11,7 @@ import { getAuthStatus, subscribeAuthSession } from '../lib/authSession';
 const HomePage = lazy(() => import('../pages/home/HomePage'));
 const AuthPage = lazy(() => import('../pages/auth/AuthPage'));
 const Dashboard = lazy(() => import('../pages/dashboard/Dashboard'));
+const DashboardHome = lazy(() => import('../pages/dashboard/DashboardHome'));
 const ExamRoom = lazy(() => import('../pages/exam-room/ExamRoom'));
 const PracticeTest = lazy(() => import('../pages/practice-test/PracticeTest'));
 const ErrorLog = lazy(() => import('../pages/error-log/ErrorLog'));
@@ -26,7 +27,7 @@ const RouteFallback = () => <div className="flex min-h-screen items-center justi
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const status = useSyncExternalStore(subscribeAuthSession, getAuthStatus, getAuthStatus);
-  if (status === 'loading') return <div className="flex min-h-screen items-center justify-center bg-[#F2F8F5] text-sm text-[#5E6B66]">Restoring your session…</div>;
+  if (status === 'loading') return <div className="flex min-h-screen items-center justify-center bg-background text-body text-muted-foreground">Restoring your session…</div>;
   if (status === 'anonymous') return <Navigate to="/auth" replace />;
   return children;
 }
@@ -45,9 +46,7 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>}>
-                {/* index: Khi vào /dashboard sẽ tự chuyển sang /dashboard/practice-test */}
-                <Route index element={<Navigate to="practice-test" replace />} />
-                {/* Các đường dẫn con */}
+                <Route index element={<DashboardHome />} />
                 <Route path="practice-test" element={<PracticeTest />} />
                 <Route path="classes" element={<ClassroomList />} />
                 <Route path="vocabulary" element={<Vocabulary />} />

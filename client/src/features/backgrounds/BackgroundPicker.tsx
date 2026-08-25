@@ -39,24 +39,24 @@ export function BackgroundPicker({ open, selectedId, saving, onSelect, onClose }
           onClick={() => onSelect(preset.id)}
         />)}
       </div>
-      <p className="mt-4 text-xs leading-5 text-[#6B7280]">Images are stored locally for fast loading. Photo sources are linked on each preset.</p>
+      <p className="mt-4 text-caption leading-5 text-muted-foreground">Images are stored locally for fast loading. Photo sources are linked on each preset.</p>
     </div>
   </Modal>;
 }
 
 function BackgroundOption({ name, image, source, selected, disabled, onClick }: { name: string; image?: string; source?: string; selected: boolean; disabled: boolean; onClick: () => void }) {
-  return <div className={`relative overflow-hidden rounded-xl border bg-white transition-colors ${selected ? 'border-[#1B7A5A] ring-2 ring-[#1B7A5A]/20' : 'border-[#C9D8D2] hover:border-[#8FB9A9]'}`}>
+  return <div className={`relative overflow-hidden rounded-card border bg-surface transition-colors ${selected ? 'border-primary ring-2 ring-primary/20' : 'border-ui-border hover:border-primary/55'}`}>
     <button type="button" disabled={disabled} onClick={onClick} className="block w-full text-left disabled:cursor-wait">
       <span
-        className="relative block h-28 border-b border-[#D2DED9] bg-[#F2F8F5] bg-cover bg-center"
+        className="relative block h-28 border-b border-ui-border bg-background bg-cover bg-center"
         style={image ? { backgroundImage: `linear-gradient(rgba(232,245,239,.28), rgba(242,248,245,.38)), url(${image})` } : { backgroundImage: 'linear-gradient(145deg, #F2F8F5 0%, #DDECE6 55%, #C2DDD4 100%)' }}
       >
-        {selected && <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-[#1B7A5A] text-white shadow-sm"><Check size={15} strokeWidth={3} aria-hidden="true" /></span>}
+        {selected && <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-control bg-primary text-white shadow-sm"><Check size={15} strokeWidth={3} aria-hidden="true" /></span>}
       </span>
       <span className="flex items-center justify-between gap-2 px-3 py-2.5 pr-11">
-        <span className="text-sm font-semibold text-[#1A1A1A]">{name}</span>
+        <span className="text-body font-semibold text-foreground">{name}</span>
       </span>
     </button>
-    {source && <a href={source} target="_blank" rel="noreferrer" aria-label={`View source for ${name}`} className="absolute bottom-1.5 right-2 flex h-7 w-7 items-center justify-center rounded-md text-[#6B7280] hover:bg-[#E8F5EF] hover:text-[#145F47]"><ExternalLink size={14} /></a>}
+    {source && <a href={source} target="_blank" rel="noreferrer" aria-label={`View source for ${name}`} className="absolute bottom-1.5 right-2 flex h-8 w-8 items-center justify-center rounded-control text-muted-foreground hover:bg-primary-soft hover:text-primary-hover"><ExternalLink size={14} /></a>}
   </div>;
 }

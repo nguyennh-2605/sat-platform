@@ -11,6 +11,8 @@
   --ui-background: #f2f8f5;
   --ui-foreground: #1a1a1a;
   --ui-surface: #ffffff;
+  --ui-surface-subtle: #f8fbf9;
+  --ui-surface-raised: #ffffff;
   --ui-primary: #1b7a5a;
   --ui-primary-hover: #145f47;
   --ui-primary-soft: #e8f5ef;
@@ -20,6 +22,8 @@
   --ui-muted: #eaf2ee;
   --ui-muted-foreground: #6b7280;
   --ui-subtle-foreground: #4b5563;
+  --ui-info: #2563eb;
+  --ui-info-soft: #eff6ff;
   --ui-border: #d2ded9;
   --ui-border-strong: #c9d8d2;
   --ui-success: #047857;
@@ -29,6 +33,12 @@
   --ui-danger: #b42318;
   --ui-danger-soft: #fef2f2;
   --ui-overlay: rgb(10 31 22 / 0.5);
+  --ui-focus: #53a889;
+  --ui-sidebar: #0f4d38;
+  --ui-sidebar-hover: #174030;
+  --ui-sidebar-border: #245d49;
+  --ui-sidebar-foreground: #d6ede4;
+  --ui-sidebar-muted: #a3c9b8;
   --ui-radius-control: 0.625rem;
   --ui-radius-card: 0.75rem;
   --ui-shadow-card: 0 1px 2px rgb(15 77 56 / 0.08);
@@ -52,7 +62,8 @@
 }
 
 html {
-  font-size: 15px;
+  font-size: 16px;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -184,7 +195,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--ui-primary) 65%, white);
+  outline: 2px solid var(--ui-focus);
   outline-offset: 2px;
 }
 

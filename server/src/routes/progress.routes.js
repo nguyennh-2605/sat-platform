@@ -11,10 +11,13 @@ router.delete('/weeks/:weekId', authenticateToken, progressController.deleteWeek
 
 // Lesson routes
 router.post('/weeks/:weekId/lessons', authenticateToken, progressController.createLesson);
+router.put('/lessons/:lessonId', authenticateToken, progressController.updateLesson);
 router.delete('/lessons/:lessonId', authenticateToken, progressController.deleteLesson);
+router.put('/lessons/:lessonId/progress', authenticateToken, progressController.completeLesson);
 
 // File routes
 router.post('/lessons/:lessonId/files', authenticateToken, progressController.addFiles);
+router.put('/files/:fileId/progress', authenticateToken, progressController.openResource);
 router.delete('/files/:fileId', authenticateToken, progressController.deleteFile);
 
 // Assignment routes

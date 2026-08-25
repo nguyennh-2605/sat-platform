@@ -88,8 +88,8 @@ const StaticMessage = React.memo(({ msg }: { msg: ChatMessage }) => {
     <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] rounded-xl px-5 py-3 text-sm ${
         msg.role === 'user' 
-          ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-tr-sm shadow-md' 
-          : 'bg-white text-gray-800 border border-gray-100 rounded-tl-sm shadow-sm'
+          ? 'bg-primary text-white rounded-tr-sm shadow-card'
+          : 'bg-surface text-foreground border border-ui-border rounded-tl-sm shadow-card'
       }`}>
         <div className="leading-relaxed">
           {msg.role === 'user' ? (
@@ -409,9 +409,23 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
     onClose();
   }, [onClose]);
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') closeModal(); };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [closeModal]);
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-14 py-4 animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Review question ${data.questionNumber}`}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ui-overlay)] px-2 py-2 animate-in fade-in duration-200 sm:px-14 sm:py-4"
       onMouseDown={event => { if (event.target === event.currentTarget) closeModal(); }}
     >
       <div className={`relative h-[90vh] w-full transition-[max-width] duration-300 ease-in-out ${isAiOpen ? 'max-w-7xl' : 'max-w-5xl'}`}>
@@ -420,17 +434,17 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
         onClick={onPrevious}
         disabled={!onPrevious}
         aria-label="Previous question"
-        className="absolute -left-14 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white text-[#1B7A5A] shadow-lg transition-colors hover:bg-[#E8F5EF] disabled:cursor-not-allowed disabled:opacity-35"
+        className="absolute -left-14 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-surface text-primary shadow-elevated transition-colors hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-35 sm:flex"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </button>
-      <div className="flex h-full w-full flex-row overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-gray-900/5">
+      <div className="flex h-full w-full flex-row overflow-hidden rounded-card bg-surface shadow-elevated ring-1 ring-ui-border">
         
         {/* ================= CỘT TRÁI ================= */}
         <div className="flex-1 flex flex-col h-full overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-300 bg-gray-100 z-10 flex-shrink-0">
+          <div className="z-10 flex shrink-0 items-center justify-between gap-3 border-b border-ui-border bg-surface-subtle px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex items-center gap-3">
-               <h2 className="text-lg font-bold text-gray-800 tracking-tight">
+               <h2 className="line-clamp-2 text-body font-semibold tracking-tight text-foreground sm:text-heading">
                  {examTitle}, {examSubject === 'RW' ? 'Reading and Writing' : 'Math'}, Question {data.questionNumber}
                </h2>
             </div>
@@ -438,8 +452,9 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowCorrectAnswer(prev => !prev)}
-                title={showCorrectAnswer ? "Ẩn đáp án đúng" : "Hiện đáp án đúng"}
-                className="p-2.5 rounded-full text-gray-800"
+                title={showCorrectAnswer ? 'Hide correct answer' : 'Show correct answer'}
+                aria-label={showCorrectAnswer ? 'Hide correct answer' : 'Show correct answer'}
+                className="flex h-10 w-10 items-center justify-center rounded-control text-subtle-foreground hover:bg-muted"
               >
                 {showCorrectAnswer ? (
                   // Icon Mắt mở (Chuẩn)
@@ -459,13 +474,16 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
               </button>
               <button 
                 onClick={() => setIsAiOpen(!isAiOpen)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${isAiOpen ? 'bg-[#C2DDD4] text-[#1B7A5A] ring-1 ring-indigo-300' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-md hover:-translate-y-0.5'}`}
+                aria-label={isAiOpen ? 'Close AI tutor' : 'Open AI tutor'}
+                aria-expanded={isAiOpen}
+                className={`flex min-h-10 items-center gap-2 rounded-control px-3 text-body font-semibold transition-colors sm:px-4 ${isAiOpen ? 'bg-primary-soft text-primary ring-1 ring-primary/30' : 'bg-primary text-white hover:bg-primary-hover'}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4M3 5h4"/></svg>
               </button>
               <button 
                 onClick={closeModal}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-800">
+                aria-label="Close review"
+                className="flex h-10 w-10 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
             </div>
@@ -474,23 +492,26 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
         </div>
 
         {/* ================= CỘT PHẢI ================= */}
-        <div className={`relative flex flex-col h-full bg-slate-50 border-l border-gray-200 transition-all duration-300 ease-in-out ${isAiOpen ? 'w-[450px] opacity-100' : 'w-0 opacity-0 overflow-hidden border-l-0'}`}>
-          <div className="px-5 py-4 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between flex-shrink-0 sticky top-0 z-10">
+        <div className={`absolute inset-0 z-20 flex h-full flex-col bg-surface-subtle transition-all duration-300 ease-in-out sm:relative sm:inset-auto sm:z-auto ${isAiOpen ? 'w-full opacity-100 sm:w-[450px] sm:border-l sm:border-ui-border' : 'w-0 overflow-hidden opacity-0'}`}>
+          <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-ui-border bg-surface/90 px-5 py-4 backdrop-blur-md">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-white shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-800 tracking-tight">Trợ lý AI</h3>
-                <p className="text-[10px] text-gray-500 flex items-center gap-1.5 mt-0.5">
+                <h3 className="text-body font-semibold tracking-tight text-foreground">AI Tutor</h3>
+                <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
-                  Luôn sẵn sàng
+                  Ready to help
                 </p>
               </div>
             </div>
+            <button type="button" onClick={() => setIsAiOpen(false)} aria-label="Close AI tutor" className="flex h-10 w-10 items-center justify-center rounded-control text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
           </div>
 
           <div 
@@ -501,29 +522,29 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
           >
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full px-2 mt-8">
-                <h2 className="text-lg font-bold text-gray-700 mb-6">Hỏi AI bất cứ điều gì về câu này</h2>
-                <div className="flex flex-col gap-3 w-full">
-                  <button onClick={handleTranslateQuestion} disabled={isTyping || !!streamingContent} className="flex items-center justify-between w-full p-4 bg-[#F7F7F9] hover:bg-[#F0F0F4] rounded-xl transition-colors group disabled:opacity-50">
+                <h2 className="mb-6 text-heading font-semibold text-foreground">Ask about this question</h2>
+                <div className="flex w-full flex-col gap-3">
+                  <button onClick={handleTranslateQuestion} disabled={isTyping || !!streamingContent} className="group flex min-h-16 w-full items-center justify-between rounded-card border border-ui-border bg-surface p-4 transition-colors hover:bg-primary-soft disabled:opacity-50">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#E1F3FB] flex items-center justify-center text-[#007EE5]">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-control bg-info-soft text-info">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
                       </div>
                       <div className="text-left text-[15px]">
-                        <span className="font-bold text-gray-900">Dịch đề bài</span>
-                        <span className="text-gray-500 ml-1">sang tiếng Việt dễ hiểu</span>
+                        <span className="font-semibold text-foreground">Translate</span>
+                        <span className="ml-1 text-muted-foreground">into clear Vietnamese</span>
                       </div>
                     </div>
                     <svg className="text-gray-400 group-hover:text-gray-600 transition-colors" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                   </button>
 
-                  <button onClick={handleExplainAnswer} disabled={isTyping || !!streamingContent} className="flex items-center justify-between w-full p-4 bg-[#F7F7F9] hover:bg-[#F0F0F4] rounded-xl transition-colors group disabled:opacity-50">
+                  <button onClick={handleExplainAnswer} disabled={isTyping || !!streamingContent} className="group flex min-h-16 w-full items-center justify-between rounded-card border border-ui-border bg-surface p-4 transition-colors hover:bg-primary-soft disabled:opacity-50">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#FFF4CE] flex items-center justify-center text-[#D97706]">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-control bg-accent-soft text-warning">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
                       </div>
                       <div className="text-left text-[15px]">
-                        <span className="font-bold text-gray-900">Giải thích</span>
-                        <span className="text-gray-500 ml-1">chi tiết cách làm bài này</span>
+                        <span className="font-semibold text-foreground">Explain</span>
+                        <span className="ml-1 text-muted-foreground">the solution step by step</span>
                       </div>
                     </div>
                     <svg className="text-gray-400 group-hover:text-gray-600 transition-colors" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -538,7 +559,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
 
             {streamingContent && (
               <div className="flex justify-start">
-                <div className="max-w-[85%] rounded-xl px-5 py-3 text-sm bg-white text-gray-800 border border-gray-100 rounded-tl-sm shadow-sm">
+                <div className="max-w-[85%] rounded-card rounded-tl-sm border border-ui-border bg-surface px-5 py-3 text-body text-foreground shadow-card">
                   <div className="leading-relaxed">
                     <TypewriterMarkdown 
                       content={streamingContent}
@@ -577,13 +598,14 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
                 scrollToBottom(true);
                 setShowScrollButton(false);
               }}
-              className="absolute left-1/2 -translate-x-1/2 bottom-[85px] z-20 bg-white/90 border border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.1)] rounded-full w-9 h-9 flex items-center justify-center hover:bg-gray-50 transition-all text-gray-500 hover:text-[#1B7A5A]"
+              aria-label="Scroll to latest message"
+              className="absolute bottom-[85px] left-1/2 z-20 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border border-ui-border bg-surface/90 text-muted-foreground shadow-elevated transition-colors hover:bg-primary-soft hover:text-primary"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
             </button>
           )}
 
-          <div className="p-4 bg-white/80 border-t border-gray-100 flex-shrink-0 z-10">
+          <div className="z-10 shrink-0 border-t border-ui-border bg-surface/90 p-4">
             <form 
               onSubmit={(e) => {
                 e.preventDefault();
@@ -596,13 +618,15 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 disabled={isTyping || !!streamingContent} // Khóa gõ chữ lúc AI đang trả lời
-                placeholder="Hỏi AI về câu này..." 
-                className="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#6BBFA0] focus:ring-4 focus:ring-indigo-100 rounded-xl pl-5 pr-12 py-3.5 text-sm outline-none transition-all disabled:opacity-60 placeholder:text-gray-400"
+                placeholder="Ask AI about this question..."
+                aria-label="Message AI tutor"
+                className="w-full rounded-card border border-ui-border bg-surface-subtle py-3.5 pl-4 pr-12 text-body text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
               />
               <button 
                 type="submit"
                 disabled={!chatInput.trim() || isTyping || !!streamingContent}
-                className="absolute right-2 p-2 bg-[#1B7A5A] hover:bg-[#145F47] disabled:bg-gray-300 text-white rounded-xl transition-all shadow-sm"
+                aria-label="Send message"
+                className="absolute right-2 flex h-9 w-9 items-center justify-center rounded-control bg-primary text-white shadow-sm transition-colors hover:bg-primary-hover disabled:bg-muted disabled:text-muted-foreground"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
               </button>
@@ -616,7 +640,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ data, onClose, onPrevious, on
         onClick={onNext}
         disabled={!onNext}
         aria-label="Next question"
-        className="absolute -right-14 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white text-[#1B7A5A] shadow-lg transition-colors hover:bg-[#E8F5EF] disabled:cursor-not-allowed disabled:opacity-35"
+        className="absolute -right-14 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-surface text-primary shadow-elevated transition-colors hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-35 sm:flex"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
       </button>

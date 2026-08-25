@@ -12,7 +12,8 @@ import type {
 } from 'react';
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Bell, Inbox, X } from 'lucide-react';
+import { ArrowLeft, Inbox, X } from 'lucide-react';
+import NotificationBell from '../../features/notifications/NotificationBell';
 import { cx, ui } from './styles';
 
 interface AppHeaderProps {
@@ -42,22 +43,19 @@ export function AppHeader({
     .toUpperCase() || 'ST';
 
   return (
-    <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center justify-between border-b border-ui-border-strong bg-surface px-6">
-      <div className="flex w-[310px] min-w-0 flex-col justify-center">
-        <h1 className="truncate text-title font-semibold text-foreground">{title}</h1>
+    <header className="sticky top-0 z-30 grid min-h-16 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-ui-border-strong bg-surface px-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+      <div className="flex min-w-0 flex-col justify-center py-2">
+        <h1 className="truncate text-heading font-semibold text-foreground">{title}</h1>
         {subtitle && <p className="mt-0.5 truncate text-caption text-muted-foreground">{subtitle}</p>}
       </div>
 
-      <div className="flex h-full min-w-0 flex-1 items-center justify-center">{centerContent}</div>
+      <div className="hidden h-full min-w-0 items-center justify-center md:flex">{centerContent}</div>
 
-      <div className="flex w-[310px] items-center justify-end gap-4">
+      <div className="flex items-center justify-end gap-3 md:min-w-0">
         {rightContent}
         {showProfile && (
           <>
-            {showNotifications && <button className="relative shrink-0 text-muted-foreground transition-colors hover:text-foreground" aria-label="Notifications">
-              <Bell size={20} />
-              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
-            </button>}
+            {showNotifications && <NotificationBell currentUserId={localStorage.getItem('userId') || ''} />}
             <div
               className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 select-none items-center justify-center rounded-full bg-primary text-caption font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-surface transition-[box-shadow] hover:ring-primary/30"
               title={userName}
@@ -83,10 +81,10 @@ const buttonVariantClasses: Record<ButtonVariant, string> = {
 };
 
 const buttonSizeClasses: Record<ButtonSize, string> = {
-  sm: 'h-8 gap-1.5 px-3 text-xs',
-  md: 'h-9 gap-2 px-4 text-sm',
-  lg: 'h-10 gap-2 px-5 text-sm',
-  icon: 'h-9 w-9 p-0',
+  sm: 'h-8 gap-1.5 px-3 text-caption',
+  md: 'h-10 gap-2 px-4 text-body',
+  lg: 'h-11 gap-2 px-5 text-body',
+  icon: 'h-10 w-10 p-0',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -176,7 +174,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cx(
-        'h-9 rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20',
+        'h-10 rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20',
         className,
       )}
       {...props}
@@ -188,7 +186,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={cx(
-        'h-9 cursor-pointer rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20',
+        'h-10 cursor-pointer rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20',
         className,
       )}
       {...props}
@@ -270,7 +268,7 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
       className={isContentPanel
         ? 'absolute inset-0 z-[200] flex min-h-0 min-w-0 bg-white'
         : isContentDialog
-          ? 'fixed inset-y-0 right-0 left-56 z-[200] flex min-h-0 min-w-0 items-center justify-center bg-[var(--ui-overlay)] p-4'
+          ? 'fixed inset-0 z-[200] flex min-h-0 min-w-0 items-center justify-center bg-[var(--ui-overlay)] p-4 lg:left-60'
           : 'fixed inset-0 z-[200] flex items-center justify-center bg-[var(--ui-overlay)] p-4'}
       onMouseDown={event => { if (!isContentPanel && closeOnBackdrop && event.target === event.currentTarget) onClose(); }}
     >

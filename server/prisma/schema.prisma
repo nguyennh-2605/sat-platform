@@ -37,6 +37,8 @@ model User {
   vocabularySessions    VocabularyStudySession[]
   createdActivities     ClassActivity[]          @relation("ActivityCreator")
   activityAssignments   ActivityAssignee[]
+  lessonProgress        LessonProgress[]
+  resourceProgress      ResourceProgress[]
 }
 
 model RefreshSession {
@@ -84,6 +86,7 @@ model Assignment {
   submissions     HomeworkSubmission[]
   testSubmissions Submission[]
   activity        HomeworkActivity?
+  lessonAssignment LessonAssignment?
 }
 
 model HomeworkSubmission {
@@ -392,28 +395,65 @@ enum ActivityAssigneeStatus {
   EXCUSED
 }
 
+enum CourseContentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LessonResourceKind {
+  FILE
+  VIDEO
+  LINK
+  EMBED
+}
+
+enum LessonProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
 model Week {
-  id         String   @id @default(uuid())
-  title      String
-  order      Int      @default(0)
-  isExpanded Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  classId    String
-  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  lessons    Lesson[]
+  id          String              @id @default(uuid())
+  title       String
+  description String?
+  order       Int                 @default(0)
+  isExpanded  Boolean             @default(true)
+  status      CourseContentStatus @default(DRAFT)
+  availableAt DateTime?
+  publishedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  classId     String
+  class       Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+
+  @@index([classId, status, order])
 }
 
 model Lesson {
-  id          String             @id @default(uuid())
-  title       String
-  order       Int                @default(0)
-  createdAt   DateTime           @default(now())
-  weekId      String
-  week        Week               @relation(fields: [weekId], references: [id], onDelete: Cascade)
-  files       LessonFile[]
-  assignments LessonAssignment[]
-  deliveries  TestDelivery[]
-  activities  ClassActivity[]
+  id              String              @id @default(uuid())
+  title           String
+  summary         String?
+  order           Int                 @default(0)
+  status          CourseContentStatus @default(DRAFT)
+  scheduledAt     DateTime?
+  durationMinutes Int?
+  availableAt     DateTime?
+  publishedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  weekId          String
+  week            Week                @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  files           LessonFile[]
+  assignments     LessonAssignment[]
+  deliveries      TestDelivery[]
+  activities      ClassActivity[]
+  progress        LessonProgress[]
+
+  @@index([weekId, status, order])
 }
 
 model TestDelivery {
@@ -472,23 +512,66 @@ model QuestionTiming {
 }
 
 model LessonFile {
-  id        String   @id @default(uuid())
-  name      String
-  url       String
-  createdAt DateTime @default(now())
-  lessonId  String
-  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  id              String             @id @default(uuid())
+  name            String
+  url             String
+  kind            LessonResourceKind @default(FILE)
+  provider        String?
+  mimeType        String?
+  thumbnailUrl    String?
+  durationSeconds Int?
+  order           Int                @default(0)
+  isRequired      Boolean            @default(false)
+  availableAt     DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  lessonId        String
+  lesson          Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  progress        ResourceProgress[]
+
+  @@index([lessonId, order])
 }
 
 model LessonAssignment {
-  id        String    @id @default(uuid())
-  title     String
-  content   String?
-  dueDate   DateTime?
-  testIds   Int[]     @default([])
-  createdAt DateTime  @default(now())
-  lessonId  String    @unique
-  lesson    Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  id           String      @id @default(uuid())
+  title        String
+  content      String?
+  dueDate      DateTime?
+  testIds      Int[]       @default([])
+  createdAt    DateTime    @default(now())
+  lessonId     String      @unique
+  assignmentId String?     @unique
+  lesson       Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+}
+
+model LessonProgress {
+  lessonId     String
+  studentId    Int
+  status       LessonProgressStatus @default(NOT_STARTED)
+  progress     Int                  @default(0)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  lastOpenedAt DateTime?
+  lesson       Lesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student      User                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([lessonId, studentId])
+  @@index([studentId, status])
+}
+
+model ResourceProgress {
+  fileId          String
+  studentId       Int
+  openedAt        DateTime   @default(now())
+  lastOpenedAt    DateTime   @default(now())
+  completedAt     DateTime?
+  positionSeconds Int        @default(0)
+  file            LessonFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  student         User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([fileId, studentId])
+  @@index([studentId, completedAt])
 }
 
 model VocabularySet {

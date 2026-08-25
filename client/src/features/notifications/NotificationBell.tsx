@@ -19,10 +19,9 @@ const timeAgo = (dateString: string | Date | null | undefined): string => {
   if (hours < 24) return `${hours} hours ago`;
   if (days < 7) return `${days} days ago`;
   
-  // Nếu lâu hơn 7 ngày thì hiển thị ngày tháng năm
-  return date.toLocaleDateString('vi-VN', { 
-    day: '2-digit', 
-    month: '2-digit', 
+  return date.toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
     year: 'numeric' 
   });
 };
@@ -142,53 +141,58 @@ export default function NotificationBell({ currentUserId }: { currentUserId: num
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Nút Chuông */}
-      <button 
+      <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-slate-400 hover:text-[#1B7A5A] hover:bg-[#E8F5EF] rounded-full transition-colors relative"
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        className="relative flex h-10 w-10 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary"
       >
-        <Bell size={20} />
+        <Bell size={20} aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-surface" aria-hidden="true" />
         )}
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-            <h3 className="font-bold text-slate-800 text-sm">Notifications</h3>
+        <div role="menu" className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-card border border-ui-border bg-surface shadow-elevated animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between border-b border-ui-border bg-surface-subtle p-3">
+            <h3 className="text-body font-semibold text-foreground">Notifications</h3>
             {unreadCount > 0 && (
-              <button 
-                onClick={handleMarkAllAsRead}
-                className="text-xs font-semibold text-[#1B7A5A] hover:text-[#145F47]"
+              <button
+                type="button"
+                onClick={() => void handleMarkAllAsRead()}
+                className="min-h-8 rounded-control px-2 text-caption font-semibold text-primary hover:bg-primary-soft hover:text-primary-hover"
               >
                 Mark as read
               </button>
             )}
           </div>
           
-          <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+          <div className="max-h-[350px] overflow-y-auto">
             {notifications.length > 0 ? (
               notifications.map((notif) => (
-                <div 
-                  key={notif.id} 
-                  className={`p-4 border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-colors ${!notif.isRead ? 'bg-[#E8F5EF]/40' : ''}`}
+                <button
+                  type="button"
+                  role="menuitem"
+                  key={notif.id}
+                  className={`block w-full border-b border-ui-border p-4 text-left transition-colors hover:bg-surface-subtle ${!notif.isRead ? 'bg-primary-soft/60' : ''}`}
                   onClick={() => {
                     if (notif.link) window.location.href = notif.link;
                     setIsOpen(false);
                   }}
                 >
-                  <p className="text-xs text-slate-600 leading-relaxed">{notif.message}</p>
-                  <span className="text-[10px] text-slate-400 mt-1 block">
+                  <p className="text-body leading-relaxed text-subtle-foreground">{notif.message}</p>
+                  <span className="mt-1 block text-caption text-muted-foreground">
                     {timeAgo(notif.createdAt)}
                   </span>
-                </div>
+                </button>
               ))
             ) : (
-              <div className="p-8 text-center flex flex-col items-center justify-center text-slate-400">
-                <Bell size={32} className="mb-2 opacity-20" />
-                <p className="text-sm">No notifications yet</p>
+              <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                <Bell size={32} className="mb-2 opacity-30" aria-hidden="true" />
+                <p className="text-body">No notifications yet</p>
               </div>
             )}
           </div>

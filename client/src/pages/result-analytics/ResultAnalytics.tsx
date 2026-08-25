@@ -136,21 +136,21 @@ const ResultAnalytics = () => {
 
   return (
     <div className={ui.page}>
-      <AppHeader title="Analytics" subtitle={`${userName} · SAT Learning Platform`} rightContent={<SatCountdown />} />
+      <AppHeader title="Analytics" subtitle={`${userName} · SAT Learning Platform`} centerContent={<SatCountdown />} />
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className={ui.content}>
           <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <MetricCard label="Overall Accuracy" value={`${summary.overallAccuracy}%`} icon={<CheckCircle2 size={22} />} iconClassName="bg-[#E8F5EF] text-[#1B7A5A]" valueClassName="text-[#1B7A5A]" loading={loading} />
-            <MetricCard label="Correct Answers" value={summary.correctAnswers.toLocaleString('en-US')} suffix="answers" icon={<BookmarkCheck size={22} />} iconClassName="bg-[#FEF9E7] text-[#E8C040]" valueClassName="text-[#92640A]" loading={loading} />
-            <MetricCard label="Questions Attempted" value={summary.questionsAttempted.toLocaleString('en-US')} suffix={`${summary.completedTests} completed tests`} icon={<PenTool size={22} />} iconClassName="bg-slate-100 text-slate-600" valueClassName="text-slate-800" loading={loading} />
+            <MetricCard label="Overall Accuracy" value={`${summary.overallAccuracy}%`} icon={<CheckCircle2 size={22} />} iconClassName="bg-primary-soft text-primary" valueClassName="text-primary" loading={loading} />
+            <MetricCard label="Correct Answers" value={summary.correctAnswers.toLocaleString('en-US')} suffix="answers" icon={<BookmarkCheck size={22} />} iconClassName="bg-accent-soft text-warning" valueClassName="text-warning" loading={loading} />
+            <MetricCard label="Questions Attempted" value={summary.questionsAttempted.toLocaleString('en-US')} suffix={`${summary.completedTests} completed tests`} icon={<PenTool size={22} />} iconClassName="bg-muted text-subtle-foreground" valueClassName="text-foreground" loading={loading} />
           </div>
 
           <Card className="mb-6 p-5">
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
-                <h2 className="font-semibold text-slate-800">Score Progress</h2>
-                <p className="text-xs text-[#6B7280]">Accuracy percentage across your latest 7 completed tests</p>
+                <h2 className="font-semibold text-foreground">Score Progress</h2>
+                <p className="text-caption text-muted-foreground">Accuracy percentage across your latest 7 completed tests</p>
               </div>
               <div className="flex items-center gap-4 text-xs font-medium text-slate-600">
                 <Legend color="#1B7A5A" label="RW" />
@@ -160,7 +160,7 @@ const ResultAnalytics = () => {
 
             <div className="h-[220px] w-full">
               {loading ? (
-                <div className="h-full w-full animate-pulse rounded-lg bg-[#F2F8F5]" />
+                <div className="h-full w-full animate-pulse rounded-control bg-background" />
               ) : scoreHistory.length === 0 ? (
                 <EmptyState title="No score history yet" description="Complete a test to see your score progress." compact surface={false} className="h-full" />
               ) : (
@@ -181,8 +181,8 @@ const ResultAnalytics = () => {
           <Card className="mb-6 p-5">
             <div className="mb-4 flex flex-col justify-between gap-4 md:flex-row md:items-center">
               <div>
-                <h2 className="flex items-center gap-2 font-semibold text-slate-800"><Calendar size={18} className="text-[#1B7A5A]" /> Activity Heatmap</h2>
-                <p className="mt-0.5 text-xs text-[#6B7280]">Your study activity over the last 12 weeks</p>
+                <h2 className="flex items-center gap-2 font-semibold text-foreground"><Calendar size={18} className="text-primary" /> Activity Heatmap</h2>
+                <p className="mt-0.5 text-caption text-muted-foreground">Your study activity over the last 12 weeks</p>
               </div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
                 <span>Less</span>
@@ -192,7 +192,7 @@ const ResultAnalytics = () => {
             </div>
 
             {loading ? (
-              <div className="h-16 animate-pulse rounded-lg bg-[#F2F8F5]" />
+              <div className="h-16 animate-pulse rounded-control bg-background" />
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {heatmapData.map(point => (

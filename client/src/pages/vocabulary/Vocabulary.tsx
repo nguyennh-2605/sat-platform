@@ -175,7 +175,7 @@ export default function Vocabulary() {
   if (selected) return <SetWorkspace set={selected} activity={activity} tab={detailTab} onTab={setDetailTab} role={role} quizConfig={quizConfig} onBack={closeDetail} onEdit={() => setEditingSet(selected)} onTermSaved={detail => { setSelected(detail); setCurrentSet(detail); invalidateQueryCache('/api/vocabulary'); }} onAssign={() => setAssignOpen(true)} onRefresh={async () => { const refreshed = await loadCollection({ ...selected, assignedActivityId: activity?.id }, true); setSelected(refreshed.detail); setCurrentSet(refreshed.detail); }} assigner={<AssignDialog open={assignOpen} set={selected} initialClassId={searchParams.get('assignTo') || ''} onClose={() => setAssignOpen(false)} />} />;
 
   return <div className={ui.page}>
-    <AppHeader title="Vocabulary" subtitle="Build vocabulary through review and retrieval practice" rightContent={<SatCountdown />} />
+    <AppHeader title="Vocabulary" subtitle="Build vocabulary through review and retrieval practice" centerContent={<SatCountdown />} />
     <main className="relative min-h-0 flex-1 overflow-y-auto"><LoadingBar active={loading} /><div className={ui.content}>
       {!hasLoaded && loading ? <VocabularyHomeSkeleton /> : !currentSet ? <EmptyState icon={<BookOpen size={20} />} title="No vocabulary sets available" description="Create a personal set or ask an administrator to publish a system set." action={<Button onClick={() => setCreatingSet(true)}><Plus size={15} />New set</Button>} /> : <>
         <section aria-labelledby="mode-selection-heading" className="mb-4">

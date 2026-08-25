@@ -1,65 +1,52 @@
-import { useCallback, useEffect, useState } from 'react';
-import { 
-  Plus, Search, Trash2, Edit3, 
-  XCircle, Save, FileText, ChevronLeft, ChevronRight, AlertCircle, Loader2
-} from 'lucide-react';
-import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { AlertCircle, ChevronLeft, ChevronRight, Edit3, FileText, Loader2, Plus, Save, Search, Trash2 } from 'lucide-react';
 import { capitalizeFirstLetter } from '../../utils/text';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
-import { AppHeader, Button, Input } from '../../components/ui/AppUI';
+import { AppHeader, Button, Card, EmptyState, Input, Modal, TableShell } from '../../components/ui/AppUI';
+import { ui } from '../../components/ui/styles';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
 
 interface ErrorEntry {
-  id: string; // Prisma UUID
+  id: string;
   source: string;
   category: string;
   userAnswer: string;
   correctAnswer: string;
   whyWrong: string;
   whyRight: string;
-  createdAt?: string; 
+  createdAt?: string;
 }
+
 interface ErrorLogPage { items: ErrorEntry[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }
 const ERROR_LOG_PAGE_SIZE = 10;
+const blankEntry = (): Partial<ErrorEntry> => ({ source: '', category: '', userAnswer: '', correctAnswer: '', whyWrong: '', whyRight: '' });
 
-// --- HELPER: MODERN BADGE COLORS ---
 const getCategoryStyle = (category: string) => {
-  const norm = category.toLowerCase();
-  if (norm.includes("word") || norm.includes("vocab")) 
-    return "bg-amber-50 text-amber-700 border-amber-200"; 
-  if (norm.includes("reading") || norm.includes("structure") || norm.includes("inference")) 
-    return "bg-rose-50 text-rose-700 border-rose-200"; 
-  if (norm.includes("grammar") || norm.includes("convention")) 
-    return "bg-emerald-50 text-emerald-700 border-emerald-200"; 
-  if (norm.includes("math") || norm.includes("logic")) 
-    return "bg-[#E8F5EF] text-[#1B7A5A] border-[#C2DDD4]";
-  return "bg-slate-100 text-slate-600 border-slate-200";
+  const normalized = category.toLowerCase();
+  if (normalized.includes('word') || normalized.includes('vocab')) return 'border-warning/20 bg-warning-soft text-warning';
+  if (normalized.includes('reading') || normalized.includes('structure') || normalized.includes('inference')) return 'border-danger/20 bg-danger-soft text-danger';
+  if (normalized.includes('grammar') || normalized.includes('convention')) return 'border-success/20 bg-success-soft text-success';
+  if (normalized.includes('math') || normalized.includes('logic')) return 'border-primary/25 bg-primary-soft text-primary';
+  return 'border-ui-border bg-muted text-subtle-foreground';
 };
 
-const ErrorLog = () => {
-  
-  // -- STATE --
+export default function ErrorLog() {
   const [logs, setLogs] = useState<ErrorEntry[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ErrorEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // Loading thật từ server
-  const [isSaving, setIsSaving] = useState(false);  // Loading khi bấm nút Save
-  
-  // Pagination State
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalEntries, setTotalEntries] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [formData, setFormData] = useState<Partial<ErrorEntry>>(blankEntry);
   const debouncedSearch = useDebounce(searchTerm, 250);
 
-  // Form State
-  const [formData, setFormData] = useState<Partial<ErrorEntry>>({
-    source: '', category: '', userAnswer: '', correctAnswer: '', whyWrong: '', whyRight: '',
-  });
-
-  // -- 1. LOAD DATA TỪ API --
   const fetchLogs = useCallback(async (force = false) => {
     try {
       setIsLoading(true);
@@ -70,408 +57,170 @@ const ErrorLog = () => {
       setTotalEntries(data.pagination.total);
       setTotalPages(data.pagination.totalPages);
     } catch (error) {
-      console.error("Failed to fetch logs:", error);
-      toast.error("Unable to load error log");
+      console.error('Failed to fetch logs:', error);
+      toast.error('Unable to load error log');
     } finally {
       setIsLoading(false);
     }
   }, [currentPage, debouncedSearch]);
 
-  useEffect(() => {
-    void fetchLogs();
-  }, [fetchLogs]);
+  useEffect(() => { void fetchLogs(); }, [fetchLogs]);
 
-  // -- 2. ACTIONS (CREATE / UPDATE) --
+  const openCreate = () => { setFormData(blankEntry()); setShowModal(true); };
+  const openEdit = (entry: ErrorEntry) => { setFormData(entry); setShowModal(true); };
+
   const handleSave = async () => {
-    if (!formData.source || !formData.userAnswer || !formData.correctAnswer) {
-      toast.error("Complete the required fields");
+    if (!formData.source?.trim() || !formData.userAnswer || !formData.correctAnswer) {
+      toast.error('Complete the required fields');
       return;
     }
-
-    // Chuẩn bị payload (loại bỏ id nếu là create)
     const payload = {
-      source: formData.source,
-      category: formData.category || 'General',
+      source: formData.source.trim(),
+      category: formData.category?.trim() || 'General',
       userAnswer: formData.userAnswer,
       correctAnswer: formData.correctAnswer,
-      whyWrong: formData.whyWrong || '',
-      whyRight: formData.whyRight || '',
+      whyWrong: formData.whyWrong?.trim() || '',
+      whyRight: formData.whyRight?.trim() || '',
     };
-
     try {
       setIsSaving(true);
-      
-      if (formData.id) {
-          // --- UPDATE ---
-        await axiosClient.put(`/api/error-logs/${formData.id}`, payload);
-        toast.success("Entry updated");
-      } else {
-          // --- CREATE ---
-        await axiosClient.post(`/api/error-logs`, payload);
-        toast.success("Entry saved");
-      }
-      
-      // Reset form & Reload data
+      if (formData.id) await axiosClient.put(`/api/error-logs/${formData.id}`, payload);
+      else await axiosClient.post('/api/error-logs', payload);
+      toast.success(formData.id ? 'Entry updated' : 'Entry saved');
       const created = !formData.id;
       setShowModal(false);
-      resetForm();
+      setFormData(blankEntry());
       invalidateQueryCache('/api/error-logs');
       if (created && currentPage !== 1) setCurrentPage(1);
       else await fetchLogs(true);
-
     } catch (error) {
       console.error(error);
-      toast.error("Unable to save entry");
+      toast.error('Unable to save entry');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // -- 3. DELETE --
-  const handleDelete = async (id: string) => {
-    if (confirm("Permanently delete this entry?")) {
-      try {
-        // Optimistic Update: Xóa trên UI trước cho nhanh
-        setLogs(prev => prev.filter(l => l.id !== id));
-        await axiosClient.delete(`/api/error-logs/${id}`);
-        toast.success("Entry deleted");
-        invalidateQueryCache('/api/error-logs');
-        if (logs.length === 1 && currentPage > 1) setCurrentPage(prev => prev - 1);
-        else await fetchLogs(true);
-      } catch {
-        toast.error("Unable to delete entry");
-        void fetchLogs(true);
-      }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await axiosClient.delete(`/api/error-logs/${deleteTarget.id}`);
+      toast.success('Entry deleted');
+      setDeleteTarget(null);
+      invalidateQueryCache('/api/error-logs');
+      if (logs.length === 1 && currentPage > 1) setCurrentPage(page => page - 1);
+      else await fetchLogs(true);
+    } catch {
+      toast.error('Unable to delete entry');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const handleEdit = (entry: ErrorEntry) => {
-    setFormData(entry);
-    setShowModal(true);
-  };
+  const firstItem = (currentPage - 1) * ERROR_LOG_PAGE_SIZE + 1;
+  const lastItem = Math.min(currentPage * ERROR_LOG_PAGE_SIZE, totalEntries);
 
-  const resetForm = () => {
-    setFormData({
-      source: '', category: '', userAnswer: '', correctAnswer: '', whyWrong: '', whyRight: '',
-    });
-  };
-
-  const indexOfLastItem = currentPage * ERROR_LOG_PAGE_SIZE;
-  const indexOfFirstItem = indexOfLastItem - ERROR_LOG_PAGE_SIZE;
-  const currentItems = logs;
-
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
-
-  return (
-    <div className="flex flex-col h-full w-full bg-[#F2F8F5] overflow-hidden">
-      <AppHeader title="Error Log" subtitle="Review mistakes and turn them into study notes" rightContent={<SatCountdown />} />
-      
-      <main className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
-        <div className="max-w-7xl mx-auto space-y-4">
-          {/* --- HEADER CONTROL --- */}
-          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                <AlertCircle className="text-rose-500" /> Error Log
-              </h2>
-              <p className="text-xs text-slate-500 font-medium">
-                {isLoading ? "Syncing…" : `${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'}`}
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-3 w-full md:w-auto">
-                <div className="relative flex-1 md:w-64">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <Input
-                        type="text" 
-                        placeholder="Search entries…"
-                        className="w-full pl-9 pr-4"
-                        value={searchTerm}
-                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                    />
-                </div>
-                <Button
-                    onClick={() => { resetForm(); setShowModal(true); }}
-                    className="whitespace-nowrap"
-                >
-                    <Plus size={16} /> Add entry
-                </Button>
-            </div>
+  return <div className={ui.page}>
+    <AppHeader title="Error Log" subtitle="Review mistakes and turn them into study notes" centerContent={<SatCountdown />} />
+    <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className={ui.content}>
+        <Card className="mb-4 flex flex-col justify-between gap-4 p-4 md:flex-row md:items-center">
+          <div>
+            <h2 className="flex items-center gap-2 text-heading font-semibold text-foreground"><AlertCircle className="text-danger" size={20} aria-hidden="true" />Mistake review</h2>
+            <p className="mt-1 text-caption font-medium text-muted-foreground">{isLoading ? 'Syncing…' : `${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'}`}</p>
           </div>
-
-          {/* --- TABLE CONTAINER --- */}
-          <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden relative">
-            
-            {/* Loading Overlay */}
-            {isLoading && (
-              <div className="absolute inset-0 z-20 bg-white/80 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-2 text-[#1B7A5A]">
-                    <Loader2 size={32} className="animate-spin" />
-                    <span className="text-xs font-semibold">Loading entries…</span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-auto custom-scrollbar">
-              <table className="w-full text-sm text-left border-collapse min-w-[1000px]">
-                {/* STICKY HEADER */}
-                <thead className="text-xs text-slate-500 uppercase bg-slate-50 font-bold sticky top-0 z-10 shadow-sm">
-                  <tr>
-                    <th className="px-6 py-4 w-48 tracking-wider">Category</th>
-                    <th className="px-6 py-4 w-56 tracking-wider">Source</th>
-                    <th className="px-4 py-4 w-24 text-center tracking-wider">Your Ans</th>
-                    <th className="px-4 py-4 w-24 text-center tracking-wider">Correct</th>
-                    <th className="px-6 py-4 min-w-[280px] tracking-wider">Analysis (Why Wrong)</th>
-                    <th className="px-6 py-4 min-w-[280px] tracking-wider">Solution (Why Right)</th>
-                    <th className="px-4 py-4 w-20 text-center">Action</th>
-                  </tr>
-                </thead>
-                
-                <tbody className="divide-y divide-slate-100">
-                  {!isLoading && currentItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
-                          {logs.length === 0 ? "No entries yet." : "No matching entries found."}
-                      </td>
-                    </tr>
-                  ) : (
-                    currentItems.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50/80 transition-colors group">
-                        
-                        {/* Category */}
-                        <td className="px-6 py-4 align-top">
-                          <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold border ${getCategoryStyle(log.category)}`}>
-                            {log.category}
-                          </span>
-                        </td>
-
-                        {/* Source */}
-                        <td className="px-6 py-4 align-top font-medium text-slate-700">
-                            <div className="flex items-start gap-2">
-                              <FileText size={14} className="mt-1 text-slate-300 shrink-0"/>
-                              <span className="line-clamp-2" title={capitalizeFirstLetter(log.source)}>{capitalizeFirstLetter(log.source)}</span>
-                            </div>
-                        </td>
-
-                        {/* User Answer (Red style) */}
-                        <td className="px-4 py-4 align-top text-center">
-                          <div className="w-8 h-8 mx-auto rounded-lg bg-red-50 text-red-600 font-bold flex items-center justify-center border border-red-100">
-                            {log.userAnswer === 'Omitted' ? 'X' : log.userAnswer}
-                          </div>
-                        </td>
-
-                        {/* Correct Answer (Green style) */}
-                        <td className="px-4 py-4 align-top text-center">
-                          <div className="w-8 h-8 mx-auto rounded-lg bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center border border-emerald-100">
-                            {log.correctAnswer}
-                          </div>
-                        </td>
-
-                        {/* Why Wrong */}
-                        <td className="px-6 py-4 align-top">
-                          <p className="text-slate-600 leading-relaxed line-clamp-3 hover:line-clamp-none cursor-help transition-all duration-300">
-                              {log.whyWrong}
-                          </p>
-                        </td>
-
-                        {/* Why Right */}
-                        <td className="px-6 py-4 align-top">
-                            <p className="text-slate-600 leading-relaxed line-clamp-3 hover:line-clamp-none cursor-help transition-all duration-300">
-                              {log.whyRight}
-                            </p>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-4 py-4 align-top text-center">
-                          <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => handleEdit(log)} 
-                                className="p-1.5 text-[#1B7A5A] hover:bg-[#E8F5EF] rounded-md transition-colors"
-                                title="Edit"
-                              >
-                                <Edit3 size={16} />
-                              </button>
-                              <button 
-                                onClick={() => handleDelete(log.id)} 
-                                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-md transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* --- PAGINATION FOOTER --- */}
-            {totalEntries > 0 && (
-                <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <div className="text-xs text-slate-500">
-                        Showing <b>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, totalEntries)}</b> of <b>{totalEntries}</b> entries
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => paginate(currentPage - 1)} 
-                            disabled={currentPage === 1}
-                            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed text-slate-600"
-                        >
-                            <ChevronLeft size={16} />
-                        </button>
-                        {/* Simple Pagination Display to save space */}
-                        <span className="text-xs font-semibold px-2 text-slate-600">Page {currentPage} / {totalPages}</span>
-
-                        <button 
-                            onClick={() => paginate(currentPage + 1)} 
-                            disabled={currentPage === totalPages}
-                            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed text-slate-600"
-                        >
-                            <ChevronRight size={16} />
-                        </button>
-                    </div>
-                </div>
-            )}
+          <div className="flex w-full items-center gap-3 md:w-auto">
+            <label className="relative min-w-0 flex-1 md:w-72">
+              <span className="sr-only">Search error log</span>
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input type="search" placeholder="Search entries…" className="w-full pl-9" value={searchTerm} onChange={event => { setSearchTerm(event.target.value); setCurrentPage(1); }} />
+            </label>
+            <Button onClick={openCreate}><Plus size={16} aria-hidden="true" /><span className="hidden sm:inline">Add entry</span></Button>
           </div>
+        </Card>
 
-          {/* --- MODAL FORM --- */}
-          {showModal && createPortal(
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 animate-in fade-in duration-200">
-              <div className="bg-white rounded-xl border border-[#E2EDE9] w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
-                
-                {/* Modal Header */}
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                      {formData.id ? <Edit3 size={18}/> : <Plus size={18}/>}
-                      {formData.id ? "Edit error analysis" : "Add error entry"}
-                    </h3>
-                    <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-rose-500 transition-colors">
-                        <XCircle size={22}/>
-                    </button>
-                </div>
+        <TableShell className="relative hidden md:block">
+          {isLoading && <LoadingOverlay />}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1000px] border-collapse text-left text-body">
+              <thead className="sticky top-0 z-10 border-b border-ui-border bg-surface-subtle text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="w-44 px-5 py-3">Category</th><th className="w-56 px-5 py-3">Source</th><th className="w-24 px-4 py-3 text-center">Yours</th><th className="w-24 px-4 py-3 text-center">Correct</th><th className="min-w-[260px] px-5 py-3">Why it was wrong</th><th className="min-w-[260px] px-5 py-3">Why this is right</th><th className="w-24 px-4 py-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ui-border">
+                {!isLoading && logs.length === 0 ? <tr><td colSpan={7}><EmptyState compact surface={false} icon={<AlertCircle size={20} />} title={searchTerm ? 'No matching entries' : 'No entries yet'} description={searchTerm ? 'Try a different search.' : 'Add a mistake to turn it into a study note.'} /></td></tr> : logs.map(log => <tr key={log.id} className="group transition-colors hover:bg-surface-subtle">
+                  <td className="px-5 py-4 align-top"><span className={`inline-flex rounded-control border px-2.5 py-1 text-[11px] font-semibold ${getCategoryStyle(log.category)}`}>{log.category}</span></td>
+                  <td className="px-5 py-4 align-top font-medium text-subtle-foreground"><div className="flex items-start gap-2"><FileText size={14} className="mt-1 shrink-0 text-muted-foreground" aria-hidden="true" /><span className="line-clamp-2" title={capitalizeFirstLetter(log.source)}>{capitalizeFirstLetter(log.source)}</span></div></td>
+                  <td className="px-4 py-4 align-top text-center"><AnswerMark value={log.userAnswer === 'Omitted' ? 'X' : log.userAnswer} correct={false} /></td>
+                  <td className="px-4 py-4 align-top text-center"><AnswerMark value={log.correctAnswer} correct /></td>
+                  <td className="px-5 py-4 align-top"><p className="line-clamp-3 leading-relaxed text-subtle-foreground hover:line-clamp-none">{log.whyWrong || '—'}</p></td>
+                  <td className="px-5 py-4 align-top"><p className="line-clamp-3 leading-relaxed text-subtle-foreground hover:line-clamp-none">{log.whyRight || '—'}</p></td>
+                  <td className="px-4 py-4 align-top"><div className="flex justify-center gap-1"><IconAction label="Edit entry" onClick={() => openEdit(log)}><Edit3 size={16} /></IconAction><IconAction danger label="Delete entry" onClick={() => setDeleteTarget(log)}><Trash2 size={16} /></IconAction></div></td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+          <PaginationFooter first={firstItem} last={lastItem} total={totalEntries} page={currentPage} pages={totalPages} onPage={setCurrentPage} />
+        </TableShell>
 
-                {/* Modal Body */}
-                <div className="p-6 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-slate-700">Source</label>
-                          <input 
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none text-sm transition-all"
-                            placeholder="e.g. Test 1 · Module 2 · Question 15"
-                            value={formData.source}
-                            onChange={e => setFormData({...formData, source: e.target.value})}
-                          />
-                      </div>
-                      <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-slate-700">Category</label>
-                          <input 
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-none text-sm transition-all"
-                            placeholder="e.g. Words in Context"
-                            list="cat-suggestions"
-                            value={formData.category}
-                            onChange={e => setFormData({...formData, category: e.target.value})}
-                          />
-                          <datalist id="cat-suggestions">
-                              <option value="Words in Context"/>
-                              <option value="Text Structure and Purpose"/>
-                              <option value="Cross-Text Connections"/>
-                              <option value="Inferences"/>
-                              <option value="Standard English Conventions"/>
-                          </datalist>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-8 p-5 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="text-center">
-                          <label className="block text-xs font-semibold text-rose-500 uppercase tracking-wide mb-3">Your answer</label>
-                          <div className="flex justify-center gap-2">
-                            {['A','B','C','D'].map(opt => (
-                                <button 
-                                    key={opt}
-                                    onClick={() => setFormData({...formData, userAnswer: opt})}
-                                    className={`w-10 h-10 rounded-lg font-bold border-2 transition-all ${
-                                        formData.userAnswer === opt 
-                                        ? 'bg-rose-500 text-white border-rose-500 shadow-lg shadow-rose-200 scale-110' 
-                                        : 'bg-white text-slate-400 border-slate-200 hover:border-rose-300'
-                                    }`}
-                                >{opt}</button>
-                            ))}
-                          </div>
-                      </div>
-                      <div className="text-center border-l border-slate-200 pl-8">
-                          <label className="block text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Correct answer</label>
-                          <div className="flex justify-center gap-2">
-                            {['A','B','C','D'].map(opt => (
-                                <button 
-                                    key={opt}
-                                    onClick={() => setFormData({...formData, correctAnswer: opt})}
-                                    className={`w-10 h-10 rounded-lg font-bold border-2 transition-all ${
-                                        formData.correctAnswer === opt 
-                                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-200 scale-110' 
-                                        : 'bg-white text-slate-400 border-slate-200 hover:border-emerald-300'
-                                    }`}
-                                >{opt}</button>
-                            ))}
-                          </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-5">
-                      <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-rose-600 flex items-center gap-2">
-                              <AlertCircle size={14}/> Why was your answer wrong?
-                          </label>
-                          <textarea 
-                            rows={3}
-                            className="w-full px-3 py-2.5 border border-rose-100 rounded-lg bg-rose-50/30 focus:bg-white focus:ring-2 focus:ring-rose-200 outline-none text-sm leading-relaxed"
-                            placeholder="Describe the misconception or reasoning error…"
-                            value={formData.whyWrong}
-                            onChange={e => setFormData({...formData, whyWrong: e.target.value})}
-                          />
-                      </div>
-                      <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-emerald-600 flex items-center gap-2">
-                              <Save size={14}/> Why is the correct answer right?
-                          </label>
-                          <textarea 
-                            rows={3}
-                            className="w-full px-3 py-2.5 border border-emerald-100 rounded-lg bg-emerald-50/30 focus:bg-white focus:ring-2 focus:ring-emerald-200 outline-none text-sm leading-relaxed"
-                            placeholder="Explain the correct reasoning and key takeaway…"
-                            value={formData.whyRight}
-                            onChange={e => setFormData({...formData, whyRight: e.target.value})}
-                          />
-                      </div>
-                    </div>
-                </div>
-
-                {/* Modal Footer */}
-                <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 rounded-b-xl">
-                    <button 
-                        onClick={() => setShowModal(false)} 
-                        disabled={isSaving}
-                        className="app-button app-button-secondary"
-                    >
-                        Cancel
-                    </button>
-                    <button 
-                        onClick={handleSave} 
-                        disabled={isSaving}
-                        className="app-button app-button-primary"
-                    >
-                      {isSaving ? <Loader2 size={18} className="animate-spin"/> : <Save size={18} />} 
-                      {isSaving ? 'Saving…' : 'Save entry'}
-                    </button>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )}
+        <div className="relative space-y-3 md:hidden">
+          {isLoading && <LoadingOverlay />}
+          {!isLoading && logs.length === 0 ? <EmptyState icon={<AlertCircle size={20} />} title={searchTerm ? 'No matching entries' : 'No entries yet'} description={searchTerm ? 'Try a different search.' : 'Add a mistake to turn it into a study note.'} /> : logs.map(log => <Card key={log.id} className="p-4">
+            <div className="flex items-start justify-between gap-3"><span className={`inline-flex rounded-control border px-2.5 py-1 text-[11px] font-semibold ${getCategoryStyle(log.category)}`}>{log.category}</span><div className="flex"><IconAction label="Edit entry" onClick={() => openEdit(log)}><Edit3 size={16} /></IconAction><IconAction danger label="Delete entry" onClick={() => setDeleteTarget(log)}><Trash2 size={16} /></IconAction></div></div>
+            <p className="mt-3 text-body font-semibold text-foreground">{capitalizeFirstLetter(log.source)}</p>
+            <div className="mt-3 flex gap-4"><span className="flex items-center gap-2 text-caption text-muted-foreground">Yours <AnswerMark value={log.userAnswer === 'Omitted' ? 'X' : log.userAnswer} correct={false} /></span><span className="flex items-center gap-2 text-caption text-muted-foreground">Correct <AnswerMark value={log.correctAnswer} correct /></span></div>
+            <dl className="mt-4 space-y-3 text-body"><div><dt className="font-semibold text-foreground">Why it was wrong</dt><dd className="mt-1 text-subtle-foreground">{log.whyWrong || '—'}</dd></div><div><dt className="font-semibold text-foreground">Why this is right</dt><dd className="mt-1 text-subtle-foreground">{log.whyRight || '—'}</dd></div></dl>
+          </Card>)}
+          <PaginationFooter first={firstItem} last={lastItem} total={totalEntries} page={currentPage} pages={totalPages} onPage={setCurrentPage} />
         </div>
-      </main>
-    </div>
-  );
-};
+      </div>
+    </main>
 
-export default ErrorLog;
+    <Modal open={showModal} onClose={() => !isSaving && setShowModal(false)} closeOnBackdrop={!isSaving} title={formData.id ? 'Edit error analysis' : 'Add error entry'} subtitle="Capture the mistake, then write the reasoning you want to remember." className="!max-w-3xl" footer={<><Button variant="ghost" disabled={isSaving} onClick={() => setShowModal(false)}>Cancel</Button><Button disabled={isSaving} onClick={() => void handleSave()}>{isSaving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}{isSaving ? 'Saving…' : 'Save entry'}</Button></>}>
+      <div className="space-y-6">
+        <div className="grid gap-5 md:grid-cols-2">
+          <Field label="Source" required><Input autoFocus className="w-full" placeholder="e.g. Test 1 · Module 2 · Question 15" value={formData.source || ''} onChange={event => setFormData({ ...formData, source: event.target.value })} /></Field>
+          <Field label="Category"><Input className="w-full" placeholder="e.g. Words in Context" list="error-category-suggestions" value={formData.category || ''} onChange={event => setFormData({ ...formData, category: event.target.value })} /><datalist id="error-category-suggestions"><option value="Words in Context" /><option value="Text Structure and Purpose" /><option value="Cross-Text Connections" /><option value="Inferences" /><option value="Standard English Conventions" /></datalist></Field>
+        </div>
+        <div className="grid gap-5 rounded-card border border-ui-border bg-surface-subtle p-4 sm:grid-cols-2 sm:p-5">
+          <AnswerPicker label="Your answer" tone="danger" value={formData.userAnswer || ''} onChange={userAnswer => setFormData({ ...formData, userAnswer })} />
+          <AnswerPicker label="Correct answer" tone="success" value={formData.correctAnswer || ''} onChange={correctAnswer => setFormData({ ...formData, correctAnswer })} />
+        </div>
+        <Field label="Why was your answer wrong?"><textarea rows={3} className="w-full rounded-control border border-ui-border bg-surface px-3 py-2.5 text-body leading-relaxed text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Describe the misconception or reasoning error…" value={formData.whyWrong || ''} onChange={event => setFormData({ ...formData, whyWrong: event.target.value })} /></Field>
+        <Field label="Why is the correct answer right?"><textarea rows={3} className="w-full rounded-control border border-ui-border bg-surface px-3 py-2.5 text-body leading-relaxed text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Explain the correct reasoning and key takeaway…" value={formData.whyRight || ''} onChange={event => setFormData({ ...formData, whyRight: event.target.value })} /></Field>
+      </div>
+    </Modal>
+
+    <Modal open={Boolean(deleteTarget)} onClose={() => !isDeleting && setDeleteTarget(null)} closeOnBackdrop={!isDeleting} title="Delete error entry?" subtitle={deleteTarget ? capitalizeFirstLetter(deleteTarget.source) : undefined} className="!max-w-md" footer={<><Button variant="ghost" disabled={isDeleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={isDeleting} onClick={() => void handleDelete()}>{isDeleting ? 'Deleting…' : 'Delete entry'}</Button></>}>
+      <p className="text-body leading-6 text-subtle-foreground">This permanently removes the study note. This action cannot be undone.</p>
+    </Modal>
+  </div>;
+}
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
+  return <label className="block"><span className="mb-2 block text-body font-medium text-foreground">{label}{required && <span className="text-danger"> *</span>}</span>{children}</label>;
+}
+
+function AnswerPicker({ label, tone, value, onChange }: { label: string; tone: 'danger' | 'success'; value: string; onChange: (value: string) => void }) {
+  const activeClass = tone === 'danger' ? 'border-danger bg-danger text-white' : 'border-success bg-success text-white';
+  return <fieldset><legend className={`mb-3 text-caption font-semibold uppercase tracking-wide ${tone === 'danger' ? 'text-danger' : 'text-success'}`}>{label}</legend><div className="flex gap-2">{['A', 'B', 'C', 'D'].map(option => <button key={option} type="button" aria-pressed={value === option} onClick={() => onChange(option)} className={`flex h-10 w-10 items-center justify-center rounded-control border-2 text-body font-bold transition-colors ${value === option ? activeClass : 'border-ui-border bg-surface text-muted-foreground hover:border-primary/50'}`}>{option}</button>)}</div></fieldset>;
+}
+
+function AnswerMark({ value, correct }: { value: string; correct: boolean }) {
+  return <span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-control border text-caption font-bold ${correct ? 'border-success/20 bg-success-soft text-success' : 'border-danger/20 bg-danger-soft text-danger'}`}>{value}</span>;
+}
+
+function IconAction({ label, danger, onClick, children }: { label: string; danger?: boolean; onClick: () => void; children: ReactNode }) {
+  return <button type="button" onClick={onClick} aria-label={label} title={label} className={`flex h-10 w-10 items-center justify-center rounded-control transition-colors ${danger ? 'text-danger hover:bg-danger-soft' : 'text-primary hover:bg-primary-soft'}`}>{children}</button>;
+}
+
+function LoadingOverlay() {
+  return <div className="absolute inset-0 z-20 flex min-h-48 items-center justify-center bg-surface/80"><div className="flex flex-col items-center gap-2 text-primary"><Loader2 size={28} className="animate-spin" aria-hidden="true" /><span className="text-caption font-semibold">Loading entries…</span></div></div>;
+}
+
+function PaginationFooter({ first, last, total, page, pages, onPage }: { first: number; last: number; total: number; page: number; pages: number; onPage: (page: number) => void }) {
+  if (total === 0) return null;
+  return <div className="flex items-center justify-between gap-3 border-t border-ui-border bg-surface-subtle p-3"><p className="text-caption text-muted-foreground">Showing <strong>{first}–{last}</strong> of <strong>{total}</strong></p><div className="flex items-center gap-2"><Button variant="outline" size="icon" disabled={page === 1} onClick={() => onPage(page - 1)} aria-label="Previous page"><ChevronLeft size={16} /></Button><span className="min-w-20 text-center text-caption font-semibold text-subtle-foreground">{page} / {pages}</span><Button variant="outline" size="icon" disabled={page === pages} onClick={() => onPage(page + 1)} aria-label="Next page"><ChevronRight size={16} /></Button></div></div>;
+}

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, BookOpenCheck, Check, ChevronLeft, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Pencil, Play, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { BookOpen, BookOpenCheck, Check, ChevronLeft, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Pencil, Play, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
-import { Button, Input, Modal, Select } from '../../components/ui/AppUI';
+import { AppHeader, Badge, Button, Card, EmptyState, Input, Modal, Select } from '../../components/ui/AppUI';
+import { ui } from '../../components/ui/styles';
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
 
@@ -67,9 +68,7 @@ const formatLastAttempt = (value?: string | null) => {
 const PracticeTest = () => {
   const navigate = useNavigate();
   const role = (localStorage.getItem('userRole') || 'STUDENT') as UserRole;
-  const userName = localStorage.getItem('userName') || 'Student';
   const canManage = role === 'TEACHER' || role === 'ADMIN';
-  const initials = userName.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase() || 'ST';
 
   const [tests, setTests] = useState<TestItem[]>([]);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
@@ -225,35 +224,20 @@ const PracticeTest = () => {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#F2F8F5] text-[#1A1A1A]">
-      <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center justify-between border-b border-[#E2EDE9] bg-white px-6">
-        <div>
-          <h1 className="text-base font-semibold leading-tight">Practice Center</h1>
-          <p className="mt-0.5 text-xs leading-tight text-[#6B7280]">Browse and attempt SAT practice tests</p>
-        </div>
-        <div className="flex items-center gap-5">
-          <SatCountdown />
-          <button className="relative shrink-0 text-[#6B7280] transition-colors hover:text-[#1A1A1A]" aria-label="Notifications">
-            <Bell size={20} />
-            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
-          </button>
-          <div className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 select-none items-center justify-center rounded-full bg-[#1B7A5A] text-xs font-semibold text-white ring-2 ring-transparent ring-offset-2 ring-offset-white transition-[box-shadow] hover:ring-[#1B7A5A]/30" title={userName}>
-            {initials}
-          </div>
-        </div>
-      </header>
+    <div className={ui.page}>
+      <AppHeader title="Practice Center" subtitle="Browse and attempt SAT practice tests" centerContent={<SatCountdown />} />
 
       <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1200px] p-6 lg:p-8 lg:pt-6">
-          <section className="mb-8 rounded-xl border border-[#E2EDE9] bg-white p-4 shadow-sm">
+        <div className={ui.content}>
+          <Card className="mb-6 p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <label className="flex h-9 min-w-0 max-w-md flex-1 items-center gap-2.5 rounded-lg border border-[#E2EDE9] bg-[#F2F8F5] px-3 focus-within:border-[#1B7A5A] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#1B7A5A]/20">
-                <Search size={15} className="shrink-0 text-[#6B7280]" />
-                <input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Search tests..." className="h-full w-full bg-transparent text-sm outline-none placeholder:text-[#6B7280]" />
+              <label className="flex h-10 min-w-0 max-w-md flex-1 items-center gap-2.5 rounded-control border border-ui-border bg-surface-subtle px-3 focus-within:border-primary focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20">
+                <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                <input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Search tests..." aria-label="Search tests" className="h-full w-full bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground" />
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="whitespace-nowrap text-sm font-medium text-[#1A1A1A]">Sort by:</span>
+                  <span className="whitespace-nowrap text-body font-medium text-foreground">Sort by:</span>
                   <Select value={sortOrder} onChange={event => { setSortOrder(event.target.value as 'NEWEST' | 'OLDEST'); setPage(1); }}>
                     <option value="NEWEST">Newest</option>
                     <option value="OLDEST">Oldest</option>
@@ -262,43 +246,42 @@ const PracticeTest = () => {
                 {canManage && (
                   selectionMode ? (
                     <>
-                      <button
+                      <Button variant="outline"
                         onClick={() => { setSelectionMode(false); setSelectedTestIds([]); }}
-                        className="app-button app-button-secondary"
                       >
                         Cancel
-                      </button>
-                      <button disabled={selectedTestIds.length === 0} onClick={() => setAssignmentOpen(true)} className="app-button app-button-primary">
+                      </Button>
+                      <Button disabled={selectedTestIds.length === 0} onClick={() => setAssignmentOpen(true)}>
                         <GraduationCap size={16} /> Assign selected{selectedTestIds.length > 0 ? ` (${selectedTestIds.length})` : ''}
-                      </button>
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <button onClick={() => setSelectionMode(true)} className="app-button app-button-secondary">
+                      <Button variant="outline" onClick={() => setSelectionMode(true)}>
                         <GraduationCap size={16} /> Assign tests
-                      </button>
-                      <button onClick={() => navigate('/dashboard/practice-test/create')} className="app-button app-button-primary">
+                      </Button>
+                      <Button onClick={() => navigate('/dashboard/practice-test/create')}>
                         <Plus size={16} /> Create Exam
-                      </button>
+                      </Button>
                     </>
                   )
                 )}
               </div>
             </div>
-            <div className="mt-4 flex flex-col gap-3 border-t border-[#E2EDE9] pt-4 lg:flex-row lg:items-center">
+            <div className="mt-4 flex flex-col gap-3 border-t border-ui-border pt-4 lg:flex-row lg:items-center">
               <div className="flex items-center gap-1.5 overflow-x-auto">
-                <SlidersHorizontal size={15} className="mr-1 shrink-0 text-[#6B7280]" />
-                <span className="mr-1 text-xs font-medium text-[#6B7280]">Subject:</span>
+                <SlidersHorizontal size={15} className="mr-1 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="mr-1 text-caption font-medium text-muted-foreground">Subject:</span>
                 {(['ALL', 'RW', 'MATH'] as const).map(value => (
-                  <button key={value} onClick={() => { setSubject(value); setPage(1); }} className={`h-7 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors ${subject === value ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]'}`}>
+                  <button key={value} onClick={() => { setSubject(value); setPage(1); }} aria-pressed={subject === value} className={`min-h-8 whitespace-nowrap rounded-full border px-3 text-caption font-medium transition-colors ${subject === value ? 'border-primary bg-primary text-white' : 'border-primary/40 bg-surface text-primary hover:bg-primary-soft'}`}>
                     {value === 'ALL' ? 'All' : subjectLabel[value]}
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto">
-                <span className="mr-1 text-xs font-medium text-[#6B7280]">Type:</span>
+                <span className="mr-1 text-caption font-medium text-muted-foreground">Type:</span>
                 {(['ALL', 'EXAM', 'PRACTICE'] as const).map(value => (
-                  <button key={value} onClick={() => { setType(value); setPage(1); }} className={`h-7 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors ${type === value ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]'}`}>
+                  <button key={value} onClick={() => { setType(value); setPage(1); }} aria-pressed={type === value} className={`min-h-8 whitespace-nowrap rounded-full border px-3 text-caption font-medium transition-colors ${type === value ? 'border-primary bg-primary text-white' : 'border-primary/40 bg-surface text-primary hover:bg-primary-soft'}`}>
                     {value === 'ALL' ? 'All' : typeLabel[value]}
                   </button>
                 ))}
@@ -310,33 +293,25 @@ const PracticeTest = () => {
                 </Select>
               )}
             </div>
-          </section>
+          </Card>
 
           {loading ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {[1, 2, 3, 4, 5, 6].map(item => <div key={item} className="h-[280px] animate-pulse rounded-xl border border-[#E2EDE9] bg-white p-5"><div className="mb-8 h-8 w-20 rounded-full bg-[#EAF2EE]" /><div className="mb-3 h-5 w-2/3 rounded bg-[#EAF2EE]" /><div className="h-4 w-full rounded bg-[#EAF2EE]" /></div>)}
+              {[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-[280px] animate-pulse p-5"><div className="mb-8 h-8 w-20 rounded-full bg-muted" /><div className="mb-3 h-5 w-2/3 rounded bg-muted" /><div className="h-4 w-full rounded bg-muted" /></Card>)}
             </div>
           ) : tests.length === 0 ? (
-            <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-[#C2DDD4] bg-white px-6 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-[#E8F5EF] text-[#1B7A5A]"><BookOpenCheck size={26} /></div>
-              <h3 className="font-semibold text-[#1A1A1A]">No matching tests</h3>
-              <p className="mt-2 max-w-sm text-sm leading-6 text-[#6B7280]">{canManage ? 'Create your first exam or adjust the current filters.' : 'Your teacher has not assigned a test to your class yet. Admin tests appear here automatically.'}</p>
-            </div>
+            <EmptyState icon={<BookOpenCheck size={22} />} title="No matching tests" description={canManage ? 'Create your first exam or adjust the current filters.' : 'Your teacher has not assigned a test to your class yet. Admin tests appear here automatically.'} className="min-h-[360px]" />
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {tests.map(test => {
                 const selected = selectedTestIds.includes(test.id);
                 const hasPartialProgress = test.progress > 0 && test.progress < 100;
                 return (
-                  <article key={test.id} className={`group relative flex transform-gpu flex-col gap-3 rounded-xl border bg-white p-5 shadow-sm transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#1B7A5A]/45 hover:shadow-[0_6px_16px_rgba(15,77,56,0.12)] ${selected ? 'border-[#1B7A5A] ring-2 ring-[#1B7A5A]/15' : 'border-[#E2EDE9]'}`}>
+                  <article key={test.id} className={`group relative flex transform-gpu flex-col gap-3 rounded-card border bg-surface p-5 shadow-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-elevated ${selected ? 'border-primary ring-2 ring-primary/15' : 'border-ui-border'}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-wrap gap-1.5">
-                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${test.subject === 'MATH' ? 'border-[#F0D070] bg-[#FEF9E7] text-[#92640A]' : 'border-[#C2DDD4] bg-[#E8F5EF] text-[#1B7A5A]'}`}>
-                          {subjectLabel[test.subject]}
-                        </span>
-                        <span className="rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-2 py-0.5 text-[11px] text-[#6B7280]">
-                          {typeLabel[test.mode]}
-                        </span>
+                        <Badge tone={test.subject === 'MATH' ? 'gold' : 'green'}>{subjectLabel[test.subject]}</Badge>
+                        <Badge>{typeLabel[test.mode]}</Badge>
                       </div>
                       {canManage && (selectionMode ? (
                         <button onClick={() => toggleTest(test.id)} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${selected ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#C2DDD4] bg-white text-transparent hover:border-[#1B7A5A]'}`} aria-label={selected ? 'Deselect test' : 'Select test'}>
@@ -355,26 +330,26 @@ const PracticeTest = () => {
                       ))}
                     </div>
 
-                    <h3 className="line-clamp-2 text-sm font-medium leading-snug text-[#1A1A1A]">{test.title}</h3>
+                    <h3 className="line-clamp-2 text-body font-semibold leading-snug text-foreground">{test.title}</h3>
 
                     <div>
-                      <div className="mb-1 flex justify-between text-xs text-[#6B7280]">
+                      <div className="mb-1 flex justify-between text-caption text-muted-foreground">
                         <span>{test.attemptStatus === 'COMPLETED' ? 'Completed' : test.isDoing ? 'In progress' : 'Not started'}</span>
                         <span>{test.progress ?? 0}%</span>
                       </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EAF2EE]">
-                        <div className="h-full rounded-full bg-[#1B7A5A] transition-all duration-300" style={{ width: `${test.progress ?? 0}%` }} />
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${test.progress ?? 0}%` }} />
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs text-[#6B7280]">
+                    <div className="flex items-center gap-3 text-caption text-muted-foreground">
                       <span className="flex items-center gap-1"><BookOpen size={12} /> {test.questionCount ?? 0}Q</span>
                       <span className="flex items-center gap-1"><Clock3 size={12} /> {Math.floor(test.duration)}m</span>
                     </div>
 
-                    <p className="text-xs text-[#6B7280]/70">Last attempted {formatLastAttempt(test.lastAttempt)}</p>
+                    <p className="text-caption text-muted-foreground/80">Last attempted {formatLastAttempt(test.lastAttempt)}</p>
 
-                    <button onClick={() => handleStart(test)} className={`mt-auto flex h-9 w-full items-center justify-center gap-1.5 rounded-lg px-4 text-xs font-medium transition-all duration-150 group-hover:gap-2 ${hasPartialProgress ? 'border border-[#1B7A5A] bg-white text-[#1B7A5A] hover:bg-[#E8F5EF]' : 'bg-[#E8C040] text-[#1A1A1A] hover:bg-[#D9B138]'}`}>
+                    <button onClick={() => handleStart(test)} className={`mt-auto flex min-h-10 w-full items-center justify-center gap-1.5 rounded-control px-4 text-body font-semibold transition-all duration-150 group-hover:gap-2 ${hasPartialProgress ? 'border border-primary bg-surface text-primary hover:bg-primary-soft' : 'bg-accent text-foreground hover:bg-accent-hover'}`}>
                       {hasPartialProgress ? <><Play size={13} /> Continue</> : <><Play size={13} /> Start <ChevronRight size={13} /></>}
                     </button>
                   </article>

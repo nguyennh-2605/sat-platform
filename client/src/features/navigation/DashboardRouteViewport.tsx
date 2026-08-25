@@ -3,9 +3,9 @@ import { Outlet } from 'react-router-dom';
 import { getRequestActivityCursor, hasPendingRequestsAfter, subscribeRequestActivity } from '../../lib/requestActivity';
 
 const REQUEST_GRACE_MS = 90;
-const MIN_TRANSITION_MS = 160;
+const MIN_TRANSITION_MS = 80;
 const MAX_TRANSITION_MS = 1_200;
-const REVEAL_DELAY_MS = 100;
+const REVEAL_DELAY_MS = 0;
 
 export function DashboardRouteViewport() {
   const requestCursorRef = useRef(getRequestActivityCursor());
@@ -52,7 +52,7 @@ export function DashboardRouteViewport() {
   return (
     <>
       <div
-        className={`dashboard-route-content h-full transition-opacity duration-150 motion-reduce:transition-none ${transitioning ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+        className="dashboard-route-content h-full"
         aria-busy={transitioning}
       >
         <Suspense fallback={<div className="h-full" aria-label="Loading page" />}>
@@ -61,10 +61,10 @@ export function DashboardRouteViewport() {
       </div>
       <div
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-x-0 top-0 z-50 h-[3px] overflow-hidden bg-[#CFE3DA] transition-opacity duration-150 motion-reduce:transition-none ${transitioning ? 'opacity-100' : 'opacity-0'}`}
+        className={`pointer-events-none absolute inset-x-0 top-0 z-50 h-[3px] overflow-hidden bg-primary-soft transition-opacity duration-150 motion-reduce:transition-none ${transitioning ? 'opacity-100' : 'opacity-0'}`}
       >
         <span
-          className="block h-full bg-[#1B7A5A] transition-[width] duration-300 ease-out motion-reduce:transition-none"
+          className="block h-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none"
           style={{ width: `${progress}%` }}
         />
       </div>

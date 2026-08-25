@@ -10,6 +10,8 @@ export default {
         background: 'var(--ui-background)',
         foreground: 'var(--ui-foreground)',
         surface: 'var(--ui-surface)',
+        'surface-subtle': 'var(--ui-surface-subtle)',
+        'surface-raised': 'var(--ui-surface-raised)',
         primary: {
           DEFAULT: 'var(--ui-primary)',
           hover: 'var(--ui-primary-hover)',
@@ -41,6 +43,17 @@ export default {
           DEFAULT: 'var(--ui-danger)',
           soft: 'var(--ui-danger-soft)',
         },
+        info: {
+          DEFAULT: 'var(--ui-info)',
+          soft: 'var(--ui-info-soft)',
+        },
+        sidebar: {
+          DEFAULT: 'var(--ui-sidebar)',
+          hover: 'var(--ui-sidebar-hover)',
+          border: 'var(--ui-sidebar-border)',
+          foreground: 'var(--ui-sidebar-foreground)',
+          muted: 'var(--ui-sidebar-muted)',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
@@ -48,9 +61,11 @@ export default {
       fontSize: {
         caption: ['0.75rem', { lineHeight: '1rem' }],
         body: ['0.875rem', { lineHeight: '1.25rem' }],
+        'body-lg': ['1rem', { lineHeight: '1.5rem' }],
         title: ['1rem', { lineHeight: '1.5rem' }],
         heading: ['1.125rem', { lineHeight: '1.75rem' }],
         display: ['1.5rem', { lineHeight: '2rem' }],
+        hero: ['3rem', { lineHeight: '3.5rem' }],
       },
       borderRadius: {
         control: 'var(--ui-radius-control)',

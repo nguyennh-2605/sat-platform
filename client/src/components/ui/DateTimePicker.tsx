@@ -44,7 +44,7 @@ export function DateTimePicker({
   const enableTime = mode === 'datetime';
 
   return <div className={`app-date-time-picker relative min-w-0 ${className}`}>
-    <CalendarDays size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[#1B7A5A]" aria-hidden="true" />
+    <CalendarDays size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-primary" aria-hidden="true" />
     <Flatpickr
       value={pickerValue(value, mode)}
       onChange={dates => {
@@ -65,13 +65,13 @@ export function DateTimePicker({
       disabled={disabled}
       placeholder={placeholder}
       aria-label={ariaLabel || placeholder}
-      className="h-10 w-full cursor-pointer rounded-lg border border-[#C9D8D2] bg-white py-2 pl-10 pr-10 text-sm font-medium text-[#1A1A1A] outline-none transition-colors placeholder:font-normal placeholder:text-[#77827E] hover:border-[#8FB9A9] focus:border-[#1B7A5A] focus:ring-2 focus:ring-[#1B7A5A]/20 disabled:cursor-not-allowed disabled:bg-[#F2F5F4] disabled:text-[#8A9490]"
+      className="h-10 w-full cursor-pointer rounded-control border border-ui-border-strong bg-surface py-2 pl-10 pr-10 text-body font-medium text-foreground outline-none transition-colors placeholder:font-normal placeholder:text-muted-foreground hover:border-primary/55 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
     />
     {clearable && value && !disabled && <button
       type="button"
       onClick={() => onChange('')}
       aria-label="Clear selected date"
-      className="absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#6B7280] transition-colors hover:bg-[#E8F5EF] hover:text-[#145F47]"
+      className="absolute right-1 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary-hover"
     >
       <X size={14} aria-hidden="true" />
     </button>}

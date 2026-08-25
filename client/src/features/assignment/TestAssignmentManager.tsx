@@ -150,8 +150,6 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
   const handleSubmit = () => {
     if (!form.title.trim()) return toast.error("Enter a title");
     if (!form.content || form.content === '<p><br></p>') return toast.error("Enter content");
-    if (selectedTests.length === 0) return toast.error("Select at least one test");
-
     setIsSubmitting(true);
     onSubmit({
       ...form,

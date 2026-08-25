@@ -74,7 +74,8 @@ export default function ClassroomList() {
       <AppHeader
         title="Classroom"
         subtitle={canCreate ? 'Manage your classes and learning spaces' : 'Classes you are enrolled in'}
-        rightContent={canCreate ? <Button size="sm" onClick={() => setEditor({ mode: 'create' })}><Plus size={15} />Create class</Button> : <SatCountdown />}
+        centerContent={<SatCountdown />}
+        rightContent={canCreate ? <Button size="sm" onClick={() => setEditor({ mode: 'create' })}><Plus size={15} aria-hidden="true" /><span className="hidden sm:inline">Create class</span></Button> : undefined}
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto">
@@ -83,15 +84,15 @@ export default function ClassroomList() {
           <section className="min-w-0" aria-label="Classes">
           {loading ? <ClassGridSkeleton /> : loadError ? (
             <Card className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
-              <p className="text-sm font-medium text-[#1A1A1A]">Classes could not be loaded</p>
-              <p className="mt-1 text-xs text-[#6B7280]">{loadError}</p>
+              <p className="text-body font-medium text-foreground">Classes could not be loaded</p>
+              <p className="mt-1 text-caption text-muted-foreground">{loadError}</p>
               <Button className="mt-4" variant="outline" onClick={() => void fetchClasses()}>Try again</Button>
             </Card>
           ) : classes.length === 0 ? (
             <Card className="flex min-h-72 flex-col items-center justify-center p-8 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#E8F5EF] text-[#145F47]"><GraduationCap size={24} /></span>
-              <h2 className="mt-4 text-base font-semibold text-[#1A1A1A]">No classes yet</h2>
-              <p className="mt-1 max-w-sm text-sm leading-6 text-[#6B7280]">{canCreate ? 'Create your first class to organize students, assignments, and progress.' : 'Classes will appear here after a teacher adds you.'}</p>
+              <span className="flex h-12 w-12 items-center justify-center rounded-card bg-primary-soft text-primary-hover"><GraduationCap size={24} aria-hidden="true" /></span>
+              <h2 className="mt-4 text-title font-semibold text-foreground">No classes yet</h2>
+              <p className="mt-1 max-w-sm text-body leading-6 text-muted-foreground">{canCreate ? 'Create your first class to organize students, assignments, and progress.' : 'Classes will appear here after a teacher adds you.'}</p>
               {canCreate && <Button className="mt-5" onClick={() => setEditor({ mode: 'create' })}><Plus size={16} />Create class</Button>}
             </Card>
           ) : (
@@ -99,15 +100,11 @@ export default function ClassroomList() {
               {classes.map(classroom => (
                 <article
                   key={classroom.id}
-                  role="link"
-                  tabIndex={0}
-                  onClick={() => navigate(`/dashboard/class/${classroom.id}?tab=notifications`)}
-                  onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); navigate(`/dashboard/class/${classroom.id}?tab=notifications`); } }}
-                  className="group relative flex min-h-[218px] transform-gpu cursor-pointer flex-col overflow-visible rounded-xl border border-[#C9D8D2] bg-white shadow-[0_3px_10px_rgba(15,77,56,0.10)] transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#8FB9A9] hover:shadow-[0_6px_16px_rgba(15,77,56,0.13)] focus:outline-none focus:ring-2 focus:ring-[#1B7A5A]/30"
+                  className="group relative flex min-h-[218px] transform-gpu flex-col overflow-visible rounded-card border border-ui-border bg-surface shadow-card transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-elevated"
                 >
                   <div className="relative h-20 rounded-t-[11px] border-b border-black/10 px-5 py-3.5 text-white" style={{ backgroundColor: classroom.color || CLASS_COLORS[0] }}>
                     <div className="pr-10">
-                      <h2 className="line-clamp-2 text-lg font-semibold leading-6">{classroom.name}</h2>
+                      <h2 className="line-clamp-2 text-heading font-semibold leading-6"><button type="button" onClick={() => navigate(`/dashboard/class/${classroom.id}?tab=notifications`)} className="rounded text-left underline-offset-4 hover:underline">{classroom.name}</button></h2>
                       <p className="mt-1 truncate text-xs text-white/85">{classroom.teacher?.name || 'Teacher'}</p>
                     </div>
                     {classroom.canManage && (
@@ -117,23 +114,23 @@ export default function ClassroomList() {
                           aria-label={`Actions for ${classroom.name}`}
                           aria-expanded={activeMenuId === classroom.id}
                           onClick={event => { event.stopPropagation(); setActiveMenuId(current => current === classroom.id ? null : classroom.id); }}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-white transition-colors hover:bg-black/20 focus:bg-black/20"
+                          className="flex h-10 w-10 items-center justify-center rounded-control text-white transition-colors hover:bg-black/20 focus:bg-black/20"
                         >
                           <MoreVertical size={19} />
                         </button>
                         {activeMenuId === classroom.id && (
-                          <div className="absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-lg border border-[#C9D8D2] bg-white py-1 text-[#1A1A1A] shadow-lg">
-                            <button type="button" onClick={event => { event.stopPropagation(); setActiveMenuId(null); setEditor({ mode: 'edit', classroom }); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-[#E8F5EF]"><Pencil size={15} className="text-[#1B7A5A]" />Edit class</button>
-                            <button type="button" onClick={event => { event.stopPropagation(); setActiveMenuId(null); setDeleteTarget(classroom); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"><Trash2 size={15} />Delete class</button>
+                          <div role="menu" className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-control border border-ui-border bg-surface py-1 text-foreground shadow-elevated">
+                            <button type="button" role="menuitem" onClick={event => { event.stopPropagation(); setActiveMenuId(null); setEditor({ mode: 'edit', classroom }); }} className="flex min-h-10 w-full items-center gap-2.5 px-3 py-2 text-left text-body hover:bg-primary-soft"><Pencil size={15} className="text-primary" aria-hidden="true" />Edit class</button>
+                            <button type="button" role="menuitem" onClick={event => { event.stopPropagation(); setActiveMenuId(null); setDeleteTarget(classroom); }} className="flex min-h-10 w-full items-center gap-2.5 px-3 py-2 text-left text-body text-danger hover:bg-danger-soft"><Trash2 size={15} aria-hidden="true" />Delete class</button>
                           </div>
                         )}
                       </div>
                     )}
                   </div>
                   <div className="flex-1 space-y-2.5 px-5 pb-2.5 pt-4">
-                    <div className="flex items-center gap-2.5 text-sm text-[#374151]"><Users size={16} className="text-[#1B7A5A]" /><span>{classroom.studentCount} {classroom.studentCount === 1 ? 'student' : 'students'}</span></div>
-                    <div className="flex items-center gap-2.5 text-sm text-[#374151]"><UserRound size={16} className="text-[#1B7A5A]" /><span className="truncate">{classroom.teacher?.email || 'No teacher email'}</span></div>
-                    <div className="flex items-center gap-2.5 text-xs text-[#6B7280]"><CalendarDays size={15} /><span>Created {format(new Date(classroom.createdAt), 'MMM d, yyyy')}</span></div>
+                    <div className="flex items-center gap-2.5 text-body text-subtle-foreground"><Users size={16} className="text-primary" aria-hidden="true" /><span>{classroom.studentCount} {classroom.studentCount === 1 ? 'student' : 'students'}</span></div>
+                    <div className="flex items-center gap-2.5 text-body text-subtle-foreground"><UserRound size={16} className="text-primary" aria-hidden="true" /><span className="truncate">{classroom.teacher?.email || 'No teacher email'}</span></div>
+                    <div className="flex items-center gap-2.5 text-caption text-muted-foreground"><CalendarDays size={15} aria-hidden="true" /><span>Created {format(new Date(classroom.createdAt), 'MMM d, yyyy')}</span></div>
                   </div>
                   <ClassCardTabs classroomId={classroom.id} showPerformance={canCreate} />
                 </article>
@@ -177,7 +174,7 @@ function ClassCardTabs({ classroomId, showPerformance }: { classroomId: string; 
       className="group/tab relative flex h-10 min-w-0 items-center justify-center border-r border-ui-border text-muted-foreground transition-colors first:rounded-bl-card last:rounded-br-card last:border-r-0 hover:bg-primary-soft hover:text-primary focus-visible:z-10 focus-visible:bg-primary-soft focus-visible:text-primary"
     >
       <Icon size={17} />
-      <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#17352A] px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/tab:opacity-100 group-focus-visible/tab:opacity-100">
+      <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 whitespace-nowrap rounded-control bg-sidebar px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/tab:opacity-100 group-focus-visible/tab:opacity-100">
         {label}
       </span>
     </button>)}
@@ -212,8 +209,8 @@ function ClassEditorModal({ state, onClose, onSaved }: { state: { mode: 'create'
 
   return <Modal open={Boolean(state)} onClose={onClose} closeOnBackdrop title={state?.mode === 'edit' ? 'Edit class' : 'Create class'} subtitle={state?.mode === 'edit' ? 'Update the class name and card color.' : 'Create a new learning space.'} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !name.trim()} onClick={save}>{saving ? 'Saving…' : state?.mode === 'edit' ? 'Save changes' : 'Create class'}</Button></>}>
     <form onSubmit={save} className="space-y-5">
-      <label className="block"><span className="mb-2 block text-sm font-medium text-[#1A1A1A]">Class name</span><Input autoFocus className="w-full" maxLength={100} value={name} onChange={event => setName(event.target.value)} placeholder="e.g. SAT Math 12A1" /></label>
-      <fieldset><legend className="mb-2 flex items-center gap-2 text-sm font-medium text-[#1A1A1A]"><Palette size={16} className="text-[#1B7A5A]" />Class color</legend><div className="flex flex-wrap gap-2.5">{CLASS_COLORS.map(item => <button key={item} type="button" aria-label={`Use color ${item}`} aria-pressed={color === item} onClick={() => setColor(item)} className={`h-9 w-9 rounded-lg border-2 transition-transform hover:scale-105 ${color === item ? 'border-[#1A1A1A] ring-2 ring-[#1A1A1A]/15' : 'border-white ring-1 ring-[#C9D8D2]'}`} style={{ backgroundColor: item }} />)}</div></fieldset>
+      <label className="block"><span className="mb-2 block text-body font-medium text-foreground">Class name</span><Input autoFocus className="w-full" maxLength={100} value={name} onChange={event => setName(event.target.value)} placeholder="e.g. SAT Math 12A1" /></label>
+      <fieldset><legend className="mb-2 flex items-center gap-2 text-body font-medium text-foreground"><Palette size={16} className="text-primary" aria-hidden="true" />Class color</legend><div className="flex flex-wrap gap-2.5">{CLASS_COLORS.map(item => <button key={item} type="button" aria-label={`Use color ${item}`} aria-pressed={color === item} onClick={() => setColor(item)} className={`h-10 w-10 rounded-control border-2 transition-transform hover:scale-105 ${color === item ? 'border-foreground ring-2 ring-foreground/15' : 'border-white ring-1 ring-ui-border'}`} style={{ backgroundColor: item }} />)}</div></fieldset>
     </form>
   </Modal>;
 }
@@ -238,11 +235,11 @@ function DeleteClassModal({ target, onClose, onDeleted }: { target: ClassSummary
   };
 
   return <Modal open={Boolean(target)} onClose={onClose} closeOnBackdrop title="Delete class" subtitle="This action permanently removes the class and its classroom data." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="destructive" disabled={deleting || confirmation.trim() !== target?.name} onClick={() => void remove()}>{deleting ? 'Deleting…' : 'Delete class'}</Button></>}>
-    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900">Assignments, student submissions, assigned tests, weeks, and lessons in <strong className="font-semibold">{target?.name}</strong> will be deleted. Original tests in Practice Center will remain.</div>
-    <label className="mt-5 block"><span className="mb-2 block text-sm font-medium text-[#1A1A1A]">Type <strong>{target?.name}</strong> to confirm</span><Input autoFocus className="w-full" value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label>
+    <div className="rounded-control border border-danger/20 bg-danger-soft p-4 text-body leading-6 text-danger">Assignments, student submissions, assigned tests, weeks, and lessons in <strong className="font-semibold">{target?.name}</strong> will be deleted. Original tests in Practice Center will remain.</div>
+    <label className="mt-5 block"><span className="mb-2 block text-body font-medium text-foreground">Type <strong>{target?.name}</strong> to confirm</span><Input autoFocus className="w-full" value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label>
   </Modal>;
 }
 
 function ClassGridSkeleton() {
-  return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} className="h-[218px] animate-pulse overflow-hidden p-0"><div className="h-20 bg-[#D8E7E1]" /><div className="space-y-2.5 px-5 pb-2.5 pt-4"><div className="h-4 w-2/3 rounded bg-[#E7EFEC]" /><div className="h-4 w-1/2 rounded bg-[#E7EFEC]" /><div className="h-3 w-1/3 rounded bg-[#E7EFEC]" /></div><div className="mt-auto h-10 border-t border-[#D8E4DF] bg-[#F3F8F5]" /></Card>)}</div>;
+  return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} className="h-[218px] animate-pulse overflow-hidden p-0"><div className="h-20 bg-muted" /><div className="space-y-2.5 px-5 pb-2.5 pt-4"><div className="h-4 w-2/3 rounded bg-muted" /><div className="h-4 w-1/2 rounded bg-muted" /><div className="h-3 w-1/3 rounded bg-muted" /></div><div className="mt-auto h-10 border-t border-ui-border bg-surface-subtle" /></Card>)}</div>;
 }

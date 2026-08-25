@@ -24,6 +24,9 @@ exports.createWeek = async (req, res) => {
     const newWeek = await progressService.createWeek({
       classId: req.params.classId,
       title: req.body.title,
+      description: req.body.description,
+      status: req.body.status,
+      availableAt: req.body.availableAt,
       userId: getUserId(req),
       userRole: getUserRole(req),
     });
@@ -40,7 +43,9 @@ exports.updateWeek = async (req, res) => {
     const updatedWeek = await progressService.updateWeek({
       weekId: req.params.weekId,
       title: req.body.title,
-      isExpanded: req.body.isExpanded,
+      description: req.body.description,
+      status: req.body.status,
+      availableAt: req.body.availableAt,
       userId: getUserId(req),
       userRole: getUserRole(req),
     });
@@ -72,6 +77,11 @@ exports.createLesson = async (req, res) => {
     const newLesson = await progressService.createLesson({
       weekId: req.params.weekId,
       title: req.body.title,
+      summary: req.body.summary,
+      status: req.body.status,
+      scheduledAt: req.body.scheduledAt,
+      durationMinutes: req.body.durationMinutes,
+      availableAt: req.body.availableAt,
       userId: getUserId(req),
       userRole: getUserRole(req),
     });
@@ -80,6 +90,27 @@ exports.createLesson = async (req, res) => {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
     console.error('Create Lesson Error:', error);
     res.status(500).json({ success: false, error: 'Lỗi khi tạo buổi học' });
+  }
+};
+
+exports.updateLesson = async (req, res) => {
+  try {
+    const lesson = await progressService.updateLesson({
+      lessonId: req.params.lessonId,
+      title: req.body.title,
+      summary: req.body.summary,
+      status: req.body.status,
+      scheduledAt: req.body.scheduledAt,
+      durationMinutes: req.body.durationMinutes,
+      availableAt: req.body.availableAt,
+      userId: getUserId(req),
+      userRole: getUserRole(req),
+    });
+    res.json({ success: true, data: lesson });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Update Lesson Error:', error);
+    res.status(500).json({ success: false, error: 'Lỗi khi cập nhật buổi học' });
   }
 };
 
@@ -122,6 +153,28 @@ exports.deleteFile = async (req, res) => {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
     console.error('Delete File Error:', error);
     res.status(500).json({ success: false, error: 'Lỗi khi xóa tài liệu' });
+  }
+};
+
+exports.openResource = async (req, res) => {
+  try {
+    const progress = await progressService.openResource({ fileId: req.params.fileId, completed: req.body.completed, positionSeconds: req.body.positionSeconds, userId: getUserId(req), userRole: getUserRole(req) });
+    res.json({ success: true, data: progress });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Open Resource Error:', error);
+    res.status(500).json({ success: false, error: 'Lỗi khi cập nhật tiến độ tài liệu' });
+  }
+};
+
+exports.completeLesson = async (req, res) => {
+  try {
+    const progress = await progressService.completeLesson({ lessonId: req.params.lessonId, completed: req.body.completed !== false, userId: getUserId(req), userRole: getUserRole(req) });
+    res.json({ success: true, data: progress });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Complete Lesson Error:', error);
+    res.status(500).json({ success: false, error: 'Lỗi khi cập nhật tiến độ buổi học' });
   }
 };
 

@@ -141,21 +141,21 @@ export function ClassroomTodoPanel() {
 
   return (
     <>
-      <aside className="min-w-0 overflow-hidden rounded-xl border border-[#C9D8D2] bg-white shadow-[0_3px_10px_rgba(15,77,56,0.10)] xl:sticky xl:top-6" aria-label="To Do">
-        <h2 className="mx-5 border-b border-[#C9D8D2] pb-3 pt-5 text-base font-semibold text-[#1A1A1A]">To Do</h2>
+      <aside className="min-w-0 overflow-hidden rounded-card border border-ui-border bg-surface shadow-card xl:sticky xl:top-6" aria-label="To Do">
+        <h2 className="mx-5 border-b border-ui-border pb-3 pt-5 text-title font-semibold text-foreground">To Do</h2>
         <div className="max-h-[620px] overflow-y-auto px-5 pb-2">
           {loading ? <TodoSkeleton /> : error ? (
-            <div className="py-6 text-sm text-[#6B7280]"><p>{error}</p><Button variant="outline" size="sm" className="mt-3" onClick={() => { setLoading(true); void loadTodos(); }}>Try again</Button></div>
+            <div className="py-6 text-body text-muted-foreground"><p>{error}</p><Button variant="outline" size="sm" className="mt-3" onClick={() => { setLoading(true); void loadTodos(); }}>Try again</Button></div>
           ) : items.length === 0 ? (
-            <p className="py-7 text-sm text-[#6B7280]">Nothing for now</p>
+            <p className="py-7 text-body text-muted-foreground">Nothing for now</p>
           ) : items.map(item => {
             const Icon = iconFor(item.type);
-            return <button key={item.key} type="button" onClick={() => openItem(item)} className="group flex w-full gap-3 border-b border-[#D2DED9] px-1 py-4 text-left transition-colors hover:bg-[#E8F5EF] focus-visible:bg-[#E8F5EF]">
-              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.priority === 'OVERDUE' ? 'bg-red-50 text-red-700' : 'bg-[#E8F5EF] text-[#1B7A5A]'}`}><Icon size={16} aria-hidden="true" /></span>
+            return <button key={item.key} type="button" onClick={() => openItem(item)} className="group flex w-full gap-3 border-b border-ui-border px-1 py-4 text-left transition-colors hover:bg-primary-soft focus-visible:bg-primary-soft">
+              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-control ${item.priority === 'OVERDUE' ? 'bg-danger-soft text-danger' : 'bg-primary-soft text-primary'}`}><Icon size={16} aria-hidden="true" /></span>
               <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-x-3">
-                <span className="line-clamp-2 text-sm font-semibold leading-5 text-[#1A1A1A] underline decoration-[#8FB9A9] underline-offset-4 group-hover:text-[#145F47]">{capitalizeFirstLetter(item.title)}</span>
-                <span className={`whitespace-nowrap pt-0.5 text-xs font-medium ${item.priority === 'OVERDUE' ? 'text-red-700' : 'text-[#66736E]'}`}>{itemTrailingMeta(item)}</span>
-                <span className="mt-1 block min-w-0 truncate text-xs leading-5 text-[#5E6B66]">{itemSummary(item)}</span>
+                <span className="line-clamp-2 text-body font-semibold leading-5 text-foreground underline decoration-primary/40 underline-offset-4 group-hover:text-primary-hover">{capitalizeFirstLetter(item.title)}</span>
+                <span className={`whitespace-nowrap pt-0.5 text-caption font-medium ${item.priority === 'OVERDUE' ? 'text-danger' : 'text-muted-foreground'}`}>{itemTrailingMeta(item)}</span>
+                <span className="mt-1 block min-w-0 truncate text-caption leading-5 text-subtle-foreground">{itemSummary(item)}</span>
               </span>
             </button>;
           })}
@@ -167,7 +167,7 @@ export function ClassroomTodoPanel() {
 }
 
 function TodoSkeleton() {
-  return <div className="space-y-1 py-2" aria-label="Loading To Do items">{[1, 2, 3].map(item => <div key={item} className="flex animate-pulse gap-3 border-b border-[#D2DED9] py-4"><div className="h-8 w-8 rounded-lg bg-[#DDE9E4]" /><div className="flex-1"><div className="h-4 w-4/5 rounded bg-[#DDE9E4]" /><div className="mt-2 h-3 w-3/5 rounded bg-[#E7EFEC]" /></div></div>)}</div>;
+  return <div className="space-y-1 py-2" aria-label="Loading To Do items">{[1, 2, 3].map(item => <div key={item} className="flex animate-pulse gap-3 border-b border-ui-border py-4"><div className="h-8 w-8 rounded-control bg-muted" /><div className="flex-1"><div className="h-4 w-4/5 rounded bg-muted" /><div className="mt-2 h-3 w-3/5 rounded bg-surface-subtle" /></div></div>)}</div>;
 }
 
 function TestStartDialog({ item, onClose }: { item: ClassroomTodoItem | null; onClose: () => void }) {
@@ -201,5 +201,5 @@ function TestStartDialog({ item, onClose }: { item: ClassroomTodoItem | null; on
 }
 
 function TestFact({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg border border-[#C9D8D2] bg-[#F8FBF9] p-3"><p className="text-xs text-[#6B7280]">{label}</p><p className="mt-1 font-medium text-[#1A1A1A]">{value}</p></div>;
+  return <div className="rounded-control border border-ui-border bg-surface-subtle p-3"><p className="text-caption text-muted-foreground">{label}</p><p className="mt-1 font-medium text-foreground">{value}</p></div>;
 }

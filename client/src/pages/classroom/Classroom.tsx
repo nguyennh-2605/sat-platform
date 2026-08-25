@@ -129,7 +129,7 @@ export default function Classroom() {
     { value: 'NOTIFICATIONS', label: 'Notifications', icon: Bell, panelId: 'classroom-notifications-panel' },
     { value: 'COURSEWORK', label: 'Coursework', icon: BookOpenCheck, panelId: 'classroom-coursework-panel' },
     { value: 'MEMBERS', label: 'Members', icon: Users, panelId: 'classroom-members-panel' },
-    { value: 'PROGRESS', label: 'Progress Timeline', icon: GitBranch, panelId: 'classroom-progress-panel' },
+    { value: 'PROGRESS', label: 'Course', icon: GitBranch, panelId: 'classroom-progress-panel' },
     ...(canManage ? [{ value: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3, panelId: 'classroom-performance-panel' }] : []),
   ];
 
