@@ -92,7 +92,7 @@ type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 const buttonVariantClasses: Record<ButtonVariant, string> = {
   primary: 'bg-primary text-white hover:bg-primary-hover',
-  outline: 'border border-primary bg-surface text-primary hover:bg-primary-soft',
+  outline: 'border border-ui-border bg-surface text-foreground hover:bg-muted',
   accent: 'bg-accent text-foreground hover:bg-accent-hover',
   ghost: 'bg-transparent text-muted-foreground shadow-none hover:bg-muted hover:text-foreground',
   destructive: 'bg-danger text-white hover:bg-red-700',
@@ -188,11 +188,16 @@ export function Badge({ className, tone = 'neutral', ...props }: BadgeProps) {
   );
 }
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  controlSize?: 'sm' | 'md';
+}
+
+export function Input({ className, controlSize = 'md', ...props }: InputProps) {
   return (
     <input
       className={cx(
-        'h-10 rounded-control border border-ui-border bg-surface px-3 text-body text-foreground outline-hidden placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20',
+        'rounded-control border border-ui-border bg-surface px-3 text-foreground outline-hidden placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20',
+        controlSize === 'sm' ? 'h-8 text-caption' : 'h-10 text-body',
         className,
       )}
       {...props}
