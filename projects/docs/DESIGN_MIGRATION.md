@@ -40,17 +40,17 @@ This is a presentation-layer migration, not a Next.js migration.
 | SAT Platform surface | Primary reference | Secondary reference | Status |
 | --- | --- | --- | --- |
 | Design tokens and primitives | `src/app/globals.css`, `src/components/ui/` | `components.json` | Foundation complete |
-| Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | Implemented; visual QA pending |
-| Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | Implemented; visual QA pending |
+| Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | Implemented; single global toolbar, visual QA pending |
+| Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | Implemented; page hierarchy and workspace cards aligned, visual QA pending |
 | Authentication | `auth/v2` | `auth/v1` | Implemented; visual QA pending |
-| Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Core list, detail, notifications, and members implemented |
-| Practice Center | `dashboard/tasks` | `dashboard/file-manager` | Pending |
-| Test Bank | `dashboard/file-manager` | `dashboard/tasks` | Pending |
-| Results Analytics | `dashboard/analytics` | `dashboard/default` | Pending |
-| Error Log | `dashboard/tasks` | default data-table patterns | Pending |
-| Vocabulary | `dashboard/tasks` | card/list patterns | Pending |
-| Score Report | `dashboard/analytics` | invoice/print composition | Pending |
-| Notifications | dashboard header menus | mail list patterns | Pending |
+| Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Implemented, including course, members, performance, assignments, and no local sticky page header |
+| Practice Center | `dashboard/tasks` | `dashboard/file-manager` | Implemented with real test/class data |
+| Test Bank | `dashboard/file-manager` | `dashboard/tasks` | No standalone route currently; embedded assignment selector aligned |
+| Results Analytics | `dashboard/analytics` | `dashboard/default` | Implemented with real attempt data |
+| Error Log | `dashboard/tasks` | default data-table patterns | Implemented |
+| Vocabulary | `dashboard/tasks` | card/list patterns | Implemented while preserving specialized quiz and flashcard interactions |
+| Score Report | `dashboard/analytics` | invoice/print composition | Implemented while preserving score and Math rendering rules |
+| Notifications | dashboard header menus | mail list patterns | Implemented for the global menu and classroom post workflow |
 | Profile/preferences | `dashboard/profile` | layout controls/theme switcher | Pending |
 | Exam Room | SAT product requirements | shared form/content primitives only | Preserve specialized UI |
 
@@ -82,10 +82,10 @@ This is a presentation-layer migration, not a Next.js migration.
 ### Phase 3 — Feature migration
 
 - [x] Classroom core surfaces (embedded analytics and vocabulary follow their owning migrations).
-- [ ] Practice Center and Test Bank.
-- [ ] Results Analytics and Score Report.
-- [ ] Error Log and Vocabulary.
-- [ ] Remaining shared overlays and supporting screens.
+- [x] Practice Center and the existing embedded Test Bank selector.
+- [x] Results Analytics and Score Report.
+- [x] Error Log and Vocabulary.
+- [x] Shared assignment, test-selection, and announcement overlays.
 
 ### Phase 4 — Consolidation
 

@@ -7,6 +7,7 @@ import 'react-quill-new/dist/quill.snow.css';
 import { type TestItem } from '../../types/quiz';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
+import { Badge, Button, Card, Input } from '../../components/ui/AppUI';
 
 interface TestAssignmentManagerProps {
   onClose: () => void;
@@ -183,69 +184,56 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+    <div className="absolute inset-0 z-50 flex h-full w-full flex-col overflow-hidden bg-background animate-in slide-in-from-bottom-4 duration-300">
 
       {/* HEADER SECTION */}
-      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-between z-30 shadow-xs w-full">
+      <header className="z-30 flex h-12 w-full flex-none items-center justify-between border-b border-ui-border bg-surface px-4 md:px-6">
         <div className="flex items-center gap-2 md:gap-4">
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition">
-            <X size={24} className="text-gray-500" />
-          </button>
-          <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">
+          <Button onClick={onClose} variant="ghost" size="icon" className="h-8 w-8" aria-label="Close assignment editor"><X size={18} /></Button>
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
             {isEditMode ? 'Edit assignment' : 'Create assignment'}
           </h2>
         </div>
 
-        <button
+        <Button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="px-4 py-2 md:px-6 md:py-2.5 bg-[#1B7A5A] text-white rounded-full font-bold hover:bg-[#145F47] shadow-md transition flex items-center gap-2 text-sm md:text-base"
+          size="sm"
         >
           <span className="hidden sm:inline">{isEditMode ? 'Save changes' : 'Assign'}</span>
-        </button>
+        </Button>
       </header>
 
       {/* MAIN CONTENT */}
       <main className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-7xl mx-auto p-6 md:p-8 pb-20">
+        <div className="mx-auto max-w-screen-2xl p-4 pb-20 md:p-6">
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* CỘT TRÁI: Nhập văn bản */}
             <div className="lg:col-span-2 space-y-6">
 
               {/* 1. Ô NHẬP TIÊU ĐỀ */}
-              <div className="bg-white p-3 rounded-lg shadow-xs border border-gray-300 focus-within:border-indigo-600 font-['Helvetica',Arial,sans-serif]">
-                <div className="relative w-full">
-                  <input
+              <label className="block"><span className="mb-2 block text-sm font-medium text-foreground">Assignment title</span>
+                  <Input
                     type="text"
                     id="test-title"
-                    placeholder=" "
-                    className="block w-full pt-4 pb-1 text-base text-gray-700 bg-transparent border-none appearance-none focus:outline-hidden focus:ring-0 peer"
+                    placeholder="Assignment title…"
+                    className="w-full"
                     value={form.title}
                     onChange={e => setForm({ ...form, title: e.target.value })}
                   />
-                  <label
-                    htmlFor="test-title"
-                    className="absolute text-base text-gray-500 italic font-medium duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-left
-                               peer-focus:text-[#1B7A5A]
-                               peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2
-                               peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-0 cursor-text"
-                  >
-                    Assignment title…
-                  </label>
-                </div>
-              </div>
+              </label>
 
               {/* 2. KHU VỰC NỘI DUNG */}
               <div>
-                <label className="block text-base font-bold text-gray-700 mb-3 ml-1">
+                <label className="mb-3 ml-1 block text-sm font-medium text-foreground">
                   Instructions
                 </label>
                 <div className="
-                  bg-white rounded-lg shadow-xs border border-gray-300 focus-within:border-indigo-600 transition-colors overflow-hidden
+                  overflow-hidden rounded-card border border-ui-border bg-surface shadow-xs transition-colors focus-within:border-primary
                   [&_.ql-container.ql-snow]:border-none
-                  [&_.ql-toolbar.ql-snow]:border-b [&_.ql-toolbar.ql-snow]:border-gray-200
-                  [&_.ql-editor]:font-sans [&_.ql-editor]:text-base [&_.ql-editor]:text-gray-700
+                  [&_.ql-toolbar.ql-snow]:border-b [&_.ql-toolbar.ql-snow]:border-ui-border
+                  [&_.ql-editor]:font-sans [&_.ql-editor]:text-base [&_.ql-editor]:text-foreground
                 ">
                   <ReactQuill
                     theme="snow"
@@ -266,27 +254,27 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
 
               {/* 3. CHỌN BÀI KIỂM TRA */}
               <div>
-                <label className="block text-base font-bold text-gray-700 mb-3 ml-1">Tests</label>
+                <label className="mb-3 ml-1 block text-sm font-medium text-foreground">Tests</label>
                 {selectedTests.length === 0 ? (
-                  <div onClick={openTestModal} className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-white hover:bg-gray-50 transition cursor-pointer group">
-                    <Plus className="mx-auto text-gray-400 group-hover:text-[#1B7A5A] transition mb-2" size={28} />
-                    <p className="text-sm font-medium text-gray-600">Select tests from Practice Center</p>
-                  </div>
+                  <button type="button" onClick={openTestModal} className="group w-full rounded-card border border-dashed border-ui-border bg-surface p-6 text-center transition hover:bg-muted">
+                    <Plus className="mx-auto mb-2 text-muted-foreground transition group-hover:text-primary" size={28} />
+                    <span className="text-sm font-medium text-muted-foreground">Select tests from Practice Center</span>
+                  </button>
                 ) : (
-                  <div onClick={openTestModal} className="flex items-center justify-between p-4 bg-[#E8F5EF] border border-[#C2DDD4] rounded-xl cursor-pointer hover:bg-[#C2DDD4]/70 transition">
+                  <button type="button" onClick={openTestModal} className="flex w-full items-center justify-between rounded-card border border-ui-border bg-surface p-4 text-left transition hover:bg-muted">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-[#1B7A5A] rounded-full flex items-center justify-center text-white font-bold shadow-xs">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
                         {selectedTests.length}
                       </div>
                       <div>
-                        <p className="font-semibold text-[#1A1A1A]">{selectedTests.length} selected tests</p>
-                        <p className="text-sm text-[#1B7A5A]/80">Open to review or change the selection</p>
+                        <p className="font-semibold text-foreground">{selectedTests.length} selected tests</p>
+                        <p className="text-sm text-muted-foreground">Open to review or change the selection</p>
                       </div>
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white text-[#1B7A5A] text-sm font-bold rounded-lg border border-[#C2DDD4] shadow-xs hover:bg-gray-50">
+                    <span className="flex items-center gap-2 rounded-control border border-ui-border bg-surface px-3 py-2 text-sm font-medium text-primary">
                       <Edit2 size={16} /> Edit
-                    </button>
-                  </div>
+                    </span>
+                  </button>
                 )}
               </div>
             </div>
@@ -294,18 +282,18 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
             {/* CỘT PHẢI: Cài đặt */}
             <div className="space-y-6">
 
-              <div className="bg-white p-6 rounded-xl shadow-xs border border-gray-300">
-                <h3 className="text-base font-bold text-gray-700 mb-2 flex items-center gap-2">
+              <Card className="p-5">
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
                   Due date
                 </h3>
-                <p className="text-sm text-gray-400 mb-4">Choose when this assignment is due.</p>
+                <p className="mb-4 text-sm text-muted-foreground">Choose when this assignment is due.</p>
                 <DateTimePicker
                   value={form.deadline}
                   onChange={deadline => setForm({ ...form, deadline })}
                   placeholder="Choose a due date…"
                   ariaLabel="Assignment due date"
                 />
-              </div>
+              </Card>
 
             </div>
           </div>
@@ -316,22 +304,22 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
       {/* TEST MODAL */}
       {isTestModalOpen && (
         <div className="absolute inset-0 z-60 flex items-center justify-center bg-slate-900/50 p-4 md:p-8 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl flex flex-col h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
+          <div role="dialog" aria-modal="true" aria-labelledby="select-tests-title" className="flex h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay animate-in zoom-in-95 duration-200">
 
             {/* Modal Header & Breadcrumb */}
-            <div className="px-6 pt-5 pb-3 border-b border-gray-200 bg-white z-10 flex flex-col gap-4">
+            <div className="z-10 flex flex-col gap-4 border-b border-ui-border bg-surface px-6 pb-3 pt-5">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-slate-800">Select tests</h3>
-                <button onClick={() => setIsTestModalOpen(false)} className="text-gray-400 hover:bg-gray-100 p-1.5 rounded-full transition"><X size={24} /></button>
+                <h3 id="select-tests-title" className="text-xl font-semibold text-foreground">Select tests</h3>
+                <Button onClick={() => setIsTestModalOpen(false)} variant="ghost" size="icon" className="h-8 w-8" aria-label="Close test selector"><X size={18} /></Button>
               </div>
 
               {/* Breadcrumb Navigation */}
-              <div className="flex items-center gap-1 text-sm font-medium text-gray-500 overflow-x-auto custom-scrollbar pb-1">
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 text-sm font-medium text-muted-foreground custom-scrollbar">
                 {folderPath.map((folder, index) => (
                   <div key={folder.id || null} className="flex items-center gap-1">
                     <button
                       onClick={() => jumpToBreadcrumb(index)}
-                      className={`hover:text-[#1B7A5A] hover:bg-[#E8F5EF] px-2 py-1 rounded-md transition whitespace-nowrap ${index === folderPath.length - 1 ? 'text-slate-800 font-bold' : ''}`}
+                      className={`whitespace-nowrap rounded-md px-2 py-1 transition hover:bg-muted hover:text-primary ${index === folderPath.length - 1 ? 'font-semibold text-foreground' : ''}`}
                     >
                       {folder.name}
                     </button>
@@ -343,21 +331,21 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
               {/* Search Bar */}
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
+                <Input
                   type="text"
                   placeholder="Search tests or folders…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-hidden transition text-sm"
+                  className="w-full pl-11"
                 />
               </div>
             </div>
 
             {/* Table */}
-            <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+            <div className="flex-1 overflow-y-auto bg-surface custom-scrollbar">
 
               {/* Table Header */}
-              <div className="sticky top-0 bg-gray-50/95 border-b border-gray-200 flex items-center px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider z-10">
+              <div className="sticky top-0 z-10 flex items-center border-b border-ui-border bg-muted/95 px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <div className="w-10"></div>
                 <div className="flex-1">Name</div>
                 <div className="w-28 text-center hidden md:block">Category</div>
@@ -382,10 +370,10 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                     <div
                       key={folder.id}
                       onClick={() => navigateToFolder(folder)}
-                      className="flex items-center px-6 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition group"
+                      className="group flex cursor-pointer items-center border-b border-ui-border px-6 py-3 transition hover:bg-muted"
                     >
-                      <div className="w-10 flex justify-center"><Folder size={20} className="text-gray-400 group-hover:text-[#1B7A5A]" fill="currentColor" fillOpacity={0.2} /></div>
-                      <div className="flex-1 font-medium text-slate-700 group-hover:text-[#1B7A5A]">{folder.name}</div>
+                      <div className="flex w-10 justify-center"><Folder size={20} className="text-muted-foreground group-hover:text-primary" fill="currentColor" fillOpacity={0.2} /></div>
+                      <div className="flex-1 font-medium text-foreground group-hover:text-primary">{folder.name}</div>
                       <div className="w-28 text-center hidden md:block text-sm text-gray-400">-</div>
                       <div className="w-24 text-center hidden sm:block text-sm text-gray-400">-</div>
                       <div className="w-24 text-center hidden sm:block text-sm text-gray-400">-</div>
@@ -399,25 +387,25 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
                       <div
                         key={test.id}
                         onClick={() => toggleTestSelection(test.id)}
-                        className={`flex items-center px-6 py-3 border-b transition cursor-pointer ${isSelected ? 'bg-[#E8F5EF]/50 border-indigo-100' : 'border-gray-100 hover:bg-gray-50'}`}
+                        className={`flex cursor-pointer items-center border-b border-ui-border px-6 py-3 transition ${isSelected ? 'bg-primary-soft/60' : 'hover:bg-muted'}`}
                       >
                         <div className="w-10 flex justify-center">
-                          <div className={`w-5 h-5 rounded-sm flex items-center justify-center border transition ${isSelected ? 'bg-[#1B7A5A] border-indigo-600' : 'bg-white border-gray-300'}`}>
+                          <div className={`flex h-5 w-5 items-center justify-center rounded-sm border transition ${isSelected ? 'border-primary bg-primary' : 'border-ui-border bg-surface'}`}>
                             {isSelected && <Check size={14} className="text-white" />}
                           </div>
                         </div>
 
                         <div className="flex-1 flex items-center gap-3 overflow-hidden">
-                          <FileIcon size={18} className={isSelected ? 'text-[#1B7A5A]' : 'text-gray-400'} />
-                          <span className={`font-medium truncate ${isSelected ? 'text-[#1A1A1A]' : 'text-slate-800'}`}>{capitalizeFirstLetter(test.title)}</span>
+                          <FileIcon size={18} className={isSelected ? 'text-primary' : 'text-muted-foreground'} />
+                          <span className="truncate font-medium text-foreground">{capitalizeFirstLetter(test.title)}</span>
                         </div>
 
                         <div className="w-28 text-center hidden md:flex justify-center">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-sm text-xs font-medium">{test.subject}</span>
+                          <Badge>{test.subject}</Badge>
                         </div>
 
                         <div className="w-24 text-center hidden sm:flex justify-center">
-                          <span className={`px-2 py-1 rounded-sm text-xs font-bold ${test.mode === 'EXAM' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{test.mode}</span>
+                          <Badge tone={test.mode === 'EXAM' ? 'danger' : 'green'}>{test.mode}</Badge>
                         </div>
 
                         <div className="w-24 text-center hidden sm:block text-sm text-gray-600">{test.duration}p</div>
@@ -430,17 +418,13 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
             </div>
 
             {/* Footer */}
-            <div className="p-5 border-t border-gray-200 bg-white flex items-center justify-between z-10">
-              <span className="text-sm font-medium text-gray-600">
-                Selecting <span className="text-[#1B7A5A] font-semibold text-base px-1">{tempSelectedTestIds.length}</span> tests
+            <div className="z-10 flex items-center justify-between border-t border-ui-border bg-surface p-5">
+              <span className="text-sm font-medium text-muted-foreground">
+                Selecting <span className="px-1 text-base font-semibold text-primary">{tempSelectedTestIds.length}</span> tests
               </span>
               <div className="flex gap-3">
-                <button onClick={() => {
-                  setTempSelectedTestIds([]);
-                  setFolderPath([{ id: null, name: 'All tests' }]);
-                  setIsTestModalOpen(false);
-                }} className="px-6 py-2 rounded-full font-medium text-gray-600 hover:bg-gray-100 transition">Cancel</button>
-                <button onClick={saveTestSelection} className="app-button app-button-primary px-8">Confirm</button>
+                <Button variant="ghost" onClick={() => { setTempSelectedTestIds([]); setFolderPath([{ id: null, name: 'All tests' }]); setIsTestModalOpen(false); }}>Cancel</Button>
+                <Button onClick={saveTestSelection}>Confirm</Button>
               </div>
             </div>
 

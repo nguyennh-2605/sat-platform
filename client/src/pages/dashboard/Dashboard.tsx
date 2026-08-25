@@ -5,15 +5,17 @@ import {
   BarChart3,
   BookA,
   BookOpenCheck,
-  ChevronsUpDown,
   GraduationCap,
   LayoutDashboard,
   LogOut,
   Moon,
+  Search,
   Sun,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +28,6 @@ import { Separator } from '@/components/ui/separator';
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -52,17 +53,6 @@ const navigation = [
   { to: '/dashboard/error-log', label: 'Error Log', icon: AlertCircle },
   { to: '/dashboard/results-analytics', label: 'Results & Analytics', icon: BarChart3 },
 ] as const;
-
-const pageTitle = (pathname: string) => {
-  if (pathname === '/dashboard') return 'Overview';
-  if (pathname.startsWith('/dashboard/practice-test')) return 'Practice Center';
-  if (pathname.startsWith('/dashboard/class')) return 'Classroom';
-  if (pathname.startsWith('/dashboard/vocabulary')) return 'Vocabulary';
-  if (pathname.startsWith('/dashboard/error-log')) return 'Error Log';
-  if (pathname.startsWith('/dashboard/results-analytics')) return 'Results & Analytics';
-  if (pathname.startsWith('/dashboard/score-report')) return 'Score Report';
-  return 'SAT Master';
-};
 
 interface NavigationItemProps {
   to: string;
@@ -91,13 +81,7 @@ function NavigationItem({ to, label, icon: Icon, exact = false, activePrefixes =
   );
 }
 
-function AppSidebar({ onLogout }: { onLogout: () => void }) {
-  const userName = localStorage.getItem('userName') || 'Student';
-  const userAvatar = localStorage.getItem('userAvatar') || '';
-  const role = localStorage.getItem('userRole') || 'STUDENT';
-  const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'S';
-  const { isMobile } = useSidebar();
-
+function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -129,45 +113,86 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-                  <Avatar className="size-8 rounded-lg grayscale">
-                    <AvatarImage src={userAvatar || undefined} alt={userName} />
-                    <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-                  </Avatar>
-                  <span className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{userName}</span>
-                    <span className="truncate text-xs text-sidebar-foreground/65">{role.toLowerCase()}</span>
-                  </span>
-                  <ChevronsUpDown className="ml-auto size-4" aria-hidden="true" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-(--radix-dropdown-menu-trigger-width) min-w-56"
-                side={isMobile ? 'bottom' : 'right'}
-                align="end"
-                sideOffset={4}
-              >
-                <DropdownMenuLabel>
-                  <p className="truncate text-sm font-medium">{userName}</p>
-                  <p className="truncate text-xs font-normal text-muted-foreground">{role.toLowerCase()}</p>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onSelect={onLogout}>
-                  <LogOut aria-hidden="true" />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+function DashboardSearch() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'j') {
+        event.preventDefault();
+        setOpen(value => !value);
+      }
+    };
+    document.addEventListener('keydown', handleShortcut);
+    return () => document.removeEventListener('keydown', handleShortcut);
+  }, []);
+
+  const matches = navigation.filter(item => item.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const openRoute = (to: string) => {
+    navigate(to);
+    setOpen(false);
+    setQuery('');
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" className="h-8 justify-start gap-2 px-2 text-muted-foreground sm:w-52" aria-label="Search workspace">
+          <Search className="size-4" aria-hidden="true" />
+          <span className="hidden sm:inline">Search</span>
+          <kbd className="ml-auto hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] sm:inline">Ctrl J</kbd>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Search workspace</DialogTitle>
+          <DialogDescription>Jump to a SAT Master section.</DialogDescription>
+        </DialogHeader>
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search sections..." className="pl-9" />
+        </label>
+        <div className="grid gap-1">
+          {matches.map(item => <Button key={item.to} variant="ghost" className="justify-start" onClick={() => openRoute(item.to)}><item.icon aria-hidden="true" />{item.label}</Button>)}
+          {matches.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">No matching section.</p>}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function HeaderAccountMenu({ onLogout }: { onLogout: () => void }) {
+  const userName = localStorage.getItem('userName') || 'Student';
+  const userAvatar = localStorage.getItem('userAvatar') || '';
+  const role = localStorage.getItem('userRole') || 'STUDENT';
+  const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'S';
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="rounded-full" aria-label="Open account menu">
+          <Avatar className="size-8">
+            <AvatarImage src={userAvatar || undefined} alt={userName} />
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuLabel>
+          <p className="truncate text-sm font-medium">{userName}</p>
+          <p className="truncate text-xs font-normal capitalize text-muted-foreground">{role.toLowerCase()}</p>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={onLogout}><LogOut aria-hidden="true" />Log out</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -188,7 +213,6 @@ function ThemeToggle() {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const location = useLocation();
   const userId = localStorage.getItem('userId') || 'guest';
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -214,17 +238,18 @@ export default function Dashboard() {
       <a href="#dashboard-content" className="fixed left-3 top-3 z-300 -translate-y-20 rounded-lg bg-popover px-3 py-2 text-sm font-medium text-popover-foreground shadow-md focus:translate-y-0">
         Skip to content
       </a>
-      <AppSidebar onLogout={() => void logout()} />
+      <AppSidebar />
       <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
         <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b bg-background/80 px-4 backdrop-blur-sm">
           <div className="flex min-w-0 items-center gap-2">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mx-1 h-4" />
-            <p className="truncate text-sm font-medium">{pageTitle(location.pathname)}</p>
+            <DashboardSearch />
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
             <NotificationBell currentUserId={userId} />
+            <HeaderAccountMenu onLogout={() => void logout()} />
           </div>
         </header>
 

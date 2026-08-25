@@ -4,7 +4,7 @@ import { compareAsc, format, formatDistanceToNow, isPast, isToday, isTomorrow } 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
-import { BackButton, Button, Card, Input, Modal, TableShell, Tabs, type TabItem } from '../../components/ui/AppUI';
+import { BackButton, Button, Card, Input, Modal, PageHeader, TableShell, Tabs, type TabItem } from '../../components/ui/AppUI';
 import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
@@ -131,41 +131,38 @@ export default function Classroom() {
   ];
 
   return <div className="h-full overflow-y-auto">
-    <ClassroomHeader
-      className={classDetail.name}
-      tabs={tabs}
-      activeTab={activeTab}
-      onSelectTab={selectTab}
-      onBack={() => navigate('/dashboard/classes')}
-    />
+    <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
+      <ClassroomHeader
+        className={classDetail.name}
+        tabs={tabs}
+        activeTab={activeTab}
+        onSelectTab={selectTab}
+        onBack={() => navigate('/dashboard/classes')}
+      />
 
-    <main><div className="mx-auto w-full max-w-[1400px]">
+      <div>
       {activeTab === 'NOTIFICATIONS' && <div id="classroom-notifications-panel" role="tabpanel"><NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} /></div>}
-      {activeTab === 'COURSEWORK' && <div id="classroom-coursework-panel" role="tabpanel" className="p-6 lg:p-8"><ClassroomVocabularyPanel classId={classId || ''} canManage={canManage} /></div>}
+      {activeTab === 'COURSEWORK' && <div id="classroom-coursework-panel" role="tabpanel" className="py-2"><ClassroomVocabularyPanel classId={classId || ''} canManage={canManage} /></div>}
       {activeTab === 'MEMBERS' && <div id="classroom-members-panel" role="tabpanel"><MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} /></div>}
-      {activeTab === 'PROGRESS' && <div id="classroom-progress-panel" role="tabpanel" className="p-6 lg:p-8"><WeeklyProgress canManage={canManage} /></div>}
-      {activeTab === 'PERFORMANCE' && canManage && <div id="classroom-performance-panel" role="tabpanel" className="p-6 lg:p-8"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
-    </div></main>
+      {activeTab === 'PROGRESS' && <div id="classroom-progress-panel" role="tabpanel" className="py-2"><WeeklyProgress canManage={canManage} /></div>}
+      {activeTab === 'PERFORMANCE' && canManage && <div id="classroom-performance-panel" role="tabpanel" className="py-2"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
+      </div>
 
     {announcementOpen && <AnnouncementCreator onClose={() => setAnnouncementOpen(false)} onSubmit={data => void createAnnouncement(data)} />}
     <AddStudentModal open={addStudentOpen} onClose={() => setAddStudentOpen(false)} onAdd={addStudent} />
     <RemoveStudentModal student={studentToRemove} onClose={() => setStudentToRemove(null)} onRemove={removeStudent} />
+    </main>
   </div>;
 }
 
 function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack }: { className: string; tabs: Array<TabItem<ClassroomTab>>; activeTab: ClassroomTab; onSelectTab: (tab: ClassroomTab) => void; onBack: () => void }) {
-  return <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 px-4 pb-0 pt-5 sm:px-6 lg:px-8">
-      <div className="flex min-w-0 items-center gap-3">
-        <BackButton onClick={onBack} />
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Classroom</p>
-          <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">{className}</h1>
-        </div>
-      </div>
-      <Tabs items={tabs} value={activeTab} onValueChange={onSelectTab} ariaLabel="Classroom sections" className="h-10 overflow-x-auto" tabClassName="h-10" />
+  return <div className="flex flex-col gap-4">
+    <div className="flex items-start gap-3">
+      <BackButton onClick={onBack} className="mt-1" />
+      <PageHeader title={className} description="Manage announcements, coursework, members, and class performance." />
     </div>
-  </header>;
+    <div className="overflow-x-auto"><Tabs items={tabs} value={activeTab} onValueChange={onSelectTab} ariaLabel="Classroom sections" /></div>
+  </div>;
 }
 
 function NotificationsTab({ classroom, canManage, onNewAnnouncement, onOpenAssignment }: { classroom: ClassDetail; canManage: boolean; onNewAnnouncement: () => void; onOpenAssignment: (assignmentId: string) => void }) {
@@ -175,7 +172,7 @@ function NotificationsTab({ classroom, canManage, onNewAnnouncement, onOpenAssig
   const filtered = assignments.filter(item => filter === 'all' || notificationType(item) === filter);
   const attention = assignments.filter(item => notificationType(item) === 'assignment' && item.deadline).sort((a, b) => compareAsc(new Date(a.deadline as string), new Date(b.deadline as string))).slice(0, 2);
 
-  return <div className="p-5 md:p-6 lg:p-8"><div className="flex min-w-0 flex-col gap-6">
+  return <div className="py-2"><div className="flex min-w-0 flex-col gap-6">
     {canManage && <div className="flex flex-wrap items-center justify-between gap-4"><InviteCodeWidget classId={classroom.id} /><Button size="sm" onClick={onNewAnnouncement}><Plus size={14} />New announcement</Button></div>}
     <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)] lg:gap-8">
       <aside className="flex min-w-0 flex-col gap-5">
@@ -206,7 +203,7 @@ function InviteCodeWidget({ classId }: { classId: string }) {
 }
 
 function MembersTab({ classroom, canManage, onInvite, onRemove }: { classroom: ClassDetail; canManage: boolean; onInvite: () => void; onRemove: (student: ClassMember) => void }) {
-  return <div className="flex flex-col gap-8 p-5 md:p-6 lg:p-8">
+  return <div className="flex flex-col gap-8 py-2">
     <MemberSection title="Teachers" count={1}>
       <MemberTable label="Teacher" members={[classroom.teacher]} canManage={false} />
     </MemberSection>

@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, Edit3, FileText, Loader2, Plus, Save, Search, Trash2 } from 'lucide-react';
 import { capitalizeFirstLetter } from '../../utils/text';
 import toast from 'react-hot-toast';
+import { Textarea } from '@/components/ui/textarea';
 import axiosClient from '../../lib/axios';
-import { AppHeader, Button, Card, EmptyState, Input, Modal, TableShell } from '../../components/ui/AppUI';
-import { ui } from '../../components/ui/styles';
+import { Button, Card, EmptyState, Input, Modal, PageHeader, TableShell } from '../../components/ui/AppUI';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -121,10 +121,9 @@ export default function ErrorLog() {
   const firstItem = (currentPage - 1) * ERROR_LOG_PAGE_SIZE + 1;
   const lastItem = Math.min(currentPage * ERROR_LOG_PAGE_SIZE, totalEntries);
 
-  return <div className={ui.page}>
-    <AppHeader title="Error Log" subtitle="Review mistakes and turn them into study notes" centerContent={<SatCountdown />} />
-    <main className="min-h-0 flex-1 overflow-y-auto">
-      <div className={ui.content}>
+  return <div className="h-full overflow-y-auto">
+    <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
+        <PageHeader title="Error Log" description="Review mistakes and turn them into study notes." actions={<><SatCountdown /><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Add entry</Button></>} />
         <Card className="mb-4 flex flex-col justify-between gap-4 p-4 md:flex-row md:items-center">
           <div>
             <h2 className="flex items-center gap-2 text-heading font-semibold text-foreground"><AlertCircle className="text-danger" size={20} aria-hidden="true" />Mistake review</h2>
@@ -136,7 +135,6 @@ export default function ErrorLog() {
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input type="search" placeholder="Search entries…" className="w-full pl-9" value={searchTerm} onChange={event => { setSearchTerm(event.target.value); setCurrentPage(1); }} />
             </label>
-            <Button onClick={openCreate}><Plus size={16} aria-hidden="true" /><span className="hidden sm:inline">Add entry</span></Button>
           </div>
         </Card>
 
@@ -175,7 +173,6 @@ export default function ErrorLog() {
           </Card>)}
           <PaginationFooter first={firstItem} last={lastItem} total={totalEntries} page={currentPage} pages={totalPages} onPage={setCurrentPage} />
         </div>
-      </div>
     </main>
 
     <Modal open={showModal} onClose={() => !isSaving && setShowModal(false)} closeOnBackdrop={!isSaving} title={formData.id ? 'Edit error analysis' : 'Add error entry'} subtitle="Capture the mistake, then write the reasoning you want to remember." className="max-w-3xl!" footer={<><Button variant="ghost" disabled={isSaving} onClick={() => setShowModal(false)}>Cancel</Button><Button disabled={isSaving} onClick={() => void handleSave()}>{isSaving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}{isSaving ? 'Saving…' : 'Save entry'}</Button></>}>
@@ -188,8 +185,8 @@ export default function ErrorLog() {
           <AnswerPicker label="Your answer" tone="danger" value={formData.userAnswer || ''} onChange={userAnswer => setFormData({ ...formData, userAnswer })} />
           <AnswerPicker label="Correct answer" tone="success" value={formData.correctAnswer || ''} onChange={correctAnswer => setFormData({ ...formData, correctAnswer })} />
         </div>
-        <Field label="Why was your answer wrong?"><textarea rows={3} className="w-full rounded-control border border-ui-border bg-surface px-3 py-2.5 text-body leading-relaxed text-foreground outline-hidden placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Describe the misconception or reasoning error…" value={formData.whyWrong || ''} onChange={event => setFormData({ ...formData, whyWrong: event.target.value })} /></Field>
-        <Field label="Why is the correct answer right?"><textarea rows={3} className="w-full rounded-control border border-ui-border bg-surface px-3 py-2.5 text-body leading-relaxed text-foreground outline-hidden placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Explain the correct reasoning and key takeaway…" value={formData.whyRight || ''} onChange={event => setFormData({ ...formData, whyRight: event.target.value })} /></Field>
+        <Field label="Why was your answer wrong?"><Textarea rows={3} placeholder="Describe the misconception or reasoning error…" value={formData.whyWrong || ''} onChange={event => setFormData({ ...formData, whyWrong: event.target.value })} /></Field>
+        <Field label="Why is the correct answer right?"><Textarea rows={3} placeholder="Explain the correct reasoning and key takeaway…" value={formData.whyRight || ''} onChange={event => setFormData({ ...formData, whyRight: event.target.value })} /></Field>
       </div>
     </Modal>
 
@@ -205,7 +202,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 
 function AnswerPicker({ label, tone, value, onChange }: { label: string; tone: 'danger' | 'success'; value: string; onChange: (value: string) => void }) {
   const activeClass = tone === 'danger' ? 'border-danger bg-danger text-white' : 'border-success bg-success text-white';
-  return <fieldset><legend className={`mb-3 text-caption font-semibold uppercase tracking-wide ${tone === 'danger' ? 'text-danger' : 'text-success'}`}>{label}</legend><div className="flex gap-2">{['A', 'B', 'C', 'D'].map(option => <button key={option} type="button" aria-pressed={value === option} onClick={() => onChange(option)} className={`flex h-10 w-10 items-center justify-center rounded-control border-2 text-body font-bold transition-colors ${value === option ? activeClass : 'border-ui-border bg-surface text-muted-foreground hover:border-primary/50'}`}>{option}</button>)}</div></fieldset>;
+  return <fieldset><legend className={`mb-3 text-caption font-semibold uppercase tracking-wide ${tone === 'danger' ? 'text-danger' : 'text-success'}`}>{label}</legend><div className="flex gap-2">{['A', 'B', 'C', 'D'].map(option => <Button key={option} variant="outline" size="icon" aria-pressed={value === option} onClick={() => onChange(option)} className={value === option ? activeClass : undefined}>{option}</Button>)}</div></fieldset>;
 }
 
 function AnswerMark({ value, correct }: { value: string; correct: boolean }) {
@@ -213,7 +210,7 @@ function AnswerMark({ value, correct }: { value: string; correct: boolean }) {
 }
 
 function IconAction({ label, danger, onClick, children }: { label: string; danger?: boolean; onClick: () => void; children: ReactNode }) {
-  return <button type="button" onClick={onClick} aria-label={label} title={label} className={`flex h-10 w-10 items-center justify-center rounded-control transition-colors ${danger ? 'text-danger hover:bg-danger-soft' : 'text-primary hover:bg-primary-soft'}`}>{children}</button>;
+  return <Button variant="ghost" size="icon" onClick={onClick} aria-label={label} title={label} className={danger ? 'text-danger hover:bg-danger-soft' : undefined}>{children}</Button>;
 }
 
 function LoadingOverlay() {

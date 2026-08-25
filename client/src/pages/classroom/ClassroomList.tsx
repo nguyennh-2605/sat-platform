@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Modal } from '../../components/ui/AppUI';
+import { PageHeader } from '../../components/ui/AppUI';
 import { ClassroomTodoPanel } from '../../features/classroom/ClassroomTodoPanel';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import axiosClient from '../../lib/axios';
@@ -68,21 +69,11 @@ export default function ClassroomList() {
   return (
     <main className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
-        <header className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">Classroom</h1>
-              {!loading && <Badge variant="secondary">{classes.length}</Badge>}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {canCreate ? 'Manage classes, students, assignments, and learning progress.' : 'Open a class to view assignments and learning activity.'}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <SatCountdown />
-            {canCreate && <Button onClick={() => setEditor({ mode: 'create' })}><Plus aria-hidden="true" />Create class</Button>}
-          </div>
-        </header>
+        <PageHeader
+          title={<span className="flex items-center gap-2">Classroom{!loading && <Badge variant="secondary">{classes.length}</Badge>}</span>}
+          description={canCreate ? 'Manage classes, students, assignments, and learning progress.' : 'Open a class to view assignments and learning activity.'}
+          actions={<><SatCountdown />{canCreate && <Button onClick={() => setEditor({ mode: 'create' })}><Plus aria-hidden="true" />Create class</Button>}</>}
+        />
 
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <section className="min-w-0" aria-label="Classes">

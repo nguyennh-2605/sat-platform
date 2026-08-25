@@ -6,6 +6,7 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { type AssignmentProps } from '../../types/quiz';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
+import { Button, Card, Input } from '../../components/ui/AppUI';
 
 interface AnnouncementCreatorProps {
   onClose: () => void;
@@ -138,69 +139,56 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col h-full w-full bg-[#F8FAFC] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+    <div className="absolute inset-0 z-50 flex h-full w-full flex-col overflow-hidden bg-background animate-in slide-in-from-bottom-4 duration-300">
 
       {/* HEADER SECTION */}
-      <header className="flex-none h-16 bg-white border-b border-gray-300 px-4 md:px-8 flex items-center justify-between z-30 shadow-xs w-full">
+      <header className="z-30 flex h-12 w-full flex-none items-center justify-between border-b border-ui-border bg-surface px-4 md:px-6">
         <div className="flex items-center gap-2 md:gap-4">
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition">
-            <X size={24} className="text-gray-500" />
-          </button>
-          <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">
+          <Button onClick={onClose} variant="ghost" size="icon" className="h-8 w-8" aria-label="Close post editor"><X size={18} /></Button>
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
             {isEditMode ? 'Edit post' : 'New post'}
           </h2>
         </div>
 
-        <button
+        <Button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="px-4 py-2 md:px-6 md:py-2.5 bg-[#1B7A5A] text-white rounded-full font-bold hover:bg-[#145F47] shadow-md transition flex items-center gap-2 text-sm md:text-base"
+          size="sm"
         >
           <span className="hidden sm:inline">{isEditMode ? 'Save changes' : 'Publish'}</span>
-        </button>
+        </Button>
       </header>
 
       {/* MAIN CONTENT */}
       <main className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-7xl mx-auto p-6 md:p-8 pb-20">
+        <div className="mx-auto max-w-screen-2xl p-4 pb-20 md:p-6">
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* CỘT TRÁI: Nhập văn bản */}
             <div className="lg:col-span-2 space-y-6">
 
               {/* 1. Ô NHẬP TIÊU ĐỀ */}
-              <div className="bg-white p-3 rounded-lg shadow-xs border border-gray-300 focus-within:border-indigo-600 font-['Helvetica',Arial,sans-serif]">
-                <div className="relative w-full">
-                  <input
+              <label className="block"><span className="mb-2 block text-sm font-medium text-foreground">Post title</span>
+                  <Input
                     type="text"
                     id="post-title"
-                    placeholder=" "
-                    className="block w-full pt-4 pb-1 text-base text-gray-700 bg-transparent border-none appearance-none focus:outline-hidden focus:ring-0 peer"
+                    placeholder="Post title…"
+                    className="w-full"
                     value={form.title}
                     onChange={e => setForm({ ...form, title: e.target.value })}
                   />
-                  <label
-                    htmlFor="post-title"
-                    className="absolute text-base text-gray-500 italic font-medium duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-left
-                               peer-focus:text-[#1B7A5A]
-                               peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2
-                               peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-0 cursor-text"
-                  >
-                    Post title…
-                  </label>
-                </div>
-              </div>
+              </label>
 
               {/* 2. KHU VỰC NỘI DUNG */}
               <div>
-                <label className="block text-base font-bold text-gray-700 mb-3 ml-1">
+                <label className="mb-3 ml-1 block text-sm font-medium text-foreground">
                   Content
                 </label>
                 <div className="
-                  bg-white rounded-lg shadow-xs border border-gray-300 focus-within:border-indigo-600 transition-colors overflow-hidden
+                  overflow-hidden rounded-card border border-ui-border bg-surface shadow-xs transition-colors focus-within:border-primary
                   [&_.ql-container.ql-snow]:border-none
-                  [&_.ql-toolbar.ql-snow]:border-b [&_.ql-toolbar.ql-snow]:border-gray-200
-                  [&_.ql-editor]:font-sans [&_.ql-editor]:text-base [&_.ql-editor]:text-gray-700
+                  [&_.ql-toolbar.ql-snow]:border-b [&_.ql-toolbar.ql-snow]:border-ui-border
+                  [&_.ql-editor]:font-sans [&_.ql-editor]:text-base [&_.ql-editor]:text-foreground
                 ">
                   <ReactQuill
                     theme="snow"
@@ -224,21 +212,21 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
             {/* CỘT PHẢI: Cài đặt & Đính kèm */}
             <div className="space-y-6">
 
-              <div className="bg-white p-6 rounded-xl shadow-xs border border-gray-300">
-                <h3 className="text-base font-bold text-gray-700 mb-2 flex items-center gap-2">
+              <Card className="p-5">
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
                   Due date
                 </h3>
-                <p className="text-sm text-gray-400 mb-4">Leave blank for an announcement without a due date.</p>
+                <p className="mb-4 text-sm text-muted-foreground">Leave blank for an announcement without a due date.</p>
                 <DateTimePicker
                   value={form.deadline}
                   onChange={deadline => setForm({ ...form, deadline })}
                   placeholder="Choose a due date…"
                   ariaLabel="Post due date"
                 />
-              </div>
+              </Card>
 
-              <div className="bg-white p-6 rounded-xl shadow-xs border border-gray-300">
-                <h3 className="text-base font-bold text-gray-700 mb-6 flex items-center gap-2">
+              <Card className="p-5">
+                <h3 className="mb-6 flex items-center gap-2 text-sm font-semibold text-foreground">
                   Attach resources
                 </h3>
 
@@ -246,53 +234,53 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                   <button
                     type="button"
                     onClick={handleOpenDrivePicker}
-                    className="flex flex-col items-center justify-center w-[72px] h-[72px] rounded-full border border-gray-300 cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="flex h-[72px] w-[72px] cursor-pointer flex-col items-center justify-center rounded-full border border-ui-border transition-colors hover:bg-muted"
                   >
-                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                    <span className="text-xs font-medium text-gray-600 mt-1">Drive</span>
+                    <svg className="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    <span className="mt-1 text-xs font-medium text-muted-foreground">Drive</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setShowLinkInput(!showLinkInput)}
-                    className="flex flex-col items-center justify-center w-[72px] h-[72px] rounded-full border border-gray-300 cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="flex h-[72px] w-[72px] cursor-pointer flex-col items-center justify-center rounded-full border border-ui-border transition-colors hover:bg-muted"
                   >
-                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                    <span className="text-xs font-medium text-gray-600 mt-1">Link</span>
+                    <svg className="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                    <span className="mt-1 text-xs font-medium text-muted-foreground">Link</span>
                   </button>
                 </div>
 
                 {showLinkInput && (
                   <div className="flex gap-2 mb-4 animate-in slide-in-from-top-2">
-                    <input
+                    <Input
                       type="url"
                       value={linkUrl}
                       onChange={(e) => setLinkUrl(e.target.value)}
                       placeholder="Paste a link…"
-                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-hidden focus:border-[#1B7A5A]"
+                      className="min-w-0 flex-1"
                     />
-                    <button
+                    <Button
                       type="button"
                       onClick={handleAddLink}
-                      className="px-4 py-2 bg-[#E8F5EF] text-[#1B7A5A] text-sm font-medium rounded-full hover:bg-[#C2DDD4] transition-colors"
+                      variant="outline"
                     >
                       Add
-                    </button>
+                    </Button>
                   </div>
                 )}
 
                 {/* DANH SÁCH FILE ĐÃ CHỌN */}
                 {driveFiles.length > 0 && (
                   <div className="mt-4 space-y-2">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Attachments ({driveFiles.length})</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Attachments ({driveFiles.length})</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
                       {driveFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between bg-gray-50 p-2.5 rounded-lg border border-gray-100 group">
+                        <div key={index} className="group flex items-center justify-between rounded-lg border border-ui-border bg-muted p-2.5">
                           <div className="flex items-center space-x-2 overflow-hidden">
-                            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
+                            <svg className="h-4 w-4 shrink-0 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
                             <a href={file.url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline truncate">{file.name}</a>
                           </div>
-                          <button type="button" onClick={() => removeDriveFile(index)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button type="button" onClick={() => removeDriveFile(index)} className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         </div>
@@ -304,15 +292,15 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                 {/* DANH SÁCH LINK ĐÃ CHỌN */}
                 {links.length > 0 && (
                   <div className="mt-4 space-y-2">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Attached links ({links.length})</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Attached links ({links.length})</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
                       {links.map((link, index) => (
-                        <div key={index} className="flex items-center justify-between bg-blue-50/50 p-2.5 rounded-lg border border-blue-100 group">
+                        <div key={index} className="group flex items-center justify-between rounded-lg border border-ui-border bg-muted p-2.5">
                           <div className="flex items-center space-x-2 overflow-hidden">
                             <svg className="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                             <a href={link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate">{link}</a>
                           </div>
-                          <button type="button" onClick={() => removeLink(index)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button type="button" onClick={() => removeLink(index)} className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         </div>
@@ -320,7 +308,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                     </div>
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
           </div>
 

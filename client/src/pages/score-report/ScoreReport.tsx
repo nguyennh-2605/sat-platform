@@ -18,7 +18,7 @@ import type { ContentBlock } from '../../types/quiz';
 import ReviewModal from '../../features/quiz/ReviewModal';
 import axiosClient from '../../lib/axios';
 import { invalidateQueryCache } from '../../lib/queryCache';
-import { AppHeader, BackButton, Badge, Button, Card, Select, TableShell } from '../../components/ui/AppUI';
+import { BackButton, Badge, Button, Card, PageHeader, Select, TableShell } from '../../components/ui/AppUI';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { capitalizeFirstLetter } from '../../utils/text';
 
@@ -157,11 +157,11 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
   const pageQuestions = filteredQuestions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   if (loading) {
-    return <PageFrame><div className="flex min-h-0 flex-1 items-center justify-center text-[#1B7A5A]"><Loader2 className="animate-spin" size={28} /><span className="ml-3 text-sm font-medium">Loading score report…</span></div></PageFrame>;
+    return <PageFrame><div className="flex min-h-0 flex-1 items-center justify-center text-primary"><Loader2 className="animate-spin" size={28} /><span className="ml-3 text-sm font-medium">Loading score report…</span></div></PageFrame>;
   }
 
   if (loadError || !data) {
-    return <PageFrame><div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center"><XCircle size={40} className="text-red-500" /><div><h1 className="text-lg font-semibold">Score report unavailable</h1><p className="mt-1 text-sm text-[#6B7280]">This result may no longer exist or you may not have access.</p></div><BackButton onClick={handleBack} /></div></PageFrame>;
+    return <PageFrame><div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center"><XCircle size={40} className="text-destructive" /><div><h1 className="text-lg font-semibold">Score report unavailable</h1><p className="mt-1 text-sm text-muted-foreground">This result may no longer exist or you may not have access.</p></div><BackButton onClick={handleBack} /></div></PageFrame>;
   }
 
   const totalQuestions = data.questions.length;
@@ -175,16 +175,14 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
     : -1;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F2F8F5] font-sans text-[#1A1A1A]">
-      <AppHeader title="Test Result Details" subtitle="Review your performance and identify areas for improvement." rightContent={<SatCountdown />} />
-      <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-8">
-      <main className="mx-auto w-full max-w-[1200px] animate-in fade-in duration-300">
-        <BackButton onClick={handleBack} className="mb-6" />
+    <div className="h-full overflow-y-auto bg-background text-foreground">
+      <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
+        <div className="flex items-start gap-3"><BackButton onClick={handleBack} className="mt-1" /><PageHeader title="Test Result Details" description="Review your performance and identify areas for improvement." actions={<SatCountdown />} /></div>
 
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="flex flex-col p-6 lg:col-span-2">
             <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row">
-              <h2 className="text-xl font-semibold text-[#1B7A5A]">{capitalizeFirstLetter(data.examTitle)}</h2>
+              <h2 className="text-xl font-semibold text-foreground">{capitalizeFirstLetter(data.examTitle)}</h2>
               <Badge tone="success" className="rounded-md px-3 py-1">Completed</Badge>
             </div>
             <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
@@ -195,9 +193,9 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
             </div>
           </Card>
 
-          <Card className="relative flex min-h-[190px] flex-col items-center justify-center overflow-hidden border-[#063D2D]! bg-[#063D2D]! p-6 text-white! shadow-md lg:col-span-1">
-            <CheckCircle2 size={120} className="absolute -right-8 -top-8 text-[#53B892] opacity-20" aria-hidden="true" />
-            <p className="relative z-10 mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#BDE8D7]">Accuracy</p>
+          <Card className="relative flex min-h-[190px] flex-col items-center justify-center overflow-hidden border-primary! bg-primary! p-6 text-primary-foreground! lg:col-span-1">
+            <CheckCircle2 size={120} className="absolute -right-8 -top-8 text-primary-foreground opacity-10" aria-hidden="true" />
+            <p className="relative z-10 mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/70">Accuracy</p>
             <div className="relative z-10 font-mono text-5xl font-bold text-white">{accuracy}%</div>
             <div className="relative z-10 mt-3 rounded-lg border border-white/15 bg-black/20 px-3 py-1 text-xs font-medium text-white">{correctCount} of {totalQuestions} correct</div>
           </Card>
@@ -205,15 +203,15 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
           <StatCard label="Total Questions" value={totalQuestions} icon={<List size={20} />} border="border-l-slate-400" iconClass="bg-slate-100 text-slate-500" />
-          <StatCard label="Correct" value={correctCount} icon={<CheckCircle2 size={20} />} border="border-l-[#1B7A5A]" iconClass="bg-[#E8F5EF] text-[#1B7A5A]" />
+          <StatCard label="Correct" value={correctCount} icon={<CheckCircle2 size={20} />} border="border-l-success" iconClass="bg-success-soft text-success" />
           <StatCard label="Incorrect" value={incorrectCount} icon={<XCircle size={20} />} border="border-l-red-500" iconClass="bg-red-50 text-red-500" />
         </div>
 
         <TableShell className="mb-8">
-          <div className="flex flex-col justify-between gap-3 border-b border-[#E2EDE9] px-6 py-5 sm:flex-row sm:items-center">
-            <h3 className="text-lg font-semibold text-slate-800">Question Review</h3>
+          <div className="flex flex-col justify-between gap-3 border-b px-6 py-5 sm:flex-row sm:items-center">
+            <h3 className="text-lg font-semibold text-foreground">Question Review</h3>
             <div className="flex items-center gap-2">
-              <Filter size={16} className="text-[#6B7280]" aria-hidden="true" />
+              <Filter size={16} className="text-muted-foreground" aria-hidden="true" />
               <Select value={filter} onChange={event => { setFilter(event.target.value as ReviewFilter); setPage(1); }} aria-label="Filter questions">
                 <option value="ALL">All questions</option>
                 <option value="CORRECT">Correct only</option>
@@ -224,40 +222,39 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-left text-sm">
-              <thead className="border-b border-[#E2EDE9] bg-[#F8FBF9] text-[11px] font-semibold uppercase tracking-[0.06em] text-[#6B7280]">
+              <thead className="border-b bg-muted/50 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <tr><th className="w-28 px-6 py-4">Question</th><th className="px-6 py-4 text-center">Status</th><th className="px-6 py-4 text-center">Correct Answer</th><th className="px-6 py-4 text-center">Your Answer</th><th className="px-6 py-4 text-center">Time Spent</th><th className="px-6 py-4 text-right">Action</th></tr>
               </thead>
-              <tbody className="divide-y divide-[#E2EDE9]">
+              <tbody className="divide-y">
                 {pageQuestions.map(question => {
                   const logged = loggedQuestions.has(question.id);
                   return (
-                    <tr key={question.id} className="transition-colors hover:bg-[#F8FBF9]">
-                      <td className="px-6 py-4"><p className="font-semibold text-slate-700">Q{question.questionNumber}</p><p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">{question.module}</p></td>
-                      <td className="px-6 py-4"><div className="flex justify-center">{question.isCorrect ? <CheckCircle2 size={20} className="text-[#1B7A5A]" aria-label="Correct" /> : <XCircle size={20} className="text-[#B42318]" aria-label="Incorrect" />}</div></td>
-                      <td className="px-6 py-4 text-center font-semibold text-slate-800">{question.correctAnswer}</td>
-                      <td className={`px-6 py-4 text-center font-semibold ${question.isCorrect ? 'text-[#1B7A5A]' : 'text-[#B42318]'}`}>{question.userAnswer || 'Omitted'}</td>
-                      <td className="whitespace-nowrap px-6 py-4 text-center font-medium text-slate-700">{formatQuestionDuration(question.activeDurationMs)}</td>
+                    <tr key={question.id} className="transition-colors hover:bg-muted/30">
+                      <td className="px-6 py-4"><p className="font-semibold text-foreground">Q{question.questionNumber}</p><p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{question.module}</p></td>
+                      <td className="px-6 py-4"><div className="flex justify-center">{question.isCorrect ? <CheckCircle2 size={20} className="text-success" aria-label="Correct" /> : <XCircle size={20} className="text-danger" aria-label="Incorrect" />}</div></td>
+                      <td className="px-6 py-4 text-center font-semibold text-foreground">{question.correctAnswer}</td>
+                      <td className={`px-6 py-4 text-center font-semibold ${question.isCorrect ? 'text-success' : 'text-danger'}`}>{question.userAnswer || 'Omitted'}</td>
+                      <td className="whitespace-nowrap px-6 py-4 text-center font-medium text-foreground">{formatQuestionDuration(question.activeDurationMs)}</td>
                       <td className="px-6 py-4"><div className="flex items-center justify-end gap-2"><Button variant={logged ? 'accent' : 'ghost'} size="sm" disabled={logged} onClick={() => handleAddToErrorLog(question)} title={logged ? 'Added to Error Log' : 'Add to Error Log'}><Bookmark size={14} className={logged ? 'fill-current' : ''} />{logged ? 'Logged' : 'Log'}</Button><Button size="sm" onClick={() => setReviewingQuestion(question)}><Eye size={14} /> Review</Button></div></td>
                     </tr>
                   );
                 })}
-                {pageQuestions.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-[#6B7280]">No questions match this filter.</td></tr>}
+                {pageQuestions.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground">No questions match this filter.</td></tr>}
               </tbody>
             </table>
           </div>
 
-          <div className="flex flex-col items-center justify-between gap-3 border-t border-[#E2EDE9] px-6 py-4 text-sm text-[#6B7280] sm:flex-row">
+          <div className="flex flex-col items-center justify-between gap-3 border-t px-6 py-4 text-sm text-muted-foreground sm:flex-row">
             <span className="font-medium">Showing {firstShown} to {lastShown} of {filteredQuestions.length} entries</span>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setPage(value => Math.max(1, value - 1))} aria-label="Previous page"><ChevronLeft size={18} /></Button>
-              <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#1B7A5A] px-2 text-xs font-semibold text-white">{currentPage}</span>
+              <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-primary px-2 text-xs font-semibold text-primary-foreground">{currentPage}</span>
               <span className="px-1 text-xs">of {totalPages}</span>
               <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))} aria-label="Next page"><ChevronRight size={18} /></Button>
             </div>
           </div>
         </TableShell>
       </main>
-      </div>
 
       {reviewingQuestion && <ReviewModal
         key={reviewingQuestion.id}
@@ -273,13 +270,13 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
 }
 
 function PageFrame({ children }: { children: React.ReactNode }) {
-  return <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F2F8F5] text-[#1A1A1A]"><AppHeader title="Test Result Details" subtitle="Review your performance and identify areas for improvement." rightContent={<SatCountdown />} />{children}</div>;
+  return <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">{children}</div>;
 }
 
 function TestMeta({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
-  return <div className="min-w-0"><p className="mb-1 text-xs font-medium text-[#6B7280]">{label}</p><p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-800">{icon && <span className="text-[#9CA3AF]">{icon}</span>}{value}</p></div>;
+  return <div className="min-w-0"><p className="mb-1 text-xs font-medium text-muted-foreground">{label}</p><p className="flex items-center gap-1.5 truncate text-sm font-semibold text-foreground">{icon && <span className="text-muted-foreground">{icon}</span>}{value}</p></div>;
 }
 
 function StatCard({ label, value, icon, border, iconClass }: { label: string; value: number; icon: React.ReactNode; border: string; iconClass: string }) {
-  return <Card className={`flex items-center gap-4 border-l-4 p-5 ${border}`}><div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconClass}`}>{icon}</div><div><p className="mb-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B7280]">{label}</p><p className="text-2xl font-semibold text-slate-800">{value}</p></div></Card>;
+  return <Card className={`flex items-center gap-4 border-l-4 p-5 ${border}`}><div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconClass}`}>{icon}</div><div><p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className="text-2xl font-semibold text-foreground">{value}</p></div></Card>;
 }

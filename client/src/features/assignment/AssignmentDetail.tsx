@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileText, Clock, Link as LinkIcon, Send, Github, Globe, YoutubeIcon, Edit, MoreVertical, Trash2, ClipboardList, ChevronRight } from 'lucide-react';
+import { FileText, Clock, Link as LinkIcon, Send, Github, Globe, YoutubeIcon, Edit, MoreHorizontal, Trash2, ClipboardList, ChevronRight, TriangleAlert } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
-import { BackButton } from '../../components/ui/AppUI';
+import { Badge, BackButton, Button, Card, EmptyState, Input, Modal, PageHeader, Tabs } from '../../components/ui/AppUI';
+import { Textarea } from '../../components/ui/textarea';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import AnnouncementCreator from '../notifications/AnnouncementCreator';
 import { type AssignmentProps } from '../../types/quiz';
   
@@ -47,7 +49,6 @@ const AssignmentDetail = () => {
   const [assignment, setAssignment] = useState<AssignmentProps | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [showActionMenu, setShowActionMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTestsModal, setShowTestsModal] = useState(false);
@@ -55,10 +56,10 @@ const AssignmentDetail = () => {
   const [submissionContent, setSubmissionContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchAssignmentDetail = async () => {
+  const fetchAssignmentDetail = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axiosClient.get<any, APIResponse>(`/api/assignments/${assignmentId}`);
+      const res = await axiosClient.get<unknown, APIResponse>(`/api/assignments/${assignmentId}`);
       setAssignment(res.data);
     } catch (error) {
       console.error(error);
@@ -66,13 +67,13 @@ const AssignmentDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [assignmentId]);
 
   useEffect(() => {
     if (assignmentId) {
       fetchAssignmentDetail();
     }
-  }, [assignmentId]);
+  }, [assignmentId, fetchAssignmentDetail]);
 
   // Hàm nộp bài của bạn (đã được tinh chỉnh xíu cho mượt)
   const handleSubmitAssignment = async () => {
@@ -92,7 +93,7 @@ const AssignmentDetail = () => {
       toast.success("Test submitted");
       // Nộp xong có thể reset form hoặc gọi API cập nhật lại trạng thái (Đã nộp)
       setSubmissionContent('');
-    } catch (error) {
+    } catch {
       toast.error("Unable to submit assignment");
     } finally {
       setIsSubmitting(false);
@@ -123,164 +124,33 @@ const AssignmentDetail = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="w-full max-w-5xl mx-auto p-6 md:p-8 animate-pulse bg-white min-h-screen">
-        {/* Khung Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex items-center gap-4 w-full">
-            {/* Vòng tròn icon */}
-            <div className="w-12 h-12 bg-slate-200 rounded-full shrink-0"></div>
-            <div className="w-full max-w-2xl">
-              {/* Tiêu đề */}
-              <div className="h-8 bg-slate-200 rounded-lg w-3/4 mb-3"></div>
-              {/* Ngày tháng */}
-              <div className="h-4 bg-slate-200 rounded-md w-1/4"></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Đường kẻ ngang */}
-        <div className="h-px w-full bg-slate-100 mb-8"></div>
-
-        {/* Khung Nội dung */}
-        <div className="space-y-4 mb-10">
-          <div className="h-4 bg-slate-200 rounded-sm w-full"></div>
-          <div className="h-4 bg-slate-200 rounded-sm w-full"></div>
-          <div className="h-4 bg-slate-200 rounded-sm w-5/6"></div>
-          <div className="h-4 bg-slate-200 rounded-sm w-4/6"></div>
-        </div>
-
-        {/* Khung File đính kèm (nếu có) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="h-16 bg-slate-100 rounded-xl border border-slate-200"></div>
-          <div className="h-16 bg-slate-100 rounded-xl border border-slate-200"></div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="mx-auto max-w-screen-2xl space-y-4 p-4 md:p-6" aria-label="Loading assignment"><div className="h-24 animate-pulse rounded-card bg-muted" /><div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]"><div className="h-72 animate-pulse rounded-card bg-muted" /><div className="h-64 animate-pulse rounded-card bg-muted" /></div></div>;
 
   if (!assignment) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-slate-500">
-        <svg className="w-16 h-16 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-        <p className="text-lg font-medium">Assignment not found</p>
-        <p className="text-sm">This assignment may have been deleted or the link is invalid.</p>
-      </div>
-    );
+    return <div className="mx-auto max-w-screen-2xl p-4 md:p-6"><BackButton onClick={() => navigate(-1)} className="mb-4" /><EmptyState icon={<TriangleAlert size={24} />} title="Assignment not found" description="This assignment may have been deleted or the link is invalid." /></div>;
   }
 
+  const hasAttachments = Boolean(assignment.fileUrls?.length || assignment.links?.length);
+  const isStudent = userRole === 'STUDENT';
+
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8">
-      <BackButton onClick={() => navigate(-1)} className="mb-6" />
+    <div className="h-full overflow-y-auto bg-background">
+      <main className="mx-auto flex max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
+        <BackButton onClick={() => navigate(-1)} className="w-fit" />
+        <PageHeader
+          title={assignment.title}
+          description={<span className="flex flex-wrap items-center gap-x-4 gap-y-1"><span>Posted {format(parseISO(assignment.createdAt), 'MMM d, yyyy')}</span><span className="inline-flex items-center gap-1"><Clock size={14} />{assignment.deadline ? `Due ${format(parseISO(assignment.deadline), 'MMM d, yyyy · HH:mm')}` : 'No due date'}</span></span>}
+          actions={userRole !== 'STUDENT' ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" aria-label="Assignment actions"><MoreHorizontal size={17} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setShowEditModal(true)}><Edit />Edit assignment</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => setShowDeleteModal(true)}><Trash2 />Delete assignment</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : undefined}
+        />
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        <div className="flex-1">
-          {/* Header Assignments */}
-          <div className="flex justify-between items-start mb-6 border-b border-slate-300 pb-6 relative">
-            
-            {/* --- Phần bên trái: Icon và Thông tin bài tập --- */}
-            <div className="flex gap-4 items-start flex-1">
-              <div className="w-12 h-12 rounded-full bg-[#C2DDD4] text-[#1B7A5A] flex items-center justify-center shrink-0 mt-1">
-                <FileText size={24} />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-800 mb-2">{assignment.title}</h1>
-                <div className="flex items-center gap-4 text-sm text-slate-500 font-medium">
-                  <span>Posted: {format(parseISO(assignment.createdAt), 'MMM d, yyyy')}</span>
+        <div className={`grid gap-4 ${isStudent && assignment.deadline ? 'lg:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
+          <div className="min-w-0 space-y-4">
+            <Card className="p-5 md:p-6">
+              <div className="prose max-w-none text-foreground marker:text-foreground" dangerouslySetInnerHTML={{ __html: assignment.content || '' }} />
+            </Card>
 
-                  {/* 2. HIỂN THỊ HẠN NỘP */}
-                  {/* Code của bạn hơi bị lặp điều kiện, chỉ cần viết ngắn gọn thế này thôi: */}
-                  {assignment.deadline ? (
-                    <span className="flex items-center gap-1 text-red-500">
-                      <Clock size={16} /> 
-                      Due: {format(parseISO(assignment.deadline), 'dd/MM/yyyy HH:mm')}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-gray-500 italic">
-                      <Clock size={16} /> 
-                      No due date
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {userRole !== 'STUDENT' && (
-              <div className="relative mt-7">
-                <button 
-                  onClick={() => setShowActionMenu(!showActionMenu)}
-                  className="p-2 text-slate-700 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors focus:outline-hidden"
-                >
-                  <MoreVertical size={22} />
-                </button>
-                {showActionMenu && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-10" 
-                      onClick={() => setShowActionMenu(false)}
-                    ></div>
-                    
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 z-20 overflow-hidden py-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                      <button 
-                        onClick={() => {
-                          setShowActionMenu(false);
-                          setShowEditModal(true);
-                        }}
-                        className="w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-[#E8F5EF] hover:text-[#1B7A5A] flex items-center gap-3 transition-colors text-left font-medium"
-                      >
-                        <Edit size={16} />
-                        Edit
-                      </button>
-                      
-                      <div className="h-px bg-slate-100 my-1"></div>
-                      
-                      <button 
-                        onClick={() => {
-                          setShowActionMenu(false);
-                          setShowDeleteModal(true);
-                        }}
-                        className="w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors text-left font-medium"
-                      >
-                        <Trash2 size={16} />
-                        Delete
-                      </button>
-                      
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* =========== KHU VỰC NỘI DUNG & TÀI LIỆU ĐÍNH KÈM =========== */}
-          {(() => {
-            const hasAttachments = (assignment.fileUrls && assignment.fileUrls.length > 0) || 
-                                   (assignment.links && assignment.links.length > 0);
-            
-            const isStudent = userRole === 'STUDENT';
-
-            return (
-              <div className={`flex flex-col ${hasAttachments && !isStudent ? 'lg:flex-row gap-8' : 'gap-6'} mb-8`}>
-                
-                {/* 1. Phần Text nội dung */}
-                <div 
-                  className={`prose marker:text-black marker:font-bold max-w-none text-slate-700 ${hasAttachments && !isStudent ? 'flex-1' : 'w-full'}`}
-                  dangerouslySetInnerHTML={{ __html: assignment.content || '' }} 
-                />
-
-                {/* 2. Phần Attachments */}
-                {hasAttachments && (
-                  <div className={`${!isStudent ? 'w-full lg:w-80 shrink-0' : 'w-full mt-4'} space-y-4`}>
-                    <h3 className="font-semibold text-slate-800 border-b border-slate-300 pb-2 uppercase text-sm tracking-wider">
-                      Attachments
-                    </h3>
-                    
-                    {/* Dàn layout file: Dọc cho giáo viên, Lưới (Grid) 2 cột cho học sinh */}
-                    <div className={isStudent ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "flex flex-col gap-3"}>
-                      
-                      {/* Render File Drive */}
-                      {assignment.fileUrls?.map((url: string, idx: number) => {
+            {hasAttachments && <Card className="p-5 md:p-6"><h2 className="text-base font-semibold text-foreground">Attachments</h2><p className="mt-1 text-sm text-muted-foreground">Files and links shared with this assignment.</p><div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {assignment.fileUrls?.map((url: string, idx: number) => {
                         let fileName = `Attachments ${idx + 1}`;
                         let cleanUrl = url;
                         let fileTypeLabel = 'Google Drive';
@@ -299,173 +169,45 @@ const AssignmentDetail = () => {
                             }
                           }
                           fileTypeLabel = getFileTypeName(fileName);
-                        } catch (e) {}
+                        } catch {
+                          // Keep the original URL and fallback label when metadata cannot be parsed.
+                        }
 
                         return (
                           <a key={`file-${idx}`} href={cleanUrl} target="_blank" rel="noreferrer" 
-                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-[#A9CFC1] hover:shadow-xs transition group">
-                            <div className="w-11 h-11 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                             className="group flex items-start gap-3 rounded-control border border-ui-border p-3 transition-colors hover:bg-muted">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-muted">
                               <img 
                                 src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" 
                                 alt="Google Drive" 
                                 className="w-6 h-6 object-contain"
                               />
                             </div>
-                            <div className="flex flex-col overflow-hidden">
-                              <span className="font-semibold text-sm text-slate-700 truncate group-hover:text-[#1B7A5A] underline underline-offset-4 transition-all">
-                                {fileName}
-                              </span>
-                              <span className="text-[12px] font-medium text-slate-500 mt-0.5 uppercase tracking-wide">
-                                {fileTypeLabel}
-                              </span>
-                            </div>
+                            <div className="min-w-0"><span className="block truncate text-sm font-medium text-foreground group-hover:underline">{fileName}</span><span className="mt-0.5 block text-xs text-muted-foreground">{fileTypeLabel}</span></div>
                           </a>
                         );
                       })}
-                      
-                      {/* Render Link Web */}
-                      {assignment.links?.map((link: string, idx: number) => {
-                        return (
+              {assignment.links?.map((link: string, idx: number) => (
                           <a key={`link-${idx}`} href={link} target="_blank" rel="noreferrer" 
-                             className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-[#A9CFC1] hover:shadow-xs transition group">
-                            <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                             className="group flex items-start gap-3 rounded-control border border-ui-border p-3 transition-colors hover:bg-muted">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-muted">
                               {getLinkIcon(link)}
                             </div>
-                            <div className="flex flex-col overflow-hidden justify-center">
-                              <div className="flex flex-col overflow-hidden justify-center">
-                                <span className="font-medium text-sm text-slate-700 underline underline-offset-2">
-                                  Link
-                                </span>
-                                <span className="text-[12px] font-medium text-slate-500 mt-0.5 tracking-wide truncate">
-                                  {link}
-                                </span>
-                              </div>
-                            </div>
+                            <div className="min-w-0"><span className="block text-sm font-medium text-foreground group-hover:underline">External link</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{link}</span></div>
                           </a>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+              ))}
+            </div></Card>}
 
           {assignment.selectedTests && assignment.selectedTests.length > 0 && (
-            <div className="mb-8">
-              <button
-                onClick={() => setShowTestsModal(true)}
-                className="w-full flex items-center justify-between p-4 md:p-5 rounded-xl border border-[#C2DDD4] bg-[#E8F5EF] hover:bg-[#C2DDD4]/70 transition text-left"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-[#1B7A5A] text-white flex items-center justify-center">
-                    <ClipboardList size={18} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-[#1A1A1A]">
-                      Attached tests ({assignment.selectedTests.length})
-                    </p>
-                    <p className="text-sm text-[#1B7A5A]/90">
-                      View the full list of assigned tests
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight size={18} className="text-[#1B7A5A]" />
-              </button>
-            </div>
+            <button onClick={() => setShowTestsModal(true)} className="flex w-full items-center gap-3 rounded-card border border-ui-border bg-surface p-4 text-left transition-colors hover:bg-muted"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-primary-soft text-primary"><ClipboardList size={18} /></span><span className="min-w-0 flex-1"><span className="block font-semibold text-foreground">Attached tests ({assignment.selectedTests.length})</span><span className="block text-sm text-muted-foreground">View the full list of assigned tests</span></span><ChevronRight size={18} className="text-muted-foreground" /></button>
           )}
-        </div>
-
-        {/* ============ CỘT PHẢI: KHU VỰC NỘP BÀI (Chỉ dành cho Học sinh) ============ */}
-        {userRole === 'STUDENT' && assignment.deadline && (
-          <div className="w-full lg:w-80 shrink-0">
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs sticky top-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-800">Your assignment</h2>
-                <span className="text-sm font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-                  Assigned
-                </span>
-              </div>
-
-              {/* Tabs chọn kiểu nộp */}
-              <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
-                <button 
-                  onClick={() => setSubmissionType('TEXT')}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'TEXT' ? 'bg-white shadow-sm text-[#1B7A5A]' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Write response
-                </button>
-                <button 
-                  onClick={() => setSubmissionType('FILE')}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${submissionType === 'FILE' ? 'bg-white shadow-sm text-[#1B7A5A]' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Share link or file
-                </button>
-              </div>
-
-              {/* Form nhập liệu */}
-              {submissionType === 'TEXT' ? (
-                <textarea 
-                  rows={5}
-                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-hidden transition text-sm mb-4"
-                  placeholder="Write your response here…"
-                  value={submissionContent}
-                  onChange={(e) => setSubmissionContent(e.target.value)}
-                />
-              ) : (
-                <div className="relative mb-4">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <LinkIcon size={16} className="text-slate-400" />
-                  </div>
-                  <input 
-                    type="text"
-                    className="w-full pl-10 p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#1B7A5A]/20 outline-hidden transition text-sm"
-                    placeholder="Paste a Google Drive or Docs link…"
-                    value={submissionContent}
-                    onChange={(e) => setSubmissionContent(e.target.value)}
-                  />
-                  {/* Gợi ý: Sau này bạn có thể thay cái input này bằng nút mở Google Picker y hệt lúc giáo viên đăng bài! */}
-                </div>
-              )}
-
-              {/* Nút Submit */}
-              <button 
-                onClick={handleSubmitAssignment}
-                disabled={isSubmitting}
-                className="w-full bg-[#1B7A5A] hover:bg-[#145F47] text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-70"
-              >
-                {isSubmitting ? 'Submitting…' : (
-                  <> <Send size={18} /> Submit test </>
-                )}
-              </button>
-            </div>
           </div>
-        )}
-      </div>
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl scale-in-95 duration-200">
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Delete assignment?</h3>
-            <p className="text-slate-500 mb-6 text-sm">
-              Are you sure you want to delete assignment <span className="font-semibold text-slate-700">"{assignment.title}"</span>? All student submissions will be permanently deleted.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleDelete}
-                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors shadow-xs"
-              >
-                Delete permanently
-              </button>
-            </div>
-          </div>
+
+          {isStudent && assignment.deadline && <Card className="h-fit p-5"><div className="flex items-center justify-between gap-3"><h2 className="text-base font-semibold text-foreground">Your assignment</h2><Badge tone="warning">Assigned</Badge></div><Tabs className="mt-4 grid w-full grid-cols-2" items={[{ value: 'TEXT' as const, label: 'Write response' }, { value: 'FILE' as const, label: 'Share link' }]} value={submissionType} onValueChange={setSubmissionType} ariaLabel="Submission type" tabClassName="w-full" /><div className="mt-4">{submissionType === 'TEXT' ? <Textarea rows={6} placeholder="Write your response here…" value={submissionContent} onChange={event => setSubmissionContent(event.target.value)} /> : <div className="relative"><LinkIcon size={16} className="pointer-events-none absolute left-3 top-3 text-muted-foreground" /><Input className="w-full pl-9" placeholder="Paste a Google Drive or Docs link…" value={submissionContent} onChange={event => setSubmissionContent(event.target.value)} /></div>}<Button className="mt-4 w-full" onClick={handleSubmitAssignment} disabled={isSubmitting || !submissionContent.trim()}>{isSubmitting ? 'Submitting…' : <><Send size={16} />Submit assignment</>}</Button></div></Card>}
         </div>
-      )}
+      </main>
+
+      <Modal open={showDeleteModal} onClose={() => setShowDeleteModal(false)} closeOnBackdrop title="Delete assignment?" subtitle="This also permanently deletes all student submissions." footer={<><Button variant="ghost" onClick={() => setShowDeleteModal(false)}>Cancel</Button><Button variant="destructive" onClick={handleDelete}>Delete permanently</Button></>}><p className="text-sm text-muted-foreground">You are about to delete <span className="font-medium text-foreground">{assignment.title}</span>. This action cannot be undone.</p></Modal>
       {showEditModal && (
         <AnnouncementCreator
           onClose={() => setShowEditModal(false)}
@@ -473,52 +215,17 @@ const AssignmentDetail = () => {
           initialData={assignment}
         />
       )}
-      {showTestsModal && assignment.selectedTests && (
-        <div className="fixed inset-0 z-110 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[80vh] overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800">
-                Attached tests
-              </h3>
-              <button
-                onClick={() => setShowTestsModal(false)}
-                className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="p-5 overflow-y-auto max-h-[calc(80vh-72px)] space-y-3">
-              {assignment.selectedTests.map((test) => (
-                <div
-                  key={test.id}
-                  className="border border-slate-200 rounded-xl p-4 bg-white hover:border-[#C2DDD4] transition"
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <h4 className="font-semibold text-slate-800">{capitalizeFirstLetter(test.title)}</h4>
-                    <span className={`px-2 py-1 rounded-sm text-xs font-bold ${test.mode === 'EXAM' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                      {test.mode}
-                    </span>
-                  </div>
-                  <div className="text-sm text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
+      <Modal open={showTestsModal && Boolean(assignment.selectedTests)} onClose={() => setShowTestsModal(false)} closeOnBackdrop presentation="content-dialog" title="Attached tests" subtitle="Tests included in this assignment." footer={<Button variant="ghost" onClick={() => setShowTestsModal(false)}>Close</Button>}>
+            <div className="space-y-3">
+              {assignment.selectedTests?.map((test) => (
+                <Card key={test.id} className="p-4"><div className="flex items-start justify-between gap-3"><h4 className="font-semibold text-foreground">{capitalizeFirstLetter(test.title)}</h4><Badge tone={test.mode === 'EXAM' ? 'danger' : 'green'}>{test.mode}</Badge></div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span>Subject: {test.subject}</span>
                     <span>Duration: {test.duration} min</span>
                     <span>Questions: {test.questionCount}</span>
-                  </div>
-                  <div className="mt-3">
-                    <button
-                      onClick={() => navigate(`/test/${test.id}?${test.deliveryId ? `deliveryId=${test.deliveryId}` : `assignmentId=${assignment.id}`}`)}
-                      className="px-3 py-2 text-sm font-semibold text-white bg-[#1B7A5A] hover:bg-[#145F47] rounded-lg transition"
-                    >
-                      Start this test
-                    </button>
-                  </div>
-                </div>
+                  </div><Button size="sm" className="mt-3" onClick={() => navigate(`/test/${test.id}?${test.deliveryId ? `deliveryId=${test.deliveryId}` : `assignmentId=${assignment.id}`}`)}>Start this test</Button></Card>
               ))}
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 };

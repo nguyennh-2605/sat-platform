@@ -25,6 +25,24 @@ interface AppHeaderProps {
   showNotifications?: boolean;
 }
 
+interface PageHeaderProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+}
+
+export function PageHeader({ title, description, actions, className, ...props }: PageHeaderProps) {
+  return (
+    <div className={cx('flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between', className)} {...props}>
+      <div className="min-w-0 space-y-1">
+        <h1 className="text-3xl tracking-tight text-foreground">{title}</h1>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2 lg:w-fit">{actions}</div>}
+    </div>
+  );
+}
+
 export function AppHeader({
   title,
   subtitle,
@@ -394,7 +412,7 @@ export function Tabs<T extends string>({ items, value, onValueChange, ariaLabel,
   };
 
   return (
-    <div role="tablist" aria-label={ariaLabel} className={cx('flex min-w-0', className)} {...props}>
+    <div role="tablist" aria-label={ariaLabel} className={cx('inline-flex min-w-0 gap-1 rounded-lg bg-muted p-1', className)} {...props}>
       {items.map((item, index) => {
         const active = item.value === value;
         const Icon = item.icon;
@@ -411,14 +429,13 @@ export function Tabs<T extends string>({ items, value, onValueChange, ariaLabel,
             onClick={() => selectTab(item)}
             onKeyDown={event => handleKeyDown(event, index)}
             className={cx(
-              'relative inline-flex h-10 shrink-0 items-center justify-center gap-1.5 px-4 text-body transition-colors disabled:pointer-events-none disabled:opacity-50',
-              active ? 'font-medium text-primary' : 'text-muted-foreground hover:text-foreground',
+              'relative inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-3 text-body transition-colors disabled:pointer-events-none disabled:opacity-50',
+              active ? 'bg-background font-medium text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground',
               tabClassName,
             )}
           >
             {Icon && <Icon size={14} aria-hidden="true" />}
             {item.label}
-            {active && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-0.5 bg-primary" />}
           </button>
         );
       })}

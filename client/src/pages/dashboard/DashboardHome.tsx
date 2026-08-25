@@ -2,7 +2,8 @@ import { ArrowRight, BarChart3, BookA, BookOpenCheck, GraduationCap } from 'luci
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '../../components/ui/AppUI';
 import { ClassroomTodoPanel } from '../../features/classroom/ClassroomTodoPanel';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 
@@ -24,53 +25,34 @@ export default function DashboardHome() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-3xl tracking-tight">Welcome back, {firstName}</h1>
-              <Badge variant="outline" className="capitalize">{role.toLowerCase()}</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">{roleMessage}</p>
-          </div>
-          <SatCountdown />
-        </div>
+        <PageHeader
+          title={<span className="flex flex-wrap items-center gap-2">Welcome back, {firstName}<Badge variant="outline" className="capitalize">{role.toLowerCase()}</Badge></span>}
+          description={roleMessage}
+          actions={<SatCountdown />}
+        />
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <section className="xl:col-span-8" aria-labelledby="workspace-title">
-            <Card>
-              <CardHeader>
-                <CardTitle id="workspace-title">Your workspace</CardTitle>
-                <CardDescription>Move between the core parts of your SAT learning plan.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2">
+            <div className="mb-3">
+              <h2 id="workspace-title" className="text-lg font-medium">Your workspace</h2>
+              <p className="text-sm text-muted-foreground">Move between the core parts of your SAT learning plan.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
                 {destinations.map(({ to, title, description, icon: Icon }) => (
-                  <Link
-                    key={to}
-                    to={to}
-                    className="group flex min-h-32 items-start gap-3 rounded-lg border bg-card p-4 transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                  >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted text-foreground">
-                      <Icon className="size-4" aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium">{title}</span>
-                      <span className="mt-1 block text-sm leading-5 text-muted-foreground">{description}</span>
-                      <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-foreground">
-                        Open <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                  <Card key={to} className="group gap-0 py-0 transition-shadow hover:shadow-md">
+                    <CardContent className="flex min-h-36 items-start gap-3 p-5">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted text-foreground"><Icon className="size-4" aria-hidden="true" /></span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="text-sm font-medium">{title}</span>
+                        <span className="mt-1 text-sm leading-5 text-muted-foreground">{description}</span>
+                        <Button asChild variant="ghost" size="sm" className="-ml-3 mt-auto w-fit">
+                          <Link to={to}>Open<ArrowRight aria-hidden="true" /></Link>
+                        </Button>
                       </span>
-                    </span>
-                  </Link>
+                    </CardContent>
+                  </Card>
                 ))}
-              </CardContent>
-              <CardFooter className="justify-end border-t">
-                <Button asChild size="sm">
-                  <Link to={role === 'TEACHER' ? '/dashboard/classes' : '/dashboard/practice-test'}>
-                    {role === 'TEACHER' ? 'Open your classes' : 'Continue learning'}
-                    <ArrowRight aria-hidden="true" />
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
+            </div>
           </section>
 
           <div className="xl:col-span-4">

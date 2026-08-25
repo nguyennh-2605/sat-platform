@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, BookOpenCheck, Check, ChevronLeft, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Pencil, Play, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { BookOpen, BookOpenCheck, ChevronLeft, ChevronRight, Clock3, GraduationCap, MoreHorizontal, Pencil, Play, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
-import { AppHeader, Badge, Button, Card, EmptyState, Input, Modal, Select } from '../../components/ui/AppUI';
-import { ui } from '../../components/ui/styles';
+import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Select } from '../../components/ui/AppUI';
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
 
@@ -90,20 +91,9 @@ const PracticeTest = () => {
   const [dueAt, setDueAt] = useState('');
   const [maxAttempts, setMaxAttempts] = useState(1);
   const [scorePolicy, setScorePolicy] = useState<'FIRST' | 'BEST' | 'LATEST'>('FIRST');
-  const [openActionTestId, setOpenActionTestId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TestItem | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const actionMenuRef = useRef<HTMLDivElement>(null);
   const debouncedSearch = useDebounce(search, 250);
-
-  useEffect(() => {
-    if (openActionTestId === null) return;
-    const closeMenu = (event: PointerEvent) => {
-      if (!actionMenuRef.current?.contains(event.target as Node)) setOpenActionTestId(null);
-    };
-    document.addEventListener('pointerdown', closeMenu);
-    return () => document.removeEventListener('pointerdown', closeMenu);
-  }, [openActionTestId]);
 
   const loadData = useCallback(async (force = false) => {
     setLoading(true);
@@ -224,16 +214,14 @@ const PracticeTest = () => {
   };
 
   return (
-    <div className={ui.page}>
-      <AppHeader title="Practice Center" subtitle="Browse and attempt SAT practice tests" centerContent={<SatCountdown />} />
-
-      <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className={ui.content}>
+    <div className="h-full overflow-y-auto">
+      <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
+        <PageHeader title="Practice Center" description="Browse and attempt SAT practice tests." actions={<SatCountdown />} />
           <Card className="mb-6 p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <label className="flex h-10 min-w-0 max-w-md flex-1 items-center gap-2.5 rounded-control border border-ui-border bg-surface-subtle px-3 focus-within:border-primary focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20">
-                <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-                <input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Search tests..." aria-label="Search tests" className="h-full w-full bg-transparent text-body text-foreground outline-hidden placeholder:text-muted-foreground" />
+              <label className="relative min-w-0 max-w-md flex-1">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Search tests..." aria-label="Search tests" className="w-full pl-9" />
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -273,17 +261,17 @@ const PracticeTest = () => {
                 <SlidersHorizontal size={15} className="mr-1 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span className="mr-1 text-caption font-medium text-muted-foreground">Subject:</span>
                 {(['ALL', 'RW', 'MATH'] as const).map(value => (
-                  <button key={value} onClick={() => { setSubject(value); setPage(1); }} aria-pressed={subject === value} className={`min-h-8 whitespace-nowrap rounded-full border px-3 text-caption font-medium transition-colors ${subject === value ? 'border-primary bg-primary text-white' : 'border-primary/40 bg-surface text-primary hover:bg-primary-soft'}`}>
+                  <Button key={value} size="sm" variant={subject === value ? 'primary' : 'outline'} onClick={() => { setSubject(value); setPage(1); }} aria-pressed={subject === value}>
                     {value === 'ALL' ? 'All' : subjectLabel[value]}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto">
                 <span className="mr-1 text-caption font-medium text-muted-foreground">Type:</span>
                 {(['ALL', 'EXAM', 'PRACTICE'] as const).map(value => (
-                  <button key={value} onClick={() => { setType(value); setPage(1); }} aria-pressed={type === value} className={`min-h-8 whitespace-nowrap rounded-full border px-3 text-caption font-medium transition-colors ${type === value ? 'border-primary bg-primary text-white' : 'border-primary/40 bg-surface text-primary hover:bg-primary-soft'}`}>
+                  <Button key={value} size="sm" variant={type === value ? 'primary' : 'outline'} onClick={() => { setType(value); setPage(1); }} aria-pressed={type === value}>
                     {value === 'ALL' ? 'All' : typeLabel[value]}
-                  </button>
+                  </Button>
                 ))}
               </div>
               {classes.length > 0 && (
@@ -314,19 +302,12 @@ const PracticeTest = () => {
                         <Badge>{typeLabel[test.mode]}</Badge>
                       </div>
                       {canManage && (selectionMode ? (
-                        <button onClick={() => toggleTest(test.id)} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${selected ? 'border-[#1B7A5A] bg-[#1B7A5A] text-white' : 'border-[#C2DDD4] bg-white text-transparent hover:border-[#1B7A5A]'}`} aria-label={selected ? 'Deselect test' : 'Select test'}>
-                          <Check size={15} strokeWidth={3} />
-                        </button>
+                        <Checkbox checked={selected} onCheckedChange={() => toggleTest(test.id)} aria-label={selected ? 'Deselect test' : 'Select test'} />
                       ) : (
-                        <div className="relative" ref={openActionTestId === test.id ? actionMenuRef : undefined}>
-                          <button onClick={() => setOpenActionTestId(current => current === test.id ? null : test.id)} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#6B7280] transition-colors hover:bg-[#EAF2EE] hover:text-[#1A1A1A]" aria-label={`Actions for ${test.title}`} aria-haspopup="menu" aria-expanded={openActionTestId === test.id}>
-                            <MoreHorizontal size={16} />
-                          </button>
-                          {openActionTestId === test.id && <div role="menu" className="absolute right-0 top-9 z-20 w-36 overflow-hidden rounded-lg border border-[#C9D8D2] bg-white py-1 shadow-lg">
-                            <button role="menuitem" onClick={() => navigate(`/dashboard/practice-test/create?edit=${test.id}`)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-[#374151] hover:bg-[#EAF2EE]"><Pencil size={14} />Edit</button>
-                            <button role="menuitem" onClick={() => { setOpenActionTestId(null); setDeleteTarget(test); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-red-700 hover:bg-red-50"><Trash2 size={14} />Delete</button>
-                          </div>}
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${test.title}`}><MoreHorizontal size={16} /></Button></DropdownMenuTrigger>
+                          <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => navigate(`/dashboard/practice-test/create?edit=${test.id}`)}><Pencil />Edit</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => setDeleteTarget(test)}><Trash2 />Delete</DropdownMenuItem></DropdownMenuContent>
+                        </DropdownMenu>
                       ))}
                     </div>
 
@@ -349,9 +330,9 @@ const PracticeTest = () => {
 
                     <p className="text-caption text-muted-foreground/80">Last attempted {formatLastAttempt(test.lastAttempt)}</p>
 
-                    <button onClick={() => handleStart(test)} className={`mt-auto flex min-h-10 w-full items-center justify-center gap-1.5 rounded-control px-4 text-body font-semibold transition-all duration-150 group-hover:gap-2 ${hasPartialProgress ? 'border border-primary bg-surface text-primary hover:bg-primary-soft' : 'bg-accent text-foreground hover:bg-accent-hover'}`}>
+                    <Button onClick={() => handleStart(test)} variant={hasPartialProgress ? 'outline' : 'accent'} className="mt-auto w-full">
                       {hasPartialProgress ? <><Play size={13} /> Continue</> : <><Play size={13} /> Start <ChevronRight size={13} /></>}
-                    </button>
+                    </Button>
                   </article>
                 );
               })}
@@ -369,7 +350,6 @@ const PracticeTest = () => {
               </div>
             </div>
           )}
-        </div>
       </main>
 
       <Modal
@@ -389,25 +369,25 @@ const PracticeTest = () => {
                 <label className="space-y-1.5 text-xs font-medium text-subtle">Attempts<Input type="number" min={1} max={10} value={maxAttempts} onChange={event => setMaxAttempts(Math.min(10, Math.max(1, Number(event.target.value))))} className="w-full" /></label>
                 <label className="space-y-1.5 text-xs font-medium text-subtle">Score policy<Select value={scorePolicy} onChange={event => setScorePolicy(event.target.value as typeof scorePolicy)} className="w-full"><option value="FIRST">First attempt</option><option value="BEST">Best attempt</option><option value="LATEST">Latest attempt</option></Select></label>
               </div>
-              <div className="border-t border-[#D6E3DE] pt-5">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B7280]">Classes</p>
-              {classes.length === 0 ? <p className="rounded-lg bg-[#EAF2EE] p-5 text-center text-sm text-[#6B7280]">You do not have any classes yet.</p> : classes.map(item => {
+              <div className="border-t pt-5">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Classes</p>
+              {classes.length === 0 ? <p className="rounded-lg bg-muted p-5 text-center text-sm text-muted-foreground">You do not have any classes yet.</p> : classes.map(item => {
                 const checked = selectedClassIds.includes(item.id);
-                return <button key={item.id} onClick={() => toggleClass(item.id)} className={`flex w-full items-center gap-4 rounded-lg border p-4 text-left transition-colors ${checked ? 'border-[#1B7A5A] bg-[#E8F5EF]' : 'border-[#E2EDE9] hover:bg-[#F2F8F5]'}`}><span className={`flex h-9 w-9 items-center justify-center rounded-lg ${checked ? 'bg-[#1B7A5A] text-white' : 'bg-[#EAF2EE] text-[#6B7280]'}`}>{checked ? <Check size={18} strokeWidth={3} /> : <GraduationCap size={18} />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-[#1A1A1A]">{item.name}</span><span className="mt-1 block text-xs text-[#6B7280]">{item._count?.students || 0} student(s)</span></span></button>;
+                return <label key={item.id} className={`flex cursor-pointer items-center gap-4 rounded-lg border p-4 transition-colors ${checked ? 'border-primary bg-accent' : 'hover:bg-muted/50'}`}><Checkbox checked={checked} onCheckedChange={() => toggleClass(item.id)} /><span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground"><GraduationCap size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-foreground">{item.name}</span><span className="mt-1 block text-xs text-muted-foreground">{item._count?.students || 0} student(s)</span></span></label>;
               })}</div>
             </div>
       </Modal>
 
       <Modal open={Boolean(startClassTest)} onClose={() => setStartClassTest(null)} closeOnBackdrop presentation="content-dialog" title="Choose a class" subtitle={startClassTest?.title} className="max-w-md!">
             {startClassTest && <div className="space-y-2">{(startClassTest.deliveries || []).length > 0
-              ? startClassTest.deliveries?.map(delivery => <button key={delivery.id} onClick={() => openTest(startClassTest, { deliveryId: delivery.id })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]"><span><span className="block">{capitalizeFirstLetter(delivery.class.name)}</span><span className="mt-1 block text-xs font-normal text-[#6B7280]">{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleString()}` : 'No deadline'}</span></span><ChevronRight size={17} /></button>)
-              : [...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <button key={classId} onClick={() => openTest(startClassTest, { classId })} className="flex w-full items-center justify-between rounded-lg border border-[#C9D8D2] p-4 text-left text-sm font-medium text-[#1A1A1A] hover:border-[#1B7A5A] hover:bg-[#E8F5EF]">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></button>)}</div>}
+              ? startClassTest.deliveries?.map(delivery => <Button key={delivery.id} variant="outline" onClick={() => openTest(startClassTest, { deliveryId: delivery.id })} className="h-auto w-full justify-between p-4 text-left"><span><span className="block">{capitalizeFirstLetter(delivery.class.name)}</span><span className="mt-1 block text-xs font-normal text-muted-foreground">{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleString()}` : 'No deadline'}</span></span><ChevronRight size={17} /></Button>)
+              : [...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <Button key={classId} variant="outline" onClick={() => openTest(startClassTest, { classId })} className="h-auto w-full justify-between p-4 text-left">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></Button>)}</div>}
       </Modal>
 
       <Modal open={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)} closeOnBackdrop={!deleting} title="Delete exam?" subtitle={deleteTarget?.title} className="max-w-md!">
         <div className="space-y-5">
-          <p className="text-sm leading-6 text-[#4B5563]">This permanently deletes the exam, its assignments, and any student attempt data associated with it. This action cannot be undone.</p>
-          <div className="flex justify-end gap-2 border-t border-[#E2EDE9] pt-4"><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={deleteTest}>{deleting ? 'Deleting…' : 'Delete exam'}</Button></div>
+          <p className="text-sm leading-6 text-muted-foreground">This permanently deletes the exam, its assignments, and any student attempt data associated with it. This action cannot be undone.</p>
+          <div className="flex justify-end gap-2 border-t pt-4"><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={deleteTest}>{deleting ? 'Deleting…' : 'Delete exam'}</Button></div>
         </div>
       </Modal>
     </div>
