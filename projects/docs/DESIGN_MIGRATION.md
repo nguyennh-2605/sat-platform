@@ -1,0 +1,104 @@
+# Studio Admin design migration
+
+**Status:** Active  
+**Started:** 25/08/2026  
+**Reference repository:** https://github.com/arhamkhnz/next-shadcn-admin-dashboard  
+**Pinned commit:** `64e775837bded678341b09e3ab046d542a1a6a8a`  
+**Reference style:** shadcn `radix-nova`, default neutral preset
+
+## Goal
+
+Adopt Studio Admin's visual system and reusable dashboard patterns while keeping SAT Platform's Vite/React Router client, Express/Prisma backend, real data, routes, permissions, and product workflows.
+
+This is a presentation-layer migration, not a Next.js migration.
+
+## Product decisions
+
+- Use the reference's neutral theme during the first migration pass so screens can be reproduced without inventing new design decisions.
+- Preserve the SAT Platform name, domain language, roles, data, and functionality.
+- Do not copy mock content, demo navigation, fake KPIs, planned features, or Next.js-only behavior.
+- Keep Exam Room optimized for Digital SAT readability; it is not required to use the dashboard shell.
+- Add an optional SAT Green preset only after the neutral default is consistent across migrated screens.
+- Pin the reference commit. Upstream changes require an explicit decision and a new migration entry.
+
+## Technical translation
+
+| Studio Admin concept | SAT Platform implementation |
+| --- | --- |
+| Next.js App Router layout | React Router dashboard shell |
+| Server Component page | Normal React page/component |
+| `next/link` | `Link` or `NavLink` from `react-router-dom` |
+| `next/headers` preferences | Existing client preference/API storage |
+| Server actions | Existing Axios + Express endpoints |
+| shadcn semantic tokens | Tokens in `client/src/index.css` |
+| shadcn UI primitives | Shared components in `client/src/components/ui` |
+| Route-local `_components` | Existing owning `pages/` or `features/` directory |
+
+## Reference map
+
+| SAT Platform surface | Primary reference | Secondary reference | Status |
+| --- | --- | --- | --- |
+| Design tokens and primitives | `src/app/globals.css`, `src/components/ui/` | `components.json` | In progress |
+| Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | In progress |
+| Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | In progress |
+| Authentication | `auth/v2` | `auth/v1` | In progress |
+| Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Pending |
+| Practice Center | `dashboard/tasks` | `dashboard/file-manager` | Pending |
+| Test Bank | `dashboard/file-manager` | `dashboard/tasks` | Pending |
+| Results Analytics | `dashboard/analytics` | `dashboard/default` | Pending |
+| Error Log | `dashboard/tasks` | default data-table patterns | Pending |
+| Vocabulary | `dashboard/tasks` | card/list patterns | Pending |
+| Score Report | `dashboard/analytics` | invoice/print composition | Pending |
+| Notifications | dashboard header menus | mail list patterns | Pending |
+| Profile/preferences | `dashboard/profile` | layout controls/theme switcher | Pending |
+| Exam Room | SAT product requirements | shared form/content primitives only | Preserve specialized UI |
+
+## Migration phases
+
+### Phase 0 — Safety and instructions
+
+- [x] Checkpoint pre-migration work.
+- [x] Create `codex/studio-admin-ui`.
+- [x] Add root `AGENTS.md`.
+- [x] Pin the reference and define the mapping.
+- [x] Update the UI source-of-truth priority.
+
+### Phase 1 — Design-system foundation
+
+- [ ] Align neutral semantic tokens, typography, radius, border, and shadow.
+- [ ] Add or align core shared primitives.
+- [ ] Keep `AppUI.tsx` as a compatibility facade.
+- [ ] Add theme infrastructure without requiring a custom SAT preset.
+- [ ] Validate existing screens still build.
+
+### Phase 2 — Proof of concept
+
+- [ ] Migrate dashboard shell.
+- [ ] Migrate Dashboard Home using real role-aware content.
+- [ ] Migrate authentication without changing auth behavior.
+- [ ] Verify desktop and mobile layouts.
+
+### Phase 3 — Feature migration
+
+- [ ] Classroom.
+- [ ] Practice Center and Test Bank.
+- [ ] Results Analytics and Score Report.
+- [ ] Error Log and Vocabulary.
+- [ ] Remaining shared overlays and supporting screens.
+
+### Phase 4 — Consolidation
+
+- [ ] Remove obsolete compatibility styles only after all consumers migrate.
+- [ ] Add the SAT Green preset if desired.
+- [ ] Run a full responsive/accessibility review.
+- [ ] Refresh reference screenshots and update this status table.
+
+## Per-screen definition of done
+
+- Uses a named pinned reference and records intentional deviations.
+- Keeps existing API calls, permissions, routes, and business behavior.
+- Uses shared primitives and semantic tokens; no local duplicate design system.
+- Does not show fabricated data while loading or when the API is empty.
+- Handles relevant loading, empty, error, disabled, and overflow states.
+- Works on mobile and desktop with keyboard-visible focus states.
+- Passes targeted lint, `npm run build`, and `git diff --check`.

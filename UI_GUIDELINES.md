@@ -1,25 +1,28 @@
 # SAT Platform UI Guidelines
 
-**Phiên bản:** 2.0
-**Cập nhật:** 24/08/2026
+**Phiên bản:** 3.0
+**Cập nhật:** 25/08/2026
 **Trạng thái:** Nguồn quy chuẩn UI duy nhất và bắt buộc
 
-Tài liệu này là nguồn quy tắc giao diện duy nhất cho mọi thay đổi frontend. Khi tài liệu cũ, code cũ hoặc Figma mâu thuẫn với nhau, thứ tự ưu tiên là: yêu cầu hiện tại của người dùng → file này → shared UI primitives → màn hình cũ. Figma chỉ là tham chiếu cho bố cục cụ thể, không được tạo thêm một design system song song.
+Tài liệu này là nguồn quy tắc giao diện duy nhất cho mọi thay đổi frontend. Khi tài liệu hoặc code mâu thuẫn, thứ tự ưu tiên là: yêu cầu hiện tại của người dùng → Studio Admin ở commit đã pin → file này → shared UI primitives → màn hình cũ. Xem mapping và trạng thái migration trong `projects/docs/DESIGN_MIGRATION.md`.
+
+Studio Admin chỉ là nguồn tham chiếu về presentation. SAT Platform tiếp tục dùng Vite, React Router, Express và Prisma; không sao chép Next.js Server Components, server actions, mock data hoặc API conventions từ template.
 
 Mọi UI mới phải dùng token trong `client/src/index.css`, alias trong `client/tailwind.config.js` và primitive trong `client/src/components/ui`. Không sao chép class của primitive sang feature.
 
 ## 1. Nguyên tắc chung
 
-- Figma ZIP là nguồn tham chiếu chính về bố cục, tỷ lệ, khoảng cách và trạng thái component.
-- Không cố giữ giao diện cũ nếu khác Figma. Ưu tiên tái tạo đúng thiết kế Figma bằng dữ liệu và tính năng thật của hệ thống.
+- Studio Admin commit `64e775837bded678341b09e3ab046d542a1a6a8a` là nguồn tham chiếu chính về bố cục, mật độ, khoảng cách, component anatomy và responsive behavior.
+- Ưu tiên các route không nằm trong `(legacy)` và dùng màn hình được map trong `projects/docs/DESIGN_MIGRATION.md`.
+- Không cố giữ giao diện cũ nếu khác reference. Tái tạo visual direction bằng dữ liệu và tính năng thật của hệ thống.
 - Không tự thêm feature, KPI, badge, button hay thông tin mà người dùng không yêu cầu hoặc backend chưa hỗ trợ.
-- Nếu Figma có feature chưa tồn tại trong hệ thống, bỏ qua feature đó thay vì dùng dữ liệu giả.
+- Nếu reference có feature chưa tồn tại trong hệ thống, bỏ qua feature đó thay vì dùng dữ liệu giả.
 - Toàn bộ nội dung hiển thị cho người dùng phải bằng tiếng Anh. Tiếng Việt chỉ được dùng trong comment nội bộ khi thật sự cần thiết.
-- Không dùng logo trong Figma.
+- Không sao chép logo hoặc thương hiệu Studio Admin.
 - Giữ giao diện gọn, chuyên nghiệp, tránh card quá cao, button quá lớn và khoảng trắng dư thừa.
 - Ưu tiên sự rõ ràng trước tính trang trí: control, đường viền, vùng nhập liệu và vùng nội dung phải nhận biết được ngay mà không cần người dùng đoán.
 - Mặc định dùng contrast đủ rõ và trọng lượng thị giác nhất quán. Chỉ tạo mức đậm–nhạt khi cần thể hiện UI hierarchy cụ thể; không làm mờ thành phần chỉ để giao diện trông “nhẹ”.
-- Ưu tiên hiệu năng và phản hồi mượt trên máy học sinh: không tùy tiện dùng `backdrop-filter`, `backdrop-blur`, blur lớn, animation liên tục, shadow nặng hoặc hiệu ứng GPU đắt tiền. Chỉ dùng khi Figma thực sự yêu cầu và lợi ích thị giác rõ ràng; ưu tiên overlay màu bán trong suốt đơn giản cho modal.
+- Ưu tiên hiệu năng và phản hồi mượt trên máy học sinh: không tùy tiện dùng `backdrop-filter`, blur lớn, animation liên tục, shadow nặng hoặc hiệu ứng GPU đắt tiền. Sticky header có thể dùng blur nhẹ như reference nếu đã kiểm tra hiệu năng; modal ưu tiên overlay màu bán trong suốt đơn giản.
 - Background cá nhân hóa chỉ dùng preset đã kiểm soát và tối ưu trong source. Ảnh chỉ áp dụng cho vùng nội dung dashboard, không phủ sidebar/header và không dùng trong Exam Room; giữ card gần như opaque để bảo đảm khả năng đọc.
 - Mỗi background raster ưu tiên WebP/AVIF và mục tiêu dưới `200 KB` (giới hạn tối đa khoảng `500 KB`), không dùng GIF/video, parallax, `background-attachment: fixed` hoặc backdrop blur. Luôn có lớp overlay màu tĩnh để duy trì contrast.
 - Khi chuyển page trong dashboard, dùng progress bar mảnh ở đầu vùng nội dung và fade ngắn để tránh flash layout. Progress phải dựa trên route/request thật, có thời gian chờ tối đa để không khóa UI khi mạng chậm, không dùng backdrop/blur và phải tôn trọng `prefers-reduced-motion`.
@@ -32,18 +35,18 @@ Sử dụng các token đã định nghĩa trong `client/src/index.css` và comp
 
 | Ý nghĩa | Tailwind alias | CSS token | Giá trị |
 | --- | --- | --- | --- |
-| Page background | `bg-background` | `--ui-background` | `#F2F8F5` |
-| Main text | `text-foreground` | `--ui-foreground` | `#1A1A1A` |
+| Page background | `bg-background` | `--ui-background` | neutral page background |
+| Main text | `text-foreground` | `--ui-foreground` | neutral foreground |
 | Card/surface | `bg-surface` | `--ui-surface` | `#FFFFFF` |
-| Primary | `bg-primary`, `text-primary` | `--ui-primary` | `#1B7A5A` |
-| Primary hover | `bg-primary-hover` | `--ui-primary-hover` | `#145F47` |
-| Primary soft | `bg-primary-soft` | `--ui-primary-soft` | `#E8F5EF` |
-| Accent | `bg-accent` | `--ui-accent` | `#E8C040` |
-| Muted surface | `bg-muted` | `--ui-muted` | `#EAF2EE` |
+| Primary | `bg-primary`, `text-primary` | `--ui-primary` | neutral high-contrast action |
+| Primary hover | `bg-primary-hover` | `--ui-primary-hover` | neutral action hover |
+| Primary soft | `bg-primary-soft` | `--ui-primary-soft` | neutral selected surface |
+| Accent | `bg-accent` | `--ui-accent` | neutral accent surface |
+| Muted surface | `bg-muted` | `--ui-muted` | neutral muted surface |
 | Muted text | `text-muted-foreground` | `--ui-muted-foreground` | `#6B7280` |
 | Secondary text | `text-subtle` | `--ui-subtle-foreground` | `#4B5563` |
-| Border | `border-ui-border` | `--ui-border` | `#D2DED9` |
-| Strong divider | `border-ui-border-strong` | `--ui-border-strong` | `#C9D8D2` |
+| Border | `border-ui-border` | `--ui-border` | neutral border |
+| Strong divider | `border-ui-border-strong` | `--ui-border-strong` | neutral strong divider |
 | Success | `text-success`, `bg-success-soft` | `--ui-success*` | semantic green |
 | Warning | `text-warning`, `bg-warning-soft` | `--ui-warning*` | semantic amber |
 | Danger | `text-danger`, `bg-danger-soft` | `--ui-danger*` | semantic red |
@@ -77,7 +80,7 @@ Không dùng radius tùy ý như `rounded-[11px]` trong feature mới.
 
 Không dùng `shadow-lg/xl/2xl` hoặc arbitrary shadow trong feature mới. Hover card chỉ nâng lên `shadow-raised`; không dịch card quá `-2px`.
 
-Không dùng indigo/purple làm màu primary. Màu đỏ, amber và emerald chỉ dùng cho trạng thái semantic như error, warning và success.
+Không dùng indigo/purple hoặc SAT green làm primary trong neutral migration pass. Màu đỏ, amber và emerald chỉ dùng cho trạng thái semantic. SAT Green sẽ là theme preset riêng sau khi migration mặc định hoàn tất.
 
 Riêng nội dung trong Exam Room (passage, table, question và answer) dùng chung class `exam-content`: system stack `Arial`, `Helvetica Neue`, `Helvetica`, `Liberation Sans`, sans-serif ở `16px/1.55`. Không tải thêm webfont cho phòng thi; ưu tiên khả năng đọc, tốc độ và sự nhất quán giữa các loại content block.
 
@@ -135,13 +138,13 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ## 4. Header và bố cục trang
 
-- Header cao `60px`, nền trắng, sticky ở phía trên và có border dưới.
-- Avatar và notification nằm bên phải header như Figma.
-- Nội dung trang dùng chiều rộng tối đa khoảng `1200px` và căn giữa.
-- Khoảng đệm mặc định: `p-6`; desktop có thể dùng `lg:p-8`.
-- Page background luôn dùng `#F2F8F5`.
-- Card dùng nền trắng, border mặc định `#D2DED9`, `rounded-xl`, shadow nhẹ. Dùng strong divider `#C9D8D2` cho split view, panel header hoặc ranh giới cần nhận biết rõ.
-- Tránh `rounded-2xl`, shadow quá đậm và gradient không có trong Figma.
+- Dashboard header cao `48px`, sticky khi phù hợp, có border dưới và blur nhẹ có kiểm soát như Studio Admin.
+- Sidebar desktop mặc định khoảng `272px`, hỗ trợ mobile sheet; content phải dùng được khi sidebar thu gọn.
+- Avatar, notification và account controls nằm bên phải header theo reference.
+- Nội dung trang mặc định dùng `p-4 md:p-6`; layout centered có thể giới hạn ở `max-w-screen-2xl`.
+- Page background dùng semantic `bg-background`, không hardcode màu trong feature.
+- Card dùng semantic surface/border, radius gọn và shadow tối thiểu như reference.
+- Tránh card quá tròn, shadow đậm hoặc gradient trang trí không có trong reference đã pin.
 
 ## 5. Typography
 
@@ -160,12 +163,12 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 ## 6. Button và control
 
 - Chiều cao button mặc định: `36px`; button lớn tối đa khoảng `40px`.
-- Primary button: nền `#1B7A5A`, chữ trắng, hover `#145F47`.
-- Secondary button: nền trắng, border và chữ `#1B7A5A`.
-- Accent button chỉ dùng khi Figma thể hiện rõ màu vàng.
+- Primary button dùng semantic primary neutral; không hardcode màu.
+- Secondary button dùng surface, border và foreground semantic.
+- Accent button chỉ dùng cho hành động có chủ ý rõ ràng; không dùng màu thương hiệu tùy tiện trong neutral pass.
 - Icon-only button phải có `aria-label` hoặc `title`.
 - Không dùng button `rounded-full` cho action thông thường.
-- Input/select cao khoảng `36px`, `rounded-lg`, focus ring xanh nhẹ.
+- Input/select cao khoảng `32–36px`, `rounded-lg`, focus ring semantic.
 - Mọi trường chọn ngày hoặc ngày–giờ phải dùng shared `DateTimePicker` từ `client/src/components/ui/DateTimePicker.tsx`; không dùng trực tiếp native `date`, `datetime-local` hoặc tạo theme calendar riêng theo từng feature.
 - Calendar dùng định dạng 24 giờ, lưu datetime dưới dạng UTC ISO và chỉ chuyển sang timezone local khi hiển thị. Date-only giữ định dạng `YYYY-MM-DD` để tránh lệch ngày do timezone.
 - Không tạo checkbox hoặc tick button quá lớn.
@@ -191,10 +194,10 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ## 8. Analytics
 
-- Bám sát bố cục trong Figma ZIP: KPI cards, Score Progress, Activity Heatmap, Section Performance và Recent Activity.
+- Bám sát `dashboard/analytics` và `dashboard/default`: KPI strip, Score Progress, Activity Heatmap, Section Performance và Recent Activity.
 - Giáo viên dùng bố cục Test Performance: KPI strip, Question Performance Breakdown và Student Rankings.
 - Không dùng số liệu giả. Empty state tốt hơn dữ liệu demo.
-- Reading & Writing dùng xanh; Math dùng vàng accent.
+- Reading & Writing và Math phải phân biệt bằng label/icon cùng semantic chart colors; không phụ thuộc màu là tín hiệu duy nhất.
 - Ngày và heatmap phải xử lý UTC ở backend để không phụ thuộc timezone của Vercel/Render.
 - Table header nhỏ, uppercase khi phù hợp; row gọn và có hover rất nhẹ.
 
@@ -222,11 +225,11 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ## 11. Checklist trước khi hoàn thành
 
-- [ ] Đã đối chiếu màn hình tương ứng trong Figma ZIP.
+- [ ] Đã đối chiếu màn hình Studio Admin tương ứng trong `projects/docs/DESIGN_MIGRATION.md`.
 - [ ] Dùng đúng font, màu, radius và spacing trong tài liệu này.
 - [ ] Không thêm hex, arbitrary radius, arbitrary shadow hoặc type size cục bộ khi token hiện có đáp ứng được.
 - [ ] Không tự dựng lại Button/Input/Select/Modal/Tabs/Card/Table/Badge/Toast/EmptyState.
-- [ ] Không còn primary indigo/purple hoặc `rounded-2xl` ngoài trường hợp có chủ ý.
+- [ ] Không còn primary indigo/purple/SAT green hoặc radius quá lớn ngoài trường hợp có chủ ý trong neutral pass.
 - [ ] Nội dung hiển thị là tiếng Anh.
 - [ ] Không thêm feature hay dữ liệu giả ngoài yêu cầu.
 - [ ] Có loading, empty và error state.

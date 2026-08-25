@@ -26,3 +26,6 @@ yarn-debug.log*
 # Local design references and Codex synchronization backups
 SAT Learning Management System UI.zip
 .codex-main-sync-files/
+
+# Local upstream visual reference; pinned in projects/docs/DESIGN_MIGRATION.md
+tmp/next-shadcn-admin-dashboard/

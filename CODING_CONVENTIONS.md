@@ -53,7 +53,7 @@ sat-platform/
 ├── .claude/                # Claude AI configuration
 ├── .git/                   # Git repository
 ├── .vscode/                # VS Code settings
-├── PROJECT_CONTEXT.md      # Bối cảnh dự án (đọc trước khi code)
+├── projects/docs/ARCHITECTURE.md # Bối cảnh và kiến trúc dự án (đọc trước khi code)
 ├── CODING_CONVENTIONS.md   # Tài liệu này
 └── .gitignore
 ```
@@ -1150,7 +1150,7 @@ import 'bootstrap.css';  // ❌
 
 ### ✅ ALWAYS DO THESE:
 
-1. **✅ ALWAYS read PROJECT_CONTEXT.md** before starting work
+1. **✅ ALWAYS read projects/docs/ARCHITECTURE.md** before starting work
 2. **✅ ALWAYS update schema.prisma FIRST** when changing database
 3. **✅ ALWAYS use try-catch** in async controllers
 4. **✅ ALWAYS validate user input** on backend
@@ -1366,12 +1366,12 @@ git pull origin main     # Pull from main
 4. **Security first** - Validate everything
 5. **Standard responses** - Keep API format consistent
 6. **Test thoroughly** - Manual testing required for UI
-7. **Read PROJECT_CONTEXT.md** - Understand project context
+7. **Read projects/docs/ARCHITECTURE.md** - Understand project context
 
 ### 📝 Questions?
 
 Nếu có thắc mắc hoặc cần clarification về bất kỳ quy tắc nào:
-1. Đọc lại `PROJECT_CONTEXT.md`
+1. Đọc lại `projects/docs/ARCHITECTURE.md`
 2. Kiểm tra code hiện tại để xem pattern được sử dụng
 3. Hỏi team lead trước khi thực hiện thay đổi lớn
 
