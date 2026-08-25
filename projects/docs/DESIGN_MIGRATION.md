@@ -44,7 +44,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | Implemented; page hierarchy and workspace cards aligned, visual QA pending |
 | Authentication | `auth/v2` | `auth/v1` | Implemented; visual QA pending |
 | Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Implemented, including course, members, performance, assignments, and no local sticky page header |
-| Practice Center | `dashboard/tasks` | `dashboard/file-manager` | Implemented with real test/class data |
+| Practice Center | `dashboard/infrastructure` | `dashboard/file-manager`, `dashboard/tasks` | Redesigned with a single-row control toolbar, reference dropdown anatomy, and card/list views using real test/class data |
 | Test Bank | `dashboard/file-manager` | `dashboard/tasks` | No standalone route currently; embedded assignment selector aligned |
 | Results Analytics | `dashboard/analytics` | `dashboard/default` | Implemented with real attempt data |
 | Error Log | `dashboard/tasks` | default data-table patterns | Implemented |

@@ -183,6 +183,9 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ## 7. Practice Center
 
+- Bám sát `dashboard/infrastructure` cho page hierarchy và toolbar: search, filter, sort, view switch và role actions nằm trên một hàng ở desktop; chỉ wrap có kiểm soát trên viewport nhỏ.
+- Filter và sort dùng shared dropdown primitives với label, radio item, submenu, separator và active count như `dashboard/file-manager`; không trải nhiều hàng pill filter trong page.
+- Hỗ trợ cả card view và list/table view trên cùng dữ liệu và hành động. View preference được lưu ở client; list rộng phải horizontal-scroll thay vì ép cột quá hẹp.
 - Giáo viên chỉ thấy đề do chính giáo viên đó tạo.
 - Học sinh thấy đề admin đăng và đề giáo viên giao cho lớp của mình.
 - Trạng thái mặc định của card có nút ba chấm ở góc phải.
