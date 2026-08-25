@@ -37,6 +37,16 @@ test('term validation trims values, preserves an optional sentence, and assigns 
   });
 });
 
+test('term validation preserves an existing term id while editing', () => {
+  const [term] = _private.validateTerms([{
+    id: 'term-123',
+    word: 'coherent',
+    meaning: 'logical and consistent',
+    translation: 'mạch lạc',
+  }]);
+  assert.equal(term.id, 'term-123');
+});
+
 test('quiz shuffling returns a new array without losing options', () => {
   const source = ['a', 'b', 'c', 'd'];
   const shuffled = _private.shuffle(source);

@@ -11,6 +11,8 @@ router.post('/sets', controller.createSet);
 router.get('/sets/:setId', controller.getSet);
 router.patch('/sets/:setId', controller.updateSet);
 router.put('/sets/:setId/terms', controller.replaceTerms);
+router.patch('/sets/:setId/terms/:termId', controller.updateTerm);
+router.delete('/sets/:setId', controller.deleteSet);
 router.post('/sets/:setId/publish', authorizeRole(['ADMIN']), controller.publishSet);
 router.post('/sets/:setId/archive', controller.archiveSet);
 router.post('/sets/:setId/sessions', controller.createSession);

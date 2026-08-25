@@ -17,6 +17,8 @@ exports.getSet = action(req => vocabularyService.getSet({ setId: req.params.setI
 exports.createSet = action(req => vocabularyService.createSet({ data: req.body, ...auth(req) }), 'Unable to create the vocabulary set.', 201);
 exports.updateSet = action(req => vocabularyService.updateSet({ setId: req.params.setId, data: req.body, ...auth(req) }), 'Unable to update the vocabulary set.');
 exports.replaceTerms = action(req => vocabularyService.replaceTerms({ setId: req.params.setId, terms: req.body.terms, ...auth(req) }), 'Unable to update vocabulary terms.');
+exports.updateTerm = action(req => vocabularyService.updateTerm({ setId: req.params.setId, termId: req.params.termId, data: req.body, ...auth(req) }), 'Unable to update the vocabulary term.');
+exports.deleteSet = action(req => vocabularyService.deleteSet({ setId: req.params.setId, ...auth(req) }), 'Unable to delete the vocabulary set.');
 exports.publishSet = action(req => vocabularyService.publishSet({ setId: req.params.setId, ...auth(req) }), 'Unable to publish the vocabulary set.');
 exports.archiveSet = action(req => vocabularyService.archiveSet({ setId: req.params.setId, ...auth(req) }), 'Unable to archive the vocabulary set.');
 exports.createSession = action(req => vocabularyService.createSession({ setId: req.params.setId, ...req.body, ...auth(req) }), 'Unable to start the study session.', 201);

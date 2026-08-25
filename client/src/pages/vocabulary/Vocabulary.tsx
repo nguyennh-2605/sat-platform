@@ -1,6 +1,6 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Archive, BookOpen, Check, ChevronLeft, ChevronRight, Clock3, ClipboardCheck, Edit3, Pause, Play, Plus, RotateCcw, Search, Send, Shuffle, Sparkles, Target, Trophy, Volume2, X } from 'lucide-react';
+import { Archive, BookOpen, Check, ChevronLeft, ChevronRight, Clock3, ClipboardCheck, Edit3, Pause, Play, Plus, RotateCcw, Search, Send, Shuffle, Sparkles, Target, Trash2, Trophy, Volume2, X } from 'lucide-react';
 import axiosClient from '../../lib/axios';
 import { AppHeader, BackButton, Badge, Button, Card, EmptyState, Input, LoadingBar, Modal, Select, Tabs, type TabItem } from '../../components/ui/AppUI';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
@@ -22,6 +22,7 @@ interface Term { id?: string; word: string; meaning: string; translation: string
 interface SetDetail extends SetSummary { canEdit: boolean; version: number; terms: Term[] }
 interface StudyQuestion { id: string; prompt: string; order: number; options: string[]; selectedMeaning?: string | null; isCorrect?: boolean | null; meaning?: string; translation?: string; exampleSentence?: string | null }
 interface StudySession { id: string; setId: string; activityId?: string | null; mode: 'FLASHCARD' | 'QUIZ'; status: 'IN_PROGRESS' | 'COMPLETED'; totalItems: number; correctCount: number; score: number; questions: StudyQuestion[] }
+interface InlineTermDraft { word: string; meaning: string; translation: string; exampleSentence: string }
 interface ClassInfo { id: string; name: string }
 interface VocabularyActivity { id: string; title: string; dueAt?: string | null; completionRule: string; passingScore?: number | null; maxAttempts: number; vocabulary: { vocabularySet: SetSummary; items: Term[] }; class: { id: string; name: string } }
 
@@ -58,9 +59,9 @@ export default function Vocabulary() {
   const [selected, setSelected] = useState<SetDetail | null>(null);
   const [activity, setActivity] = useState<VocabularyActivity | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('TERMS');
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [homeEditorSet, setHomeEditorSet] = useState<SetDetail | undefined>();
   const [creatingSet, setCreatingSet] = useState(false);
+  const [editingSet, setEditingSet] = useState<SetDetail | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SetSummary | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [quizSetupOpen, setQuizSetupOpen] = useState(false);
   const [quizConfig, setQuizConfig] = useState<QuizConfig | null>(null);
@@ -169,8 +170,9 @@ export default function Vocabulary() {
   const safeWordPage = Math.min(wordPage, pageCount);
   const visibleTerms = useMemo(() => filteredTerms.slice((safeWordPage - 1) * PAGE_SIZE, safeWordPage * PAGE_SIZE), [filteredTerms, safeWordPage]);
 
-  if (creatingSet) return <CreateSetScreen role={role} onBack={() => setCreatingSet(false)} onSaved={async detail => { currentCollectionKeyRef.current = `set:${detail.id}`; setCurrentSet(detail); setCurrentActivity(null); setCreatingSet(false); await loadSets(); }} />;
-  if (selected) return <SetWorkspace set={selected} activity={activity} tab={detailTab} onTab={setDetailTab} role={role} quizConfig={quizConfig} onBack={closeDetail} onEdit={() => setEditorOpen(true)} onAssign={() => setAssignOpen(true)} onRefresh={async () => { const refreshed = await loadCollection({ ...selected, assignedActivityId: activity?.id }); setSelected(refreshed.detail); setCurrentSet(refreshed.detail); }} editor={<SetEditor open={editorOpen} set={selected} role={role} onClose={() => setEditorOpen(false)} onSaved={async detail => { setSelected(detail); setCurrentSet(detail); setEditorOpen(false); await loadSets(); }} />} assigner={<AssignDialog open={assignOpen} set={selected} initialClassId={searchParams.get('assignTo') || ''} onClose={() => setAssignOpen(false)} />} />;
+  if (editingSet) return <CollectionEditorScreen key={editingSet.id} role={role} set={editingSet} onBack={() => setEditingSet(null)} onSaved={async detail => { currentCollectionKeyRef.current = `set:${detail.id}`; setCurrentSet(detail); if (selected?.id === detail.id) setSelected(detail); setEditingSet(null); await loadSets(true); }} />;
+  if (creatingSet) return <CollectionEditorScreen key="new-set" role={role} onBack={() => setCreatingSet(false)} onSaved={async detail => { currentCollectionKeyRef.current = `set:${detail.id}`; setCurrentSet(detail); setCurrentActivity(null); setCreatingSet(false); await loadSets(true); }} />;
+  if (selected) return <SetWorkspace set={selected} activity={activity} tab={detailTab} onTab={setDetailTab} role={role} quizConfig={quizConfig} onBack={closeDetail} onEdit={() => setEditingSet(selected)} onTermSaved={detail => { setSelected(detail); setCurrentSet(detail); invalidateQueryCache('/api/vocabulary'); }} onAssign={() => setAssignOpen(true)} onRefresh={async () => { const refreshed = await loadCollection({ ...selected, assignedActivityId: activity?.id }, true); setSelected(refreshed.detail); setCurrentSet(refreshed.detail); }} assigner={<AssignDialog open={assignOpen} set={selected} initialClassId={searchParams.get('assignTo') || ''} onClose={() => setAssignOpen(false)} />} />;
 
   return <div className={ui.page}>
     <AppHeader title="Vocabulary" subtitle="Build vocabulary through review and retrieval practice" rightContent={<SatCountdown />} />
@@ -188,13 +190,13 @@ export default function Vocabulary() {
 
         <section aria-labelledby="my-sets-heading" className="mt-9">
           <div className="flex flex-wrap items-center justify-between gap-4"><h2 id="my-sets-heading" className="text-heading font-semibold text-foreground">My Vocabulary Sets</h2><Button variant="ghost" size="sm" onClick={() => setCreatingSet(true)}><Plus size={15} />New set</Button></div>
-          <CollectionGrid sets={choices} currentKey={currentKey} onSelect={selectCollection} />
+          <CollectionGrid sets={choices} currentKey={currentKey} onSelect={selectCollection} onDelete={setDeleteTarget} />
         </section>
 
         <Card className="mt-10 overflow-hidden">
           <section aria-labelledby="set-words-heading">
             <div className="p-5 sm:p-6"><div className="flex flex-wrap items-center gap-2"><h2 id="set-words-heading" className="text-heading font-semibold text-foreground">Words in {currentSet.title}</h2><Badge tone={currentActivity ? 'gold' : currentSet.scope === 'SYSTEM' ? 'green' : 'neutral'}>{currentActivity ? 'Assigned' : currentSet.scope === 'SYSTEM' ? 'System' : 'Personal'}</Badge></div>
-              <div className="mt-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><label className="relative block w-full sm:max-w-sm"><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input value={wordQuery} onChange={event => { setWordQuery(event.target.value); setWordPage(1); }} className="w-full bg-background pl-9" placeholder="Search words..." /></label><div className="flex flex-wrap items-center gap-2"><Select aria-label="Filter by progress" value={progressFilter} onChange={event => { setProgressFilter(event.target.value as ProgressFilter); setWordPage(1); }} className="w-36"><option value="ALL">All progress</option><option value="MASTERED">Mastered</option><option value="LEARNING">Learning</option><option value="NOT_STUDIED">Not studied</option></Select>{currentSet.canEdit && (currentSet.scope !== 'SYSTEM' || role === 'ADMIN') && <Button size="sm" onClick={() => { setHomeEditorSet(currentSet); setEditorOpen(true); }}><Plus size={15} />Add Word</Button>}</div></div>
+              <div className="mt-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><label className="relative block w-full sm:max-w-sm"><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input value={wordQuery} onChange={event => { setWordQuery(event.target.value); setWordPage(1); }} className="w-full bg-background pl-9" placeholder="Search words..." /></label><div className="flex flex-wrap items-center gap-2"><Select aria-label="Filter by progress" value={progressFilter} onChange={event => { setProgressFilter(event.target.value as ProgressFilter); setWordPage(1); }} className="w-36"><option value="ALL">All progress</option><option value="MASTERED">Mastered</option><option value="LEARNING">Learning</option><option value="NOT_STUDIED">Not studied</option></Select>{currentSet.canEdit && (currentSet.scope !== 'SYSTEM' || role === 'ADMIN') && <Button size="sm" onClick={() => setEditingSet(currentSet)}><Edit3 size={15} />Edit collection</Button>}</div></div>
             </div>
             <div className="border-t border-ui-border bg-surface p-5 sm:p-6">{visibleTerms.length ? <WordGrid terms={visibleTerms} /> : <EmptyState compact surface={false} icon={<Search size={19} />} title="No matching words" description="Try another word, meaning, translation, or progress filter." />}</div>
             <div className="flex flex-col gap-3 border-t border-ui-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"><p className="text-caption text-muted-foreground">{filteredTerms.length ? `Showing ${(safeWordPage - 1) * PAGE_SIZE + 1}–${Math.min(safeWordPage * PAGE_SIZE, filteredTerms.length)} of ${filteredTerms.length} words` : 'Showing 0 words'}</p><Pagination page={safeWordPage} pageCount={pageCount} onChange={setWordPage} /></div>
@@ -202,7 +204,7 @@ export default function Vocabulary() {
         </Card>
       </>}
     </div></main>
-    <SetEditor open={editorOpen} set={homeEditorSet} role={role} onClose={() => { setEditorOpen(false); setHomeEditorSet(undefined); }} onSaved={async detail => { currentCollectionKeyRef.current = `set:${detail.id}`; setCurrentSet(detail); setCurrentActivity(null); setEditorOpen(false); setHomeEditorSet(undefined); await loadSets(); }} />
+    <DeleteCollectionDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={async deletedId => { if (currentSet?.id === deletedId) currentCollectionKeyRef.current = ''; setDeleteTarget(null); invalidateQueryCache('/api/vocabulary'); await loadSets(true); }} />
     {currentSet && quizSetupOpen && <QuizSetupModal open set={currentSet} onClose={() => setQuizSetupOpen(false)} onStart={config => { setQuizConfig(config); setQuizSetupOpen(false); setSelected(currentSet); setActivity(currentActivity); setDetailTab('QUIZ'); }} />}
   </div>;
 }
@@ -230,13 +232,32 @@ const StudyModeCard = memo(function StudyModeCard({ icon: Icon, tone, title, des
   </Card>;
 });
 
-const CollectionGrid = memo(function CollectionGrid({ sets, currentKey, onSelect }: { sets: SetSummary[]; currentKey: string; onSelect: (set: SetSummary) => void }) {
-  return <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">{sets.map(set => <CollectionCard key={collectionKey(set)} set={set} active={collectionKey(set) === currentKey} onClick={() => void onSelect(set)} />)}</div>;
+const CollectionGrid = memo(function CollectionGrid({ sets, currentKey, onSelect, onDelete }: { sets: SetSummary[]; currentKey: string; onSelect: (set: SetSummary) => void; onDelete: (set: SetSummary) => void }) {
+  return <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">{sets.map(set => <CollectionCard key={collectionKey(set)} set={set} active={collectionKey(set) === currentKey} onClick={() => void onSelect(set)} onDelete={() => onDelete(set)} />)}</div>;
 });
 
-function CollectionCard({ set, active, onClick }: { set: SetSummary; active: boolean; onClick: () => void }) {
+function CollectionCard({ set, active, onClick, onDelete }: { set: SetSummary; active: boolean; onClick: () => void; onDelete: () => void }) {
   const created = new Date(set.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  return <button type="button" onClick={onClick} aria-pressed={active} className={`group flex min-h-36 flex-col rounded-card border p-4 text-left shadow-card transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:shadow-raised ${active ? 'border-primary bg-primary text-white' : 'border-ui-border bg-surface text-foreground hover:border-primary/35'}`}><div className={`text-[11px] font-medium ${active ? 'text-white/65' : 'text-muted-foreground'}`}>Created {created}</div><h3 className="mt-3 line-clamp-1 text-title font-semibold">{set.title}</h3>{set.description && <p className={`mt-1.5 line-clamp-2 text-caption leading-4 ${active ? 'text-white/78' : 'text-muted-foreground'}`}>{set.description}</p>}<div className={`mt-auto flex items-center justify-between gap-2 pt-4 text-caption ${active ? 'text-white/85' : 'text-muted-foreground'}`}><span className="font-medium">{set.termCount.toLocaleString()} words</span>{set.assignedActivityId && <span>Assigned</span>}</div></button>;
+  const personal = set.scope === 'PERSONAL' && !set.assignedActivityId;
+  return <div className="group relative min-h-36">
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex h-full min-h-36 w-full flex-col rounded-card border p-4 text-left shadow-card transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:shadow-raised ${personal ? 'pr-12' : ''} ${active ? 'border-primary bg-primary text-white' : 'border-ui-border bg-surface text-foreground hover:border-primary/35'}`}><div className={`text-[11px] font-medium ${active ? 'text-white/65' : 'text-muted-foreground'}`}>Created {created}</div><h3 className="mt-3 line-clamp-1 text-title font-semibold">{set.title}</h3>{set.description && <p className={`mt-1.5 line-clamp-2 text-caption leading-4 ${active ? 'text-white/78' : 'text-muted-foreground'}`}>{set.description}</p>}<div className={`mt-auto flex items-center justify-between gap-2 pt-4 text-caption ${active ? 'text-white/85' : 'text-muted-foreground'}`}><span className="font-medium">{set.termCount.toLocaleString()} words</span>{set.assignedActivityId && <span>Assigned</span>}</div></button>
+    {personal && <Button variant="ghost" size="icon" onClick={onDelete} className={`absolute right-2.5 top-2.5 h-8 w-8 ${active ? 'text-white/75 hover:bg-white/15 hover:text-white' : 'text-muted-foreground hover:bg-danger-soft hover:text-danger'}`} aria-label={`Delete ${set.title}`} title="Delete collection"><Trash2 size={15} /></Button>}
+  </div>;
+}
+
+function DeleteCollectionDialog({ target, onClose, onDeleted }: { target: SetSummary | null; onClose: () => void; onDeleted: (setId: string) => Promise<void> }) {
+  const [deleting, setDeleting] = useState(false);
+  const remove = async () => {
+    if (!target || deleting) return;
+    setDeleting(true);
+    try {
+      await axiosClient.delete(`/api/vocabulary/sets/${target.id}`);
+      appToast.success('Vocabulary collection deleted.');
+      await onDeleted(target.id);
+    } catch (error) { appToast.error(errorMessage(error, 'Unable to delete the vocabulary collection.')); }
+    finally { setDeleting(false); }
+  };
+  return <Modal open={Boolean(target)} onClose={onClose} closeOnBackdrop title="Delete collection?" subtitle="This permanently removes the collection, its words, and your study progress." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={() => void remove()}><Trash2 size={15} />{deleting ? 'Deleting…' : 'Delete collection'}</Button></>}><p className="text-body text-muted-foreground">You’re about to delete <strong className="font-semibold text-foreground">{target?.title}</strong>. This action cannot be undone.</p></Modal>;
 }
 
 const WordGrid = memo(function WordGrid({ terms }: { terms: Term[] }) {
@@ -261,8 +282,8 @@ function VocabularyHomeSkeleton() {
   return <div className="space-y-8" aria-label="Loading vocabulary"><div className="h-80 animate-pulse rounded-card border border-ui-border bg-muted" /><div><div className="h-6 w-48 animate-pulse rounded bg-muted" /><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[1, 2, 3].map(item => <div key={item} className="h-32 animate-pulse rounded-card border border-ui-border bg-muted" />)}</div></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <div key={item} className="h-36 animate-pulse rounded-card border border-ui-border bg-muted" />)}</div></div>;
 }
 
-function SetWorkspace({ set, activity, tab, onTab, role, quizConfig, onBack, onEdit, onAssign, onRefresh, editor, assigner }: { set: SetDetail; activity: VocabularyActivity | null; tab: DetailTab; onTab: (tab: DetailTab) => void; role: UserRole; quizConfig: QuizConfig | null; onBack: () => void; onEdit: () => void; onAssign: () => void; onRefresh: () => Promise<void>; editor: React.ReactNode; assigner: React.ReactNode }) {
-  if (tab === 'FLASHCARDS') return <FlashcardWorkspace set={set} activityId={activity?.id} onBack={onBack} />;
+function SetWorkspace({ set, activity, tab, onTab, role, quizConfig, onBack, onEdit, onTermSaved, onAssign, onRefresh, assigner }: { set: SetDetail; activity: VocabularyActivity | null; tab: DetailTab; onTab: (tab: DetailTab) => void; role: UserRole; quizConfig: QuizConfig | null; onBack: () => void; onEdit: () => void; onTermSaved: (set: SetDetail) => void; onAssign: () => void; onRefresh: () => Promise<void>; assigner: React.ReactNode }) {
+  if (tab === 'FLASHCARDS') return <FlashcardWorkspace set={set} activityId={activity?.id} onBack={onBack} canEdit={set.canEdit && !activity} onTermSaved={onTermSaved} />;
   if (tab === 'QUIZ') return <QuizWorkspace set={set} activityId={activity?.id} config={quizConfig} onBack={onBack} />;
   const tabs: Array<TabItem<DetailTab>> = [{ value: 'TERMS', label: 'Terms', icon: BookOpen }, { value: 'FLASHCARDS', label: 'Flashcards', icon: RotateCcw }, { value: 'QUIZ', label: 'Test', icon: ClipboardCheck, disabled: set.terms.length < 4 }];
   const publish = async () => { try { await axiosClient.post(`/api/vocabulary/sets/${set.id}/publish`); invalidateQueryCache('/api/vocabulary'); appToast.success('Vocabulary set published.'); await onRefresh(); } catch (error) { appToast.error(errorMessage(error, 'Unable to publish the set.')); } };
@@ -274,11 +295,11 @@ function SetWorkspace({ set, activity, tab, onTab, role, quizConfig, onBack, onE
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4"><div><div className="flex items-center gap-2"><h2 className="text-heading font-semibold">{set.title}</h2><Badge tone={set.scope === 'SYSTEM' ? 'green' : 'neutral'}>{set.scope === 'SYSTEM' ? 'System library' : 'Personal'}</Badge>{set.status !== 'PUBLISHED' && <Badge tone="warning">{set.status}</Badge>}</div>{set.description && <p className="mt-2 max-w-2xl text-body text-muted-foreground">{set.description}</p>}</div><p className="text-caption text-muted-foreground">{set.masteredCount}/{set.termCount} mastered</p></div>
       <Tabs items={tabs} value={tab} onValueChange={onTab} ariaLabel="Vocabulary study modes" className="mt-6 border-b border-ui-border-strong" />
       <div key={tab} role="tabpanel" className="mt-6 min-h-[360px]"><TermList terms={set.terms} /></div>
-    </div></main>{editor}{assigner}
+    </div></main>{assigner}
   </div>;
 }
 
-function FlashcardWorkspace({ set, activityId, onBack }: { set: SetDetail; activityId?: string; onBack: () => void }) {
+function FlashcardWorkspace({ set, activityId, onBack, canEdit, onTermSaved }: { set: SetDetail; activityId?: string; onBack: () => void; canEdit: boolean; onTermSaved: (set: SetDetail) => void }) {
   const [session, setSession] = useState<StudySession | null>(null);
   const [questionOrder, setQuestionOrder] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
@@ -286,6 +307,9 @@ function FlashcardWorkspace({ set, activityId, onBack }: { set: SetDetail; activ
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autoplay, setAutoplay] = useState(false);
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [termDraft, setTermDraft] = useState<InlineTermDraft | null>(null);
+  const [savingTerm, setSavingTerm] = useState(false);
   const start = useCallback(async () => {
     setLoading(true);
     try {
@@ -344,16 +368,40 @@ function FlashcardWorkspace({ set, activityId, onBack }: { set: SetDetail; activ
     catch (error) { appToast.error(errorMessage(error, 'Unable to save your progress.')); }
     finally { setSaving(false); }
   };
+  const beginTermEdit = (question: StudyQuestion) => {
+    setAutoplay(false);
+    setEditingQuestionId(question.id);
+    setTermDraft({ word: question.prompt, meaning: question.meaning || '', translation: question.translation || '', exampleSentence: question.exampleSentence || '' });
+  };
+  const cancelTermEdit = () => { setEditingQuestionId(null); setTermDraft(null); };
+  const updateTermDraft = (field: keyof InlineTermDraft, value: string) => setTermDraft(current => current ? { ...current, [field]: value } : current);
+  const saveTermEdit = async () => {
+    if (!editingQuestionId || !termDraft || savingTerm || !termDraft.word.trim() || !termDraft.meaning.trim() || !termDraft.translation.trim()) return;
+    setSavingTerm(true);
+    try {
+      const detail = await axiosClient.patch<SetDetail, SetDetail>(`/api/vocabulary/sets/${set.id}/terms/${editingQuestionId}`, termDraft);
+      const updated = detail.terms.find(term => term.id === editingQuestionId);
+      if (updated) setSession(currentSession => currentSession ? { ...currentSession, questions: currentSession.questions.map(question => question.id === editingQuestionId ? { ...question, prompt: updated.word, meaning: updated.meaning, translation: updated.translation, exampleSentence: updated.exampleSentence } : question) } : currentSession);
+      onTermSaved(detail);
+      cancelTermEdit();
+      appToast.success('Vocabulary term updated.');
+    } catch (error) { appToast.error(errorMessage(error, 'Unable to update this vocabulary term.')); }
+    finally { setSavingTerm(false); }
+  };
 
   return <div className={ui.page}>
     <AppHeader title="Flashcards" subtitle={set.title} rightContent={<SatCountdown />} />
     <main className="relative min-h-0 flex-1 overflow-y-auto"><LoadingBar active={loading || saving} />
       <BackButton label="Back to Vocabulary" onClick={onBack} className="absolute left-4 top-5 z-10 sm:left-6 lg:left-8" />
       <div className={`${ui.content} !max-w-[1080px] !pt-5`}>
-      <h1 className="hidden min-h-9 text-center text-title font-semibold text-foreground sm:block">{set.title}</h1>
+      <header className="mx-auto mt-12 max-w-[820px] text-center sm:mt-0">
+        <p className="text-caption font-semibold uppercase tracking-[0.14em] text-primary">Vocabulary set</p>
+        <h1 className="mt-1 text-display font-semibold text-foreground">{set.title}</h1>
+        <p className="mt-1 text-body text-muted-foreground">{set.termCount} terms · {set.masteredCount} mastered</p>
+      </header>
       {loading ? <div className="mt-8 h-[430px] animate-pulse rounded-card border border-ui-border bg-muted" /> : !current ? <EmptyState icon={<RotateCcw size={20} />} title="No flashcards available" description="Add words to this set before starting flashcards." action={<Button variant="outline" onClick={onBack}>Back to vocabulary</Button>} /> : <>
-        <section aria-labelledby="flashcard-heading" className="mt-7">
-          <div className="mx-auto mb-4 max-w-[820px]"><div className="flex items-end justify-between gap-4"><div><p className="text-caption font-medium uppercase tracking-wide text-muted-foreground">Term</p><h2 id="flashcard-heading" className="mt-1 text-heading font-semibold text-foreground">Study with flashcards</h2></div><p className="text-title font-semibold text-foreground" aria-live="polite">{index + 1} <span className="font-normal text-muted-foreground">/ {orderedQuestions.length}</span></p></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${((index + 1) / orderedQuestions.length) * 100}%` }} /></div></div>
+        <section aria-labelledby="flashcard-heading" className="mt-6">
+          <div className="mx-auto mb-4 max-w-[820px]"><div className="flex items-end justify-between gap-4"><h2 id="flashcard-heading" className="text-title font-semibold text-foreground">Flashcard review</h2><p className="text-title font-semibold text-foreground" aria-live="polite">{index + 1} <span className="font-normal text-muted-foreground">/ {orderedQuestions.length}</span></p></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${((index + 1) / orderedQuestions.length) * 100}%` }} /></div></div>
 
           <div className="grid items-center gap-2 sm:grid-cols-[48px_minmax(0,820px)_48px] sm:justify-center sm:gap-4">
             <Button variant="ghost" size="icon" className="hidden h-12 w-12 sm:inline-flex" disabled={index === 0} onClick={() => goTo(index - 1)} aria-label="Previous flashcard"><ChevronLeft size={25} /></Button>
@@ -372,11 +420,36 @@ function FlashcardWorkspace({ set, activityId, onBack }: { set: SetDetail; activ
           <div className="mx-auto mt-5 flex max-w-[820px] flex-wrap items-center justify-between gap-3"><div className="flex gap-2 sm:hidden"><Button variant="outline" size="icon" disabled={index === 0} onClick={() => goTo(index - 1)} aria-label="Previous flashcard"><ChevronLeft size={20} /></Button><Button variant="outline" size="icon" disabled={index === orderedQuestions.length - 1} onClick={() => goTo(index + 1)} aria-label="Next flashcard"><ChevronRight size={20} /></Button></div><div className="flex gap-2"><Button variant="outline" size="md" onClick={shuffleCards}><Shuffle size={16} />Shuffle</Button><Button variant={autoplay ? 'primary' : 'outline'} size="md" onClick={() => setAutoplay(value => !value)}>{autoplay ? <Pause size={16} /> : <Play size={16} />}{autoplay ? 'Pause' : 'Autoplay'}</Button></div>{flipped ? current.selectedMeaning ? <Badge tone={current.selectedMeaning === 'KNOW' ? 'success' : 'warning'}>{current.selectedMeaning === 'KNOW' ? 'Known' : 'Still learning'}</Badge> : <div className="flex gap-2"><Button variant="outline" disabled={saving} onClick={() => void answer('LEARNING')}>Still learning</Button><Button disabled={saving} onClick={() => void answer('KNOW')}><Check size={16} />Know it</Button></div> : <p className="hidden text-caption text-muted-foreground md:block">Flip the card to rate your recall</p>}</div>
         </section>
 
-        <section aria-labelledby="terms-in-set-heading" className="mt-14"><div className="flex items-center justify-between gap-4"><div><h2 id="terms-in-set-heading" className="text-heading font-semibold text-foreground">Terms in this set</h2><p className="mt-1 text-caption text-muted-foreground">{orderedQuestions.length} terms</p></div>{session?.status === 'COMPLETED' && <Badge tone="success">Session complete · {session.score}%</Badge>}</div><div className="mt-4 space-y-3">{orderedQuestions.map(question => <Card key={question.id} className="grid gap-3 p-4 sm:grid-cols-[minmax(140px,0.35fr)_1fr] sm:items-start sm:p-5"><p className="font-semibold text-foreground">{question.prompt}</p><div className="border-ui-border sm:border-l sm:pl-5"><p className="text-body text-foreground">{question.meaning}</p><p className="mt-1 text-caption font-medium text-primary">{question.translation}</p>{question.exampleSentence && <p className="mt-2 text-caption italic text-muted-foreground">“{question.exampleSentence}”</p>}</div></Card>)}</div></section>
+        <section aria-labelledby="terms-in-set-heading" className="mt-16"><div className="flex items-end justify-between gap-4"><div><h2 id="terms-in-set-heading" className="text-display font-semibold text-foreground">Terms in this set</h2><p className="mt-1 text-body text-muted-foreground">Review every term and its complete definition.</p></div><div className="flex items-center gap-2">{!canEdit && <Badge tone="neutral">Read only</Badge>}<Badge tone="neutral">{orderedQuestions.length} terms</Badge>{session?.status === 'COMPLETED' && <Badge tone="success">Session complete · {session.score}%</Badge>}</div></div><div className="mt-5 space-y-4">{orderedQuestions.map(question => <InlineEditableTermCard key={question.id} question={question} canEdit={canEdit} editing={editingQuestionId === question.id} draft={editingQuestionId === question.id ? termDraft : null} saving={savingTerm} onEdit={() => beginTermEdit(question)} onCancel={cancelTermEdit} onChange={updateTermDraft} onSave={() => void saveTermEdit()} />)}</div></section>
       </>}
     </div></main>
   </div>;
 }
+
+const InlineEditableTermCard = memo(function InlineEditableTermCard({ question, canEdit, editing, draft, saving, onEdit, onCancel, onChange, onSave }: { question: StudyQuestion; canEdit: boolean; editing: boolean; draft: InlineTermDraft | null; saving: boolean; onEdit: () => void; onCancel: () => void; onChange: (field: keyof InlineTermDraft, value: string) => void; onSave: () => void }) {
+  if (editing && draft) {
+    const valid = Boolean(draft.word.trim() && draft.meaning.trim() && draft.translation.trim());
+    return <Card className="overflow-hidden border-primary shadow-raised ring-2 ring-primary/10">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary/15 bg-primary-soft/60 px-4 py-3 sm:px-5">
+        <div className="flex items-center gap-2 text-caption font-semibold text-primary"><Edit3 size={15} />Editing term</div>
+        <div className="flex items-center gap-2"><Button variant="ghost" size="sm" disabled={saving} onClick={onCancel}>Cancel</Button><Button size="sm" disabled={saving || !valid} onClick={onSave}><Check size={15} />{saving ? 'Saving…' : 'Save'}</Button></div>
+      </div>
+      <div className="grid gap-5 p-5 sm:grid-cols-[minmax(210px,0.34fr)_1fr] sm:p-6">
+        <label className="text-caption font-medium text-foreground">Word <span className="text-danger">*</span><Input autoFocus className="mt-2 w-full" value={draft.word} onChange={event => onChange('word', event.target.value)} placeholder="Enter the word" /></label>
+        <div className="grid gap-4 border-ui-border-strong sm:border-l-2 sm:pl-6">
+          <label className="text-caption font-medium text-foreground">English meaning <span className="text-danger">*</span><Input className="mt-2 w-full" value={draft.meaning} onChange={event => onChange('meaning', event.target.value)} placeholder="Enter the English meaning" /></label>
+          <label className="text-caption font-medium text-foreground">Translation <span className="text-danger">*</span><Input className="mt-2 w-full" value={draft.translation} onChange={event => onChange('translation', event.target.value)} placeholder="Enter the translation" /></label>
+          <label className="text-caption font-medium text-foreground">Example sentence <span className="font-normal text-muted-foreground">(optional)</span><Input className="mt-2 w-full" value={draft.exampleSentence} onChange={event => onChange('exampleSentence', event.target.value)} placeholder="Use the word in a sentence" /></label>
+        </div>
+      </div>
+    </Card>;
+  }
+  return <Card className="relative grid min-h-32 gap-4 border-ui-border-strong p-5 pr-16 shadow-card transition-colors hover:border-primary/25 sm:grid-cols-[minmax(210px,0.34fr)_1fr] sm:items-center sm:p-6 sm:pr-16">
+    <p className="break-words text-heading font-semibold leading-7 text-foreground">{question.prompt}</p>
+    <div className="border-ui-border-strong sm:border-l-2 sm:pl-6"><p className="text-title leading-6 text-foreground">{question.meaning}</p><p className="mt-2 text-body font-semibold text-primary">{question.translation}</p>{question.exampleSentence && <p className="mt-2 text-body italic leading-6 text-muted-foreground">“{question.exampleSentence}”</p>}</div>
+    {canEdit && <Button variant="ghost" size="icon" className="absolute right-3 top-1/2 h-10 w-10 -translate-y-1/2 bg-transparent text-primary hover:bg-primary-soft hover:text-primary" onClick={onEdit} aria-label={`Edit ${question.prompt}`} title="Edit term"><Edit3 size={17} /></Button>}
+  </Card>;
+});
 
 function QuizSetupModal({ open, set, onClose, onStart }: { open: boolean; set: SetDetail; onClose: () => void; onStart: (config: QuizConfig) => void }) {
   const [startIndex, setStartIndex] = useState(1);
@@ -463,11 +536,12 @@ function QuizConfetti() { return <div aria-hidden="true" className="pointer-even
 
 function TermList({ terms }: { terms: Term[] }) { return <div className="space-y-3">{terms.map((term, index) => <Card key={term.id || index} className="grid gap-3 p-5 md:grid-cols-[180px_1fr_180px]"><div><p className="font-semibold">{term.word}</p>{term.progress?.mastery && <Badge className="mt-2" tone={term.progress.mastery === 'MASTERED' ? 'success' : 'warning'}>{term.progress.mastery.replace('_', ' ').toLowerCase()}</Badge>}</div><div><p className="text-body">{term.meaning}</p>{term.exampleSentence && <p className="mt-2 text-caption italic text-muted-foreground">{term.exampleSentence}</p>}</div><p className="text-body font-medium text-primary">{term.translation}</p></Card>)}</div>; }
 
-function CreateSetScreen({ role, onBack, onSaved }: { role: UserRole; onBack: () => void; onSaved: (set: SetDetail) => void }) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [scope, setScope] = useState<'PERSONAL' | 'SYSTEM'>('PERSONAL');
-  const [terms, setTerms] = useState<Term[]>([createDraftTerm()]);
+function CollectionEditorScreen({ role, set, onBack, onSaved }: { role: UserRole; set?: SetDetail; onBack: () => void; onSaved: (set: SetDetail) => void }) {
+  const editing = Boolean(set);
+  const [title, setTitle] = useState(set?.title || '');
+  const [description, setDescription] = useState(set?.description || '');
+  const [scope, setScope] = useState<'PERSONAL' | 'SYSTEM'>(set?.scope || 'PERSONAL');
+  const [terms, setTerms] = useState<Term[]>(set?.terms.length ? set.terms.map(term => ({ ...term })) : [createDraftTerm()]);
   const [saving, setSaving] = useState(false);
   const updateTerm = useCallback((index: number, field: keyof Term, value: string) => setTerms(current => current.map((term, termIndex) => termIndex === index ? { ...term, [field]: value } : term)), []);
   const removeTerm = useCallback((index: number) => setTerms(current => current.length === 1 ? current : current.filter((_, termIndex) => termIndex !== index)), []);
@@ -477,24 +551,30 @@ function CreateSetScreen({ role, onBack, onSaved }: { role: UserRole; onBack: ()
     if (!canSave || saving) return;
     setSaving(true);
     try {
-      const detail = await axiosClient.post<SetDetail, SetDetail>('/api/vocabulary/sets', { title, description, scope, terms });
+      let detail: SetDetail;
+      if (set) {
+        await axiosClient.patch(`/api/vocabulary/sets/${set.id}`, { title, description });
+        detail = await axiosClient.put<SetDetail, SetDetail>(`/api/vocabulary/sets/${set.id}/terms`, { terms });
+      } else {
+        detail = await axiosClient.post<SetDetail, SetDetail>('/api/vocabulary/sets', { title, description, scope, terms });
+      }
       invalidateQueryCache('/api/vocabulary');
-      appToast.success('Vocabulary set created.');
+      appToast.success(editing ? 'Vocabulary collection updated.' : 'Vocabulary set created.');
       onSaved(detail);
-    } catch (error) { appToast.error(errorMessage(error, 'Unable to create the vocabulary set.')); }
+    } catch (error) { appToast.error(errorMessage(error, editing ? 'Unable to update the vocabulary collection.' : 'Unable to create the vocabulary set.')); }
     finally { setSaving(false); }
   };
   return <div className={ui.page}>
-    <AppHeader title="New vocabulary set" subtitle="Build a reusable collection for study and practice" rightContent={<SatCountdown />} />
+    <AppHeader title={editing ? 'Edit vocabulary collection' : 'New vocabulary set'} subtitle={editing ? 'Update collection details and vocabulary cards' : 'Build a reusable collection for study and practice'} rightContent={<SatCountdown />} />
     <main className="min-h-0 flex-1 overflow-y-auto"><div className={`${ui.content} !max-w-[1040px]`}>
       <BackButton label="Back to vocabulary" onClick={onBack} />
-      <div className="mt-5"><h1 className="mt-3 text-display font-semibold text-foreground">Create a vocabulary set</h1><p className="mt-2 max-w-2xl text-body text-muted-foreground">Name your collection, then add the words students will study. English meaning and translation are required for every word.</p></div>
+      <div className="mt-5"><h1 className="mt-3 text-display font-semibold text-foreground">{editing ? 'Edit your vocabulary collection' : 'Create a vocabulary set'}</h1><p className="mt-2 max-w-2xl text-body text-muted-foreground">{editing ? 'Revise existing words, remove outdated cards, or add new vocabulary. Your progress is preserved for words that remain in the collection.' : 'Name your collection, then add the words students will study. English meaning and translation are required for every word.'}</p></div>
 
       <Card className="mt-7 overflow-hidden">
         <div className="flex items-center gap-3 border-b border-ui-border bg-muted/50 px-5 py-4 sm:px-6"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-caption font-semibold text-white">1</span><div><h2 className="text-title font-semibold text-foreground">Collection details</h2><p className="mt-0.5 text-caption text-muted-foreground">Give this set a clear, recognizable name.</p></div></div>
         <div className="grid gap-5 p-5 sm:p-6 md:grid-cols-2">
           <label className="text-caption font-medium text-foreground">Collection title <span className="text-danger">*</span><Input autoFocus className="mt-2 h-10 w-full" value={title} maxLength={120} onChange={event => setTitle(event.target.value)} placeholder="e.g. Essential SAT vocabulary" /></label>
-          {role === 'ADMIN' ? <label className="text-caption font-medium text-foreground">Collection type<Select className="mt-2 h-10 w-full" value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="PERSONAL">Personal collection</option><option value="SYSTEM">System library</option></Select></label> : <div><p className="text-caption font-medium text-foreground">Collection type</p><div className="mt-2 flex h-10 items-center rounded-control border border-ui-border bg-background px-3 text-body text-muted-foreground">Personal collection</div></div>}
+          {role === 'ADMIN' && !editing ? <label className="text-caption font-medium text-foreground">Collection type<Select className="mt-2 h-10 w-full" value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="PERSONAL">Personal collection</option><option value="SYSTEM">System library</option></Select></label> : <div><p className="text-caption font-medium text-foreground">Collection type</p><div className="mt-2 flex h-10 items-center rounded-control border border-ui-border bg-background px-3 text-body text-muted-foreground">{set?.scope === 'SYSTEM' ? 'System library' : 'Personal collection'}</div></div>}
           <label className="text-caption font-medium text-foreground md:col-span-2">Description <span className="font-normal text-muted-foreground">(optional)</span><textarea className="mt-2 min-h-24 w-full resize-y rounded-control border border-ui-border bg-surface px-3 py-2.5 text-body text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20" value={description} maxLength={500} onChange={event => setDescription(event.target.value)} placeholder="What is this collection for?" /></label>
         </div>
       </Card>
@@ -505,7 +585,7 @@ function CreateSetScreen({ role, onBack, onSaved }: { role: UserRole; onBack: ()
         <button type="button" onClick={addTerm} className="mt-4 flex min-h-20 w-full items-center justify-center gap-2 rounded-card border border-dashed border-primary/45 bg-primary-soft text-sm font-medium text-primary transition-colors hover:border-primary hover:bg-primary-soft"><Plus size={18} />Add another vocabulary card</button>
       </section>
 
-      <div className="mt-8 flex flex-col-reverse gap-3 border-t border-ui-border py-6 sm:flex-row sm:items-center sm:justify-between"><p className="text-caption text-muted-foreground">You can edit this collection and add more words later.</p><div className="flex gap-3"><Button variant="ghost" size="lg" onClick={onBack}>Cancel</Button><Button size="lg" className="min-w-36" disabled={!canSave || saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save collection'}<Check size={17} /></Button></div></div>
+      <div className="mt-8 flex flex-col-reverse gap-3 border-t border-ui-border py-6 sm:flex-row sm:items-center sm:justify-between"><p className="text-caption text-muted-foreground">{editing ? 'Changes apply to future study sessions.' : 'You can edit this collection and add more words later.'}</p><div className="flex gap-3"><Button variant="ghost" size="lg" onClick={onBack}>Cancel</Button><Button size="lg" className="min-w-36" disabled={!canSave || saving} onClick={() => void save()}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Save collection'}<Check size={17} /></Button></div></div>
     </div></main>
   </div>;
 }
@@ -521,14 +601,6 @@ const VocabularyTermEditor = memo(function VocabularyTermEditor({ index, term, c
     </div>
   </Card>;
 });
-
-function SetEditor({ open, set, role, onClose, onSaved }: { open: boolean; set?: SetDetail; role: UserRole; onClose: () => void; onSaved: (set: SetDetail) => void }) {
-  const [title, setTitle] = useState(''); const [description, setDescription] = useState(''); const [scope, setScope] = useState<'PERSONAL' | 'SYSTEM'>('PERSONAL'); const [terms, setTerms] = useState<Term[]>([]); const [saving, setSaving] = useState(false);
-  useEffect(() => { if (!open) return; setTitle(set?.title || ''); setDescription(set?.description || ''); setScope(set?.scope || 'PERSONAL'); setTerms(set?.terms.length ? set.terms.map(term => ({ ...term })) : [{ word: '', meaning: '', translation: '', exampleSentence: '' }]); }, [open, set]);
-  const update = (index: number, field: keyof Term, value: string) => setTerms(current => current.map((term, termIndex) => termIndex === index ? { ...term, [field]: value } : term));
-  const save = async () => { setSaving(true); try { let detail: SetDetail; if (set) { await axiosClient.patch(`/api/vocabulary/sets/${set.id}`, { title, description }); detail = await axiosClient.put<SetDetail, SetDetail>(`/api/vocabulary/sets/${set.id}/terms`, { terms }); } else { detail = await axiosClient.post<SetDetail, SetDetail>('/api/vocabulary/sets', { title, description, scope, terms }); } invalidateQueryCache('/api/vocabulary'); appToast.success(set ? 'Vocabulary set updated.' : 'Vocabulary set created.'); onSaved(detail); } catch (error) { appToast.error(errorMessage(error, 'Unable to save the vocabulary set.')); } finally { setSaving(false); } };
-  return <Modal open={open} onClose={onClose} presentation="content-dialog" title={set ? 'Edit vocabulary set' : 'Create vocabulary set'} subtitle="Every term needs an English meaning and translation." className="!max-w-5xl" footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !title.trim()} onClick={() => void save()}>{saving ? 'Saving…' : 'Save set'}</Button></>}><div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1"><div className="grid gap-4 sm:grid-cols-2"><label className="text-caption font-medium">Set title<Input className="mt-1 w-full" value={title} onChange={event => setTitle(event.target.value)} /></label>{role === 'ADMIN' && !set && <label className="text-caption font-medium">Collection<Select className="mt-1 w-full" value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="PERSONAL">My Vocabulary</option><option value="SYSTEM">System Library</option></Select></label>}</div><label className="block text-caption font-medium">Description<Input className="mt-1 w-full" value={description} onChange={event => setDescription(event.target.value)} /></label><div className="space-y-3">{terms.map((term, index) => <Card key={index} className="relative grid gap-3 p-4 md:grid-cols-2"><span className="absolute right-3 top-3 text-caption text-muted-foreground">#{index + 1}</span><Input placeholder="Word" value={term.word} onChange={event => update(index, 'word', event.target.value)} /><Input placeholder="English meaning" value={term.meaning} onChange={event => update(index, 'meaning', event.target.value)} /><Input placeholder="Translation" value={term.translation} onChange={event => update(index, 'translation', event.target.value)} /><div className="flex gap-2"><Input className="flex-1" placeholder="Example sentence (optional)" value={term.exampleSentence || ''} onChange={event => update(index, 'exampleSentence', event.target.value)} /><Button variant="ghost" size="icon" disabled={terms.length === 1} onClick={() => setTerms(current => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove term ${index + 1}`}><X size={16} /></Button></div></Card>)}</div><Button variant="outline" onClick={() => setTerms(current => [...current, { word: '', meaning: '', translation: '', exampleSentence: '' }])}><Plus size={15} />Add term</Button></div></Modal>;
-}
 
 function AssignDialog({ open, set, initialClassId = '', onClose }: { open: boolean; set: SetDetail; initialClassId?: string; onClose: () => void }) {
   const [classes, setClasses] = useState<ClassInfo[]>([]); const [classId, setClassId] = useState(''); const [dueAt, setDueAt] = useState(''); const [passingScore, setPassingScore] = useState(80); const [maxAttempts, setMaxAttempts] = useState(3); const [saving, setSaving] = useState(false);

@@ -25,7 +25,8 @@ const validateTerms = rawTerms => {
     if (!word || !meaning || !translation) throw new ApiError(400, { error: `Term ${order + 1} requires a word, meaning, and translation.` });
     if (seen.has(normalizedWord)) throw new ApiError(400, { error: `The word “${word}” appears more than once in this set.` });
     seen.add(normalizedWord);
-    return { word, normalizedWord, meaning, translation, exampleSentence, order };
+    const id = clean(raw.id, 80) || undefined;
+    return { ...(id ? { id } : {}), word, normalizedWord, meaning, translation, exampleSentence, order };
   });
 };
 
@@ -173,15 +174,47 @@ exports.updateSet = async ({ setId, data, userId, userRole }) => {
 };
 
 exports.replaceTerms = async ({ setId, terms: rawTerms, userId, userRole }) => {
-  const set = await getAccessibleSet({ setId, userId, userRole, includeTerms: false });
+  const set = await getAccessibleSet({ setId, userId, userRole });
   if (!canManageSet(set, userId, userRole)) throw new ApiError(403, { error: 'You cannot edit this vocabulary set.' });
   const terms = validateTerms(rawTerms);
+  const existingIds = new Set(set.terms.map(term => term.id));
+  const retainedIds = terms.map(term => term.id).filter(id => id && existingIds.has(id));
   await prisma.$transaction(async tx => {
-    await tx.vocabularyTerm.deleteMany({ where: { setId: set.id } });
-    if (terms.length) await tx.vocabularyTerm.createMany({ data: terms.map(term => ({ ...term, setId: set.id })) });
+    await tx.vocabularyTerm.deleteMany({ where: { setId: set.id, id: { notIn: retainedIds } } });
+    if (retainedIds.length) await tx.vocabularyTerm.updateMany({ where: { setId: set.id, id: { in: retainedIds } }, data: { order: { increment: 1_000_000 } } });
+    for (const term of terms) {
+      const { id, ...data } = term;
+      if (id && existingIds.has(id)) await tx.vocabularyTerm.update({ where: { id }, data });
+      else await tx.vocabularyTerm.create({ data: { ...data, setId: set.id } });
+    }
     await tx.vocabularySet.update({ where: { id: set.id }, data: { version: { increment: 1 } } });
   });
   return exports.getSet({ setId, userId, userRole });
+};
+
+exports.updateTerm = async ({ setId, termId, data, userId, userRole }) => {
+  const set = await getAccessibleSet({ setId, userId, userRole, includeTerms: false });
+  if (!canManageSet(set, userId, userRole)) throw new ApiError(403, { error: 'You cannot edit this vocabulary set.' });
+  const existing = await prisma.vocabularyTerm.findFirst({ where: { id: String(termId), setId: set.id } });
+  if (!existing) throw new ApiError(404, { error: 'Vocabulary term not found.' });
+  const [validated] = validateTerms([{ ...data, id: existing.id }]);
+  const { id, order, ...termData } = validated;
+  const duplicate = await prisma.vocabularyTerm.findFirst({ where: { setId: set.id, normalizedWord: termData.normalizedWord, id: { not: existing.id } }, select: { id: true } });
+  if (duplicate) throw new ApiError(400, { error: `The word “${termData.word}” already exists in this set.` });
+  await prisma.vocabularyTerm.update({ where: { id }, data: termData });
+  return exports.getSet({ setId, userId, userRole });
+};
+
+exports.deleteSet = async ({ setId, userId }) => {
+  const set = await prisma.vocabularySet.findUnique({
+    where: { id: String(setId) },
+    select: { id: true, scope: true, ownerId: true, _count: { select: { activities: true } } },
+  });
+  if (!set) throw new ApiError(404, { error: 'Vocabulary set not found.' });
+  if (set.scope !== 'PERSONAL' || set.ownerId !== intId(userId)) throw new ApiError(403, { error: 'You can only delete your own personal vocabulary sets.' });
+  if (set._count.activities > 0) throw new ApiError(409, { error: 'This collection is used by a classroom activity and cannot be deleted.' });
+  await prisma.vocabularySet.delete({ where: { id: set.id } });
+  return { deleted: true };
 };
 
 exports.publishSet = async ({ setId, userId, userRole }) => {
