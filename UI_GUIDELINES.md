@@ -184,7 +184,8 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 ## 7. Practice Center
 
 - Bám sát `dashboard/infrastructure` cho page hierarchy và toolbar: search, filter, sort, view switch và role actions nằm trên một hàng ở desktop; chỉ wrap có kiểm soát trên viewport nhỏ.
-- Toolbar dùng search compact cố định bên trái (`lg:w-80`) và nhóm control `size="sm"` canh phải; không để search flex-grow lấn át control hoặc dùng control cao như action chính.
+- Toolbar dùng search bên trái và nhóm control `size="sm"` bên phải. Trên desktop, search nhận phần chiều rộng còn lại để khoảng cách từ search đến Filter bằng đúng khoảng cách giữa các control (`gap-2`); không chèn khoảng trống bằng `justify-between`/`justify-end` hoặc dùng control cao như action chính.
+- View switch dùng icon dễ đọc và thêm check trước mode đang chọn; selected mode dùng neutral accent surface rõ hơn trạng thái chưa chọn.
 - Filter và sort dùng shared dropdown primitives với label, radio item, submenu, separator và active count như `dashboard/file-manager`; không trải nhiều hàng pill filter trong page.
 - Attempt status bám sát badge của `dashboard/default`: một outline pill trung tính cho mọi trạng thái, chỉ icon bên trong biểu thị Completed/In progress/Not started; không dùng border xanh/vàng cho status badge.
 - Hỗ trợ cả card view và list/table view trên cùng dữ liệu và hành động. View preference được lưu ở client; list rộng phải horizontal-scroll thay vì ép cột quá hẹp.
