@@ -24,7 +24,7 @@ Mọi UI mới phải dùng token trong `client/src/index.css`, alias trong `cli
 - Mặc định dùng contrast đủ rõ và trọng lượng thị giác nhất quán. Chỉ tạo mức đậm–nhạt khi cần thể hiện UI hierarchy cụ thể; không làm mờ thành phần chỉ để giao diện trông “nhẹ”.
 - Ưu tiên hiệu năng và phản hồi mượt trên máy học sinh: không tùy tiện dùng `backdrop-filter`, blur lớn, animation liên tục, shadow nặng hoặc hiệu ứng GPU đắt tiền. Sticky header có thể dùng blur nhẹ như reference nếu đã kiểm tra hiệu năng; modal ưu tiên overlay màu bán trong suốt đơn giản.
 - Background cá nhân hóa chỉ dùng preset đã kiểm soát và tối ưu trong source. Ảnh chỉ áp dụng cho vùng nội dung dashboard, không phủ sidebar/header và không dùng trong Exam Room; giữ card gần như opaque để bảo đảm khả năng đọc.
-- Mỗi background raster ưu tiên WebP/AVIF và mục tiêu dưới `200 KB` (giới hạn tối đa khoảng `500 KB`), không dùng GIF/video, parallax, `background-attachment: fixed` hoặc backdrop blur. Luôn có lớp overlay màu tĩnh để duy trì contrast.
+- Dashboard dùng semantic page background của theme; không thêm ảnh nền hoặc background picker cá nhân hóa.
 - Khi chuyển page trong dashboard, dùng progress bar mảnh ở đầu vùng nội dung và fade ngắn để tránh flash layout. Progress phải dựa trên route/request thật, có thời gian chờ tối đa để không khóa UI khi mạng chậm, không dùng backdrop/blur và phải tôn trọng `prefers-reduced-motion`.
 
 ## 2. Design tokens bắt buộc

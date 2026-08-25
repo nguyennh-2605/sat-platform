@@ -19,6 +19,7 @@ This is a presentation-layer migration, not a Next.js migration.
 - Do not copy mock content, demo navigation, fake KPIs, planned features, or Next.js-only behavior.
 - Keep Exam Room optimized for Digital SAT readability; it is not required to use the dashboard shell.
 - Add an optional SAT Green preset only after the neutral default is consistent across migrated screens.
+- Do not provide dashboard image backgrounds or a background picker; use the semantic theme background consistently.
 - Pin the reference commit. Upstream changes require an explicit decision and a new migration entry.
 
 ## Technical translation
@@ -42,7 +43,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | Implemented; visual QA pending |
 | Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | Implemented; visual QA pending |
 | Authentication | `auth/v2` | `auth/v1` | Implemented; visual QA pending |
-| Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Pending |
+| Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Core list, detail, notifications, and members implemented |
 | Practice Center | `dashboard/tasks` | `dashboard/file-manager` | Pending |
 | Test Bank | `dashboard/file-manager` | `dashboard/tasks` | Pending |
 | Results Analytics | `dashboard/analytics` | `dashboard/default` | Pending |
@@ -80,7 +81,7 @@ This is a presentation-layer migration, not a Next.js migration.
 
 ### Phase 3 — Feature migration
 
-- [ ] Classroom.
+- [x] Classroom core surfaces (embedded analytics and vocabulary follow their owning migrations).
 - [ ] Practice Center and Test Bank.
 - [ ] Results Analytics and Score Report.
 - [ ] Error Log and Vocabulary.

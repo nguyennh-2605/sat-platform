@@ -10,10 +10,8 @@ import {
   LayoutDashboard,
   LogOut,
   Moon,
-  Palette,
   Sun,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,11 +40,8 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { BackgroundPicker } from '../../features/backgrounds/BackgroundPicker';
-import { backgroundById, normalizeBackgroundId, type BackgroundId } from '../../features/backgrounds/backgroundPresets';
 import { DashboardRouteViewport } from '../../features/navigation/DashboardRouteViewport';
 import NotificationBell from '../../features/notifications/NotificationBell';
-import axiosClient from '../../lib/axios';
 import { logoutAuthSession } from '../../lib/authSession';
 
 const navigation = [
@@ -96,7 +91,7 @@ function NavigationItem({ to, label, icon: Icon, exact = false, activePrefixes =
   );
 }
 
-function AppSidebar({ onBackground, onLogout }: { onBackground: () => void; onLogout: () => void }) {
+function AppSidebar({ onLogout }: { onLogout: () => void }) {
   const userName = localStorage.getItem('userName') || 'Student';
   const userAvatar = localStorage.getItem('userAvatar') || '';
   const role = localStorage.getItem('userRole') || 'STUDENT';
@@ -162,11 +157,6 @@ function AppSidebar({ onBackground, onLogout }: { onBackground: () => void; onLo
                   <p className="truncate text-xs font-normal text-muted-foreground">{role.toLowerCase()}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={onBackground}>
-                  <Palette aria-hidden="true" />
-                  Background
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onSelect={onLogout}>
                   <LogOut aria-hidden="true" />
                   Log out
@@ -200,24 +190,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const userId = localStorage.getItem('userId') || 'guest';
-  const storageKey = `dashboardBackground:${userId}`;
-  const [backgroundId, setBackgroundId] = useState<BackgroundId>(() => normalizeBackgroundId(localStorage.getItem(storageKey)));
-  const [backgroundOpen, setBackgroundOpen] = useState(false);
-  const [backgroundSaving, setBackgroundSaving] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    axiosClient.get<{ backgroundId: BackgroundId }, { backgroundId: BackgroundId }>('/api/user-preferences/dashboard-background')
-      .then(response => {
-        if (!active) return;
-        const nextId = normalizeBackgroundId(response.backgroundId);
-        setBackgroundId(nextId);
-        localStorage.setItem(storageKey, nextId);
-      })
-      .catch(error => console.error('Unable to load dashboard background.', error));
-    return () => { active = false; };
-  }, [storageKey]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--dashboard-sidebar-offset', sidebarOpen ? '17rem' : '3rem');
@@ -226,29 +199,10 @@ export default function Dashboard() {
     };
   }, [sidebarOpen]);
 
-  const chooseBackground = async (nextId: BackgroundId) => {
-    const previousId = backgroundId;
-    setBackgroundId(nextId);
-    localStorage.setItem(storageKey, nextId);
-    setBackgroundSaving(true);
-    try {
-      await axiosClient.put('/api/user-preferences/dashboard-background', { backgroundId: nextId });
-    } catch (error) {
-      console.error(error);
-      setBackgroundId(previousId);
-      localStorage.setItem(storageKey, previousId);
-      toast.error('Unable to save background.');
-    } finally {
-      setBackgroundSaving(false);
-    }
-  };
-
   const logout = async () => {
     await logoutAuthSession();
     navigate('/auth', { replace: true });
   };
-
-  const selectedBackground = backgroundById(backgroundId);
 
   return (
     <SidebarProvider
@@ -260,7 +214,7 @@ export default function Dashboard() {
       <a href="#dashboard-content" className="fixed left-3 top-3 z-300 -translate-y-20 rounded-lg bg-popover px-3 py-2 text-sm font-medium text-popover-foreground shadow-md focus:translate-y-0">
         Skip to content
       </a>
-      <AppSidebar onBackground={() => setBackgroundOpen(true)} onLogout={() => void logout()} />
+      <AppSidebar onLogout={() => void logout()} />
       <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
         <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b bg-background/80 px-4 backdrop-blur-sm">
           <div className="flex min-w-0 items-center gap-2">
@@ -274,26 +228,10 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div
-          id="dashboard-content"
-          tabIndex={-1}
-          className="dashboard-surface relative min-h-0 min-w-0 flex-1 overflow-hidden bg-background bg-cover bg-center outline-hidden"
-          data-background-active={selectedBackground ? 'true' : 'false'}
-          style={selectedBackground ? {
-            backgroundImage: `linear-gradient(color-mix(in oklch, var(--background) 84%, transparent), color-mix(in oklch, var(--background) 90%, transparent)), url(${selectedBackground.image})`,
-          } : undefined}
-        >
+        <div id="dashboard-content" tabIndex={-1} className="dashboard-surface relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted/30 outline-hidden">
           <DashboardRouteViewport />
         </div>
       </SidebarInset>
-
-      <BackgroundPicker
-        open={backgroundOpen}
-        selectedId={backgroundId}
-        saving={backgroundSaving}
-        onSelect={id => void chooseBackground(id)}
-        onClose={() => setBackgroundOpen(false)}
-      />
     </SidebarProvider>
   );
 }
