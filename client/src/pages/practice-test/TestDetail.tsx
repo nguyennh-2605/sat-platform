@@ -21,8 +21,9 @@ interface TestQuestion {
 interface TestSection { id: number; name: string; order: number; duration: number; questions: TestQuestion[] }
 interface TestDetailData {
   id: number; title: string; description?: string | null; duration: number; subject: 'RW' | 'MATH'; mode: 'PRACTICE' | 'EXAM'; category: string;
-  status: TestStatus; createdAt: string; updatedAt: string; authorId?: number | null; author?: { name?: string | null; role: string } | null;
-  isOwner: boolean; hasAttempts: boolean; deliveryCount: number; questionCount: number; sections: TestSection[];
+  status: TestStatus; scope: 'SYSTEM' | 'PERSONAL'; createdAt: string; updatedAt: string; authorId?: number | null; author?: { name?: string | null; role: string } | null;
+  isOwner: boolean; hasAttempts: boolean; hasUsage: boolean; deliveryCount: number; questionCount: number; sections: TestSection[];
+  capabilities: { canEdit: boolean; canArchive: boolean; canRestore: boolean; canDelete: boolean; canDuplicate: boolean; canCopyToSystem: boolean };
 }
 
 const statusLabel = { DRAFT: 'Draft', PUBLISHED: 'Published', ARCHIVED: 'Archived' } as const;
@@ -84,6 +85,21 @@ export default function TestDetail() {
     }
   };
 
+  const copyToSystem = async () => {
+    if (!test) return;
+    setWorking(true);
+    try {
+      const copy = await axiosClient.post<{ id: number }, { id: number }>(`/api/tests/${test.id}/copy-to-system`);
+      invalidateQueryCache('/api/tests');
+      toast.success('Teacher test copied to the System Library');
+      navigate(`/dashboard/practice-test/create?edit=${copy.id}`);
+    } catch (requestError) {
+      toast.error(errorMessage(requestError, 'Unable to copy this test to the System Library.'));
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const remove = async () => {
     if (!test) return;
     setWorking(true);
@@ -103,7 +119,7 @@ export default function TestDetail() {
   if (!test || error) return <div className="mx-auto max-w-screen-2xl p-4 md:p-6"><EmptyState icon={<TriangleAlert size={23} />} title="Test not found" description={error || 'This test may have been removed or you may not have access.'} /></div>;
 
   return <div className="h-full overflow-y-auto bg-background"><main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
-    <PageHeader title={test.title} description={`${test.subject === 'MATH' ? 'Math' : 'Reading & Writing'} · ${test.mode === 'EXAM' ? 'Exam' : 'Practice'}`} actions={<div className="flex flex-wrap items-center gap-2">{test.isOwner ? <>{test.status === 'ARCHIVED' ? <Button variant="outline" size="sm" disabled={working} onClick={() => void updateStatus('PUBLISHED')}><RotateCcw size={15} />Restore</Button> : <Button size="sm" disabled={working || test.hasAttempts} onClick={() => navigate(`/dashboard/practice-test/create?edit=${test.id}`)}><Pencil size={15} />Edit test</Button>}<Button variant="outline" size="sm" disabled={working} onClick={() => void duplicate()}><Copy size={15} />Duplicate</Button></> : <Button size="sm" disabled={working} onClick={() => void duplicate()}>{working ? <LoaderCircle size={15} className="animate-spin" /> : <Copy size={15} />}Duplicate to My Tests</Button>}</div>} />
+    <PageHeader title={test.title} description={`${test.subject === 'MATH' ? 'Math' : 'Reading & Writing'} · ${test.mode === 'EXAM' ? 'Exam' : 'Practice'}`} actions={<div className="flex flex-wrap items-center gap-2">{test.capabilities.canRestore && <Button variant="outline" size="sm" disabled={working} onClick={() => void updateStatus('PUBLISHED')}><RotateCcw size={15} />Restore</Button>}{test.capabilities.canEdit && <Button size="sm" disabled={working} onClick={() => navigate(`/dashboard/practice-test/create?edit=${test.id}`)}><Pencil size={15} />Edit test</Button>}{test.capabilities.canDuplicate && <Button variant={test.capabilities.canEdit ? 'outline' : 'primary'} size="sm" disabled={working} onClick={() => void duplicate()}>{working ? <LoaderCircle size={15} className="animate-spin" /> : <Copy size={15} />}{test.scope === 'SYSTEM' && localStorage.getItem('userRole') === 'TEACHER' ? 'Duplicate to My Tests' : 'Duplicate'}</Button>}{test.capabilities.canCopyToSystem && <Button size="sm" disabled={working} onClick={() => void copyToSystem()}>{working ? <LoaderCircle size={15} className="animate-spin" /> : <Copy size={15} />}Copy to System Library</Button>}</div>} />
     <div className="overflow-x-auto"><Tabs items={[{ value: 'OVERVIEW' as const, label: 'Overview' }, { value: 'QUESTIONS' as const, label: `Questions (${test.questionCount})` }]} value={activeTab} onValueChange={setActiveTab} ariaLabel="Test detail sections" /></div>
 
     {activeTab === 'OVERVIEW' ? <Overview test={test} onArchive={() => void updateStatus('ARCHIVED')} onDelete={() => setDeleteOpen(true)} working={working} /> : <Questions test={test} />}
@@ -113,7 +129,11 @@ export default function TestDetail() {
 }
 
 function Overview({ test, onArchive, onDelete, working }: { test: TestDetailData; onArchive: () => void; onDelete: () => void; working: boolean }) {
-  return <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]"><Card className="p-5 md:p-6"><h2 className="text-title font-semibold">Test overview</h2><div className="mt-5 grid gap-px overflow-hidden rounded-card border border-ui-border bg-ui-border sm:grid-cols-2"><Metric label="Subject" value={test.subject === 'MATH' ? 'Math' : 'Reading & Writing'} /><Metric label="Type" value={test.mode === 'EXAM' ? 'Exam' : 'Practice'} /><Metric label="Questions" value={String(test.questionCount)} /><Metric label="Duration" value={`${test.duration} minutes`} /><Metric label="Created" value={formatDate(test.createdAt)} /><Metric label="Last updated" value={formatDate(test.updatedAt)} /></div>{test.description && <div className="mt-5"><h3 className="text-caption font-medium text-muted-foreground">Description</h3><p className="mt-2 text-body leading-6 text-foreground">{test.description}</p></div>}</Card><Card className="h-fit p-5"><div className="flex items-center justify-between gap-3"><h2 className="text-title font-semibold">Publication</h2><StatusBadge status={test.status} /></div><p className="mt-3 text-body leading-6 text-muted-foreground">{test.isOwner ? test.status === 'PUBLISHED' ? 'This test can be selected when creating a Classroom activity.' : test.status === 'DRAFT' ? 'Publish this test before assigning it to a class.' : 'Restore this test to return it to your active library.' : `Published by ${test.author?.name || 'SAT Platform'}. Duplicate it to make an editable copy.`}</p>{test.isOwner && <div className="mt-5 space-y-2">{test.status === 'PUBLISHED' && <Button variant="outline" className="w-full" disabled={working} onClick={onArchive}><Archive size={16} />Archive test</Button>}<Button variant="ghost" className="w-full text-danger hover:bg-danger-soft hover:text-danger" disabled={working} onClick={onDelete}><Trash2 size={16} />Delete permanently</Button></div>}{test.hasAttempts && <p className="mt-4 rounded-control bg-muted p-3 text-caption text-muted-foreground">This test has student attempts and is read-only. Duplicate it to make structural changes.</p>}</Card></div>;
+  const role = localStorage.getItem('userRole');
+  const publicationCopy = test.scope === 'SYSTEM'
+    ? test.status === 'PUBLISHED' ? 'This platform test is available to students and teachers.' : test.status === 'DRAFT' ? 'Publish this test to make it available across the platform.' : 'Restore this test to return it to the active System Library.'
+    : role === 'ADMIN' ? `Owned by ${test.author?.name || 'a teacher'}. Copy it to the System Library to create a platform-owned draft.` : test.status === 'PUBLISHED' ? 'This test can be selected when creating a Classroom activity.' : 'Publish this test before assigning it to a class.';
+  return <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]"><Card className="p-5 md:p-6"><h2 className="text-title font-semibold">Test overview</h2><div className="mt-5 grid gap-px overflow-hidden rounded-card border border-ui-border bg-ui-border sm:grid-cols-2"><Metric label="Subject" value={test.subject === 'MATH' ? 'Math' : 'Reading & Writing'} /><Metric label="Type" value={test.mode === 'EXAM' ? 'Exam' : 'Practice'} /><Metric label="Questions" value={String(test.questionCount)} /><Metric label="Duration" value={`${test.duration} minutes`} /><Metric label="Created" value={formatDate(test.createdAt)} /><Metric label="Last updated" value={formatDate(test.updatedAt)} /></div>{test.description && <div className="mt-5"><h3 className="text-caption font-medium text-muted-foreground">Description</h3><p className="mt-2 text-body leading-6 text-foreground">{test.description}</p></div>}</Card><Card className="h-fit p-5"><div className="flex items-center justify-between gap-3"><h2 className="text-title font-semibold">Publication</h2><StatusBadge status={test.status} /></div><p className="mt-3 text-body leading-6 text-muted-foreground">{publicationCopy}</p>{(test.capabilities.canArchive || test.capabilities.canDelete) && <div className="mt-5 space-y-2">{test.capabilities.canArchive && <Button variant="outline" className="w-full" disabled={working} onClick={onArchive}><Archive size={16} />Archive test</Button>}{test.capabilities.canDelete && <Button variant="ghost" className="w-full text-danger hover:bg-danger-soft hover:text-danger" disabled={working} onClick={onDelete}><Trash2 size={16} />Delete permanently</Button>}</div>}{(!test.capabilities.canEdit && test.hasUsage) && <p className="mt-4 rounded-control bg-muted p-3 text-caption text-muted-foreground">This test has classroom history and is read-only. Duplicate it to create a new editable version.</p>}</Card></div>;
 }
 
 function Questions({ test }: { test: TestDetailData }) {

@@ -12,6 +12,7 @@ import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Select, Tabl
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
 import TeacherTestLibrary from './TeacherTestLibrary';
+import AdminTestManagement from './AdminTestManagement';
 
 interface ClassInfo {
   id: string;
@@ -69,7 +70,8 @@ const clampProgress = (value: number | null | undefined) => Math.min(100, Math.m
 
 const PracticeTest = () => {
   const role = (localStorage.getItem('userRole') || 'STUDENT') as UserRole;
-  if (role !== 'STUDENT') return <TeacherTestLibrary />;
+  if (role === 'ADMIN') return <AdminTestManagement />;
+  if (role === 'TEACHER') return <TeacherTestLibrary />;
   return <PracticeCenter role={role} />;
 };
 

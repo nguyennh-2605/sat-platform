@@ -14,7 +14,6 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
   const test = await prisma.test.findUnique({
     where: { id: Number(testId) },
     include: {
-      author: { select: { role: true } },
       sections: {
         orderBy: { order: 'asc' }, // Sắp xếp Module 1 trước, Module 2 sau
         include: {
@@ -44,7 +43,7 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
   }
 
   if (userRole === 'STUDENT') {
-    const isAdminPublicTest = test.isPublic && test.author?.role === 'ADMIN';
+    const isSystemPublishedTest = test.scope === 'SYSTEM' && test.status === 'PUBLISHED';
     let hasClassAccess = false;
 
     if (deliveryId) {
@@ -73,7 +72,7 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
       hasClassAccess = !!classTestAccess;
     }
 
-    if (!isAdminPublicTest && !hasClassAccess) {
+    if (!isSystemPublishedTest && !hasClassAccess) {
       throw new ApiError(403, { error: 'Đề thi này chưa được giao cho lớp của bạn' });
     }
   }

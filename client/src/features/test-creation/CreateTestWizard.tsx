@@ -302,7 +302,7 @@ const CreateTestWizard = () => {
         });
         setEditFolderId(detail.folderId ?? null);
         setTestStatus(detail.status);
-        setEditLocked(detail.hasAttempts);
+        setEditLocked(detail.hasUsage);
         setRawText(detail.structuredText);
         const parsed = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview-text', {
           text: detail.structuredText,
@@ -393,7 +393,7 @@ const CreateTestWizard = () => {
   };
 
   const saveTest = async (nextStatus: Exclude<TestStatus, 'ARCHIVED'>) => {
-    if (editLocked) return toast.error('This test cannot be edited because a student has already started it');
+    if (editLocked) return toast.error('This test is already used by a classroom. Duplicate it to create a new editable version');
     if (blockingErrors) return toast.error('Resolve all errors before saving the test');
     setIsSaving(true);
     try {

@@ -184,6 +184,15 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ## 7. Practice Center
 
+- Với Admin, route này hiển thị `Test Management`, không dùng composition hoặc label của Teacher `Test Library`.
+- Admin dùng hai collection `System Library | Teacher Tests`. Collection trả lời ownership/source; `Draft`, `Published`, `Archived` tiếp tục là lifecycle filter.
+- `System Library` gồm mọi test có `scope = SYSTEM`, không phụ thuộc Admin đã tạo. Admin có thể Preview/Edit/Duplicate/Publish/Move to Draft/Archive/Delete theo capability backend.
+- `Teacher Tests` gồm test `scope = PERSONAL` của Teacher và mặc định read-only. Action hợp lệ trong iteration hiện tại là Preview và Copy to System Library; không Edit/Archive/Delete trực tiếp nội dung Teacher.
+- Copy to System Library luôn tạo một `SYSTEM` Draft mới và giữ nguyên bản gốc của Teacher.
+- Admin Test Management bám sát `dashboard/tasks`: toolbar nằm trong bordered surface, input/filter/action cao compact, dropdown dùng shared Radix animation, table row gọn, action menu icon-size và footer pagination responsive. Card view là lựa chọn bổ sung trên cùng dữ liệu thật.
+- Test đã có Classroom delivery hoặc attempt history không được sửa cấu trúc hoặc xóa vĩnh viễn; Duplicate tạo phiên bản Draft mới.
+- Navigation copy phải role-aware và nhất quán ở Sidebar, Dashboard search và Dashboard Home: Student `Practice Center`, Teacher `Test Library`, Admin `Test Management`.
+
 - Với Teacher, route này hiển thị `Test Library`: chỉ tạo, quản lý lifecycle và xem nội dung test. Mọi thao tác giao test, deadline, attempts, audience và theo dõi completion nằm trong `Classroom → Activities`.
 - Teacher dùng hai nguồn `My Tests` và `System Tests`. `My Tests` chỉ gồm test giáo viên sở hữu; `System Tests` chỉ gồm test Published do Admin/platform cung cấp.
 - `Draft`, `Published`, `Archived` là lifecycle filter bên trong `My Tests`, không phải source tab. `All` chỉ gồm Draft + Published; Archived chỉ xuất hiện khi chọn riêng.

@@ -4,6 +4,81 @@ const { buildAttemptSummary } = require('../utils/practice-test-progress');
 const { getTaxonomy, validateClassification } = require('../utils/question-taxonomy');
 const { parsePagination, paginationMeta } = require('../utils/pagination');
 
+const activeStatuses = { in: ['DRAFT', 'PUBLISHED'] };
+
+const lifecycleWhere = requestedStatus => requestedStatus === 'ARCHIVED'
+  ? { status: 'ARCHIVED' }
+  : ['DRAFT', 'PUBLISHED'].includes(requestedStatus)
+    ? { status: requestedStatus }
+    : { status: activeStatuses };
+
+const normalizeSource = ({ userRole, source }) => {
+  const fallback = userRole === 'ADMIN' ? 'SYSTEM' : userRole === 'TEACHER' ? 'MY' : 'AVAILABLE';
+  const requested = String(source || fallback).trim().toUpperCase();
+  const allowed = userRole === 'ADMIN'
+    ? new Set(['SYSTEM', 'TEACHER'])
+    : userRole === 'TEACHER'
+      ? new Set(['MY', 'SYSTEM'])
+      : new Set(['AVAILABLE']);
+  if (!allowed.has(requested)) throw new ApiError(400, { error: 'Test library source is invalid for this role.' });
+  return requested;
+};
+
+const testCapabilities = ({ test, userId, userRole }) => {
+  const isSystem = test.scope === 'SYSTEM';
+  const ownsPersonal = !isSystem && test.authorId === Number(userId);
+  const canManage = (userRole === 'ADMIN' && isSystem) || (userRole === 'TEACHER' && ownsPersonal);
+  const hasHistory = Number(test._count?.submissions || 0) > 0
+    || Number(test._count?.deliveries || 0) > 0
+    || Number(test._count?.classTests || 0) > 0;
+  return {
+    canEdit: canManage && test.status !== 'ARCHIVED' && !hasHistory,
+    canArchive: canManage && test.status === 'PUBLISHED',
+    canRestore: canManage && test.status === 'ARCHIVED',
+    canDelete: canManage && !hasHistory,
+    canDuplicate: userRole === 'TEACHER' || (userRole === 'ADMIN' && isSystem),
+    canCopyToSystem: userRole === 'ADMIN' && !isSystem && test.author?.role === 'TEACHER',
+  };
+};
+
+exports.buildTestListWhere = ({ userId, userRole, source, status }) => {
+  const requestedSource = normalizeSource({ userRole, source });
+  const requestedStatus = String(status || '').trim().toUpperCase();
+  if (userRole === 'STUDENT') {
+    return {
+      source: 'AVAILABLE',
+      where: {
+        OR: [
+          { scope: 'SYSTEM', status: 'PUBLISHED' },
+          {
+            deliveries: {
+              some: {
+                status: 'PUBLISHED',
+                assignees: { some: { studentId: Number(userId), excusedAt: null } },
+              },
+            },
+          },
+        ],
+      },
+    };
+  }
+  if (userRole === 'ADMIN') {
+    return {
+      source: requestedSource,
+      where: requestedSource === 'TEACHER'
+        ? { scope: 'PERSONAL', author: { role: 'TEACHER' }, ...lifecycleWhere(requestedStatus) }
+        : { scope: 'SYSTEM', ...lifecycleWhere(requestedStatus) },
+    };
+  }
+  if (userRole === 'TEACHER' && requestedSource === 'SYSTEM') {
+    return { source: requestedSource, where: { scope: 'SYSTEM', status: 'PUBLISHED' } };
+  }
+  return {
+    source: 'MY',
+    where: { scope: 'PERSONAL', authorId: Number(userId), ...lifecycleWhere(requestedStatus) },
+  };
+};
+
 exports.getClasses = ({ userId, userRole }) => {
   let whereCondition = {};
 
@@ -28,47 +103,23 @@ exports.getClasses = ({ userId, userRole }) => {
 
 exports.getTests = async ({ userId, userRole, query = {} }) => {
   const hasUser = !isNaN(userId);
-  const requestedSource = String(query.source || 'MY').trim().toUpperCase();
-  const requestedStatus = String(query.status || '').trim().toUpperCase();
-
-  let whereCondition;
-  if (!hasUser) {
-    whereCondition = { isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } };
-  } else if (userRole === 'STUDENT') {
-    whereCondition = {
-      OR: [
-        // Học sinh luôn thấy đề do admin công khai.
-        { isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } },
-        // Đề của giáo viên chỉ hiện khi đã giao vào lớp mà học sinh tham gia.
-        {
-          deliveries: {
-            some: {
-              status: 'PUBLISHED',
-              assignees: { some: { studentId: userId, excusedAt: null } }
-            }
-          }
-        }
-      ]
-    };
-  } else if (userRole === 'TEACHER' && requestedSource === 'SYSTEM') {
-    whereCondition = { isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } };
-  } else {
-    whereCondition = {
-      authorId: userId,
-      ...(requestedStatus === 'ARCHIVED'
-        ? { status: 'ARCHIVED' }
-        : ['DRAFT', 'PUBLISHED'].includes(requestedStatus)
-          ? { status: requestedStatus }
-          : { status: { in: ['DRAFT', 'PUBLISHED'] } }),
-    };
-  }
+  const access = hasUser
+    ? exports.buildTestListWhere({ userId, userRole, source: query.source, status: query.status })
+    : { source: 'SYSTEM', where: { scope: 'SYSTEM', status: 'PUBLISHED' } };
+  const whereCondition = access.where;
 
   const search = String(query.search || '').trim().slice(0, 100);
   const requestedSubject = String(query.subject || '').toUpperCase();
   const requestedMode = String(query.mode || '').toUpperCase();
   const pagination = parsePagination(query, { defaultPageSize: 24, maxPageSize: 48 });
   const filters = [whereCondition];
-  if (search) filters.push({ OR: [{ title: { contains: search, mode: 'insensitive' } }, { description: { contains: search, mode: 'insensitive' } }] });
+  if (search) filters.push({ OR: [
+    { title: { contains: search, mode: 'insensitive' } },
+    { description: { contains: search, mode: 'insensitive' } },
+    ...(userRole === 'ADMIN' && access.source === 'TEACHER'
+      ? [{ author: { name: { contains: search, mode: 'insensitive' } } }]
+      : []),
+  ] });
   if (['RW', 'MATH'].includes(requestedSubject)) filters.push({ subject: requestedSubject });
   if (['PRACTICE', 'EXAM'].includes(requestedMode)) filters.push({ mode: requestedMode });
   const pagedWhere = { AND: filters };
@@ -92,6 +143,7 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
       testDate: true,
       mode: true,
       status: true,
+      scope: true,
       isPublic: true,
       createdAt: true,
       updatedAt: true,
@@ -100,6 +152,7 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
       sections: {
         select: { _count: { select: { questions: true } } }
       },
+      _count: { select: { submissions: true, deliveries: true, classTests: true } },
       classTests: {
         ...(userRole === 'STUDENT' ? {
           where: {
@@ -151,15 +204,20 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
   ];
   if (userRole === 'TEACHER') {
     operations.push(
-      prisma.test.count({ where: { authorId: Number(userId), status: { not: 'ARCHIVED' } } }),
-      prisma.test.count({ where: { isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } } }),
+      prisma.test.count({ where: { scope: 'PERSONAL', authorId: Number(userId), status: activeStatuses } }),
+      prisma.test.count({ where: { scope: 'SYSTEM', status: 'PUBLISHED' } }),
+    );
+  } else if (userRole === 'ADMIN') {
+    operations.push(
+      prisma.test.count({ where: { scope: 'SYSTEM', status: activeStatuses } }),
+      prisma.test.count({ where: { scope: 'PERSONAL', author: { role: 'TEACHER' }, status: activeStatuses } }),
     );
   }
-  const [total, tests, myTests, systemTests] = await prisma.$transaction(operations);
+  const [total, tests, firstSourceCount, secondSourceCount] = await prisma.$transaction(operations);
 
   // Map dữ liệu để trả về format gọn gàng cho Frontend
   const items = tests.map(test => {
-    const { submissions, sections, ...rest } = test;
+    const { submissions, sections, _count, ...rest } = test;
     const questionCount = sections.reduce(
       (total, section) => total + section._count.questions,
       0
@@ -172,6 +230,12 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
     return {
       ...rest,
       questionCount,
+      usage: {
+        attempts: _count.submissions,
+        deliveries: _count.deliveries,
+        legacyClassLinks: _count.classTests,
+      },
+      capabilities: testCapabilities({ test, userId, userRole }),
       ...attemptSummary
     };
   });
@@ -179,7 +243,9 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
   return {
     items,
     pagination: paginationMeta({ ...pagination, total }),
-    ...(userRole === 'TEACHER' ? { sourceCounts: { my: myTests, system: systemTests } } : {}),
+    source: access.source,
+    ...(userRole === 'TEACHER' ? { sourceCounts: { my: firstSourceCount, system: secondSourceCount } } : {}),
+    ...(userRole === 'ADMIN' ? { sourceCounts: { system: firstSourceCount, teacher: secondSourceCount } } : {}),
   };
 };
 
@@ -277,7 +343,8 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
 
   const normalizedSections = validateSections({ sections, subject });
   const finalStatus = status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
-  const isPublic = userRole === 'ADMIN' && finalStatus === 'PUBLISHED';
+  const scope = userRole === 'ADMIN' ? 'SYSTEM' : 'PERSONAL';
+  const isPublic = scope === 'SYSTEM' && finalStatus === 'PUBLISHED';
   const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
   const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' && testDate ? String(testDate) : null;
 
@@ -292,10 +359,11 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
       status: finalStatus,
       mode: mode === 'EXAM' ? 'EXAM' : 'PRACTICE',
       authorId: Number(userId),
+      scope,
       isPublic,
       category: finalCategory,
       testDate: finalTestDate,
-      folderId: Number.isInteger(Number(folderId)) ? Number(folderId) : null,
+      folderId: scope === 'PERSONAL' && Number.isInteger(Number(folderId)) ? Number(folderId) : null,
       sections: {
         create: normalizedSections.map((section) => ({
           name: section.name,
@@ -364,13 +432,18 @@ const serializeTest = (test) => test.sections.map(section => [
   ...section.questions.map(serializeQuestion),
 ].join('\n\n')).join('\n\n');
 
-const ownedTest = async ({ testId, userId, include = {} }) => {
+const manageableTest = async ({ testId, userId, userRole, include = {} }) => {
   const id = Number(testId);
   if (!Number.isInteger(id)) throw new ApiError(400, { error: 'Invalid exam ID.' });
-  const test = await prisma.test.findFirst({ where: { id, authorId: Number(userId) }, include });
+  const where = exports.buildManageableTestWhere({ id, userId, userRole });
+  const test = await prisma.test.findFirst({ where, include });
   if (!test) throw new ApiError(404, { error: 'Exam not found or you do not have permission to manage it.' });
   return test;
 };
+
+exports.buildManageableTestWhere = ({ id, userId, userRole }) => userRole === 'ADMIN'
+  ? { id: Number(id), scope: 'SYSTEM' }
+  : { id: Number(id), scope: 'PERSONAL', authorId: Number(userId) };
 
 const readableTest = async ({ testId, userId, userRole, include = {} }) => {
   const id = Number(testId);
@@ -378,12 +451,14 @@ const readableTest = async ({ testId, userId, userRole, include = {} }) => {
   const test = await prisma.test.findFirst({
     where: {
       id,
-      OR: [
-        { authorId: Number(userId) },
-        ...(userRole === 'TEACHER' || userRole === 'ADMIN'
-          ? [{ isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } }]
-          : []),
-      ],
+      ...(userRole === 'ADMIN'
+        ? {}
+        : {
+            OR: [
+              { scope: 'PERSONAL', authorId: Number(userId) },
+              { scope: 'SYSTEM', status: 'PUBLISHED' },
+            ],
+          }),
     },
     include,
   });
@@ -391,16 +466,17 @@ const readableTest = async ({ testId, userId, userRole, include = {} }) => {
   return test;
 };
 
-exports.getTestForEdit = async ({ testId, userId }) => {
-  const test = await ownedTest({
+exports.getTestForEdit = async ({ testId, userId, userRole }) => {
+  const test = await manageableTest({
     testId,
     userId,
+    userRole,
     include: {
       sections: {
         orderBy: { order: 'asc' },
         include: { questions: { orderBy: { order: 'asc' } } },
       },
-      _count: { select: { submissions: true } },
+      _count: { select: { submissions: true, deliveries: true, classTests: true } },
     },
   });
   return {
@@ -411,10 +487,12 @@ exports.getTestForEdit = async ({ testId, userId }) => {
     mode: test.mode,
     category: test.category,
     status: test.status,
+    scope: test.scope,
     testDate: test.testDate,
     folderId: test.folderId,
     moduleCount: test.sections.length,
     hasAttempts: test._count.submissions > 0,
+    hasUsage: test._count.submissions > 0 || test._count.deliveries > 0 || test._count.classTests > 0,
     structuredText: serializeTest(test),
   };
 };
@@ -427,7 +505,7 @@ exports.getTestContent = async ({ testId, userId, userRole }) => {
     include: {
       author: { select: { id: true, name: true, role: true } },
       sections: { orderBy: { order: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } },
-      _count: { select: { submissions: true, deliveries: true } },
+      _count: { select: { submissions: true, deliveries: true, classTests: true } },
     },
   });
   return {
@@ -439,13 +517,16 @@ exports.getTestContent = async ({ testId, userId, userRole }) => {
     mode: test.mode,
     category: test.category,
     status: test.status,
+    scope: test.scope,
     createdAt: test.createdAt,
     updatedAt: test.updatedAt,
     authorId: test.authorId,
     author: test.author,
     isOwner: test.authorId === Number(userId),
     hasAttempts: test._count.submissions > 0,
+    hasUsage: test._count.submissions > 0 || test._count.deliveries > 0 || test._count.classTests > 0,
     deliveryCount: test._count.deliveries,
+    capabilities: testCapabilities({ test, userId, userRole }),
     questionCount: test.sections.reduce((sum, section) => sum + section.questions.length, 0),
     sections: test.sections,
     structuredText: serializeTest(test),
@@ -453,12 +534,12 @@ exports.getTestContent = async ({ testId, userId, userRole }) => {
 };
 
 exports.updateTest = async ({ testId, title, duration, subject, mode, sections, testDate, category, folderId, status, userId, userRole }) => {
-  const existing = await ownedTest({ testId, userId, include: { _count: { select: { submissions: true } } } });
+  const existing = await manageableTest({ testId, userId, userRole, include: { _count: { select: { submissions: true, deliveries: true, classTests: true } } } });
   if (existing.status === 'ARCHIVED') {
     throw new ApiError(409, { error: 'Restore this test before editing it.' });
   }
-  if (existing._count.submissions > 0) {
-    throw new ApiError(409, { error: 'This exam cannot be edited because a student has already started it.' });
+  if (existing._count.submissions > 0 || existing._count.deliveries > 0 || existing._count.classTests > 0) {
+    throw new ApiError(409, { error: 'This test is already used by a classroom. Duplicate it to create a new editable version.' });
   }
 
   const trimmedTitle = String(title || '').trim();
@@ -482,9 +563,9 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
         status: status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT',
         mode: mode === 'EXAM' ? 'EXAM' : 'PRACTICE',
         category: finalCategory,
-        isPublic: userRole === 'ADMIN' && status === 'PUBLISHED',
+        isPublic: existing.scope === 'SYSTEM' && status === 'PUBLISHED',
         testDate: finalTestDate,
-        folderId: Number.isInteger(Number(folderId)) ? Number(folderId) : null,
+        folderId: existing.scope === 'PERSONAL' && Number.isInteger(Number(folderId)) ? Number(folderId) : null,
         sections: {
           create: normalizedSections.map(section => ({
             name: section.name,
@@ -503,12 +584,12 @@ exports.updateTestStatus = async ({ testId, status, userId, userRole }) => {
   if (!['DRAFT', 'PUBLISHED', 'ARCHIVED'].includes(normalizedStatus)) {
     throw new ApiError(400, { error: 'Test status is invalid.' });
   }
-  const test = await ownedTest({ testId, userId });
+  const test = await manageableTest({ testId, userId, userRole });
   return prisma.test.update({
     where: { id: test.id },
     data: {
       status: normalizedStatus,
-      isPublic: userRole === 'ADMIN' && normalizedStatus === 'PUBLISHED',
+      isPublic: test.scope === 'SYSTEM' && normalizedStatus === 'PUBLISHED',
     },
   });
 };
@@ -529,6 +610,7 @@ exports.duplicateTest = async ({ testId, userId, userRole }) => {
       mode: source.mode,
       category: userRole === 'ADMIN' ? source.category : 'CLASS',
       status: 'DRAFT',
+      scope: userRole === 'ADMIN' ? 'SYSTEM' : 'PERSONAL',
       isPublic: false,
       authorId: Number(userId),
       sections: {
@@ -556,10 +638,57 @@ exports.duplicateTest = async ({ testId, userId, userRole }) => {
   });
 };
 
-exports.deleteTest = async ({ testId, userId }) => {
-  const test = await ownedTest({
+exports.copyTestToSystem = async ({ testId, userId, userRole }) => {
+  if (userRole !== 'ADMIN') throw new ApiError(403, { error: 'Only administrators can copy tests to the System Library.' });
+  const id = Number(testId);
+  if (!Number.isInteger(id)) throw new ApiError(400, { error: 'Invalid test ID.' });
+  const source = await prisma.test.findFirst({
+    where: { id, scope: 'PERSONAL', author: { role: 'TEACHER' } },
+    include: { sections: { orderBy: { order: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } } },
+  });
+  if (!source) throw new ApiError(404, { error: 'Teacher test not found.' });
+  return prisma.test.create({
+    data: {
+      title: `Copy of ${source.title}`.slice(0, 200),
+      description: source.description,
+      duration: source.duration,
+      subject: source.subject,
+      mode: source.mode,
+      category: source.category === 'REAL' ? 'REAL' : 'PRACTICE',
+      status: 'DRAFT',
+      scope: 'SYSTEM',
+      isPublic: false,
+      authorId: Number(userId),
+      sections: {
+        create: source.sections.map(section => ({
+          name: section.name,
+          order: section.order,
+          duration: section.duration,
+          questions: {
+            create: section.questions.map(question => ({
+              order: question.order,
+              questionText: question.questionText,
+              correctAnswer: question.correctAnswer,
+              type: question.type,
+              explanation: question.explanation,
+              blocks: question.blocks,
+              choices: question.choices,
+              domainCode: question.domainCode,
+              skillCode: question.skillCode,
+            })),
+          },
+        })),
+      },
+    },
+    select: { id: true, title: true, status: true, scope: true },
+  });
+};
+
+exports.deleteTest = async ({ testId, userId, userRole }) => {
+  const test = await manageableTest({
     testId,
     userId,
+    userRole,
     include: { _count: { select: { submissions: true, deliveries: true, classTests: true } } },
   });
   if (test._count.submissions > 0 || test._count.deliveries > 0 || test._count.classTests > 0) {

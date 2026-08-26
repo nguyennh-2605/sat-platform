@@ -24,7 +24,7 @@ exports.getFolderContent = async ({ folderId, userId }) => {
   });
 
   const rawTests = await prisma.test.findMany({
-    where: { authorId: userId, folderId: parsedFolderId },
+    where: { scope: 'PERSONAL', authorId: userId, folderId: parsedFolderId },
     include: {
       sections: {
         select: { _count: { select: { questions: true } } }
@@ -58,7 +58,7 @@ exports.deleteItems = async ({ folderIds = [], testIds = [], userId }) => {
 
   if (testIds.length > 0) {
     await prisma.test.deleteMany({
-      where: { id: { in: testIds }, authorId: userId }
+      where: { id: { in: testIds }, scope: 'PERSONAL', authorId: userId }
     });
   }
 
@@ -80,7 +80,7 @@ exports.moveItems = async ({ folderIds = [], testIds = [], destinationFolderId, 
 
   if (testIds.length > 0) {
     await prisma.test.updateMany({
-      where: { id: { in: testIds }, authorId: userId },
+      where: { id: { in: testIds }, scope: 'PERSONAL', authorId: userId },
       data: { folderId: destinationFolderId }
     });
   }

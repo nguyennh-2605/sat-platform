@@ -149,6 +149,7 @@ Express Server (index.js → app.js)
 | `POST` | `/api/tests/create` | JWT + TEACHER/ADMIN | Create a Draft or Published test with sections and questions |
 | `GET` | `/api/tests/:id/content` | JWT + TEACHER/ADMIN | Read owned or published system test content without creating an attempt |
 | `POST` | `/api/tests/:id/duplicate` | JWT + TEACHER/ADMIN | Duplicate an accessible test into an owned Draft |
+| `POST` | `/api/tests/:id/copy-to-system` | JWT + ADMIN | Copy a Teacher-owned Personal test into a platform-owned System Draft |
 | `PATCH` | `/api/tests/:id/status` | JWT + TEACHER/ADMIN | Publish, archive, or restore an owned test |
 | `GET` | `/api/class-activities/class/:classId` | JWT | List unified class activities visible to staff or an enrolled student |
 | `POST` | `/api/test-deliveries` | JWT + TEACHER/ADMIN | Publish a Classroom test activity with availability, attempts, score policy, and audience |
@@ -266,7 +267,7 @@ Folder ──1:N── Test
 
 **Assignment**: `id` (UUID), `title`, `content`, `fileUrls[]`, `links[]`, `testIds[]`, `deadline`, `classId` (FK → Class, cascade)
 
-**Test**: `id`, `title`, `description`, `duration` (default 64 min), `mode` (PRACTICE | EXAM), `status` (DRAFT | PUBLISHED | ARCHIVED), `category` (REAL | CLASS | PRACTICE), `isPublic`, `subject` (RW | MATH), `authorId` (FK → User), `folderId` (FK → Folder), `createdAt`, `updatedAt`
+**Test**: `id`, `title`, `description`, `duration` (default 64 min), `mode` (PRACTICE | EXAM), `status` (DRAFT | PUBLISHED | ARCHIVED), `scope` (SYSTEM | PERSONAL), `category` (REAL | CLASS | PRACTICE), transitional `isPublic`, `subject` (RW | MATH), `authorId` (creator attribution, FK → User), `folderId` (Personal tests only, FK → Folder), `createdAt`, `updatedAt`
 
 **Submission**: `id`, `userId`, `testId`, `assignmentId`, `classTestId`, `savedAnswers` (JSON), `timeRemaining`, `currentQuestionIndex`, `score`, `violationCount`, `status` (DOING | COMPLETED), `startedAt`, `endTime`
 
@@ -274,7 +275,7 @@ Folder ──1:N── Test
 
 **Answer**: `id`, `submissionId`, `questionId`, `selectedChoice`, `isCorrect`
 
-**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR)
+**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestScope` (SYSTEM, PERSONAL), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR)
 
 ---
 
@@ -341,6 +342,18 @@ Folder ──1:N── Test
 6. POST /api/test-deliveries creates TestDelivery + canonical ClassActivity + assignees and notifications.
 7. Classroom Activities owns completion/performance; Test Library never displays student attempt state.
 8. Archiving prevents new delivery but preserves existing deliveries and student access/history.
+```
+
+### 8.4 Admin Test Management
+
+```text
+1. Admin opens Test Management; System Library is the default collection.
+2. SYSTEM tests are platform-owned. Any Admin can manage them; authorId records who created the row.
+3. Admin-created tests and duplicates are SYSTEM Drafts until published.
+4. Teacher Tests lists PERSONAL tests created by Teachers and is read-only for Admin.
+5. Copy to System Library creates a new SYSTEM Draft and preserves the Teacher-owned original.
+6. Tests with classroom or attempt history cannot be structurally edited or permanently deleted; duplicate them to create a new version.
+7. Publishing/archiving affects library availability, while existing deliveries and attempt history remain accessible.
 ```
 
 ### 8.4 AI Question Generation & Evaluation (LogicLab)

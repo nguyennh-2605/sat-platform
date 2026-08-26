@@ -10,6 +10,7 @@ router.get('/:id/content', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']
 router.get('/', authenticateToken, practiceTestController.getTests);
 router.post('/create', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), practiceTestController.createTest);
 router.post('/:id/duplicate', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), practiceTestController.duplicateTest);
+router.post('/:id/copy-to-system', authenticateToken, authorizeRole(['ADMIN']), practiceTestController.copyTestToSystem);
 router.patch('/:id/status', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), practiceTestController.updateTestStatus);
 router.put('/:id', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), practiceTestController.updateTest);
 router.delete('/:id', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), practiceTestController.deleteTest);

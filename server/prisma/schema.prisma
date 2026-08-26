@@ -132,6 +132,7 @@ model Test {
   isPublic    Boolean        @default(false)
   subject     TestSubject    @default(RW)
   status      TestStatus     @default(DRAFT)
+  scope       TestScope      @default(PERSONAL)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   testDate    String?
@@ -144,6 +145,7 @@ model Test {
   deliveries  TestDelivery[]
 
   @@index([authorId, status, updatedAt])
+  @@index([scope, status, updatedAt])
   @@index([isPublic, status, updatedAt])
 }
 
@@ -325,6 +327,11 @@ enum TestStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+enum TestScope {
+  SYSTEM
+  PERSONAL
 }
 
 enum SubmissionStatus {

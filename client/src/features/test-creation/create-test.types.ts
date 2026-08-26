@@ -53,5 +53,6 @@ export interface EditTestPayload {
   folderId?: number | null;
   moduleCount: number;
   hasAttempts: boolean;
+  hasUsage: boolean;
   structuredText: string;
 }

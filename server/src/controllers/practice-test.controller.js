@@ -62,6 +62,7 @@ exports.getTestForEdit = async (req, res) => {
     const test = await practiceTestService.getTestForEdit({
       testId: req.params.id,
       userId: req.user.userId,
+      userRole: req.user.role,
     });
     res.json(test);
   } catch (error) {
@@ -133,9 +134,24 @@ exports.duplicateTest = async (req, res) => {
   }
 };
 
+exports.copyTestToSystem = async (req, res) => {
+  try {
+    const test = await practiceTestService.copyTestToSystem({
+      testId: req.params.id,
+      userId: req.user.userId,
+      userRole: req.user.role,
+    });
+    res.status(201).json(test);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Copy test to system error:', error);
+    res.status(500).json({ error: 'Unable to copy this test to the System Library.' });
+  }
+};
+
 exports.deleteTest = async (req, res) => {
   try {
-    await practiceTestService.deleteTest({ testId: req.params.id, userId: req.user.userId });
+    await practiceTestService.deleteTest({ testId: req.params.id, userId: req.user.userId, userRole: req.user.role });
     res.status(204).send();
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);

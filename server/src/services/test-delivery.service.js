@@ -85,8 +85,8 @@ exports.createDeliveries = async ({ classIds, testIds, studentIds, lessonId, tit
         status: 'PUBLISHED',
         ...(userRole === 'ADMIN' ? {} : {
           OR: [
-            { authorId: parseUserId(userId) },
-            { isPublic: true, author: { role: 'ADMIN' } },
+            { scope: 'PERSONAL', authorId: parseUserId(userId) },
+            { scope: 'SYSTEM' },
           ],
         }),
       },

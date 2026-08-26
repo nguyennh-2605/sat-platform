@@ -56,6 +56,10 @@ const navigation = [
   { to: '/dashboard/results-analytics', label: 'Results & Analytics', icon: BarChart3 },
 ] as const;
 
+const navigationForRole = (role: string) => navigation.map(item => item.to === '/dashboard/practice-test'
+  ? { ...item, label: role === 'ADMIN' ? 'Test Management' : role === 'TEACHER' ? 'Test Library' : item.label }
+  : item);
+
 interface NavigationItemProps {
   to: string;
   label: string;
@@ -84,6 +88,8 @@ function NavigationItem({ to, label, icon: Icon, exact = false, activePrefixes =
 }
 
 function AppSidebar() {
+  const role = localStorage.getItem('userRole') || 'STUDENT';
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="flex-row items-center gap-1">
@@ -110,7 +116,7 @@ function AppSidebar() {
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigation.map(item => <NavigationItem key={item.to} {...item} />)}
+              {navigationForRole(role).map(item => <NavigationItem key={item.to} {...item} />)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -145,6 +151,7 @@ function DashboardHeaderNavigation() {
 
 function DashboardSearch() {
   const navigate = useNavigate();
+  const role = localStorage.getItem('userRole') || 'STUDENT';
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -159,7 +166,7 @@ function DashboardSearch() {
     return () => document.removeEventListener('keydown', handleShortcut);
   }, []);
 
-  const matches = navigation.filter(item => item.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const matches = navigationForRole(role).filter(item => item.label.toLowerCase().includes(query.trim().toLowerCase()));
   const openRoute = (to: string) => {
     navigate(to);
     setOpen(false);

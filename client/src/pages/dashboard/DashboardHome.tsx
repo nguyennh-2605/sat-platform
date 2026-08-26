@@ -20,7 +20,20 @@ export default function DashboardHome() {
   const role = (localStorage.getItem('userRole') || 'STUDENT').toUpperCase();
   const roleMessage = role === 'TEACHER'
     ? 'Manage learning activities and keep each class moving forward.'
+    : role === 'ADMIN'
+      ? 'Manage platform content and keep the SAT workspace organized.'
     : 'Pick up where you left off and focus on the work that matters today.';
+  const roleDestinations = destinations.map(destination => destination.to === '/dashboard/practice-test'
+    ? {
+        ...destination,
+        title: role === 'ADMIN' ? 'Test Management' : role === 'TEACHER' ? 'Test Library' : destination.title,
+        description: role === 'ADMIN'
+          ? 'Manage system tests and oversee teacher-created content.'
+          : role === 'TEACHER'
+            ? 'Create and manage tests for your classes.'
+            : destination.description,
+      }
+    : destination);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -38,7 +51,7 @@ export default function DashboardHome() {
               <p className="text-sm text-muted-foreground">Move between the core parts of your SAT learning plan.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-                {destinations.map(({ to, title, description, icon: Icon }) => (
+                {roleDestinations.map(({ to, title, description, icon: Icon }) => (
                   <Card key={to} className="group gap-0 py-0 transition-shadow hover:shadow-md">
                     <CardContent className="flex min-h-36 items-start gap-3 p-5">
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted text-foreground"><Icon className="size-4" aria-hidden="true" /></span>

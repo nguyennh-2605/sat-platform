@@ -44,7 +44,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | Implemented; page hierarchy and workspace cards aligned, visual QA pending |
 | Authentication | `auth/v2` | `auth/v1` | Implemented; visual QA pending |
 | Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Implemented with unified Activities, course, members, performance, assignments, and no local sticky page header |
-| Teacher Test Library / Student Practice Center | `dashboard/infrastructure` | `dashboard/file-manager`, `dashboard/tasks`, `dashboard/default` | Teacher content lifecycle uses My/System sources and Draft/Published/Archived; all test delivery moved to Classroom Activities; Student attempt experience remains separate |
+| Admin Test Management / Teacher Test Library / Student Practice Center | `dashboard/tasks`, `dashboard/infrastructure` | `dashboard/file-manager`, `dashboard/default` | Admin uses platform-owned System Library and read-only Teacher Tests; Teacher content lifecycle uses My/System sources; Student attempt experience remains separate |
 | Create/Edit Test workspace | `dashboard/invoice` | shared `field`, `select`, `tabs`, `card` primitives | Build/Review composition implemented without a stepper; Details and Import share the left card, live preview remains on the right, and Review actions live in the page header |
 | Test Bank | `dashboard/file-manager` | `dashboard/tasks` | No standalone route currently; embedded assignment selector aligned |
 | Results Analytics | `dashboard/analytics` | `dashboard/default` | Implemented with real attempt data |
@@ -85,6 +85,7 @@ This is a presentation-layer migration, not a Next.js migration.
 - [x] Classroom core surfaces (embedded analytics and vocabulary follow their owning migrations).
 - [x] Practice Center and the existing embedded Test Bank selector.
 - [x] Separate Teacher Test Library content lifecycle from Classroom test delivery and student attempt state.
+- [x] Add dedicated Admin Test Management with System Library, read-only Teacher Tests, and Copy to System Library.
 - [x] Results Analytics and Score Report.
 - [x] Error Log and Vocabulary.
 - [x] Shared assignment, test-selection, and announcement overlays.
