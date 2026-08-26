@@ -176,10 +176,11 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ### Page-level Back button
 
-- Mọi hành động quay lại ở cấp trang hoặc quay lại một màn hình cha phải dùng shared component `BackButton` từ `client/src/components/ui/AppUI.tsx`; không tự viết lại bằng thẻ `button` và một bộ class riêng.
-- Mẫu mặc định luôn gồm icon `ArrowLeft` cỡ `16px` và nhãn English `Back`; cao `32px`, `rounded-lg`, nền trong suốt, chữ `#4B5563`, hover nền xanh nhạt và chữ xanh đậm.
-- Không đổi thành icon-only, outline button, text link hoặc các nhãn dài như `Back to Analytics` / `Back to class` nếu không có yêu cầu đặc biệt về accessibility hoặc không gian.
-- Điều hướng Previous/Next trong bảng, carousel, question review hoặc stepper là workflow control, không phải page-level Back và tiếp tục dùng variant phù hợp với ngữ cảnh đó.
+- Page-level Back chỉ xuất hiện trong global dashboard header, tại vị trí cũ của desktop Sidebar Trigger; detail screen không đặt Back trong body, PageHeader, empty state hoặc card.
+- Detail screen đăng ký parent action qua shared dashboard Back controller. Back dùng icon `ArrowLeft` và label English `Back`, đậm khi hoạt động; list/root screen vẫn hiển thị control nhạt và disabled để giữ ổn định layout.
+- Desktop Sidebar Trigger nằm bên phải Sidebar Header. Mobile giữ menu trigger trong dashboard header để mở off-canvas sidebar và hiển thị Back cạnh nó khi detail action hoạt động.
+- Back controller phải giữ được custom behavior như unsaved-change confirmation hoặc quay lại nested workspace, không được mặc định dùng browser history khi parent route đã biết rõ.
+- Điều hướng Previous/Next trong bảng, carousel hoặc question review là workflow control, không phải page-level Back và tiếp tục dùng variant phù hợp với ngữ cảnh đó.
 
 ## 7. Practice Center
 
@@ -191,6 +192,12 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Published có Preview/Edit/Duplicate/Archive/Delete; Draft có Continue editing/Preview/Duplicate/Delete; Archived có Preview/Restore/Delete. Backend phải chặn permanent delete khi test đã có classroom hoặc attempt history.
 - Test Detail dùng `Overview | Questions`; không thêm Assignments tab. Preview content không được tạo Submission cho giáo viên.
 - Create/Edit dùng terminology `Test`, có `Save draft` và `Publish test`; chỉ Published test mới được chọn khi tạo Classroom activity.
+- Create/Edit Test chỉ có hai trạng thái `Build` và `Review`; không hiển thị stepper. Build dùng composition của `dashboard/invoice`: page header title/subtitle bên trái, action bên phải, form card bên trái và preview bên phải.
+- Card Build bên trái có hai tab full-width `Details | Import questions`. Details dùng shared `Field`, React Hook Form và schema validation; Subject, Mode, Modules và Publication dùng shared Radix Select đúng animation/check/focus của Studio Admin.
+- Import questions đặt structured editor ở trên và nhóm Formatting guide, Upload file, Upload image, Update preview ở toolbar bên dưới. Preview là card riêng bên phải và luôn phản ánh parsed content; trên viewport nhỏ hai card xếp dọc như Invoice.
+- Header action ở Build là `Continue to review`. Khi sang Review, cùng vị trí đổi thành `Replace import`, `Save draft`, `Publish test`; các action dùng shared Studio Admin Button compact như Invoice, không lặp ở footer hoặc tạo sticky sub-header.
+- Review gồm question navigator, content preview và classification editor; desktop dùng ba cột có chiều cao giới hạn với navigator/content cuộn độc lập, mobile dùng tabs Preview/Edit. Previous/Next nằm ngay dưới nội dung và đáp án của câu hiện tại. Trạng thái disabled phải được giải thích bằng validation summary.
+- Khi có thay đổi chưa lưu, page-level Back phải xác nhận trước khi rời; browser refresh/close phải dùng native before-unload protection. Formatting guide dùng dashboard content-dialog để không phủ sidebar.
 - Bám sát `dashboard/infrastructure` cho page hierarchy và toolbar: search, filter, sort, view switch và role actions nằm trên một hàng ở desktop; chỉ wrap có kiểm soát trên viewport nhỏ.
 - Toolbar dùng search bên trái và nhóm control `size="sm"` bên phải. Trên desktop, search nhận phần chiều rộng còn lại để khoảng cách từ search đến Filter bằng đúng khoảng cách giữa các control (`gap-2`); không chèn khoảng trống bằng `justify-between`/`justify-end` hoặc dùng control cao như action chính.
 - View switch dùng icon dễ đọc và thêm check trước mode đang chọn; selected mode dùng neutral accent surface rõ hơn trạng thái chưa chọn.

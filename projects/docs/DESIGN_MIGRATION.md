@@ -45,6 +45,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | Authentication | `auth/v2` | `auth/v1` | Implemented; visual QA pending |
 | Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Implemented with unified Activities, course, members, performance, assignments, and no local sticky page header |
 | Teacher Test Library / Student Practice Center | `dashboard/infrastructure` | `dashboard/file-manager`, `dashboard/tasks`, `dashboard/default` | Teacher content lifecycle uses My/System sources and Draft/Published/Archived; all test delivery moved to Classroom Activities; Student attempt experience remains separate |
+| Create/Edit Test workspace | `dashboard/invoice` | shared `field`, `select`, `tabs`, `card` primitives | Build/Review composition implemented without a stepper; Details and Import share the left card, live preview remains on the right, and Review actions live in the page header |
 | Test Bank | `dashboard/file-manager` | `dashboard/tasks` | No standalone route currently; embedded assignment selector aligned |
 | Results Analytics | `dashboard/analytics` | `dashboard/default` | Implemented with real attempt data |
 | Error Log | `dashboard/tasks` | default data-table patterns | Implemented |

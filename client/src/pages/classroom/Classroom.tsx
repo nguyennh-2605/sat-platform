@@ -4,7 +4,8 @@ import { compareAsc, format, formatDistanceToNow, isPast, isToday, isTomorrow } 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
-import { BackButton, Button, Card, Input, Modal, PageHeader, TableShell, Tabs, type TabItem } from '../../components/ui/AppUI';
+import { Button, Card, Input, Modal, PageHeader, TableShell, Tabs, type TabItem } from '../../components/ui/AppUI';
+import { useDashboardBack } from '../../features/navigation/DashboardBackContext';
 import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
@@ -58,6 +59,7 @@ export default function Classroom() {
   const [postKind, setPostKind] = useState<'post' | 'homework'>('post');
   const [addStudentOpen, setAddStudentOpen] = useState(false);
   const [studentToRemove, setStudentToRemove] = useState<ClassMember | null>(null);
+  useDashboardBack(() => navigate('/dashboard/classes'));
 
   const fetchClassDetail = useCallback(async () => {
     if (!classId) return;
@@ -129,7 +131,7 @@ export default function Classroom() {
   };
 
   if (!currentUser || loading) return <ClassroomLoading />;
-  if (!classDetail || loadError) return <ClassroomError message={loadError} onBack={() => navigate('/dashboard/classes')} onRetry={() => void fetchClassDetail()} />;
+  if (!classDetail || loadError) return <ClassroomError message={loadError} onRetry={() => void fetchClassDetail()} />;
 
   const tabs: Array<TabItem<ClassroomTab>> = [
     { value: 'NOTIFICATIONS', label: 'Notifications', icon: Bell, panelId: 'classroom-notifications-panel' },
@@ -146,7 +148,6 @@ export default function Classroom() {
         tabs={tabs}
         activeTab={activeTab}
         onSelectTab={selectTab}
-        onBack={() => navigate('/dashboard/classes')}
       />
 
       <div>
@@ -164,12 +165,9 @@ export default function Classroom() {
   </div>;
 }
 
-function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack }: { className: string; tabs: Array<TabItem<ClassroomTab>>; activeTab: ClassroomTab; onSelectTab: (tab: ClassroomTab) => void; onBack: () => void }) {
+function ClassroomHeader({ className, tabs, activeTab, onSelectTab }: { className: string; tabs: Array<TabItem<ClassroomTab>>; activeTab: ClassroomTab; onSelectTab: (tab: ClassroomTab) => void }) {
   return <div className="flex flex-col gap-4">
-    <div className="flex items-start gap-3">
-      <BackButton onClick={onBack} className="mt-1" />
-      <PageHeader title={className} description="Manage announcements, activities, members, and class performance." />
-    </div>
+    <PageHeader title={className} description="Manage announcements, activities, members, and class performance." />
     <div className="overflow-x-auto"><Tabs items={tabs} value={activeTab} onValueChange={onSelectTab} ariaLabel="Classroom sections" /></div>
   </div>;
 }
@@ -266,8 +264,8 @@ function ClassroomLoading() {
   return <div className="h-full bg-background"><div className="h-24 animate-pulse border-b bg-muted/50" /><div className="mx-auto grid w-full max-w-[1400px] gap-8 p-8 lg:grid-cols-12"><div className="h-56 animate-pulse rounded-xl bg-muted lg:col-span-4" /><div className="h-80 animate-pulse rounded-xl bg-muted lg:col-span-8" /></div></div>;
 }
 
-function ClassroomError({ message, onBack, onRetry }: { message: string; onBack: () => void; onRetry: () => void }) {
-  return <div className="flex h-full items-center justify-center bg-background p-6"><Card className="w-full max-w-md p-8 text-center"><h2 className="text-base font-semibold text-foreground">Class could not be loaded</h2><p className="mt-2 text-sm text-muted-foreground">{message}</p><div className="mt-5 flex justify-center gap-2"><BackButton onClick={onBack} /><Button variant="outline" onClick={onRetry}>Try again</Button></div></Card></div>;
+function ClassroomError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div className="flex h-full items-center justify-center bg-background p-6"><Card className="w-full max-w-md p-8 text-center"><h2 className="text-base font-semibold text-foreground">Class could not be loaded</h2><p className="mt-2 text-sm text-muted-foreground">{message}</p><div className="mt-5 flex justify-center"><Button variant="outline" onClick={onRetry}>Try again</Button></div></Card></div>;
 }
 
 const initials = (name: string | null) => String(name || 'Student').split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase();

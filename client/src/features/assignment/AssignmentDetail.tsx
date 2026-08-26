@@ -5,7 +5,8 @@ import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
-import { Badge, BackButton, Button, Card, EmptyState, Input, Modal, PageHeader, Tabs } from '../../components/ui/AppUI';
+import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Tabs } from '../../components/ui/AppUI';
+import { useDashboardBack } from '../navigation/DashboardBackContext';
 import { Textarea } from '../../components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import AnnouncementCreator from '../notifications/AnnouncementCreator';
@@ -55,6 +56,7 @@ const AssignmentDetail = () => {
   const [submissionType, setSubmissionType] = useState<'TEXT' | 'FILE'>('TEXT');
   const [submissionContent, setSubmissionContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  useDashboardBack(() => navigate(`/dashboard/class/${classId}`));
 
   const fetchAssignmentDetail = useCallback(async () => {
     try {
@@ -127,7 +129,7 @@ const AssignmentDetail = () => {
   if (loading) return <div className="mx-auto max-w-screen-2xl space-y-4 p-4 md:p-6" aria-label="Loading assignment"><div className="h-24 animate-pulse rounded-card bg-muted" /><div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]"><div className="h-72 animate-pulse rounded-card bg-muted" /><div className="h-64 animate-pulse rounded-card bg-muted" /></div></div>;
 
   if (!assignment) {
-    return <div className="mx-auto max-w-screen-2xl p-4 md:p-6"><BackButton onClick={() => navigate(-1)} className="mb-4" /><EmptyState icon={<TriangleAlert size={24} />} title="Assignment not found" description="This assignment may have been deleted or the link is invalid." /></div>;
+    return <div className="mx-auto max-w-screen-2xl p-4 md:p-6"><EmptyState icon={<TriangleAlert size={24} />} title="Assignment not found" description="This assignment may have been deleted or the link is invalid." /></div>;
   }
 
   const hasAttachments = Boolean(assignment.fileUrls?.length || assignment.links?.length);
@@ -136,7 +138,6 @@ const AssignmentDetail = () => {
   return (
     <div className="h-full overflow-y-auto bg-background">
       <main className="mx-auto flex max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
-        <BackButton onClick={() => navigate(-1)} className="w-fit" />
         <PageHeader
           title={assignment.title}
           description={<span className="flex flex-wrap items-center gap-x-4 gap-y-1"><span>Posted {format(parseISO(assignment.createdAt), 'MMM d, yyyy')}</span><span className="inline-flex items-center gap-1"><Clock size={14} />{assignment.deadline ? `Due ${format(parseISO(assignment.deadline), 'MMM d, yyyy · HH:mm')}` : 'No due date'}</span></span>}

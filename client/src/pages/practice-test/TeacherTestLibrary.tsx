@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { Archive, ArrowUpDown, BookOpen, Check, ChevronLeft, ChevronRight, Copy, FilePenLine, Grid2X2, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, RefreshCw, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { Archive, ArrowUpDown, BookOpen, Check, ChevronLeft, ChevronRight, Clock3, Copy, FilePenLine, Grid2X2, History, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, RefreshCw, RotateCcw, Search, Trash2, UserRound, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -219,7 +219,7 @@ interface TestActions { preview: (test: LibraryTest) => void; edit: (test: Libra
 
 function LibraryCard({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
   const system = source === 'SYSTEM';
-  return <Card size="sm" className="gap-0 py-0 shadow-card">
+  return <Card size="sm" className="flex h-full flex-col gap-0 py-0 shadow-card">
     <CardHeader className="gap-1 px-4 pb-0 pt-4">
       <CardTitle className="line-clamp-2 min-w-0 pr-2 text-title font-semibold text-foreground">{test.title}</CardTitle>
       <CardAction className="flex items-center gap-1.5 pl-2">
@@ -230,12 +230,12 @@ function LibraryCard({ test, source, working, actions }: { test: LibraryTest; so
     </CardHeader>
     <CardContent className="px-4 pb-4 pt-3">
       <ul className="space-y-2 text-body text-foreground">
-        <li className="flex items-center gap-2"><ChevronRight size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span>{test.questionCount} questions</span></li>
-        <li className="flex items-center gap-2"><ChevronRight size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span>{test.duration ? `${test.duration} minutes` : 'No time limit'}</span></li>
-        <li className="flex min-w-0 items-center gap-2"><ChevronRight size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span className="truncate">{system ? `Provided by ${test.author?.name || 'SAT Platform'}` : `Updated ${relativeTime(test.updatedAt)}`}</span></li>
+        <li className="flex items-center gap-2"><BookOpen size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span>{test.questionCount} questions</span></li>
+        <li className="flex items-center gap-2"><Clock3 size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span>{test.duration ? `${test.duration} minutes` : 'No time limit'}</span></li>
+        <li className="flex min-w-0 items-center gap-2">{system ? <UserRound size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /> : <History size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />}<span className="truncate">{system ? `Provided by ${test.author?.name || 'SAT Platform'}` : `Updated ${relativeTime(test.updatedAt)}`}</span></li>
       </ul>
     </CardContent>
-    <CardFooter className="grid gap-2 bg-muted/40 p-3">
+    <CardFooter className="mt-auto grid gap-2 bg-muted/40 p-3">
       <CardStackedActions test={test} source={source} working={working} actions={actions} />
     </CardFooter>
   </Card>;

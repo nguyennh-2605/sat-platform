@@ -2,12 +2,13 @@ import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useSta
 import { useSearchParams } from 'react-router-dom';
 import { Archive, BookOpen, Check, ChevronLeft, ChevronRight, Clock3, ClipboardCheck, Edit3, Pause, Play, Plus, RotateCcw, Search, Send, Shuffle, Sparkles, Target, Trash2, Trophy, Volume2, X } from 'lucide-react';
 import axiosClient from '../../lib/axios';
-import { BackButton, Badge, Button, Card, EmptyState, Input, LoadingBar, Modal, PageHeader, Select, Tabs, type TabItem } from '../../components/ui/AppUI';
+import { Badge, Button, Card, EmptyState, Input, LoadingBar, Modal, PageHeader, Select, Tabs, type TabItem } from '../../components/ui/AppUI';
 import { Textarea } from '@/components/ui/textarea';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
 import { appToast } from '../../components/ui/toast';
 import { ui } from '../../components/ui/styles';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
+import { useDashboardBack } from '../../features/navigation/DashboardBackContext';
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 
 type DetailTab = 'TERMS' | 'FLASHCARDS' | 'QUIZ';
@@ -154,6 +155,11 @@ export default function Vocabulary() {
     setSelected(null); setActivity(null); setDetailTab('TERMS'); setQuizConfig(null);
     if (searchParams.has('activity') || searchParams.has('set') || searchParams.has('assignTo')) { const next = new URLSearchParams(searchParams); next.delete('activity'); next.delete('set'); next.delete('assignTo'); setSearchParams(next, { replace: true }); }
   };
+  useDashboardBack(
+    editingSet ? () => setEditingSet(null) : creatingSet ? () => setCreatingSet(false) : closeDetail,
+    Boolean(editingSet || creatingSet || selected),
+    5,
+  );
 
   const choices = useMemo(() => [...systemSets, ...personalSets, ...assignedSets], [assignedSets, personalSets, systemSets]);
   const currentKey = currentActivity ? `activity:${currentActivity.id}` : currentSet ? `set:${currentSet.id}` : '';
@@ -284,14 +290,14 @@ function VocabularyHomeSkeleton() {
 }
 
 function SetWorkspace({ set, activity, tab, onTab, role, quizConfig, onBack, onEdit, onTermSaved, onAssign, onRefresh, assigner }: { set: SetDetail; activity: VocabularyActivity | null; tab: DetailTab; onTab: (tab: DetailTab) => void; role: UserRole; quizConfig: QuizConfig | null; onBack: () => void; onEdit: () => void; onTermSaved: (set: SetDetail) => void; onAssign: () => void; onRefresh: () => Promise<void>; assigner: React.ReactNode }) {
-  if (tab === 'FLASHCARDS') return <FlashcardWorkspace set={set} activityId={activity?.id} onBack={onBack} canEdit={set.canEdit && !activity} onTermSaved={onTermSaved} />;
-  if (tab === 'QUIZ') return <QuizWorkspace set={set} activityId={activity?.id} config={quizConfig} onBack={onBack} />;
+  if (tab === 'FLASHCARDS') return <FlashcardWorkspace set={set} activityId={activity?.id} canEdit={set.canEdit && !activity} onTermSaved={onTermSaved} />;
+  if (tab === 'QUIZ') return <QuizWorkspace set={set} activityId={activity?.id} config={quizConfig} />;
   const tabs: Array<TabItem<DetailTab>> = [{ value: 'TERMS', label: 'Terms', icon: BookOpen }, { value: 'FLASHCARDS', label: 'Flashcards', icon: RotateCcw }, { value: 'QUIZ', label: 'Test', icon: ClipboardCheck, disabled: set.terms.length < 4 }];
   const publish = async () => { try { await axiosClient.post(`/api/vocabulary/sets/${set.id}/publish`); invalidateQueryCache('/api/vocabulary'); appToast.success('Vocabulary set published.'); await onRefresh(); } catch (error) { appToast.error(errorMessage(error, 'Unable to publish the set.')); } };
   const archive = async () => { try { await axiosClient.post(`/api/vocabulary/sets/${set.id}/archive`); invalidateQueryCache('/api/vocabulary'); appToast.success('Vocabulary set archived.'); onBack(); } catch (error) { appToast.error(errorMessage(error, 'Unable to archive the set.')); } };
   return <div className={ui.page}>
     <main className="min-h-0 flex-1 overflow-y-auto"><div className={ui.content}>
-      <div className="flex items-start gap-3"><BackButton onClick={onBack} className="mt-1" /><PageHeader title={set.title} description={`${set.termCount} words${activity ? ` · ${activity.class.name}` : ''}`} actions={<>{set.canEdit && <Button variant="outline" size="sm" onClick={onEdit}><Edit3 size={14} />Edit</Button>}{role === 'ADMIN' && set.scope === 'SYSTEM' && set.status !== 'PUBLISHED' && <Button size="sm" onClick={() => void publish()}><Sparkles size={14} />Publish</Button>}{(role === 'TEACHER' || role === 'ADMIN') && set.status === 'PUBLISHED' && <Button size="sm" onClick={onAssign}><Send size={14} />Assign</Button>}{set.canEdit && <Button variant="ghost" size="icon" onClick={() => void archive()} aria-label="Archive set"><Archive size={16} /></Button>}</>} /></div>
+      <PageHeader title={set.title} description={`${set.termCount} words${activity ? ` · ${activity.class.name}` : ''}`} actions={<>{set.canEdit && <Button variant="outline" size="sm" onClick={onEdit}><Edit3 size={14} />Edit</Button>}{role === 'ADMIN' && set.scope === 'SYSTEM' && set.status !== 'PUBLISHED' && <Button size="sm" onClick={() => void publish()}><Sparkles size={14} />Publish</Button>}{(role === 'TEACHER' || role === 'ADMIN') && set.status === 'PUBLISHED' && <Button size="sm" onClick={onAssign}><Send size={14} />Assign</Button>}{set.canEdit && <Button variant="ghost" size="icon" onClick={() => void archive()} aria-label="Archive set"><Archive size={16} /></Button>}</>} />
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4"><div className="flex items-center gap-2"><Badge tone={set.scope === 'SYSTEM' ? 'green' : 'neutral'}>{set.scope === 'SYSTEM' ? 'System library' : 'Personal'}</Badge>{set.status !== 'PUBLISHED' && <Badge tone="warning">{set.status}</Badge>}{set.description && <p className="text-body text-muted-foreground">{set.description}</p>}</div><p className="text-caption text-muted-foreground">{set.masteredCount}/{set.termCount} mastered</p></div>
       <Tabs items={tabs} value={tab} onValueChange={onTab} ariaLabel="Vocabulary study modes" className="mt-6 border-b border-ui-border-strong" />
       <div key={tab} role="tabpanel" className="mt-6 min-h-[360px]"><TermList terms={set.terms} /></div>
@@ -299,7 +305,7 @@ function SetWorkspace({ set, activity, tab, onTab, role, quizConfig, onBack, onE
   </div>;
 }
 
-function FlashcardWorkspace({ set, activityId, onBack, canEdit, onTermSaved }: { set: SetDetail; activityId?: string; onBack: () => void; canEdit: boolean; onTermSaved: (set: SetDetail) => void }) {
+function FlashcardWorkspace({ set, activityId, canEdit, onTermSaved }: { set: SetDetail; activityId?: string; canEdit: boolean; onTermSaved: (set: SetDetail) => void }) {
   const [session, setSession] = useState<StudySession | null>(null);
   const [questionOrder, setQuestionOrder] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
@@ -392,13 +398,13 @@ function FlashcardWorkspace({ set, activityId, onBack, canEdit, onTermSaved }: {
   return <div className={ui.page}>
     <main className="relative min-h-0 flex-1 overflow-y-auto"><LoadingBar active={loading || saving} />
       <div className={`${ui.content} !max-w-[1080px] !pt-5`}>
-      <div className="flex items-center justify-between"><BackButton label="Back to Vocabulary" onClick={onBack} /><SatCountdown /></div>
+      <div className="flex justify-end"><SatCountdown /></div>
       <header className="mx-auto mt-12 max-w-[820px] text-center sm:mt-0">
         <p className="text-caption font-semibold uppercase tracking-[0.14em] text-primary">Vocabulary set</p>
         <h1 className="mt-1 text-display font-semibold text-foreground">{set.title}</h1>
         <p className="mt-1 text-body text-muted-foreground">{set.termCount} terms · {set.masteredCount} mastered</p>
       </header>
-      {loading ? <div className="mt-8 h-[430px] animate-pulse rounded-card border border-ui-border bg-muted" /> : !current ? <EmptyState icon={<RotateCcw size={20} />} title="No flashcards available" description="Add words to this set before starting flashcards." action={<Button variant="outline" onClick={onBack}>Back to vocabulary</Button>} /> : <>
+      {loading ? <div className="mt-8 h-[430px] animate-pulse rounded-card border border-ui-border bg-muted" /> : !current ? <EmptyState icon={<RotateCcw size={20} />} title="No flashcards available" description="Add words to this set before starting flashcards." /> : <>
         <section aria-labelledby="flashcard-heading" className="mt-6">
           <div className="mx-auto mb-4 max-w-[820px]"><div className="flex items-end justify-between gap-4"><h2 id="flashcard-heading" className="text-title font-semibold text-foreground">Flashcard review</h2><p className="text-title font-semibold text-foreground" aria-live="polite">{index + 1} <span className="font-normal text-muted-foreground">/ {orderedQuestions.length}</span></p></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${((index + 1) / orderedQuestions.length) * 100}%` }} /></div></div>
 
@@ -472,7 +478,7 @@ function QuizSetupModal({ open, set, onClose, onStart }: { open: boolean; set: S
   </Modal>;
 }
 
-function QuizWorkspace({ set, activityId, config, onBack }: { set: SetDetail; activityId?: string; config: QuizConfig | null; onBack: () => void }) {
+function QuizWorkspace({ set, activityId, config }: { set: SetDetail; activityId?: string; config: QuizConfig | null }) {
   const [session, setSession] = useState<StudySession | null>(null);
   const [index, setIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState('');
@@ -505,12 +511,12 @@ function QuizWorkspace({ set, activityId, config, onBack }: { set: SetDetail; ac
   };
   const next = () => { if (!session || index >= session.questions.length - 1) return; setIndex(value => value + 1); setSelectedAnswer(''); };
 
-  if (session?.status === 'COMPLETED') return <QuizCompleteScreen session={session} elapsedSeconds={elapsedSeconds} retrying={loading} onRetry={() => void start()} onBack={onBack} />;
+  if (session?.status === 'COMPLETED') return <QuizCompleteScreen session={session} elapsedSeconds={elapsedSeconds} retrying={loading} onRetry={() => void start()} />;
   return <div className={ui.page}>
     <main className="relative min-h-0 flex-1 overflow-y-auto"><LoadingBar active={loading || saving} /><div className={`${ui.content} !max-w-[980px] !pt-5`}>
-      <div className="flex items-center justify-between"><BackButton label="Exit Quiz" onClick={onBack} /><SatCountdown /></div>
+      <div className="flex justify-end"><SatCountdown /></div>
       <div className="flex min-h-9 items-center justify-center"><h1 className="hidden text-title font-semibold text-foreground sm:block">{set.title}</h1></div>
-      {loading ? <div className="mt-8 h-[520px] animate-pulse rounded-card border border-ui-border bg-muted" /> : !current || !session ? <EmptyState icon={<ClipboardCheck size={20} />} title="Quiz unavailable" description="There are not enough matching words for this quiz." action={<Button variant="outline" onClick={onBack}>Back to vocabulary</Button>} /> : <section aria-labelledby="quiz-question-heading" className="mt-6"><div className="flex items-center justify-between gap-4"><p className="text-caption font-semibold uppercase tracking-wide text-primary">Question {index + 1} of {session.totalItems}</p><p className="text-caption text-muted-foreground">Choose one answer</p></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${((index + 1) / session.totalItems) * 100}%` }} /></div>
+      {loading ? <div className="mt-8 h-[520px] animate-pulse rounded-card border border-ui-border bg-muted" /> : !current || !session ? <EmptyState icon={<ClipboardCheck size={20} />} title="Quiz unavailable" description="There are not enough matching words for this quiz." /> : <section aria-labelledby="quiz-question-heading" className="mt-6"><div className="flex items-center justify-between gap-4"><p className="text-caption font-semibold uppercase tracking-wide text-primary">Question {index + 1} of {session.totalItems}</p><p className="text-caption text-muted-foreground">Choose one answer</p></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${((index + 1) / session.totalItems) * 100}%` }} /></div>
         <Card className="mt-7 overflow-hidden"><div className="border-b border-ui-border bg-muted/40 px-6 py-5 text-center"><p className="text-caption font-medium uppercase tracking-[0.16em] text-muted-foreground">Target word</p><h2 id="quiz-question-heading" className="mt-4 text-[clamp(2rem,5vw,3.25rem)] font-semibold leading-tight text-foreground">{current.prompt}</h2>{current.translation && answered && <p className="mt-3 text-title font-medium text-primary">{current.translation}</p>}</div><div className="p-5 sm:p-7"><p className="text-title font-semibold text-foreground">Which meaning best matches this word?</p><div className="mt-5 grid gap-3">{current.options.map((option, optionIndex) => { const selected = selectedAnswer === option; const correct = answered && option === current.meaning; const incorrect = answered && selected && !current.isCorrect; return <button key={option} type="button" disabled={answered || saving} onClick={() => setSelectedAnswer(option)} className={`flex min-h-16 items-center gap-4 rounded-control border px-4 py-3 text-left transition-colors ${correct ? 'border-success bg-success-soft text-success' : incorrect ? 'border-danger bg-danger-soft text-danger' : selected ? 'border-primary bg-primary-soft ring-1 ring-primary/20' : 'border-ui-border bg-surface text-foreground hover:border-primary/45 hover:bg-primary-soft/40'}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-caption font-semibold ${correct ? 'bg-success text-white' : incorrect ? 'bg-danger text-white' : selected ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>{String.fromCharCode(65 + optionIndex)}</span><span className="flex-1 text-body font-medium">{option}</span>{correct && <Check size={19} />}{incorrect && <X size={19} />}</button>; })}</div>{answered && <div className={`mt-5 rounded-control border p-4 ${current.isCorrect ? 'border-success/25 bg-success-soft' : 'border-danger/20 bg-danger-soft'}`}><p className="font-semibold text-foreground">{current.isCorrect ? 'Correct — well done.' : 'Not quite — review the correct meaning.'}</p>{current.exampleSentence && <p className="mt-1 text-caption italic text-muted-foreground">“{current.exampleSentence}”</p>}</div>}</div></Card>
         <div className="mt-5 flex justify-end"><Button size="lg" className="min-w-40" disabled={saving || (!answered && !selectedAnswer)} onClick={() => answered ? next() : void submit()}>{answered ? 'Next question' : 'Check answer'}<ChevronRight size={18} /></Button></div>
       </section>}
@@ -518,7 +524,7 @@ function QuizWorkspace({ set, activityId, config, onBack }: { set: SetDetail; ac
   </div>;
 }
 
-function QuizCompleteScreen({ session, elapsedSeconds, retrying, onRetry, onBack }: { session: StudySession; elapsedSeconds: number; retrying: boolean; onRetry: () => void; onBack: () => void }) {
+function QuizCompleteScreen({ session, elapsedSeconds, retrying, onRetry }: { session: StudySession; elapsedSeconds: number; retrying: boolean; onRetry: () => void }) {
   const mistakes = useMemo(() => session.questions.filter(question => !question.isCorrect), [session.questions]);
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
@@ -527,7 +533,7 @@ function QuizCompleteScreen({ session, elapsedSeconds, retrying, onRetry, onBack
     <section className="text-center"><span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-soft text-success shadow-card"><Trophy size={30} /></span><h1 className="mt-5 text-display font-semibold text-foreground">Quiz complete</h1><p className="mt-2 text-title text-muted-foreground">{mistakes.length ? `${mistakes.length} ${mistakes.length === 1 ? 'word needs' : 'words need'} another review.` : 'Excellent work — every answer was correct.'}</p></section>
     <section aria-label="Quiz results" className="mt-8 grid gap-4 md:grid-cols-3"><Card className="relative overflow-hidden p-6"><Target size={70} className="absolute -right-3 -top-3 text-primary opacity-[0.08]" /><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Final score</p><p className="mt-4 text-display font-semibold text-primary">{session.correctCount}<span className="text-heading font-medium text-muted-foreground"> / {session.totalItems}</span></p><p className="mt-3 text-caption font-medium text-success">{session.score >= 80 ? 'Strong performance' : 'Keep building recall'}</p></Card><Card className="p-6"><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Accuracy</p><div className="mt-4 flex items-center gap-4"><div className="relative flex h-20 w-20 items-center justify-center rounded-full" style={{ background: `conic-gradient(var(--ui-primary) ${session.score}%, var(--ui-muted) 0)` }}><span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface text-title font-semibold">{session.score}%</span></div><p className="text-caption text-muted-foreground">{session.correctCount} correct<br />{mistakes.length} incorrect</p></div></Card><Card className="p-6"><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Total time</p><div className="mt-4 flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary"><Clock3 size={20} /></span><p className="text-heading font-semibold text-foreground">{minutes}m {String(seconds).padStart(2, '0')}s</p></div><p className="mt-4 text-caption text-muted-foreground">Completed {session.totalItems} questions</p></Card></section>
     <section id="quiz-mistakes" aria-labelledby="quiz-review-heading" className="mt-8"><Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border px-5 py-4 sm:px-6"><div><h2 id="quiz-review-heading" className="text-heading font-semibold text-foreground">Words to review</h2><p className="mt-1 text-caption text-muted-foreground">Review incorrect answers before your next attempt.</p></div><Badge tone={mistakes.length ? 'danger' : 'success'}>{mistakes.length} {mistakes.length === 1 ? 'mistake' : 'mistakes'}</Badge></div>{mistakes.length ? <div className="divide-y divide-ui-border">{mistakes.map(question => <div key={question.id} className="grid gap-4 p-5 sm:grid-cols-[0.65fr_1fr_1fr] sm:p-6"><div><p className="font-semibold text-foreground">{question.prompt}</p><p className="mt-1 text-caption font-medium text-primary">{question.translation}</p></div><div><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Your answer</p><p className="mt-2 text-body text-danger">{question.selectedMeaning}</p></div><div><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Correct meaning</p><p className="mt-2 text-body text-success">{question.meaning}</p></div></div>)}</div> : <div className="p-8 text-center"><Check size={24} className="mx-auto text-success" /><p className="mt-3 font-semibold text-foreground">Nothing to review</p><p className="mt-1 text-caption text-muted-foreground">You answered every question correctly.</p></div>}</Card></section>
-    <div className="mt-7 flex flex-wrap justify-end gap-3">{mistakes.length > 0 && <Button variant="outline" size="lg" onClick={() => document.getElementById('quiz-mistakes')?.scrollIntoView({ behavior: 'smooth' })}>Review mistakes</Button>}<Button variant="outline" size="lg" disabled={retrying} onClick={onRetry}><RotateCcw size={17} />{retrying ? 'Starting…' : 'Retry quiz'}</Button><Button size="lg" onClick={onBack}>Back to Vocabulary<ChevronRight size={17} /></Button></div>
+    <div className="mt-7 flex flex-wrap justify-end gap-3">{mistakes.length > 0 && <Button variant="outline" size="lg" onClick={() => document.getElementById('quiz-mistakes')?.scrollIntoView({ behavior: 'smooth' })}>Review mistakes</Button>}<Button variant="outline" size="lg" disabled={retrying} onClick={onRetry}><RotateCcw size={17} />{retrying ? 'Starting…' : 'Retry quiz'}</Button></div>
   </div></main></div>;
 }
 
@@ -566,7 +572,7 @@ function CollectionEditorScreen({ role, set, onBack, onSaved }: { role: UserRole
   };
   return <div className={ui.page}>
     <main className="min-h-0 flex-1 overflow-y-auto"><div className={`${ui.content} !max-w-[1040px]`}>
-      <div className="flex items-start gap-3"><BackButton label="Back to vocabulary" onClick={onBack} className="mt-1" /><PageHeader title={editing ? 'Edit vocabulary collection' : 'New vocabulary set'} description={editing ? 'Update collection details and vocabulary cards.' : 'Build a reusable collection for study and practice.'} actions={<SatCountdown />} /></div>
+      <PageHeader title={editing ? 'Edit vocabulary collection' : 'New vocabulary set'} description={editing ? 'Update collection details and vocabulary cards.' : 'Build a reusable collection for study and practice.'} actions={<SatCountdown />} />
 
       <Card className="mt-7 overflow-hidden">
         <div className="flex items-center gap-3 border-b border-ui-border bg-muted/50 px-5 py-4 sm:px-6"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-caption font-semibold text-white">1</span><div><h2 className="text-title font-semibold text-foreground">Collection details</h2><p className="mt-0.5 text-caption text-muted-foreground">Give this set a clear, recognizable name.</p></div></div>

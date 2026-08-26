@@ -7,6 +7,7 @@ import {
   BookOpenCheck,
   GraduationCap,
   LayoutDashboard,
+  ArrowLeft,
   LogOut,
   Moon,
   Search,
@@ -42,6 +43,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { DashboardRouteViewport } from '../../features/navigation/DashboardRouteViewport';
+import { DashboardBackProvider, useDashboardBackAction } from '../../features/navigation/DashboardBackContext';
 import NotificationBell from '../../features/notifications/NotificationBell';
 import { logoutAuthSession } from '../../lib/authSession';
 
@@ -84,8 +86,8 @@ function NavigationItem({ to, label, icon: Icon, exact = false, activePrefixes =
 function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <SidebarMenu>
+      <SidebarHeader className="flex-row items-center gap-1">
+        <SidebarMenu className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip="SAT Master">
               <NavLink to="/dashboard">
@@ -100,6 +102,7 @@ function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <SidebarTrigger className="ml-auto shrink-0" />
       </SidebarHeader>
 
       <SidebarContent>
@@ -115,6 +118,28 @@ function AppSidebar() {
 
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+function DashboardHeaderNavigation() {
+  const backAction = useDashboardBackAction();
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <SidebarTrigger className="-ml-1 md:hidden" />
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={!backAction}
+        onClick={() => backAction?.()}
+        className={backAction ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground'}
+        aria-label={backAction ? 'Back' : 'Back is unavailable on this page'}
+      >
+        <ArrowLeft aria-hidden="true" />
+        <span className="hidden sm:inline">Back</span>
+      </Button>
+      <Separator orientation="vertical" className="mx-1 h-4" />
+      <DashboardSearch />
+    </div>
   );
 }
 
@@ -238,25 +263,23 @@ export default function Dashboard() {
       <a href="#dashboard-content" className="fixed left-3 top-3 z-300 -translate-y-20 rounded-lg bg-popover px-3 py-2 text-sm font-medium text-popover-foreground shadow-md focus:translate-y-0">
         Skip to content
       </a>
-      <AppSidebar />
-      <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
-        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b bg-background/80 px-4 backdrop-blur-sm">
-          <div className="flex min-w-0 items-center gap-2">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mx-1 h-4" />
-            <DashboardSearch />
-          </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <NotificationBell currentUserId={userId} />
-            <HeaderAccountMenu onLogout={() => void logout()} />
-          </div>
-        </header>
+      <DashboardBackProvider>
+        <AppSidebar />
+        <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
+          <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b bg-background/80 px-4 backdrop-blur-sm">
+            <DashboardHeaderNavigation />
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <NotificationBell currentUserId={userId} />
+              <HeaderAccountMenu onLogout={() => void logout()} />
+            </div>
+          </header>
 
-        <div id="dashboard-content" tabIndex={-1} className="dashboard-surface relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted/30 outline-hidden">
-          <DashboardRouteViewport />
-        </div>
-      </SidebarInset>
+          <div id="dashboard-content" tabIndex={-1} className="dashboard-surface relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted/30 outline-hidden">
+            <DashboardRouteViewport />
+          </div>
+        </SidebarInset>
+      </DashboardBackProvider>
     </SidebarProvider>
   );
 }

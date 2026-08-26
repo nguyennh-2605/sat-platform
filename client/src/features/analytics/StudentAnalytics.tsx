@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, BarChart3, CheckCircle2, Clock3, Eye, FileText, Target, Trophy, Users } from 'lucide-react';
 import axiosClient from '../../lib/axios';
-import { BackButton, Badge, Button, Card, EmptyState, Modal, Select, TableShell } from '../../components/ui/AppUI';
+import { Badge, Button, Card, EmptyState, Modal, Select, TableShell } from '../../components/ui/AppUI';
+import { useDashboardBack } from '../navigation/DashboardBackContext';
 import { capitalizeFirstLetter } from '../../utils/text';
 
 interface DeliveryListItem {
@@ -70,7 +71,8 @@ export default function StudentAnalytics({ classId, initialDeliveryId }: { class
     next.delete('deliveryId');
     setSearchParams(next, { replace: true });
   };
-  if (selectedDeliveryId) return <PerformanceDashboard report={report} loading={loading} onBack={closeReport} />;
+  useDashboardBack(closeReport, Boolean(selectedDeliveryId), 10);
+  if (selectedDeliveryId) return <PerformanceDashboard report={report} loading={loading} />;
   return <div className="space-y-5 animate-fade-in-up">
     <div><h2 className="text-lg font-semibold text-foreground">Test Performance</h2><p className="mt-1 text-xs text-muted-foreground">Select an assigned test to review submissions and question-level performance.</p></div>
     {loading ? <EmptyState title="Loading assigned tests…" compact /> : deliveries.length === 0 ? <EmptyState title="No assigned tests" description="Tests assigned to this class will appear here." /> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{deliveries.map(delivery => <Card key={delivery.id} className="group cursor-pointer p-5 transition hover:bg-muted/30 hover:shadow-md" onClick={() => openReport(delivery.id)}>
@@ -81,9 +83,9 @@ export default function StudentAnalytics({ classId, initialDeliveryId }: { class
   </div>;
 }
 
-function PerformanceDashboard({ report, loading, onBack }: { report: PerformanceReport | null; loading: boolean; onBack: () => void }) {
+function PerformanceDashboard({ report, loading }: { report: PerformanceReport | null; loading: boolean }) {
   const [selectedStudent, setSelectedStudent] = useState<StudentRow | null>(null);
-  if (loading || !report) return <div className="space-y-5"><PageHeading title="Test Performance" subtitle="Loading report…" onBack={onBack} /><EmptyState title="Loading performance data…" compact /></div>;
+  if (loading || !report) return <div className="space-y-5"><PageHeading title="Test Performance" subtitle="Loading report…" /><EmptyState title="Loading performance data…" compact /></div>;
   const kpis = [
     { label: 'AVERAGE SCORE', value: correctScore(report.kpis.averageCorrect, report.delivery.test.questionCount), detail: `Median ${score(report.kpis.medianScore)}`, icon: Target },
     { label: 'HIGHEST SCORE', value: correctScore(report.kpis.highestCorrect, report.delivery.test.questionCount), detail: 'Top result', icon: Trophy },
@@ -93,7 +95,7 @@ function PerformanceDashboard({ report, loading, onBack }: { report: Performance
     { label: 'AVERAGE TIME', value: report.delivery.test.mode === 'EXAM' ? formatDuration(report.kpis.averageTimeMs) : 'N/A', detail: report.delivery.test.mode === 'EXAM' ? 'Active test duration' : 'Test mode only', icon: Clock3 },
   ];
   return <div className="space-y-6">
-    <PageHeading title={capitalizeFirstLetter(report.delivery.title)} subtitle={`${capitalizeFirstLetter(report.delivery.test.title)} · ${report.delivery.test.mode === 'EXAM' ? 'Test mode' : 'Practice mode'} · ${report.delivery.test.questionCount} questions`} onBack={onBack} />
+    <PageHeading title={capitalizeFirstLetter(report.delivery.title)} subtitle={`${capitalizeFirstLetter(report.delivery.test.title)} · ${report.delivery.test.mode === 'EXAM' ? 'Test mode' : 'Practice mode'} · ${report.delivery.test.questionCount} questions`} />
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{kpis.map(({ label, value, detail, icon: Icon }) => <Card key={label} className="min-h-[116px] p-4"><div className="flex items-start justify-between"><span className="text-[10px] font-semibold tracking-[0.08em] text-muted-foreground">{label}</span><Icon size={15} className="text-primary" /></div><p className="mt-4 text-2xl font-semibold text-foreground">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{detail}</p></Card>)}</div>
     <div className="grid items-start gap-6 xl:grid-cols-12"><div className="space-y-6 xl:col-span-8"><QuestionBreakdown questions={report.questions} showTiming={report.delivery.test.mode === 'EXAM'} /><StudentRankings students={report.students} totalQuestions={report.delivery.test.questionCount} showTiming={report.delivery.test.mode === 'EXAM'} onView={setSelectedStudent} /></div><div className="space-y-6 xl:col-span-4"><HardestQuestions questions={report.hardestQuestions} /><ScoreDistribution items={report.scoreDistribution} /></div></div>
     {selectedStudent && <StudentDetailModal deliveryId={report.delivery.id} student={selectedStudent} onClose={() => setSelectedStudent(null)} />}
@@ -203,7 +205,7 @@ function StudentDetailModal({ deliveryId, student, onClose }: { deliveryId: stri
     </Modal>
   );
 }
-function PageHeading({ title, subtitle, onBack }: { title: string; subtitle: string; onBack: () => void }) { return <div className="flex items-center gap-3"><BackButton onClick={onBack} /><div><h2 className="text-lg font-semibold">{title}</h2><p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p></div></div>; }
+function PageHeading({ title, subtitle }: { title: string; subtitle: string }) { return <div><h2 className="text-lg font-semibold">{title}</h2><p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p></div>; }
 function Metric({ value, label, bordered = false }: { value: string; label: string; bordered?: boolean }) { return <div className={bordered ? 'border-x border-ui-border' : ''}><p className="text-base font-semibold text-foreground">{value}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{label}</p></div>; }
 function Legend({ color, label }: { color: string; label: string }) { return <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-xs" style={{ backgroundColor: color }} />{label}</span>; }
 function score(value: number | null | undefined) { return Number.isFinite(value) ? `${value}%` : '—'; }

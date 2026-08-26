@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,11 +11,9 @@ import {
   CircleAlert,
   CircleHelp,
   Eye,
-  FileText,
   ImagePlus,
   LoaderCircle,
   Save,
-  ShieldCheck,
   UploadCloud,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -21,64 +21,17 @@ import katex from 'katex';
 import axiosClient from '../../lib/axios';
 import BlockRenderer from '../../components/content/BlockRenderer';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
-import { Badge, Button, Card, Input, Modal, PageHeader, Select } from '../../components/ui/AppUI';
-import { DateTimePicker } from '../../components/ui/DateTimePicker';
+import { Badge, Card, Input, Modal } from '../../components/ui/AppUI';
+import { Button } from '../../components/ui/button';
 import { Textarea } from '../../components/ui/textarea';
+import { Field, FieldLabel } from '../../components/ui/field';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { ui } from '../../components/ui/styles';
-import type { ContentBlock } from '../../types/quiz';
-
-type Subject = 'RW' | 'MATH';
-type TestMode = 'PRACTICE' | 'EXAM';
-type TestStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-type Step = 'SETUP' | 'IMPORT' | 'REVIEW';
-type IssueSeverity = 'error' | 'warning';
-
-interface TaxonomySkill { code: string; name: string; sortOrder: number }
-interface TaxonomyDomain { code: string; name: string; subject: Subject; sortOrder: number; skills: TaxonomySkill[] }
-interface ImportIssue { severity: IssueSeverity; code: string; message: string }
-interface ImportChoice { id: string; text: string }
-interface ImportQuestion {
-  clientId: string;
-  module: number;
-  order: number;
-  type: 'MCQ' | 'SPR';
-  blocks: ContentBlock[];
-  questionText: string;
-  choices: ImportChoice[];
-  correctAnswer: string;
-  explanation?: string;
-  domainCode: string;
-  skillCode: string;
-  issues: ImportIssue[];
-}
-interface ImportModule { order: number; name: string; questions: ImportQuestion[] }
-interface ImportPreview {
-  fileName?: string;
-  modules: ImportModule[];
-  summary: { questionCount: number; classifiedCount: number; errorCount: number; warningCount: number };
-  issues: ImportIssue[];
-}
-interface ExtractedDocument { fileName: string; text: string }
-interface EditTestPayload {
-  id: number;
-  title: string;
-  duration: number;
-  subject: Subject;
-  mode: TestMode;
-  category: string;
-  status: TestStatus;
-  testDate?: string | null;
-  folderId?: number | null;
-  moduleCount: number;
-  hasAttempts: boolean;
-  structuredText: string;
-}
-
-const steps: Array<{ key: Step; label: string }> = [
-  { key: 'SETUP', label: 'Setup' },
-  { key: 'IMPORT', label: 'Import' },
-  { key: 'REVIEW', label: 'Review' },
-];
+import { useDashboardBack } from '../navigation/DashboardBackContext';
+import { createTestDetailsSchema } from './create-test.schema';
+import type { EditTestPayload, ExtractedDocument, ImportIssue, ImportPreview, ImportQuestion, IssueSeverity, Subject, TaxonomyDomain, TestDetailsValues, TestStatus } from './create-test.types';
+import { TestDetailsStep } from './TestDetailsStep';
 
 const emptyPreview = (): ImportPreview => ({
   modules: [],
@@ -224,16 +177,26 @@ const CreateTestWizard = () => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const loadedEditIdRef = useRef<number | null>(null);
-  const [step, setStep] = useState<Step>(editTestId ? 'IMPORT' : 'SETUP');
-  const [form, setForm] = useState({
+  const userRole = localStorage.getItem('userRole') || 'TEACHER';
+  const isAdmin = userRole === 'ADMIN';
+  const detailsForm = useForm<TestDetailsValues>({
+    resolver: zodResolver(createTestDetailsSchema(isAdmin)),
+    mode: 'onBlur',
+    defaultValues: {
     title: '',
-    subject: 'RW' as Subject,
+    subject: 'RW',
     duration: 64,
     moduleCount: 2,
-    mode: 'PRACTICE' as TestMode,
+    mode: 'PRACTICE',
     category: 'PRACTICE',
     testDate: '',
+    },
   });
+  const details = useWatch({ control: detailsForm.control });
+  const subject = details.subject ?? 'RW';
+  const moduleCount = details.moduleCount ?? 2;
+  const [stage, setStage] = useState<'BUILD' | 'REVIEW'>('BUILD');
+  const [buildTab, setBuildTab] = useState<'DETAILS' | 'IMPORT'>(editTestId ? 'IMPORT' : 'DETAILS');
   const [taxonomy, setTaxonomy] = useState<TaxonomyDomain[]>([]);
   const [preview, setPreview] = useState<ImportPreview>(emptyPreview);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
@@ -247,14 +210,17 @@ const CreateTestWizard = () => {
   const [editLocked, setEditLocked] = useState(false);
   const [testStatus, setTestStatus] = useState<TestStatus>('DRAFT');
   const [importError, setImportError] = useState('');
-  const userRole = localStorage.getItem('userRole') || 'TEACHER';
+  const [mobileReviewPane, setMobileReviewPane] = useState<'PREVIEW' | 'EDIT'>('PREVIEW');
+  const [contentDirty, setContentDirty] = useState(false);
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
+  const allowNavigationRef = useRef(false);
   const folderIdParam = searchParams.get('folderId');
   const folderId = folderIdParam ? Number(folderIdParam) : undefined;
 
   useEffect(() => {
     const loadTaxonomy = async () => {
       try {
-        const response = await axiosClient.get<TaxonomyDomain[], TaxonomyDomain[]>(`/api/tests/taxonomy?subject=${form.subject}`);
+        const response = await axiosClient.get<TaxonomyDomain[], TaxonomyDomain[]>(`/api/tests/taxonomy?subject=${subject}`);
         setTaxonomy(response);
       } catch (error) {
         console.error(error);
@@ -262,25 +228,26 @@ const CreateTestWizard = () => {
       }
     };
     void loadTaxonomy();
-  }, [form.subject]);
+  }, [subject]);
 
   useEffect(() => {
-    if (taxonomy.length > 0) setPreview(current => current.modules.length ? reviewPreview(current, taxonomy, form.subject) : current);
-  }, [form.subject, taxonomy]);
+    if (taxonomy.length > 0) setPreview(current => current.modules.length ? reviewPreview(current, taxonomy, subject) : current);
+  }, [subject, taxonomy]);
 
   const questions = useMemo(() => preview.modules.flatMap(module => module.questions), [preview]);
   const selectedQuestion = questions.find(question => question.clientId === selectedQuestionId) || questions[0] || null;
   const selectedDomain = taxonomy.find(domain => domain.code === selectedQuestion?.domainCode);
   const blockingErrors = preview.summary.errorCount > 0 || preview.summary.questionCount === 0;
-  const activeImportTemplate = form.subject === 'MATH' ? mathImportTemplate : importTemplate;
+  const activeImportTemplate = subject === 'MATH' ? mathImportTemplate : importTemplate;
 
   useEffect(() => {
     if (selectedQuestion && selectedQuestion.clientId !== selectedQuestionId) setSelectedQuestionId(selectedQuestion.clientId);
   }, [selectedQuestion, selectedQuestionId]);
 
   const applyPreview = (nextPreview: ImportPreview) => {
-    const reviewed = reviewPreview(nextPreview, taxonomy, form.subject);
+    const reviewed = reviewPreview(nextPreview, taxonomy, subject);
     setPreview(reviewed);
+    setContentDirty(true);
     const firstQuestion = reviewed.modules[0]?.questions[0];
     if (firstQuestion) setSelectedQuestionId(firstQuestion.clientId);
   };
@@ -292,13 +259,8 @@ const CreateTestWizard = () => {
         ...module,
         questions: module.questions.map(question => question.clientId === clientId ? updater(question) : question),
       })),
-    }, taxonomy, form.subject));
-  };
-
-  const handleSetupNext = () => {
-    if (!form.title.trim()) return toast.error('Enter a test name');
-    if (!Number.isFinite(form.duration) || form.duration < 1) return toast.error('Enter a valid duration');
-    setStep('IMPORT');
+    }, taxonomy, subject));
+    setContentDirty(true);
   };
 
   const previewText = async (text = rawText) => {
@@ -308,8 +270,8 @@ const CreateTestWizard = () => {
     try {
       const response = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview-text', {
         text,
-        subject: form.subject,
-        moduleCount: form.moduleCount,
+        subject,
+        moduleCount,
       });
       applyPreview(response);
       toast.success('Preview updated');
@@ -329,7 +291,7 @@ const CreateTestWizard = () => {
       setIsLoadingEdit(true);
       try {
         const detail = await axiosClient.get<EditTestPayload, EditTestPayload>(`/api/tests/${editTestId}/edit`);
-        setForm({
+        detailsForm.reset({
           title: detail.title,
           subject: detail.subject,
           duration: detail.duration,
@@ -349,7 +311,9 @@ const CreateTestWizard = () => {
         });
         setPreview(parsed);
         setSelectedQuestionId(parsed.modules[0]?.questions[0]?.clientId || '');
-        setStep('IMPORT');
+        setContentDirty(false);
+        setBuildTab('IMPORT');
+        setStage('BUILD');
       } catch (error: unknown) {
         toast.error(requestErrorMessage(error, 'Unable to load this test for editing'));
         navigate('/dashboard/practice-test');
@@ -358,7 +322,7 @@ const CreateTestWizard = () => {
       }
     };
     void loadExam();
-  }, [editTestId, navigate]);
+  }, [detailsForm, editTestId, navigate]);
 
   const parseFile = async (file: File) => {
     setIsParsing(true);
@@ -368,11 +332,12 @@ const CreateTestWizard = () => {
       body.append('file', file);
       const extracted = await axiosClient.post<ExtractedDocument, ExtractedDocument>('/api/test-imports/extract', body, { headers: { 'Content-Type': 'multipart/form-data' } });
       setRawText(extracted.text);
-      if (!form.title.trim()) setForm(current => ({ ...current, title: fileTitle(extracted.fileName) }));
+      setContentDirty(true);
+      if (!detailsForm.getValues('title').trim()) detailsForm.setValue('title', fileTitle(extracted.fileName), { shouldDirty: true });
       const response = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview-text', {
         text: extracted.text,
-        subject: form.subject,
-        moduleCount: form.moduleCount,
+        subject,
+        moduleCount,
       });
       applyPreview({ ...response, fileName: extracted.fileName });
       toast.success('Document loaded into the editor');
@@ -394,6 +359,7 @@ const CreateTestWizard = () => {
     const separator = start > 0 && rawText[start - 1] !== '\n' ? '\n\n' : '';
     const insertion = `${separator}[IMG]\n${text}\n`;
     setRawText(current => `${current.slice(0, start)}${insertion}${current.slice(end)}`);
+    setContentDirty(true);
     requestAnimationFrame(() => {
       editor?.focus();
       const cursor = start + insertion.length;
@@ -431,15 +397,16 @@ const CreateTestWizard = () => {
     if (blockingErrors) return toast.error('Resolve all errors before saving the test');
     setIsSaving(true);
     try {
-      const moduleDuration = Math.max(1, Math.floor(form.duration / Math.max(1, preview.modules.length)));
+      const values = detailsForm.getValues();
+      const moduleDuration = Math.max(1, Math.floor(values.duration / Math.max(1, preview.modules.length)));
       const payload = {
-        title: form.title.trim(),
-        subject: form.subject,
-        duration: Number(form.duration),
-        mode: form.mode,
+        title: values.title.trim(),
+        subject: values.subject,
+        duration: Number(values.duration),
+        mode: values.mode,
         status: nextStatus,
-        category: userRole === 'ADMIN' ? form.category : 'CLASS',
-        testDate: userRole === 'ADMIN' && form.category === 'REAL' ? form.testDate || undefined : undefined,
+        category: isAdmin ? values.category : 'CLASS',
+        testDate: isAdmin && values.category === 'REAL' ? values.testDate || undefined : undefined,
         folderId: folderId ?? editFolderId ?? undefined,
         sections: preview.modules.map(module => ({
           name: module.name,
@@ -460,6 +427,9 @@ const CreateTestWizard = () => {
       if (editTestId) await axiosClient.put(`/api/tests/${editTestId}`, payload);
       else await axiosClient.post('/api/tests/create', payload);
       setTestStatus(nextStatus);
+      allowNavigationRef.current = true;
+      setContentDirty(false);
+      detailsForm.reset(values);
       toast.success(nextStatus === 'PUBLISHED' ? 'Test published. It is now available in Classroom.' : editTestId ? 'Draft changes saved' : 'Draft test created');
       navigate('/dashboard/practice-test');
     } catch (error: unknown) {
@@ -476,102 +446,133 @@ const CreateTestWizard = () => {
     if (next) setSelectedQuestionId(next.clientId);
   };
 
+  const hasUnsavedChanges = detailsForm.formState.isDirty || contentDirty;
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges || allowNavigationRef.current) return;
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const leaveWizard = () => {
+    if (hasUnsavedChanges && !allowNavigationRef.current) setConfirmLeaveOpen(true);
+    else navigate('/dashboard/practice-test');
+  };
+
+  const confirmLeave = () => {
+    allowNavigationRef.current = true;
+    setConfirmLeaveOpen(false);
+    navigate('/dashboard/practice-test');
+  };
+
+  useDashboardBack(leaveWizard);
+
+  const continueToReview = detailsForm.handleSubmit(() => {
+    if (preview.summary.questionCount === 0) {
+      setBuildTab('IMPORT');
+      toast.error('Import questions and update the preview before continuing');
+      return;
+    }
+    setStage('REVIEW');
+  });
+
   return (
     <div className={ui.page}>
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className={`${ui.content} flex min-h-full flex-col gap-6`}>
-          <PageHeader
-            title={editTestId ? 'Edit Test' : 'Create Test'}
-            description={editTestId ? 'Update the structured content and review your changes.' : 'Import, review, and organize SAT questions.'}
-            actions={step === 'IMPORT'
-              ? <Button variant="outline" size="sm" onClick={() => setGuideOpen(true)}><CircleHelp size={15} />Formatting guide</Button>
-              : step === 'REVIEW'
-                ? <div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('DRAFT')}><Save size={15} />{isSaving ? 'Saving…' : 'Save draft'}</Button><Button size="sm" disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('PUBLISHED')}><CheckCircle2 size={15} />Publish test</Button></div>
-                : undefined}
-          />
-          <WizardStepper step={step} />
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 flex-col gap-1">
+              <h1 className="text-3xl font-medium leading-none tracking-tight text-foreground">{editTestId ? 'Edit Test' : 'Create New Test'}</h1>
+              <p className="text-sm text-muted-foreground">{stage === 'BUILD' ? 'Add test details, import questions, and review the live preview.' : 'Resolve validation issues before saving or publishing this test.'}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {stage === 'BUILD' ? (
+                <Button disabled={isLoadingEdit || isParsing} onClick={() => void continueToReview()}>Continue to review <ArrowRight data-icon="inline-end" /></Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => { setStage('BUILD'); setBuildTab('IMPORT'); }}><ArrowLeft data-icon="inline-start" />Replace import</Button>
+                  <Button variant="outline" disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('DRAFT')}><Save data-icon="inline-start" />{isSaving ? 'Saving…' : testStatus === 'DRAFT' ? 'Save draft' : 'Move to draft'}</Button>
+                  <Button disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('PUBLISHED')}><CheckCircle2 data-icon="inline-start" />Publish test</Button>
+                </>
+              )}
+            </div>
+          </div>
           {isLoadingEdit && <Card className="flex min-h-[360px] items-center justify-center gap-3 p-8 text-sm text-muted-foreground"><LoaderCircle size={20} className="animate-spin text-primary" />Loading test content…</Card>}
-          {!isLoadingEdit && step === 'SETUP' && (
-            <Card className="wizard-step-enter mx-auto w-full max-w-3xl p-6 lg:p-8">
-              <div className="mb-6"><h2 className="text-lg font-semibold text-foreground">Test details</h2><p className="mt-1 text-sm text-muted-foreground">Set up the test before importing its questions.</p></div>
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Field label="Test name" className="md:col-span-2"><Input className="w-full" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder="e.g. SAT Reading Practice Test 1" autoFocus /></Field>
-                <Field label="Subject"><Select className="w-full" value={form.subject} onChange={event => setForm(current => ({ ...current, subject: event.target.value as Subject }))}><option value="RW">Reading & Writing</option><option value="MATH">Math</option></Select></Field>
-                <Field label="Duration (minutes)"><Input className="w-full" type="number" min={1} value={form.duration} onChange={event => setForm(current => ({ ...current, duration: Number(event.target.value) }))} /></Field>
-                <Field label="Modules"><Select className="w-full" value={form.moduleCount} onChange={event => setForm(current => ({ ...current, moduleCount: Number(event.target.value) }))}><option value={1}>1 module</option><option value={2}>2 modules</option></Select></Field>
-                <Field label="Test mode"><div className="grid grid-cols-2 gap-2"><ModeButton active={form.mode === 'PRACTICE'} icon={<FileText size={16} />} title="Practice" text="Flexible practice" onClick={() => setForm(current => ({ ...current, mode: 'PRACTICE' }))} /><ModeButton active={form.mode === 'EXAM'} icon={<ShieldCheck size={16} />} title="Secure exam" text="Timed exam rules" onClick={() => setForm(current => ({ ...current, mode: 'EXAM' }))} /></div></Field>
-                {userRole === 'ADMIN' && <Field label="Publication" className="md:col-span-2"><div className="flex flex-wrap items-center gap-3"><Select value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value, testDate: event.target.value === 'REAL' ? current.testDate : '' }))}><option value="PRACTICE">Practice</option><option value="REAL">Official</option></Select>{form.category === 'REAL' && <DateTimePicker mode="date" value={form.testDate} onChange={testDate => setForm(current => ({ ...current, testDate }))} placeholder="Choose official test date" ariaLabel="Official test date" className="min-w-56" />}</div></Field>}
-              </div>
-              <div className="mt-8 flex justify-end"><Button onClick={handleSetupNext}>Continue <ArrowRight size={16} /></Button></div>
-            </Card>
-          )}
-
-          {!isLoadingEdit && step === 'IMPORT' && (
+          {!isLoadingEdit && stage === 'BUILD' && (
             <div className="wizard-step-enter flex min-h-0 flex-1 flex-col gap-4">
               {editLocked && <ImportNotice tone="warning" message="This test is read-only because a student has already started it. Duplicate it from Test Library to make structural changes." />}
-              <Card className="flex min-h-[620px] flex-1 flex-col overflow-hidden">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border px-4 py-3">
-                  <div><h2 className="text-sm font-semibold text-foreground">Import workspace</h2><p className="mt-0.5 text-xs text-muted-foreground">Edit structured text and check the parsed result side by side.</p></div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void parseFile(file); }} />
-                    <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadImage(file); }} />
-                    <Button variant="outline" size="sm" disabled={isParsing || editLocked} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoaderCircle size={15} className="animate-spin" /> : <UploadCloud size={15} />}Upload file</Button>
-                    <Button variant="outline" size="sm" disabled={isUploadingImage || editLocked} onClick={() => imageInputRef.current?.click()}>{isUploadingImage ? <LoaderCircle size={15} className="animate-spin" /> : <ImagePlus size={15} />}Upload image</Button>
-                    <Button size="sm" disabled={isParsing || !rawText.trim() || editLocked} onClick={() => void previewText()}>{isParsing ? <LoaderCircle size={15} className="animate-spin" /> : <Eye size={15} />}Update preview</Button>
+              <form className="grid min-h-0 gap-5 xl:grid-cols-2" noValidate onSubmit={event => event.preventDefault()}>
+                <div className="flex min-h-[620px] min-w-0 flex-col gap-4 rounded-xl border border-border bg-card p-4">
+                  <Tabs value={buildTab} onValueChange={value => setBuildTab(value as 'DETAILS' | 'IMPORT')} className="min-h-0 flex-1">
+                    <TabsList className="w-full">
+                      <TabsTrigger value="DETAILS">Details</TabsTrigger>
+                      <TabsTrigger value="IMPORT">Import questions</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="DETAILS" className="min-h-0 flex-1 pt-2">
+                      <TestDetailsStep form={detailsForm} isAdmin={isAdmin} />
+                    </TabsContent>
+                    <TabsContent value="IMPORT" className="min-h-0 flex-1 pt-2">
+                      <div className="flex h-full min-h-[520px] flex-col gap-4">
+                        <div className="flex items-center justify-between border-b border-border pb-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">Structured text</span><span>{rawText.length.toLocaleString()} characters</span></div>
+                        {/* The structured editor needs direct cursor-selection APIs so image blocks can be inserted at the caret. */}
+                        <textarea aria-label="Structured test content" ref={editorRef} value={rawText} onChange={event => { setRawText(event.target.value); setContentDirty(true); }} readOnly={editLocked} spellCheck={false} className="min-h-80 flex-1 resize-none rounded-lg border border-input bg-transparent p-3 font-mono text-xs leading-6 text-foreground outline-none placeholder:text-muted-foreground read-only:cursor-not-allowed read-only:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" placeholder={activeImportTemplate} />
+                        {importError && <ImportNotice tone="error" message={importError} />}
+                        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
+                          {/* Native file inputs are required because the shared text Input does not expose the browser file-picker contract. */}
+                          <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void parseFile(file); }} />
+                          <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadImage(file); }} />
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setGuideOpen(true)}><CircleHelp data-icon="inline-start" />Formatting guide</Button>
+                          <Button type="button" variant="outline" size="sm" disabled={isParsing || editLocked} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <UploadCloud data-icon="inline-start" />}Upload file</Button>
+                          <Button type="button" variant="outline" size="sm" disabled={isUploadingImage || editLocked} onClick={() => imageInputRef.current?.click()}>{isUploadingImage ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <ImagePlus data-icon="inline-start" />}Upload image</Button>
+                          <Button type="button" size="sm" disabled={isParsing || !rawText.trim() || editLocked} onClick={() => void previewText()}>{isParsing ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Eye data-icon="inline-start" />}Update preview</Button>
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+
+                <section className="flex min-h-[620px] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+                  <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+                    <div><h2 className="text-sm font-medium text-foreground">Test preview</h2><p className="mt-0.5 text-xs text-muted-foreground">Live output from the imported content.</p></div>
+                    {selectedQuestion && <div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveQuestion(-1)} disabled={selectedIndex <= 0} aria-label="Previous question"><ChevronLeft size={15} /></Button><span className="min-w-16 text-center text-xs font-medium text-muted-foreground">{selectedIndex + 1} / {questions.length}</span><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveQuestion(1)} disabled={selectedIndex >= questions.length - 1} aria-label="Next question"><ChevronRight size={15} /></Button></div>}
                   </div>
-                </div>
-
-                <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
-                  <section className="flex min-h-[520px] min-w-0 flex-col border-b border-ui-border lg:border-b-0 lg:border-r">
-                    <div className="flex h-11 shrink-0 items-center justify-between border-b border-ui-border bg-muted px-4"><span className="text-xs font-semibold uppercase tracking-[0.08em] text-foreground">Structured text</span><span className="text-[11px] text-muted-foreground">{rawText.length.toLocaleString()} characters</span></div>
-                    <textarea ref={editorRef} value={rawText} onChange={event => setRawText(event.target.value)} readOnly={editLocked} spellCheck={false} className="min-h-0 flex-1 resize-none bg-surface p-4 font-mono text-xs leading-6 text-foreground outline-hidden placeholder:text-muted-foreground read-only:cursor-not-allowed read-only:bg-muted focus:bg-background" placeholder={activeImportTemplate} />
-                  </section>
-
-                  <section className="flex min-h-[520px] min-w-0 flex-col bg-muted/30">
-                    <div className="flex h-11 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ui-border bg-muted px-4">
-                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground"><span className="font-semibold uppercase tracking-[0.08em] text-foreground">Preview</span>{preview.summary.questionCount > 0 && <><span>{preview.summary.questionCount} questions</span><span className={preview.summary.errorCount ? 'font-semibold text-danger' : 'text-success'}>{preview.summary.errorCount} errors</span></>}</div>
-                      {selectedQuestion && <div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveQuestion(-1)} disabled={selectedIndex <= 0} aria-label="Previous question"><ChevronLeft size={15} /></Button><span className="min-w-16 text-center text-[11px] font-medium text-muted-foreground">{selectedIndex + 1} / {questions.length}</span><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveQuestion(1)} disabled={selectedIndex >= questions.length - 1} aria-label="Next question"><ChevronRight size={15} /></Button></div>}
-                    </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto p-5">
-                      {selectedQuestion ? <QuestionPreview question={selectedQuestion} subject={form.subject} /> : <div className="flex h-full min-h-72 flex-col items-center justify-center text-center"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-soft text-primary"><Eye size={19} /></span><p className="mt-3 text-sm font-medium text-foreground">No preview yet</p><p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Enter structured text or upload a document, then select Update preview.</p></div>}
-                    </div>
-                  </section>
-                </div>
-              </Card>
-              {importError && <ImportNotice tone="error" message={importError} />}
-              <div className="flex items-center justify-between"><Button variant="ghost" onClick={() => setStep('SETUP')}><ArrowLeft size={16} />Back</Button><Button disabled={preview.summary.questionCount === 0} onClick={() => setStep('REVIEW')}>Continue to review<ArrowRight size={16} /></Button></div>
+                  {preview.summary.questionCount > 0 && <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-border bg-muted/50 px-4 py-2 text-xs text-muted-foreground"><span>{preview.summary.questionCount} questions</span><span>{preview.summary.classifiedCount} classified</span><span className={preview.summary.errorCount ? 'font-medium text-destructive' : 'text-success'}>{preview.summary.errorCount} errors</span></div>}
+                  <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                    {selectedQuestion ? <QuestionPreview question={selectedQuestion} subject={subject} /> : <div className="flex h-full min-h-80 flex-col items-center justify-center text-center"><span className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Eye size={19} /></span><p className="mt-3 text-sm font-medium text-foreground">No preview yet</p><p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">Open Import questions, add structured content, then select Update preview.</p></div>}
+                  </div>
+                </section>
+              </form>
             </div>
           )}
 
-          {!isLoadingEdit && step === 'REVIEW' && (
+          {!isLoadingEdit && stage === 'REVIEW' && (
             <div className="wizard-step-enter flex min-h-0 flex-1 flex-col gap-4">
               <Card className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3 text-xs text-muted-foreground"><span className="font-medium text-foreground">{preview.fileName || 'Pasted content'}</span><span>{preview.summary.questionCount} questions</span><span>{preview.summary.classifiedCount} classified</span><span className={preview.summary.errorCount ? 'font-semibold text-danger' : 'text-success'}>{preview.summary.errorCount} errors</span><span className={preview.summary.warningCount ? 'font-medium text-warning' : ''}>{preview.summary.warningCount} warnings</span></Card>
               {preview.issues.map((item, index) => <ImportNotice key={`${item.code}-${index}`} tone={item.severity} message={item.message} />)}
-              <div className="grid min-h-[620px] grid-cols-1 overflow-hidden rounded-card border border-ui-border bg-surface lg:grid-cols-[220px_minmax(0,1fr)_280px]">
-                <aside className="border-b border-ui-border bg-muted/30 p-3 lg:border-b-0 lg:border-r"><p className="mb-3 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Questions</p><div className="flex max-h-44 gap-1 overflow-x-auto lg:max-h-none lg:flex-col lg:overflow-y-auto">{preview.modules.map(module => <div key={module.order}><p className="mb-1 mt-2 px-2 text-[10px] font-medium text-muted-foreground">{module.name}</p>{module.questions.map(question => <button key={question.clientId} onClick={() => setSelectedQuestionId(question.clientId)} className={`flex w-full items-center gap-2 rounded-control px-2.5 py-2 text-left text-xs transition-colors ${selectedQuestion?.clientId === question.clientId ? 'bg-primary-soft font-medium text-primary' : 'text-muted-foreground hover:bg-muted'}`}><StatusIcon issues={question.issues} /><span className="whitespace-nowrap">Q{question.order}</span><span className="hidden truncate lg:block">{question.domainCode ? 'Classified' : 'Needs review'}</span></button>)}</div>)}</div></aside>
-                <section className="min-w-0 border-b border-ui-border p-5 lg:border-b-0 lg:border-r lg:p-6">{selectedQuestion ? <QuestionPreview question={selectedQuestion} subject={form.subject} /> : <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Select a question to review.</div>}</section>
-                <aside className="min-w-0 bg-muted/30 p-5">{selectedQuestion ? <QuestionEditor question={selectedQuestion} domain={selectedDomain} taxonomy={taxonomy} onChange={updateQuestion} /> : null}</aside>
+              <Tabs value={mobileReviewPane} onValueChange={value => setMobileReviewPane(value as 'PREVIEW' | 'EDIT')} className="contents">
+              <div className="lg:hidden"><TabsList className="w-full"><TabsTrigger value="PREVIEW" className="flex-1">Question preview</TabsTrigger><TabsTrigger value="EDIT" className="flex-1">Classification & answer</TabsTrigger></TabsList></div>
+              <div className="grid min-h-[620px] grid-cols-1 overflow-hidden rounded-card border border-ui-border bg-surface lg:h-[640px] lg:min-h-0 lg:grid-cols-[220px_minmax(0,1fr)_280px]">
+                <aside className="flex min-h-0 flex-col border-b border-ui-border bg-muted/30 p-3 lg:border-b-0 lg:border-r"><p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Questions</p><div className="flex max-h-44 min-h-0 gap-1 overflow-x-auto lg:max-h-none lg:flex-1 lg:flex-col lg:overflow-y-auto">{preview.modules.map(module => <div key={module.order} className="flex gap-1 lg:block"><p className="mb-1 mt-2 hidden px-2 text-[10px] font-medium text-muted-foreground lg:block">{module.name}</p>{module.questions.map(question => <Button key={question.clientId} variant="ghost" size="sm" onClick={() => setSelectedQuestionId(question.clientId)} className={`h-8 shrink-0 justify-start gap-2 px-2.5 text-xs ${selectedQuestion?.clientId === question.clientId ? 'bg-primary-soft font-semibold text-primary' : 'text-muted-foreground'}`}><StatusIcon issues={question.issues} /><span className="whitespace-nowrap">Q{question.order}</span><span className="hidden truncate lg:block">{question.domainCode ? 'Classified' : 'Needs review'}</span></Button>)}</div>)}</div></aside>
+                <TabsContent value="PREVIEW" forceMount asChild><section className={`${mobileReviewPane === 'PREVIEW' ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-col border-b border-ui-border lg:flex lg:border-b-0 lg:border-r`}><div className="min-h-0 flex-1 overflow-y-auto p-5 lg:p-6">{selectedQuestion ? <QuestionPreview question={selectedQuestion} subject={subject} /> : <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Select a question to review.</div>}</div>{selectedQuestion && <div className="flex items-center justify-between gap-3 border-t border-ui-border px-5 py-3 lg:px-6"><Button variant="ghost" size="sm" onClick={() => moveQuestion(-1)} disabled={selectedIndex <= 0}><ChevronLeft data-icon="inline-start" />Previous</Button><span className="text-xs font-medium text-muted-foreground">Question {selectedIndex + 1} of {questions.length}</span><Button variant="ghost" size="sm" onClick={() => moveQuestion(1)} disabled={selectedIndex < 0 || selectedIndex >= questions.length - 1}>Next<ChevronRight data-icon="inline-end" /></Button></div>}</section></TabsContent>
+                <TabsContent value="EDIT" forceMount asChild><aside className={`${mobileReviewPane === 'EDIT' ? 'block' : 'hidden'} min-h-0 min-w-0 overflow-y-auto bg-muted/30 p-5 lg:block`}>{selectedQuestion ? <QuestionEditor question={selectedQuestion} domain={selectedDomain} taxonomy={taxonomy} onChange={updateQuestion} /> : null}</aside></TabsContent>
               </div>
-              <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={() => moveQuestion(-1)} disabled={selectedIndex <= 0}><ChevronLeft size={16} />Previous</Button><Button variant="ghost" size="sm" onClick={() => moveQuestion(1)} disabled={selectedIndex < 0 || selectedIndex >= questions.length - 1}>Next<ChevronRight size={16} /></Button></div><div className="flex flex-wrap items-center justify-end gap-2"><Button variant="outline" onClick={() => setStep('IMPORT')}>Replace import</Button><Button variant="outline" disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('DRAFT')}><Save size={16} />{isSaving ? 'Saving…' : testStatus === 'DRAFT' ? 'Save draft' : 'Move to draft'}</Button><Button disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('PUBLISHED')}><CheckCircle2 size={16} />Publish test</Button></div></Card>
+              </Tabs>
+              {blockingErrors && <p className="text-right text-xs text-destructive">Resolve {preview.summary.errorCount || 'all'} validation {preview.summary.errorCount === 1 ? 'error' : 'errors'} before saving.</p>}
             </div>
           )}
         </div>
       </main>
-      <Modal open={guideOpen} onClose={() => setGuideOpen(false)} closeOnBackdrop title="Test formatting guide" subtitle="Use the same structure for pasted text and uploaded documents." className="max-w-6xl! shadow-none!">
-        <FormattingGuide subject={form.subject} template={activeImportTemplate} />
+      <Modal open={guideOpen} onClose={() => setGuideOpen(false)} closeOnBackdrop presentation="content-dialog" title="Test formatting guide" subtitle="Use the same structure for pasted text and uploaded documents." className="max-w-6xl! shadow-none!">
+        <FormattingGuide subject={subject} template={activeImportTemplate} />
+      </Modal>
+      <Modal open={confirmLeaveOpen} onClose={() => setConfirmLeaveOpen(false)} closeOnBackdrop presentation="content-dialog" title="Leave test creation?" subtitle="Your unsaved test details and imported content will be lost." className="max-w-md!">
+        <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setConfirmLeaveOpen(false)}>Keep editing</Button><Button variant="destructive" onClick={confirmLeave}>Leave without saving</Button></div>
       </Modal>
     </div>
   );
 };
-
-function WizardStepper({ step }: { step: Step }) {
-  const activeIndex = steps.findIndex(item => item.key === step);
-  return <div className="flex items-center gap-1.5" aria-label="Create test progress">{steps.map((item, index) => {
-    const active = item.key === step;
-    const complete = activeIndex > index;
-    return <div key={item.key} className="flex items-center gap-1.5"><span className={`flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-semibold transition-colors duration-200 ${active || complete ? 'border-primary bg-primary-soft text-primary' : 'border-ui-border bg-surface text-muted-foreground'}`}>{complete ? <CheckCircle2 size={14} /> : index + 1}</span><span className={`hidden text-xs font-medium transition-colors duration-200 sm:inline ${active ? 'text-foreground' : 'text-muted-foreground'}`}>{item.label}</span>{index < steps.length - 1 && <span className={`h-px w-5 transition-colors duration-200 lg:w-8 ${complete ? 'bg-primary' : 'bg-border'}`} />}</div>;
-  })}</div>;
-}
 
 function FormattingGuide({ subject, template }: { subject: Subject; template: string }) {
   return <div className="grid max-h-[65vh] gap-6 overflow-y-auto pr-1 md:grid-cols-[0.85fr_1.15fr]">
@@ -601,14 +602,6 @@ function FormattingGuide({ subject, template }: { subject: Subject; template: st
   </div>;
 }
 
-function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
-  return <label className={`block ${className}`}><span className="mb-2 block text-sm font-medium text-foreground">{label}</span>{children}</label>;
-}
-
-function ModeButton({ active, icon, title, text, onClick }: { active: boolean; icon: ReactNode; title: string; text: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`flex min-h-20 items-start gap-2 rounded-control border p-3 text-left transition-colors ${active ? 'border-primary bg-primary-soft text-primary' : 'border-ui-border bg-surface text-muted-foreground hover:bg-muted'}`}><span className="mt-0.5">{icon}</span><span><span className="block text-xs font-semibold">{title}</span><span className="mt-1 block text-[11px] leading-4">{text}</span></span></button>;
-}
-
 function ImportNotice({ tone, message }: { tone: IssueSeverity; message: string }) {
   const warning = tone === 'warning';
   return <div className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${warning ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-800'}`}><CircleAlert size={17} className="mt-0.5 shrink-0" /><span>{message}</span></div>;
@@ -629,7 +622,7 @@ function QuestionPreview({ question, subject }: { question: ImportQuestion; subj
 
 function QuestionEditor({ question, domain, taxonomy, onChange }: { question: ImportQuestion; domain?: TaxonomyDomain; taxonomy: TaxonomyDomain[]; onChange: (id: string, updater: (question: ImportQuestion) => ImportQuestion) => void }) {
   const update = (patch: Partial<ImportQuestion>) => onChange(question.clientId, current => ({ ...current, ...patch }));
-  return <div className="space-y-5"><div><h2 className="text-sm font-semibold text-foreground">Classification</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Required for SAT performance analytics.</p></div><Field label="Content domain"><Select className="w-full" value={question.domainCode} onChange={event => update({ domainCode: event.target.value, skillCode: '' })}><option value="">Choose domain</option>{taxonomy.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</Select></Field><Field label="Skill"><Select className="w-full" value={question.skillCode} disabled={!domain} onChange={event => update({ skillCode: event.target.value })}><option value="">Choose skill</option>{domain?.skills.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</Select></Field><div className="border-t border-ui-border pt-5"><h2 className="text-sm font-semibold text-foreground">Question details</h2><label className="mt-3 block text-xs font-medium text-foreground">Correct answer</label><Input className="mt-1 w-full" value={question.correctAnswer} onChange={event => update({ correctAnswer: event.target.value.toUpperCase() })} placeholder={question.type === 'MCQ' ? 'A' : 'Answer'} /><label className="mt-4 block text-xs font-medium text-foreground">Explanation <span className="font-normal text-muted-foreground">(optional)</span></label><Textarea className="mt-1 min-h-24" value={question.explanation || ''} onChange={event => update({ explanation: event.target.value })} /></div>{question.issues.length > 0 && <div className="border-t border-ui-border pt-4"><p className="mb-2 text-xs font-semibold text-foreground">Validation</p><div className="space-y-2">{question.issues.map(item => <ImportNotice key={item.code} tone={item.severity} message={item.message} />)}</div></div>}</div>;
+  return <div className="space-y-5"><div><h2 className="text-sm font-semibold text-foreground">Classification</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Required for SAT performance analytics.</p></div><Field><FieldLabel htmlFor="question-domain">Content domain</FieldLabel><Select value={question.domainCode || undefined} onValueChange={value => update({ domainCode: value, skillCode: '' })}><SelectTrigger id="question-domain" className="w-full"><SelectValue placeholder="Choose domain" /></SelectTrigger><SelectContent position="popper" align="start">{taxonomy.map(item => <SelectItem key={item.code} value={item.code}>{item.name}</SelectItem>)}</SelectContent></Select></Field><Field><FieldLabel htmlFor="question-skill">Skill</FieldLabel><Select value={question.skillCode || undefined} disabled={!domain} onValueChange={value => update({ skillCode: value })}><SelectTrigger id="question-skill" className="w-full"><SelectValue placeholder="Choose skill" /></SelectTrigger><SelectContent position="popper" align="start">{domain?.skills.map(item => <SelectItem key={item.code} value={item.code}>{item.name}</SelectItem>)}</SelectContent></Select></Field><div className="space-y-4 border-t border-ui-border pt-5"><h2 className="text-sm font-semibold text-foreground">Question details</h2><Field><FieldLabel htmlFor="question-answer">Correct answer</FieldLabel><Input id="question-answer" className="w-full" value={question.correctAnswer} onChange={event => update({ correctAnswer: event.target.value.toUpperCase() })} placeholder={question.type === 'MCQ' ? 'A' : 'Answer'} /></Field><Field><FieldLabel htmlFor="question-explanation">Explanation <span className="font-normal text-muted-foreground">(optional)</span></FieldLabel><Textarea id="question-explanation" className="min-h-24" value={question.explanation || ''} onChange={event => update({ explanation: event.target.value })} /></Field></div>{question.issues.length > 0 && <div className="border-t border-ui-border pt-4"><p className="mb-2 text-xs font-semibold text-foreground">Validation</p><div className="space-y-2">{question.issues.map(item => <ImportNotice key={item.code} tone={item.severity} message={item.message} />)}</div></div>}</div>;
 }
 
 export default CreateTestWizard;

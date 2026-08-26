@@ -18,7 +18,8 @@ import type { ContentBlock } from '../../types/quiz';
 import ReviewModal from '../../features/quiz/ReviewModal';
 import axiosClient from '../../lib/axios';
 import { invalidateQueryCache } from '../../lib/queryCache';
-import { BackButton, Badge, Button, Card, PageHeader, Select, TableShell } from '../../components/ui/AppUI';
+import { Badge, Button, Card, PageHeader, Select, TableShell } from '../../components/ui/AppUI';
+import { useDashboardBack } from '../../features/navigation/DashboardBackContext';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { capitalizeFirstLetter } from '../../utils/text';
 
@@ -123,6 +124,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
     if (onBackToHome) onBackToHome();
     else navigate('/dashboard/results-analytics');
   };
+  useDashboardBack(handleBack);
 
   const handleAddToErrorLog = async (question: QuestionResult) => {
     if (!data || loggedQuestions.has(question.id)) return;
@@ -161,7 +163,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
   }
 
   if (loadError || !data) {
-    return <PageFrame><div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center"><XCircle size={40} className="text-destructive" /><div><h1 className="text-lg font-semibold">Score report unavailable</h1><p className="mt-1 text-sm text-muted-foreground">This result may no longer exist or you may not have access.</p></div><BackButton onClick={handleBack} /></div></PageFrame>;
+    return <PageFrame><div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6 text-center"><XCircle size={40} className="text-destructive" /><div><h1 className="text-lg font-semibold">Score report unavailable</h1><p className="mt-1 text-sm text-muted-foreground">This result may no longer exist or you may not have access.</p></div></div></PageFrame>;
   }
 
   const totalQuestions = data.questions.length;
@@ -177,7 +179,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
   return (
     <div className="h-full overflow-y-auto bg-background text-foreground">
       <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
-        <div className="flex items-start gap-3"><BackButton onClick={handleBack} className="mt-1" /><PageHeader title="Test Result Details" description="Review your performance and identify areas for improvement." actions={<SatCountdown />} /></div>
+        <PageHeader title="Test Result Details" description="Review your performance and identify areas for improvement." actions={<SatCountdown />} />
 
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="flex flex-col p-6 lg:col-span-2">

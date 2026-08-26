@@ -4,7 +4,8 @@ import { format } from 'date-fns';
 import { Archive, Check, Copy, FilePenLine, LoaderCircle, Pencil, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ContentBlock } from '@/types/quiz';
-import { Badge, BackButton, Button, Card, EmptyState, Modal, PageHeader, Tabs } from '@/components/ui/AppUI';
+import { Badge, Button, Card, EmptyState, Modal, PageHeader, Tabs } from '@/components/ui/AppUI';
+import { useDashboardBack } from '@/features/navigation/DashboardBackContext';
 import BlockRenderer from '@/components/content/BlockRenderer';
 import FormattedTextRenderer from '@/components/content/TextRenderer';
 import axiosClient from '@/lib/axios';
@@ -35,6 +36,7 @@ export default function TestDetail() {
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  useDashboardBack(() => navigate('/dashboard/practice-test'));
 
   const loadTest = useCallback(async () => {
     if (!testId) return;
@@ -98,10 +100,9 @@ export default function TestDetail() {
   };
 
   if (loading) return <div className="mx-auto max-w-screen-2xl space-y-4 p-4 md:p-6"><div className="h-24 animate-pulse rounded-card bg-muted" /><div className="h-80 animate-pulse rounded-card bg-muted" /></div>;
-  if (!test || error) return <div className="mx-auto max-w-screen-2xl p-4 md:p-6"><BackButton onClick={() => navigate('/dashboard/practice-test')} className="mb-4" /><EmptyState icon={<TriangleAlert size={23} />} title="Test not found" description={error || 'This test may have been removed or you may not have access.'} /></div>;
+  if (!test || error) return <div className="mx-auto max-w-screen-2xl p-4 md:p-6"><EmptyState icon={<TriangleAlert size={23} />} title="Test not found" description={error || 'This test may have been removed or you may not have access.'} /></div>;
 
   return <div className="h-full overflow-y-auto bg-background"><main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
-    <BackButton onClick={() => navigate('/dashboard/practice-test')} />
     <PageHeader title={test.title} description={`${test.subject === 'MATH' ? 'Math' : 'Reading & Writing'} · ${test.mode === 'EXAM' ? 'Exam' : 'Practice'}`} actions={<div className="flex flex-wrap items-center gap-2">{test.isOwner ? <>{test.status === 'ARCHIVED' ? <Button variant="outline" size="sm" disabled={working} onClick={() => void updateStatus('PUBLISHED')}><RotateCcw size={15} />Restore</Button> : <Button size="sm" disabled={working || test.hasAttempts} onClick={() => navigate(`/dashboard/practice-test/create?edit=${test.id}`)}><Pencil size={15} />Edit test</Button>}<Button variant="outline" size="sm" disabled={working} onClick={() => void duplicate()}><Copy size={15} />Duplicate</Button></> : <Button size="sm" disabled={working} onClick={() => void duplicate()}>{working ? <LoaderCircle size={15} className="animate-spin" /> : <Copy size={15} />}Duplicate to My Tests</Button>}</div>} />
     <div className="overflow-x-auto"><Tabs items={[{ value: 'OVERVIEW' as const, label: 'Overview' }, { value: 'QUESTIONS' as const, label: `Questions (${test.questionCount})` }]} value={activeTab} onValueChange={setActiveTab} ariaLabel="Test detail sections" /></div>
 
