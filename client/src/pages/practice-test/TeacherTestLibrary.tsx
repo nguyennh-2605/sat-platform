@@ -41,7 +41,6 @@ const statusLabel = { ALL: 'All statuses', DRAFT: 'Draft', PUBLISHED: 'Published
 
 export default function TeacherTestLibrary() {
   const navigate = useNavigate();
-  const isAdmin = localStorage.getItem('userRole') === 'ADMIN';
   const [source, setSource] = useState<LibrarySource>('MY');
   const [tests, setTests] = useState<LibraryTest[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta>({ page: 1, pageSize: 24, total: 0, totalPages: 1 });
@@ -72,14 +71,13 @@ export default function TeacherTestLibrary() {
       setTests(data.items.map(item => ({ ...item, title: capitalizeFirstLetter(item.title) })));
       setPagination(data.pagination);
       if (data.sourceCounts) setSourceCounts(data.sourceCounts);
-      else if (isAdmin) setSourceCounts(current => ({ ...current, my: data.pagination.total }));
     } catch (loadError) {
       console.error(loadError);
       setError('Your test library could not be loaded. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, isAdmin, mode, page, sort, source, status, subject]);
+  }, [debouncedSearch, mode, page, sort, source, status, subject]);
 
   useEffect(() => { void loadTests(); }, [loadTests]);
 
@@ -167,11 +165,11 @@ export default function TeacherTestLibrary() {
 
   return <div className="h-full overflow-y-auto bg-background">
     <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
-      <PageHeader title={<span className="font-medium">{isAdmin ? 'System Test Library' : 'Test Library'}</span>} description={isAdmin ? 'Create and manage published platform tests.' : 'Create and manage your SAT test library.'} />
-      {!isAdmin && <div className="overflow-x-auto"><Tabs items={[
+      <PageHeader title={<span className="font-medium">Test Library</span>} description="Create and manage your SAT test library." />
+      <div className="overflow-x-auto"><Tabs items={[
         { value: 'MY' as const, label: `My Tests (${sourceCounts.my})` },
         { value: 'SYSTEM' as const, label: `System Tests (${sourceCounts.system})` },
-      ]} value={source} onValueChange={changeSource} ariaLabel="Test library source" /></div>}
+      ]} value={source} onValueChange={changeSource} ariaLabel="Test library source" /></div>
       <section className="overflow-hidden rounded-card border border-ui-border bg-background" aria-label={source === 'MY' ? 'My Tests' : 'System Tests'}>
         <LibraryToolbar source={source} search={search} onSearch={value => { setSearch(value); setPage(1); }} subject={subject} onSubject={value => { setSubject(value); setPage(1); }} mode={mode} onMode={value => { setMode(value); setPage(1); }} status={status} onStatus={value => { setStatus(value); setPage(1); }} sort={sort} onSort={value => { setSort(value); setPage(1); }} view={view} onView={changeView} hasActiveFilters={hasStructuredFilters} onReset={resetFilters} loading={loading} onRefresh={() => void refresh()} onCreate={() => navigate('/dashboard/practice-test/create')} />
 
