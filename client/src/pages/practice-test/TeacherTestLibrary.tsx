@@ -4,7 +4,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { Archive, ArrowUpDown, BookOpen, Check, ChevronLeft, ChevronRight, Copy, FilePenLine, Grid2X2, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, RefreshCw, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell, Tabs } from '@/components/ui/AppUI';
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge, Button, EmptyState, Input, Modal, PageHeader, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell, Tabs } from '@/components/ui/AppUI';
 import axiosClient from '@/lib/axios';
 import { cachedGet, invalidateQueryCache } from '@/lib/queryCache';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -218,7 +219,41 @@ interface TestActions { preview: (test: LibraryTest) => void; edit: (test: Libra
 
 function LibraryCard({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
   const system = source === 'SYSTEM';
-  return <Card className="flex min-h-64 flex-col overflow-hidden p-0"><div className="flex flex-1 flex-col p-5"><div className="flex items-start justify-between gap-3"><p className="text-caption font-medium text-muted-foreground">{system ? 'System Test' : subjectLabel[test.subject]}</p>{!system && <StatusBadge status={test.status} />}</div><h2 className="mt-3 line-clamp-2 text-title font-semibold text-foreground">{test.title}</h2><p className="mt-1 text-caption text-muted-foreground">{system ? `${subjectLabel[test.subject]} · ${modeLabel[test.mode]}` : modeLabel[test.mode]}</p><div className="mt-auto pt-6"><p className="text-caption text-subtle">{test.questionCount} questions{test.duration ? ` · ${test.duration} min` : ''}</p><p className="mt-1 text-caption text-muted-foreground">{system ? `Provided by ${test.author?.name || 'SAT Platform'}` : `Updated ${relativeTime(test.updatedAt)}`}</p></div></div><div className="flex items-center gap-2 border-t border-ui-border bg-muted/20 px-4 py-3"><CardPrimaryActions test={test} source={source} working={working} actions={actions} /><div className="ml-auto"><TestMenu test={test} source={source} working={working} actions={actions} /></div></div></Card>;
+  return <Card size="sm" className="gap-0 py-0 shadow-card">
+    <CardHeader className="gap-1 px-4 pb-0 pt-4">
+      <CardTitle className="line-clamp-2 min-w-0 pr-2 text-title font-semibold text-foreground">{test.title}</CardTitle>
+      <CardAction className="flex items-center gap-1.5 pl-2">
+        <Badge className="font-medium text-muted-foreground">{subjectLabel[test.subject]}</Badge>
+        <TestMenu test={test} source={source} working={working} actions={actions} />
+      </CardAction>
+      <div className="col-span-2 flex min-w-0 items-center justify-between gap-3 pt-0.5">
+        <p className="truncate text-caption text-muted-foreground">{modeLabel[test.mode]}</p>
+        {!system && <StatusBadge status={test.status} />}
+      </div>
+    </CardHeader>
+    <CardContent className="px-4 pb-4 pt-3">
+      <ul className="space-y-2 text-body text-foreground">
+        <li className="flex items-center gap-2"><ChevronRight size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span>{test.questionCount} questions</span></li>
+        <li className="flex items-center gap-2"><ChevronRight size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span>{test.duration ? `${test.duration} minutes` : 'No time limit'}</span></li>
+        <li className="flex min-w-0 items-center gap-2"><ChevronRight size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span className="truncate">{system ? `Provided by ${test.author?.name || 'SAT Platform'}` : `Updated ${relativeTime(test.updatedAt)}`}</span></li>
+      </ul>
+    </CardContent>
+    <CardFooter className="grid gap-2 bg-muted/40 p-3">
+      <CardStackedActions test={test} source={source} working={working} actions={actions} />
+    </CardFooter>
+  </Card>;
+}
+
+function CardStackedActions({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
+  const primaryAction = source === 'SYSTEM'
+    ? <Button size="sm" className="w-full" disabled={working} onClick={() => actions.duplicate(test)}>{working ? <LoaderCircle size={15} className="animate-spin" /> : <Copy size={15} />}Duplicate to My Tests</Button>
+    : test.status === 'DRAFT'
+      ? <Button size="sm" className="w-full" disabled={working} onClick={() => actions.edit(test)}><FilePenLine size={15} />Continue editing</Button>
+      : test.status === 'ARCHIVED'
+        ? <Button size="sm" className="w-full" disabled={working} onClick={() => actions.restore(test)}>{working ? <LoaderCircle size={15} className="animate-spin" /> : <RotateCcw size={15} />}Restore</Button>
+        : <Button size="sm" className="w-full" disabled={working} onClick={() => actions.edit(test)}><Pencil size={15} />Edit test</Button>;
+
+  return <>{primaryAction}<Button variant="outline" size="sm" className="w-full bg-surface" disabled={working} onClick={() => actions.preview(test)}><Play size={15} />Preview</Button></>;
 }
 
 function CardPrimaryActions({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
@@ -243,7 +278,7 @@ function StatusBadge({ status }: { status: TestStatus }) {
 
 function LibrarySkeleton({ view }: { view: ViewMode }) {
   if (view === 'LIST') return <TableShell className="animate-pulse"><div className="h-12 border-b border-ui-border bg-muted" />{[1, 2, 3, 4, 5].map(item => <div key={item} className="flex h-16 items-center gap-5 border-b border-ui-border px-5 last:border-0"><span className="h-4 w-64 rounded-sm bg-muted" /><span className="h-4 w-32 rounded-sm bg-muted" /><span className="ml-auto h-8 w-32 rounded-control bg-muted" /></div>)}</TableShell>;
-  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-64 animate-pulse bg-muted" />)}</div>;
+  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-60 animate-pulse bg-muted" />)}</div>;
 }
 
 const relativeTime = (value: string) => {

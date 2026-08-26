@@ -201,6 +201,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Học sinh thấy đề admin đăng và đề giáo viên giao cho lớp của mình.
 - Practice Center của Student tiếp tục hiển thị attempt status, progress, last attempt và score từ dữ liệu thật.
 - Card phải gọn; title, metadata, progress và action không được cách nhau quá xa.
+- Teacher Test Library card dùng anatomy `CardHeader → CardContent → CardFooter`: title và subject cùng hàng, mode là subtitle, lifecycle là neutral badge; question count, duration và source/updated time là các metadata row compact. Footer tách bằng border + muted surface và có hai content action full-width xếp dọc, primary trước và outline sau; lifecycle action phụ nằm trong menu dấu ba chấm.
 - Hiển thị question count, progress percentage, last attempt và score khi có dữ liệu thật.
 - Các trạng thái dùng English: `Not started`, `In progress`, `Completed`.
 
