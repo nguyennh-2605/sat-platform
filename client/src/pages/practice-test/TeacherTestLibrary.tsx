@@ -226,10 +226,7 @@ function LibraryCard({ test, source, working, actions }: { test: LibraryTest; so
         <Badge className="font-medium text-muted-foreground">{subjectLabel[test.subject]}</Badge>
         <TestMenu test={test} source={source} working={working} actions={actions} />
       </CardAction>
-      <div className="col-span-2 flex min-w-0 items-center justify-between gap-3 pt-0.5">
-        <p className="truncate text-caption text-muted-foreground">{modeLabel[test.mode]}</p>
-        {!system && <StatusBadge status={test.status} />}
-      </div>
+      <p className="col-start-1 row-start-2 -mt-0.5 truncate text-caption text-muted-foreground">{modeLabel[test.mode]}</p>
     </CardHeader>
     <CardContent className="px-4 pb-4 pt-3">
       <ul className="space-y-2 text-body text-foreground">

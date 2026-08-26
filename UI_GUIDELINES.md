@@ -186,7 +186,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Với Teacher, route này hiển thị `Test Library`: chỉ tạo, quản lý lifecycle và xem nội dung test. Mọi thao tác giao test, deadline, attempts, audience và theo dõi completion nằm trong `Classroom → Activities`.
 - Teacher dùng hai nguồn `My Tests` và `System Tests`. `My Tests` chỉ gồm test giáo viên sở hữu; `System Tests` chỉ gồm test Published do Admin/platform cung cấp.
 - `Draft`, `Published`, `Archived` là lifecycle filter bên trong `My Tests`, không phải source tab. `All` chỉ gồm Draft + Published; Archived chỉ xuất hiện khi chọn riêng.
-- Teacher card không hiển thị attempt status, progress, last score hoặc Continue. Card chỉ hiển thị subject/source, lifecycle, title, type, question count, duration, updated time và content actions.
+- Teacher card không hiển thị attempt status, progress, last score hoặc Continue. Card chỉ hiển thị subject/source, title, type, question count, duration, updated time và content actions; lifecycle được thể hiện qua filter và list view, không lặp lại trên card.
 - System Tests là read-only đối với Teacher; action hợp lệ là Preview và Duplicate to My Tests. Bản duplicate luôn là teacher-owned Draft.
 - Published có Preview/Edit/Duplicate/Archive/Delete; Draft có Continue editing/Preview/Duplicate/Delete; Archived có Preview/Restore/Delete. Backend phải chặn permanent delete khi test đã có classroom hoặc attempt history.
 - Test Detail dùng `Overview | Questions`; không thêm Assignments tab. Preview content không được tạo Submission cho giáo viên.
@@ -201,7 +201,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Học sinh thấy đề admin đăng và đề giáo viên giao cho lớp của mình.
 - Practice Center của Student tiếp tục hiển thị attempt status, progress, last attempt và score từ dữ liệu thật.
 - Card phải gọn; title, metadata, progress và action không được cách nhau quá xa.
-- Teacher Test Library card dùng anatomy `CardHeader → CardContent → CardFooter`: title và subject cùng hàng, mode là subtitle, lifecycle là neutral badge; question count, duration và source/updated time là các metadata row compact. Footer tách bằng border + muted surface và có hai content action full-width xếp dọc, primary trước và outline sau; lifecycle action phụ nằm trong menu dấu ba chấm.
+- Teacher Test Library card dùng anatomy `CardHeader → CardContent → CardFooter`: title và subject cùng hàng, mode là subtitle nằm sát title; question count, duration và source/updated time là các metadata row compact. Footer tách bằng border + muted surface và có hai content action full-width xếp dọc, primary trước và outline sau; lifecycle action phụ nằm trong menu dấu ba chấm.
 - Hiển thị question count, progress percentage, last attempt và score khi có dữ liệu thật.
 - Các trạng thái dùng English: `Not started`, `In progress`, `Completed`.
 
