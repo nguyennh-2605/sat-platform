@@ -72,20 +72,20 @@ model Class {
 }
 
 model Assignment {
-  id              String               @id @default(uuid())
-  title           String
-  type            String               @default("assignment")
-  content         String?
-  fileUrls        String[]
-  links           String[]
-  testIds         Int[]                @default([])
-  deadline        DateTime?
-  createdAt       DateTime             @default(now())
-  classId         String
-  class           Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
-  submissions     HomeworkSubmission[]
-  testSubmissions Submission[]
-  activity        HomeworkActivity?
+  id               String               @id @default(uuid())
+  title            String
+  type             String               @default("assignment")
+  content          String?
+  fileUrls         String[]
+  links            String[]
+  testIds          Int[]                @default([])
+  deadline         DateTime?
+  createdAt        DateTime             @default(now())
+  classId          String
+  class            Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+  submissions      HomeworkSubmission[]
+  testSubmissions  Submission[]
+  activity         HomeworkActivity?
   lessonAssignment LessonAssignment?
 }
 
@@ -131,7 +131,9 @@ model Test {
   category    TestCategory   @default(PRACTICE)
   isPublic    Boolean        @default(false)
   subject     TestSubject    @default(RW)
+  status      TestStatus     @default(DRAFT)
   createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
   testDate    String?
   classTests  ClassTest[]
   sections    Section[]
@@ -141,8 +143,8 @@ model Test {
   author      User?          @relation(fields: [authorId], references: [id])
   deliveries  TestDelivery[]
 
-  @@index([authorId, id])
-  @@index([isPublic, id])
+  @@index([authorId, status, updatedAt])
+  @@index([isPublic, status, updatedAt])
 }
 
 model ClassTest {
@@ -317,6 +319,12 @@ enum TestCategory {
 enum TestSubject {
   RW
   MATH
+}
+
+enum TestStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
 enum SubmissionStatus {

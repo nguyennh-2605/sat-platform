@@ -11,6 +11,7 @@ import { DateTimePicker } from '../../components/ui/DateTimePicker';
 import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '../../components/ui/AppUI';
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
+import TeacherTestLibrary from './TeacherTestLibrary';
 
 interface ClassInfo {
   id: string;
@@ -67,9 +68,14 @@ const formatLastAttempt = (value?: string | null) => {
 const clampProgress = (value: number | null | undefined) => Math.min(100, Math.max(0, value ?? 0));
 
 const PracticeTest = () => {
-  const navigate = useNavigate();
   const role = (localStorage.getItem('userRole') || 'STUDENT') as UserRole;
-  const canManage = role === 'TEACHER' || role === 'ADMIN';
+  if (role !== 'STUDENT') return <TeacherTestLibrary />;
+  return <PracticeCenter role={role} />;
+};
+
+function PracticeCenter({ role }: { role: 'STUDENT' }) {
+  const navigate = useNavigate();
+  const canManage = false;
 
   const [tests, setTests] = useState<TestItem[]>([]);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
@@ -263,7 +269,7 @@ const PracticeTest = () => {
       <Modal open={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)} closeOnBackdrop={!deleting} presentation="content-dialog" title="Delete exam?" subtitle={deleteTarget?.title} className="max-w-md!" footer={<><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={deleteTest}>{deleting ? 'Deleting…' : 'Delete exam'}</Button></>}><p className="text-sm leading-6 text-muted-foreground">This permanently deletes the exam, its assignments, and any student attempt data associated with it. This action cannot be undone.</p></Modal>
     </div>
   );
-};
+}
 
 interface PracticeToolbarProps {
   search: string; onSearchChange: (value: string) => void;

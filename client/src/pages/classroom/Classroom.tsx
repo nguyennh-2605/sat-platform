@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react';
-import { AlertTriangle, BarChart3, Bell, BookOpenCheck, Calendar, Check, ClipboardList, Clock, Copy, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Calendar, Check, ClipboardList, Clock, Copy, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
 import { compareAsc, format, formatDistanceToNow, isPast, isToday, isTomorrow } from 'date-fns';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -8,11 +8,11 @@ import { BackButton, Button, Card, Input, Modal, PageHeader, TableShell, Tabs, t
 import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
-import ClassroomVocabularyPanel from '../../features/vocabulary/ClassroomVocabularyPanel';
+import ClassroomActivities from '../../features/classroom/ClassroomActivities';
 import { capitalizeFirstLetter } from '../../utils/text';
 
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-type ClassroomTab = 'NOTIFICATIONS' | 'COURSEWORK' | 'MEMBERS' | 'PROGRESS' | 'PERFORMANCE';
+type ClassroomTab = 'NOTIFICATIONS' | 'ACTIVITIES' | 'MEMBERS' | 'PROGRESS' | 'PERFORMANCE';
 type NotificationFilter = 'all' | 'assignment' | 'announcement';
 
 interface CurrentUser { id: string; name: string; role: UserRole }
@@ -34,7 +34,7 @@ interface ClassDetail {
   students: ClassMember[];
   assignments: ClassAssignment[];
 }
-interface AnnouncementData { title: string; content?: string; deadline?: string | null; fileUrls?: string[]; links?: string[] }
+interface AnnouncementData { title: string; content?: string; deadline?: string | null; fileUrls?: string[]; links?: string[]; type?: 'assignment' | 'announcement' }
 
 const AVATAR_COLORS = ['#1B7A5A', '#0F4D38', '#2563EB', '#A16207', '#8B3A62', '#475569'];
 const requestErrorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
@@ -55,6 +55,7 @@ export default function Classroom() {
   const [loadError, setLoadError] = useState('');
   const [activeTab, setActiveTab] = useState<ClassroomTab>('NOTIFICATIONS');
   const [announcementOpen, setAnnouncementOpen] = useState(false);
+  const [postKind, setPostKind] = useState<'post' | 'homework'>('post');
   const [addStudentOpen, setAddStudentOpen] = useState(false);
   const [studentToRemove, setStudentToRemove] = useState<ClassMember | null>(null);
 
@@ -81,7 +82,7 @@ export default function Classroom() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')?.toUpperCase();
-    if (requestedTab === 'NOTIFICATIONS' || requestedTab === 'COURSEWORK' || requestedTab === 'MEMBERS' || requestedTab === 'PROGRESS') setActiveTab(requestedTab);
+    if (requestedTab === 'NOTIFICATIONS' || requestedTab === 'ACTIVITIES' || requestedTab === 'MEMBERS' || requestedTab === 'PROGRESS') setActiveTab(requestedTab);
     if (canManage && requestedTab === 'PERFORMANCE') setActiveTab(requestedTab);
   }, [canManage, searchParams]);
 
@@ -93,10 +94,18 @@ export default function Classroom() {
     setSearchParams(next, { replace: true });
   };
 
+  const openTestPerformance = (deliveryId: string) => {
+    setActiveTab('PERFORMANCE');
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', 'performance');
+    next.set('deliveryId', deliveryId);
+    setSearchParams(next, { replace: true });
+  };
+
   const createAnnouncement = async (data: AnnouncementData) => {
     if (!classId) return;
     try {
-      const type = data.deadline ? 'assignment' : 'announcement';
+      const type = data.type || (data.deadline ? 'assignment' : 'announcement');
       await axiosClient.post('/api/classes/posts', { classId, title: data.title, content: data.content, type, deadline: data.deadline || null, driveFiles: data.fileUrls || [], externalLinks: data.links || [], testIds: [] });
       toast.success(type === 'assignment' ? 'Assignment posted' : 'Announcement posted');
       setAnnouncementOpen(false);
@@ -124,7 +133,7 @@ export default function Classroom() {
 
   const tabs: Array<TabItem<ClassroomTab>> = [
     { value: 'NOTIFICATIONS', label: 'Notifications', icon: Bell, panelId: 'classroom-notifications-panel' },
-    { value: 'COURSEWORK', label: 'Coursework', icon: BookOpenCheck, panelId: 'classroom-coursework-panel' },
+    { value: 'ACTIVITIES', label: 'Activities', icon: ClipboardList, panelId: 'classroom-activities-panel' },
     { value: 'MEMBERS', label: 'Members', icon: Users, panelId: 'classroom-members-panel' },
     { value: 'PROGRESS', label: 'Course', icon: GitBranch, panelId: 'classroom-progress-panel' },
     ...(canManage ? [{ value: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3, panelId: 'classroom-performance-panel' }] : []),
@@ -141,14 +150,14 @@ export default function Classroom() {
       />
 
       <div>
-      {activeTab === 'NOTIFICATIONS' && <div id="classroom-notifications-panel" role="tabpanel"><NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} /></div>}
-      {activeTab === 'COURSEWORK' && <div id="classroom-coursework-panel" role="tabpanel" className="py-2"><ClassroomVocabularyPanel classId={classId || ''} canManage={canManage} /></div>}
+      {activeTab === 'NOTIFICATIONS' && <div id="classroom-notifications-panel" role="tabpanel"><NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => { setPostKind('post'); setAnnouncementOpen(true); }} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} /></div>}
+      {activeTab === 'ACTIVITIES' && <div id="classroom-activities-panel" role="tabpanel"><ClassroomActivities classId={classId || ''} students={classDetail.students} canManage={canManage} onOpenPerformance={openTestPerformance} onNewHomework={() => { setPostKind('homework'); setAnnouncementOpen(true); }} /></div>}
       {activeTab === 'MEMBERS' && <div id="classroom-members-panel" role="tabpanel"><MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} /></div>}
       {activeTab === 'PROGRESS' && <div id="classroom-progress-panel" role="tabpanel" className="py-2"><WeeklyProgress canManage={canManage} /></div>}
       {activeTab === 'PERFORMANCE' && canManage && <div id="classroom-performance-panel" role="tabpanel" className="py-2"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
       </div>
 
-    {announcementOpen && <AnnouncementCreator onClose={() => setAnnouncementOpen(false)} onSubmit={data => void createAnnouncement(data)} />}
+    {announcementOpen && <AnnouncementCreator kind={postKind} onClose={() => setAnnouncementOpen(false)} onSubmit={data => void createAnnouncement(data)} />}
     <AddStudentModal open={addStudentOpen} onClose={() => setAddStudentOpen(false)} onAdd={addStudent} />
     <RemoveStudentModal student={studentToRemove} onClose={() => setStudentToRemove(null)} onRemove={removeStudent} />
     </main>
@@ -159,7 +168,7 @@ function ClassroomHeader({ className, tabs, activeTab, onSelectTab, onBack }: { 
   return <div className="flex flex-col gap-4">
     <div className="flex items-start gap-3">
       <BackButton onClick={onBack} className="mt-1" />
-      <PageHeader title={className} description="Manage announcements, coursework, members, and class performance." />
+      <PageHeader title={className} description="Manage announcements, activities, members, and class performance." />
     </div>
     <div className="overflow-x-auto"><Tabs items={tabs} value={activeTab} onValueChange={onSelectTab} ariaLabel="Classroom sections" /></div>
   </div>;

@@ -2,7 +2,6 @@ const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { buildAttemptSummary } = require('../utils/practice-test-progress');
 const { getTaxonomy, validateClassification } = require('../utils/question-taxonomy');
-const testDeliveryService = require('./test-delivery.service');
 const { parsePagination, paginationMeta } = require('../utils/pagination');
 
 exports.getClasses = ({ userId, userRole }) => {
@@ -29,15 +28,17 @@ exports.getClasses = ({ userId, userRole }) => {
 
 exports.getTests = async ({ userId, userRole, query = {} }) => {
   const hasUser = !isNaN(userId);
+  const requestedSource = String(query.source || 'MY').trim().toUpperCase();
+  const requestedStatus = String(query.status || '').trim().toUpperCase();
 
   let whereCondition;
   if (!hasUser) {
-    whereCondition = { isPublic: true, author: { role: 'ADMIN' } };
+    whereCondition = { isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } };
   } else if (userRole === 'STUDENT') {
     whereCondition = {
       OR: [
         // Học sinh luôn thấy đề do admin công khai.
-        { isPublic: true, author: { role: 'ADMIN' } },
+        { isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } },
         // Đề của giáo viên chỉ hiện khi đã giao vào lớp mà học sinh tham gia.
         {
           deliveries: {
@@ -49,28 +50,36 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
         }
       ]
     };
+  } else if (userRole === 'TEACHER' && requestedSource === 'SYSTEM') {
+    whereCondition = { isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } };
   } else {
-    // Giáo viên/Admin quản lý đúng kho đề họ đã tải lên.
-    whereCondition = { authorId: userId };
+    whereCondition = {
+      authorId: userId,
+      ...(requestedStatus === 'ARCHIVED'
+        ? { status: 'ARCHIVED' }
+        : ['DRAFT', 'PUBLISHED'].includes(requestedStatus)
+          ? { status: requestedStatus }
+          : { status: { in: ['DRAFT', 'PUBLISHED'] } }),
+    };
   }
 
   const search = String(query.search || '').trim().slice(0, 100);
   const requestedSubject = String(query.subject || '').toUpperCase();
   const requestedMode = String(query.mode || '').toUpperCase();
-  const classId = String(query.classId || '').trim();
   const pagination = parsePagination(query, { defaultPageSize: 24, maxPageSize: 48 });
   const filters = [whereCondition];
   if (search) filters.push({ OR: [{ title: { contains: search, mode: 'insensitive' } }, { description: { contains: search, mode: 'insensitive' } }] });
   if (['RW', 'MATH'].includes(requestedSubject)) filters.push({ subject: requestedSubject });
   if (['PRACTICE', 'EXAM'].includes(requestedMode)) filters.push({ mode: requestedMode });
-  if (classId && classId !== 'ALL') filters.push({ OR: [{ classTests: { some: { classId } } }, { deliveries: { some: { classId, status: 'PUBLISHED' } } }] });
   const pagedWhere = { AND: filters };
 
-  const [total, tests] = await prisma.$transaction([
+  const operations = [
     prisma.test.count({ where: pagedWhere }),
     prisma.test.findMany({
     where: pagedWhere,
-    orderBy: { id: String(query.sort || '').toUpperCase() === 'OLDEST' ? 'asc' : 'desc' },
+    orderBy: userRole === 'STUDENT'
+      ? { id: String(query.sort || '').toUpperCase() === 'OLDEST' ? 'asc' : 'desc' }
+      : { updatedAt: String(query.sort || '').toUpperCase() === 'OLDEST' ? 'asc' : 'desc' },
     skip: pagination.skip,
     take: pagination.pageSize,
     select: {
@@ -82,6 +91,10 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
       category: true,
       testDate: true,
       mode: true,
+      status: true,
+      isPublic: true,
+      createdAt: true,
+      updatedAt: true,
       authorId: true,
       author: { select: { id: true, name: true, role: true } },
       sections: {
@@ -116,7 +129,7 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
         }
       }),
       // Lấy lần làm gần nhất để dựng trạng thái và tiến trình thật trên card.
-      ...(hasUser && {
+      ...(userRole === 'STUDENT' && {
         submissions: {
           where: { userId: userId },
           orderBy: { startedAt: 'desc' },
@@ -135,7 +148,14 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
       })
     }
     }),
-  ]);
+  ];
+  if (userRole === 'TEACHER') {
+    operations.push(
+      prisma.test.count({ where: { authorId: Number(userId), status: { not: 'ARCHIVED' } } }),
+      prisma.test.count({ where: { isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } } }),
+    );
+  }
+  const [total, tests, myTests, systemTests] = await prisma.$transaction(operations);
 
   // Map dữ liệu để trả về format gọn gàng cho Frontend
   const items = tests.map(test => {
@@ -145,7 +165,9 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
       0
     );
     const latestSubmission = submissions?.[0] || null;
-    const attemptSummary = buildAttemptSummary({ questionCount, submission: latestSubmission });
+    const attemptSummary = userRole === 'STUDENT'
+      ? buildAttemptSummary({ questionCount, submission: latestSubmission })
+      : {};
 
     return {
       ...rest,
@@ -154,24 +176,10 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
     };
   });
 
-  return { items, pagination: paginationMeta({ ...pagination, total }) };
-};
-
-exports.assignTestsToClasses = async ({ testIds, classIds, availableAt, dueAt, maxAttempts, scorePolicy, userId, userRole }) => {
-  const deliveries = await testDeliveryService.createDeliveries({
-    testIds,
-    classIds,
-    availableAt,
-    dueAt,
-    maxAttempts,
-    scorePolicy,
-    userId,
-    userRole,
-  });
   return {
-    assignedTests: new Set(deliveries.map(item => item.testId)).size,
-    assignedClasses: new Set(deliveries.map(item => item.classId)).size,
-    deliveries,
+    items,
+    pagination: paginationMeta({ ...pagination, total }),
+    ...(userRole === 'TEACHER' ? { sourceCounts: { my: myTests, system: systemTests } } : {}),
   };
 };
 
@@ -252,7 +260,7 @@ const validateSections = ({ sections, subject }) => {
   });
 };
 
-exports.createTest = async ({ title, duration, subject, mode, sections, testDate, category, folderId, userId, userRole }) => {
+exports.createTest = async ({ title, duration, subject, mode, sections, testDate, category, folderId, status, userId, userRole }) => {
   const trimmedTitle = String(title || '').trim();
   const normalizedTitle = trimmedTitle ? `${trimmedTitle.charAt(0).toLocaleUpperCase()}${trimmedTitle.slice(1)}` : trimmedTitle;
   if (!normalizedTitle) {
@@ -268,7 +276,8 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
   }
 
   const normalizedSections = validateSections({ sections, subject });
-  const isPublic = userRole === 'ADMIN';
+  const finalStatus = status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
+  const isPublic = userRole === 'ADMIN' && finalStatus === 'PUBLISHED';
   const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
   const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' && testDate ? String(testDate) : null;
 
@@ -280,6 +289,7 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
       description: null,
       duration: normalizedDuration,
       subject,
+      status: finalStatus,
       mode: mode === 'EXAM' ? 'EXAM' : 'PRACTICE',
       authorId: Number(userId),
       isPublic,
@@ -362,6 +372,25 @@ const ownedTest = async ({ testId, userId, include = {} }) => {
   return test;
 };
 
+const readableTest = async ({ testId, userId, userRole, include = {} }) => {
+  const id = Number(testId);
+  if (!Number.isInteger(id)) throw new ApiError(400, { error: 'Invalid test ID.' });
+  const test = await prisma.test.findFirst({
+    where: {
+      id,
+      OR: [
+        { authorId: Number(userId) },
+        ...(userRole === 'TEACHER' || userRole === 'ADMIN'
+          ? [{ isPublic: true, status: 'PUBLISHED', author: { role: 'ADMIN' } }]
+          : []),
+      ],
+    },
+    include,
+  });
+  if (!test) throw new ApiError(404, { error: 'Test not found or you do not have permission to view it.' });
+  return test;
+};
+
 exports.getTestForEdit = async ({ testId, userId }) => {
   const test = await ownedTest({
     testId,
@@ -381,6 +410,7 @@ exports.getTestForEdit = async ({ testId, userId }) => {
     subject: test.subject,
     mode: test.mode,
     category: test.category,
+    status: test.status,
     testDate: test.testDate,
     folderId: test.folderId,
     moduleCount: test.sections.length,
@@ -389,8 +419,44 @@ exports.getTestForEdit = async ({ testId, userId }) => {
   };
 };
 
-exports.updateTest = async ({ testId, title, duration, subject, mode, sections, testDate, category, folderId, userId, userRole }) => {
+exports.getTestContent = async ({ testId, userId, userRole }) => {
+  const test = await readableTest({
+    testId,
+    userId,
+    userRole,
+    include: {
+      author: { select: { id: true, name: true, role: true } },
+      sections: { orderBy: { order: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } },
+      _count: { select: { submissions: true, deliveries: true } },
+    },
+  });
+  return {
+    id: test.id,
+    title: test.title,
+    description: test.description,
+    duration: test.duration,
+    subject: test.subject,
+    mode: test.mode,
+    category: test.category,
+    status: test.status,
+    createdAt: test.createdAt,
+    updatedAt: test.updatedAt,
+    authorId: test.authorId,
+    author: test.author,
+    isOwner: test.authorId === Number(userId),
+    hasAttempts: test._count.submissions > 0,
+    deliveryCount: test._count.deliveries,
+    questionCount: test.sections.reduce((sum, section) => sum + section.questions.length, 0),
+    sections: test.sections,
+    structuredText: serializeTest(test),
+  };
+};
+
+exports.updateTest = async ({ testId, title, duration, subject, mode, sections, testDate, category, folderId, status, userId, userRole }) => {
   const existing = await ownedTest({ testId, userId, include: { _count: { select: { submissions: true } } } });
+  if (existing.status === 'ARCHIVED') {
+    throw new ApiError(409, { error: 'Restore this test before editing it.' });
+  }
   if (existing._count.submissions > 0) {
     throw new ApiError(409, { error: 'This exam cannot be edited because a student has already started it.' });
   }
@@ -413,9 +479,10 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
         title: normalizedTitle,
         duration: normalizedDuration,
         subject,
+        status: status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT',
         mode: mode === 'EXAM' ? 'EXAM' : 'PRACTICE',
         category: finalCategory,
-        isPublic: userRole === 'ADMIN',
+        isPublic: userRole === 'ADMIN' && status === 'PUBLISHED',
         testDate: finalTestDate,
         folderId: Number.isInteger(Number(folderId)) ? Number(folderId) : null,
         sections: {
@@ -431,8 +498,73 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
   });
 };
 
-exports.deleteTest = async ({ testId, userId }) => {
+exports.updateTestStatus = async ({ testId, status, userId, userRole }) => {
+  const normalizedStatus = String(status || '').toUpperCase();
+  if (!['DRAFT', 'PUBLISHED', 'ARCHIVED'].includes(normalizedStatus)) {
+    throw new ApiError(400, { error: 'Test status is invalid.' });
+  }
   const test = await ownedTest({ testId, userId });
+  return prisma.test.update({
+    where: { id: test.id },
+    data: {
+      status: normalizedStatus,
+      isPublic: userRole === 'ADMIN' && normalizedStatus === 'PUBLISHED',
+    },
+  });
+};
+
+exports.duplicateTest = async ({ testId, userId, userRole }) => {
+  const source = await readableTest({
+    testId,
+    userId,
+    userRole,
+    include: { sections: { orderBy: { order: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } } },
+  });
+  return prisma.test.create({
+    data: {
+      title: `Copy of ${source.title}`.slice(0, 200),
+      description: source.description,
+      duration: source.duration,
+      subject: source.subject,
+      mode: source.mode,
+      category: userRole === 'ADMIN' ? source.category : 'CLASS',
+      status: 'DRAFT',
+      isPublic: false,
+      authorId: Number(userId),
+      sections: {
+        create: source.sections.map(section => ({
+          name: section.name,
+          order: section.order,
+          duration: section.duration,
+          questions: {
+            create: section.questions.map(question => ({
+              order: question.order,
+              questionText: question.questionText,
+              correctAnswer: question.correctAnswer,
+              type: question.type,
+              explanation: question.explanation,
+              blocks: question.blocks,
+              choices: question.choices,
+              domainCode: question.domainCode,
+              skillCode: question.skillCode,
+            })),
+          },
+        })),
+      },
+    },
+    select: { id: true, title: true, status: true },
+  });
+};
+
+exports.deleteTest = async ({ testId, userId }) => {
+  const test = await ownedTest({
+    testId,
+    userId,
+    include: { _count: { select: { submissions: true, deliveries: true, classTests: true } } },
+  });
+  if (test._count.submissions > 0 || test._count.deliveries > 0 || test._count.classTests > 0) {
+    throw new ApiError(409, { error: 'This test has classroom or attempt history and cannot be permanently deleted. Archive it instead.' });
+  }
   await prisma.test.delete({ where: { id: test.id } });
 };
 

@@ -43,8 +43,8 @@ This is a presentation-layer migration, not a Next.js migration.
 | Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | Implemented; single global toolbar, visual QA pending |
 | Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | Implemented; page hierarchy and workspace cards aligned, visual QA pending |
 | Authentication | `auth/v2` | `auth/v1` | Implemented; visual QA pending |
-| Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Implemented, including course, members, performance, assignments, and no local sticky page header |
-| Practice Center | `dashboard/infrastructure` | `dashboard/file-manager`, `dashboard/tasks` | Redesigned with a single-row control toolbar, reference dropdown anatomy, and card/list views using real test/class data |
+| Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Implemented with unified Activities, course, members, performance, assignments, and no local sticky page header |
+| Teacher Test Library / Student Practice Center | `dashboard/infrastructure` | `dashboard/file-manager`, `dashboard/tasks`, `dashboard/default` | Teacher content lifecycle uses My/System sources and Draft/Published/Archived; all test delivery moved to Classroom Activities; Student attempt experience remains separate |
 | Test Bank | `dashboard/file-manager` | `dashboard/tasks` | No standalone route currently; embedded assignment selector aligned |
 | Results Analytics | `dashboard/analytics` | `dashboard/default` | Implemented with real attempt data |
 | Error Log | `dashboard/tasks` | default data-table patterns | Implemented |
@@ -83,6 +83,7 @@ This is a presentation-layer migration, not a Next.js migration.
 
 - [x] Classroom core surfaces (embedded analytics and vocabulary follow their owning migrations).
 - [x] Practice Center and the existing embedded Test Bank selector.
+- [x] Separate Teacher Test Library content lifecycle from Classroom test delivery and student attempt state.
 - [x] Results Analytics and Score Report.
 - [x] Error Log and Vocabulary.
 - [x] Shared assignment, test-selection, and announcement overlays.

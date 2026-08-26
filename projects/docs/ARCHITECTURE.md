@@ -146,7 +146,12 @@ Express Server (index.js → app.js)
 |---|---|---|---|
 | `GET` | `/api/tests` | JWT | List available tests (public, class-assigned, own) |
 | `GET` | `/api/tests/classes` | JWT | Get classes for test assignment dropdown |
-| `POST` | `/api/tests/create` | JWT + TEACHER/ADMIN | Create test with sections, questions, optional class assignment |
+| `POST` | `/api/tests/create` | JWT + TEACHER/ADMIN | Create a Draft or Published test with sections and questions |
+| `GET` | `/api/tests/:id/content` | JWT + TEACHER/ADMIN | Read owned or published system test content without creating an attempt |
+| `POST` | `/api/tests/:id/duplicate` | JWT + TEACHER/ADMIN | Duplicate an accessible test into an owned Draft |
+| `PATCH` | `/api/tests/:id/status` | JWT + TEACHER/ADMIN | Publish, archive, or restore an owned test |
+| `GET` | `/api/class-activities/class/:classId` | JWT | List unified class activities visible to staff or an enrolled student |
+| `POST` | `/api/test-deliveries` | JWT + TEACHER/ADMIN | Publish a Classroom test activity with availability, attempts, score policy, and audience |
 | `GET` | `/api/test/:id` | JWT | Start or resume a test session |
 | `POST` | `/api/test/:id/save-progress` | JWT | Auto-save answers, time, current question |
 | `POST` | `/api/test/:id/submit` | JWT | Submit test → auto-grade → store results → notify teacher |
@@ -261,7 +266,7 @@ Folder ──1:N── Test
 
 **Assignment**: `id` (UUID), `title`, `content`, `fileUrls[]`, `links[]`, `testIds[]`, `deadline`, `classId` (FK → Class, cascade)
 
-**Test**: `id`, `title`, `description`, `duration` (default 64 min), `mode` (PRACTICE | EXAM), `category` (REAL | CLASS | PRACTICE), `isPublic`, `subject` (RW | MATH), `authorId` (FK → User), `folderId` (FK → Folder)
+**Test**: `id`, `title`, `description`, `duration` (default 64 min), `mode` (PRACTICE | EXAM), `status` (DRAFT | PUBLISHED | ARCHIVED), `category` (REAL | CLASS | PRACTICE), `isPublic`, `subject` (RW | MATH), `authorId` (FK → User), `folderId` (FK → Folder), `createdAt`, `updatedAt`
 
 **Submission**: `id`, `userId`, `testId`, `assignmentId`, `classTestId`, `savedAnswers` (JSON), `timeRemaining`, `currentQuestionIndex`, `score`, `violationCount`, `status` (DOING | COMPLETED), `startedAt`, `endTime`
 
@@ -269,7 +274,7 @@ Folder ──1:N── Test
 
 **Answer**: `id`, `submissionId`, `questionId`, `selectedChoice`, `isCorrect`
 
-**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR)
+**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR)
 
 ---
 
@@ -315,17 +320,30 @@ Folder ──1:N── Test
 ```
 1. Teacher creates class: POST /api/classes
 2. Teacher adds students by email: POST /api/classes/:classId/students
-3. Teacher creates assignments: POST /api/classes/posts
-   → Can attach tests (testIds), files (fileUrls), external links
-   → Sends notification to all students in class
+3. Teacher creates announcements/homework posts: POST /api/classes/posts
+   → Can attach files (fileUrls) and external links; tests are delivered only through Classroom Activities
+   → Sends notification to the selected class audience
 4. Teacher views class detail: GET /api/classes/:id
    → Shows students, assignments, submissions per student
-5. Teacher views test analytics: GET /api/classes/:testId/report
-   → Leaderboard + per-question answer distribution
+5. Teacher opens a Test activity performance report
+   → GET /api/test-deliveries/:deliveryId/performance returns completion, leaderboard, and question analytics
 6. Teacher manages weekly lessons: Progress API (Weeks → Lessons → Files/Assignments)
 ```
 
-### 8.3 AI Question Generation & Evaluation (LogicLab)
+### 8.3 Teacher Test Library and Classroom Delivery
+
+```text
+1. Teacher creates or edits content in Test Library.
+2. Save draft keeps the test private and unavailable for delivery.
+3. Publish test makes it selectable from Classroom → Activities.
+4. Classroom → Add Activity → Test lists Published My Tests and Published System Tests.
+5. Teacher configures availability, deadline, attempts, score policy, and all/selected students.
+6. POST /api/test-deliveries creates TestDelivery + canonical ClassActivity + assignees and notifications.
+7. Classroom Activities owns completion/performance; Test Library never displays student attempt state.
+8. Archiving prevents new delivery but preserves existing deliveries and student access/history.
+```
+
+### 8.4 AI Question Generation & Evaluation (LogicLab)
 
 ```
 1. Student requests a question: POST /api/challenge/generate
@@ -336,7 +354,7 @@ Folder ──1:N── Test
    → Returns correctness, per-option feedback, and summary
 ```
 
-### 8.4 Document Parsing (AI Parser)
+### 8.5 Document Parsing (AI Parser)
 
 ```
 1. Teacher uploads PDF/DOCX: POST /api/ai-parser (multipart/form-data)
@@ -346,7 +364,7 @@ Folder ──1:N── Test
    → Formatted text returned to client
 ```
 
-### 8.5 Real-Time Notifications
+### 8.6 Real-Time Notifications
 
 ```
 1. Client connects: GET /api/notifications/stream (SSE)

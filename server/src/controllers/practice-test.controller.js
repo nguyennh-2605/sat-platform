@@ -31,26 +31,6 @@ exports.getTests = async (req, res) => {
   }
 };
 
-exports.assignTestsToClasses = async (req, res) => {
-  try {
-    const result = await practiceTestService.assignTestsToClasses({
-      testIds: req.body.testIds,
-      classIds: req.body.classIds,
-      availableAt: req.body.availableAt,
-      dueAt: req.body.dueAt,
-      maxAttempts: req.body.maxAttempts,
-      scorePolicy: req.body.scorePolicy,
-      userId: req.user.userId,
-      userRole: req.user.role,
-    });
-    res.json({ message: 'Giao đề thi cho lớp thành công', ...result });
-  } catch (error) {
-    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
-    console.error('Assign tests error:', error);
-    res.status(500).json({ error: 'Lỗi giao đề thi cho lớp' });
-  }
-};
-
 exports.getTaxonomy = async (req, res) => {
   try {
     const taxonomy = practiceTestService.getTaxonomy({ subject: req.query.subject });
@@ -91,6 +71,21 @@ exports.getTestForEdit = async (req, res) => {
   }
 };
 
+exports.getTestContent = async (req, res) => {
+  try {
+    const test = await practiceTestService.getTestContent({
+      testId: req.params.id,
+      userId: req.user.userId,
+      userRole: req.user.role,
+    });
+    res.json(test);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Get test content error:', error);
+    res.status(500).json({ error: 'Unable to load this test.' });
+  }
+};
+
 exports.updateTest = async (req, res) => {
   try {
     const test = await practiceTestService.updateTest({
@@ -104,6 +99,37 @@ exports.updateTest = async (req, res) => {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
     console.error('Update test error:', error);
     res.status(500).json({ error: 'Unable to update this exam.' });
+  }
+};
+
+exports.updateTestStatus = async (req, res) => {
+  try {
+    const test = await practiceTestService.updateTestStatus({
+      testId: req.params.id,
+      status: req.body.status,
+      userId: req.user.userId,
+      userRole: req.user.role,
+    });
+    res.json(test);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Update test status error:', error);
+    res.status(500).json({ error: 'Unable to update this test status.' });
+  }
+};
+
+exports.duplicateTest = async (req, res) => {
+  try {
+    const test = await practiceTestService.duplicateTest({
+      testId: req.params.id,
+      userId: req.user.userId,
+      userRole: req.user.role,
+    });
+    res.status(201).json(test);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Duplicate test error:', error);
+    res.status(500).json({ error: 'Unable to duplicate this test.' });
   }
 };
 

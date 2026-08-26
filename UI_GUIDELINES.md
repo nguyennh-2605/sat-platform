@@ -183,20 +183,33 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ## 7. Practice Center
 
+- Với Teacher, route này hiển thị `Test Library`: chỉ tạo, quản lý lifecycle và xem nội dung test. Mọi thao tác giao test, deadline, attempts, audience và theo dõi completion nằm trong `Classroom → Activities`.
+- Teacher dùng hai nguồn `My Tests` và `System Tests`. `My Tests` chỉ gồm test giáo viên sở hữu; `System Tests` chỉ gồm test Published do Admin/platform cung cấp.
+- `Draft`, `Published`, `Archived` là lifecycle filter bên trong `My Tests`, không phải source tab. `All` chỉ gồm Draft + Published; Archived chỉ xuất hiện khi chọn riêng.
+- Teacher card không hiển thị attempt status, progress, last score hoặc Continue. Card chỉ hiển thị subject/source, lifecycle, title, type, question count, duration, updated time và content actions.
+- System Tests là read-only đối với Teacher; action hợp lệ là Preview và Duplicate to My Tests. Bản duplicate luôn là teacher-owned Draft.
+- Published có Preview/Edit/Duplicate/Archive/Delete; Draft có Continue editing/Preview/Duplicate/Delete; Archived có Preview/Restore/Delete. Backend phải chặn permanent delete khi test đã có classroom hoặc attempt history.
+- Test Detail dùng `Overview | Questions`; không thêm Assignments tab. Preview content không được tạo Submission cho giáo viên.
+- Create/Edit dùng terminology `Test`, có `Save draft` và `Publish test`; chỉ Published test mới được chọn khi tạo Classroom activity.
 - Bám sát `dashboard/infrastructure` cho page hierarchy và toolbar: search, filter, sort, view switch và role actions nằm trên một hàng ở desktop; chỉ wrap có kiểm soát trên viewport nhỏ.
 - Toolbar dùng search bên trái và nhóm control `size="sm"` bên phải. Trên desktop, search nhận phần chiều rộng còn lại để khoảng cách từ search đến Filter bằng đúng khoảng cách giữa các control (`gap-2`); không chèn khoảng trống bằng `justify-between`/`justify-end` hoặc dùng control cao như action chính.
 - View switch dùng icon dễ đọc và thêm check trước mode đang chọn; selected mode dùng neutral accent surface rõ hơn trạng thái chưa chọn.
 - Filter và sort dùng shared dropdown primitives với label, radio item, submenu, separator và active count như `dashboard/file-manager`; không trải nhiều hàng pill filter trong page.
 - Attempt status bám sát badge của `dashboard/default`: một outline pill trung tính cho mọi trạng thái, chỉ icon bên trong biểu thị Completed/In progress/Not started; không dùng border xanh/vàng cho status badge.
 - Hỗ trợ cả card view và list/table view trên cùng dữ liệu và hành động. View preference được lưu ở client; list rộng phải horizontal-scroll thay vì ép cột quá hẹp.
-- Giáo viên chỉ thấy đề do chính giáo viên đó tạo.
+- Giáo viên chỉ được sửa lifecycle/nội dung đề do chính giáo viên đó tạo.
 - Học sinh thấy đề admin đăng và đề giáo viên giao cho lớp của mình.
-- Trạng thái mặc định của card có nút ba chấm ở góc phải.
-- Giáo viên nhấn `Assign tests` để vào selection mode; lúc đó nút ba chấm mới đổi thành checkbox.
-- Không hiện số lớp đã giao trên card nếu không được yêu cầu.
+- Practice Center của Student tiếp tục hiển thị attempt status, progress, last attempt và score từ dữ liệu thật.
 - Card phải gọn; title, metadata, progress và action không được cách nhau quá xa.
 - Hiển thị question count, progress percentage, last attempt và score khi có dữ liệu thật.
 - Các trạng thái dùng English: `Not started`, `In progress`, `Completed`.
+
+### Classroom Activities
+
+- `Activities` thay thế `Coursework` và hợp nhất Test, Vocabulary, Homework/Resource bằng `ClassActivity` thật; `Course` vẫn là cây tuần/buổi học riêng.
+- Teacher tạo test activity từ bên trong Classroom, chọn Published My Test hoặc Published System Test rồi cấu hình availability, deadline, attempts, score policy và audience.
+- Activity list hiển thị type, deadline, audience/completion summary và mở đúng destination: test performance, vocabulary activity hoặc homework detail.
+- Archive test trong Test Library không được làm mất quyền truy cập vào delivery đã Published; archive chỉ ảnh hưởng content library và việc tạo assignment mới.
 
 ## 8. Analytics
 

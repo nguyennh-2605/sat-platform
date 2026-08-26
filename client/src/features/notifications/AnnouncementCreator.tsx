@@ -10,11 +10,12 @@ import { Button, Card, Input } from '../../components/ui/AppUI';
 
 interface AnnouncementCreatorProps {
   onClose: () => void;
-  onSubmit: (data: { title: string; content: string; deadline: string | null; fileUrls: string[]; links: string[] }) => void;
+  onSubmit: (data: { title: string; content: string; deadline: string | null; fileUrls: string[]; links: string[]; type?: 'assignment' | 'announcement' }) => void;
   initialData?: AssignmentProps;
+  kind?: 'post' | 'homework';
 }
 
-const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCreatorProps) => {
+const AnnouncementCreator = ({ onClose, onSubmit, initialData, kind = 'post' }: AnnouncementCreatorProps) => {
   const [links, setLinks] = useState<string[]>([]);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
@@ -134,7 +135,8 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
       ...form,
       deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
       fileUrls: formattedFileUrls,
-      links: links
+      links: links,
+      type: kind === 'homework' ? 'assignment' : undefined,
     });
   };
 
@@ -146,7 +148,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
         <div className="flex items-center gap-2 md:gap-4">
           <Button onClick={onClose} variant="ghost" size="icon" className="h-8 w-8" aria-label="Close post editor"><X size={18} /></Button>
           <h2 className="text-base font-semibold tracking-tight text-foreground">
-            {isEditMode ? 'Edit post' : 'New post'}
+            {isEditMode ? 'Edit post' : kind === 'homework' ? 'New homework' : 'New post'}
           </h2>
         </div>
 
@@ -172,7 +174,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                   <Input
                     type="text"
                     id="post-title"
-                    placeholder="Post title…"
+                    placeholder={kind === 'homework' ? 'Homework title…' : 'Post title…'}
                     className="w-full"
                     value={form.title}
                     onChange={e => setForm({ ...form, title: e.target.value })}
@@ -216,7 +218,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData }: AnnouncementCre
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
                   Due date
                 </h3>
-                <p className="mb-4 text-sm text-muted-foreground">Leave blank for an announcement without a due date.</p>
+                <p className="mb-4 text-sm text-muted-foreground">{kind === 'homework' ? 'Choose a deadline or leave it open-ended.' : 'Leave blank for an announcement without a due date.'}</p>
                 <DateTimePicker
                   value={form.deadline}
                   onChange={deadline => setForm({ ...form, deadline })}

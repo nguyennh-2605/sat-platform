@@ -51,9 +51,10 @@ const median = (values) => {
   return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 };
 
-exports.createDeliveries = async ({ classIds, testIds, lessonId, title, availableAt, dueAt, maxAttempts, scorePolicy, userId, userRole }) => {
+exports.createDeliveries = async ({ classIds, testIds, studentIds, lessonId, title, availableAt, dueAt, maxAttempts, scorePolicy, userId, userRole }) => {
   const normalizedClassIds = [...new Set((Array.isArray(classIds) ? classIds : []).map(String).filter(Boolean))];
   const normalizedTestIds = [...new Set((Array.isArray(testIds) ? testIds : []).map(Number).filter(Number.isInteger))];
+  const normalizedStudentIds = [...new Set((Array.isArray(studentIds) ? studentIds : []).map(parseUserId).filter(Number.isInteger))];
   if (normalizedClassIds.length === 0 || normalizedTestIds.length === 0) {
     throw new ApiError(400, { error: 'Select at least one test and one class.' });
   }
@@ -68,6 +69,9 @@ exports.createDeliveries = async ({ classIds, testIds, lessonId, title, availabl
   if (lessonId && normalizedClassIds.length !== 1) {
     throw new ApiError(400, { error: 'A lesson can only be attached when assigning to one class.' });
   }
+  if (normalizedStudentIds.length && normalizedClassIds.length !== 1) {
+    throw new ApiError(400, { error: 'Selected students can only be used when assigning to one class.' });
+  }
 
   return prisma.$transaction(async tx => {
     const classes = [];
@@ -78,12 +82,18 @@ exports.createDeliveries = async ({ classIds, testIds, lessonId, title, availabl
     const tests = await tx.test.findMany({
       where: {
         id: { in: normalizedTestIds },
-        ...(userRole === 'ADMIN' ? {} : { authorId: parseUserId(userId) }),
+        status: 'PUBLISHED',
+        ...(userRole === 'ADMIN' ? {} : {
+          OR: [
+            { authorId: parseUserId(userId) },
+            { isPublic: true, author: { role: 'ADMIN' } },
+          ],
+        }),
       },
       select: { id: true, title: true },
     });
     if (tests.length !== normalizedTestIds.length) {
-      throw new ApiError(403, { error: 'You can only assign tests you own.' });
+      throw new ApiError(403, { error: 'Only your published tests and published system tests can be assigned.' });
     }
 
     if (lessonId) {
@@ -96,6 +106,14 @@ exports.createDeliveries = async ({ classIds, testIds, lessonId, title, availabl
 
     const deliveries = [];
     for (const classroom of classes) {
+      const classStudentIds = new Set(classroom.students.map(student => student.id));
+      const assigneeIds = normalizedStudentIds.length
+        ? normalizedStudentIds.filter(studentId => classStudentIds.has(studentId))
+        : [...classStudentIds];
+      if (normalizedStudentIds.length && assigneeIds.length !== normalizedStudentIds.length) {
+        throw new ApiError(400, { error: 'One or more selected students do not belong to this class.' });
+      }
+      if (!assigneeIds.length) throw new ApiError(400, { error: 'Select at least one student.' });
       for (const test of tests) {
         const classTest = await tx.classTest.upsert({
           where: { classId_testId: { classId: classroom.id, testId: test.id } },
@@ -120,7 +138,7 @@ exports.createDeliveries = async ({ classIds, testIds, lessonId, title, availabl
             createdById: parseUserId(userId),
             legacyClassTestId: legacyAlreadyLinked ? null : classTest.id,
             assignees: {
-              create: classroom.students.map(student => ({ studentId: student.id })),
+              create: assigneeIds.map(studentId => ({ studentId })),
             },
           },
           include: { test: { select: { id: true, title: true, mode: true } }, class: { select: { id: true, name: true } } },
@@ -137,13 +155,20 @@ exports.createDeliveries = async ({ classIds, testIds, lessonId, title, availabl
             maxAttempts: normalizedMaxAttempts,
             scorePolicy: normalizedScorePolicy,
             completionRule: 'SUBMIT',
-            audience: 'ALL_STUDENTS',
+            audience: normalizedStudentIds.length ? 'SELECTED' : 'ALL_STUDENTS',
             createdById: parseUserId(userId),
-            assignees: { create: classroom.students.map(student => ({ studentId: student.id })) },
+            assignees: { create: assigneeIds.map(studentId => ({ studentId })) },
           },
           select: { id: true },
         });
         await tx.$executeRaw`INSERT INTO "TestActivity" ("activityId", "testDeliveryId") VALUES (${canonicalActivity.id}, ${delivery.id}) ON CONFLICT ("activityId") DO NOTHING`;
+        await tx.notification.createMany({
+          data: assigneeIds.map(studentId => ({
+            userId: studentId,
+            message: `${classroom.name}: ${delivery.title}`,
+            link: `/dashboard/class/${classroom.id}?tab=activities`,
+          })),
+        });
         deliveries.push(delivery);
       }
     }

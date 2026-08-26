@@ -29,6 +29,7 @@ import type { ContentBlock } from '../../types/quiz';
 
 type Subject = 'RW' | 'MATH';
 type TestMode = 'PRACTICE' | 'EXAM';
+type TestStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 type Step = 'SETUP' | 'IMPORT' | 'REVIEW';
 type IssueSeverity = 'error' | 'warning';
 
@@ -65,6 +66,7 @@ interface EditTestPayload {
   subject: Subject;
   mode: TestMode;
   category: string;
+  status: TestStatus;
   testDate?: string | null;
   folderId?: number | null;
   moduleCount: number;
@@ -243,6 +245,7 @@ const CreateTestWizard = () => {
   const [isLoadingEdit, setIsLoadingEdit] = useState(Boolean(editTestId));
   const [editFolderId, setEditFolderId] = useState<number | null>(null);
   const [editLocked, setEditLocked] = useState(false);
+  const [testStatus, setTestStatus] = useState<TestStatus>('DRAFT');
   const [importError, setImportError] = useState('');
   const userRole = localStorage.getItem('userRole') || 'TEACHER';
   const folderIdParam = searchParams.get('folderId');
@@ -336,6 +339,7 @@ const CreateTestWizard = () => {
           testDate: detail.testDate || '',
         });
         setEditFolderId(detail.folderId ?? null);
+        setTestStatus(detail.status);
         setEditLocked(detail.hasAttempts);
         setRawText(detail.structuredText);
         const parsed = await axiosClient.post<ImportPreview, ImportPreview>('/api/test-imports/preview-text', {
@@ -347,7 +351,7 @@ const CreateTestWizard = () => {
         setSelectedQuestionId(parsed.modules[0]?.questions[0]?.clientId || '');
         setStep('IMPORT');
       } catch (error: unknown) {
-        toast.error(requestErrorMessage(error, 'Unable to load this exam for editing'));
+        toast.error(requestErrorMessage(error, 'Unable to load this test for editing'));
         navigate('/dashboard/practice-test');
       } finally {
         setIsLoadingEdit(false);
@@ -422,9 +426,9 @@ const CreateTestWizard = () => {
     }
   };
 
-  const saveTest = async () => {
-    if (editLocked) return toast.error('This exam cannot be edited because a student has already started it');
-    if (blockingErrors) return toast.error('Resolve all errors before creating the exam');
+  const saveTest = async (nextStatus: Exclude<TestStatus, 'ARCHIVED'>) => {
+    if (editLocked) return toast.error('This test cannot be edited because a student has already started it');
+    if (blockingErrors) return toast.error('Resolve all errors before saving the test');
     setIsSaving(true);
     try {
       const moduleDuration = Math.max(1, Math.floor(form.duration / Math.max(1, preview.modules.length)));
@@ -433,6 +437,7 @@ const CreateTestWizard = () => {
         subject: form.subject,
         duration: Number(form.duration),
         mode: form.mode,
+        status: nextStatus,
         category: userRole === 'ADMIN' ? form.category : 'CLASS',
         testDate: userRole === 'ADMIN' && form.category === 'REAL' ? form.testDate || undefined : undefined,
         folderId: folderId ?? editFolderId ?? undefined,
@@ -454,11 +459,12 @@ const CreateTestWizard = () => {
       };
       if (editTestId) await axiosClient.put(`/api/tests/${editTestId}`, payload);
       else await axiosClient.post('/api/tests/create', payload);
-      toast.success(editTestId ? 'Exam updated' : 'Exam created. Assign it from Practice Center when you are ready.');
+      setTestStatus(nextStatus);
+      toast.success(nextStatus === 'PUBLISHED' ? 'Test published. It is now available in Classroom.' : editTestId ? 'Draft changes saved' : 'Draft test created');
       navigate('/dashboard/practice-test');
     } catch (error: unknown) {
       console.error(error);
-      toast.error(requestErrorMessage(error, 'Unable to create the exam'));
+      toast.error(requestErrorMessage(error, 'Unable to save the test'));
     } finally {
       setIsSaving(false);
     }
@@ -475,19 +481,19 @@ const CreateTestWizard = () => {
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className={`${ui.content} flex min-h-full flex-col gap-6`}>
           <PageHeader
-            title={editTestId ? 'Edit Exam' : 'Create Exam'}
+            title={editTestId ? 'Edit Test' : 'Create Test'}
             description={editTestId ? 'Update the structured content and review your changes.' : 'Import, review, and organize SAT questions.'}
             actions={step === 'IMPORT'
               ? <Button variant="outline" size="sm" onClick={() => setGuideOpen(true)}><CircleHelp size={15} />Formatting guide</Button>
               : step === 'REVIEW'
-                ? <Button size="sm" disabled={blockingErrors || isSaving || editLocked} onClick={saveTest}><Save size={15} />{isSaving ? 'Saving…' : editTestId ? 'Save changes' : 'Create exam'}</Button>
+                ? <div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('DRAFT')}><Save size={15} />{isSaving ? 'Saving…' : 'Save draft'}</Button><Button size="sm" disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('PUBLISHED')}><CheckCircle2 size={15} />Publish test</Button></div>
                 : undefined}
           />
           <WizardStepper step={step} />
-          {isLoadingEdit && <Card className="flex min-h-[360px] items-center justify-center gap-3 p-8 text-sm text-muted-foreground"><LoaderCircle size={20} className="animate-spin text-primary" />Loading exam content…</Card>}
+          {isLoadingEdit && <Card className="flex min-h-[360px] items-center justify-center gap-3 p-8 text-sm text-muted-foreground"><LoaderCircle size={20} className="animate-spin text-primary" />Loading test content…</Card>}
           {!isLoadingEdit && step === 'SETUP' && (
             <Card className="wizard-step-enter mx-auto w-full max-w-3xl p-6 lg:p-8">
-              <div className="mb-6"><h2 className="text-lg font-semibold text-foreground">Test details</h2><p className="mt-1 text-sm text-muted-foreground">Set up the exam before importing its questions.</p></div>
+              <div className="mb-6"><h2 className="text-lg font-semibold text-foreground">Test details</h2><p className="mt-1 text-sm text-muted-foreground">Set up the test before importing its questions.</p></div>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <Field label="Test name" className="md:col-span-2"><Input className="w-full" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder="e.g. SAT Reading Practice Test 1" autoFocus /></Field>
                 <Field label="Subject"><Select className="w-full" value={form.subject} onChange={event => setForm(current => ({ ...current, subject: event.target.value as Subject }))}><option value="RW">Reading & Writing</option><option value="MATH">Math</option></Select></Field>
@@ -502,7 +508,7 @@ const CreateTestWizard = () => {
 
           {!isLoadingEdit && step === 'IMPORT' && (
             <div className="wizard-step-enter flex min-h-0 flex-1 flex-col gap-4">
-              {editLocked && <ImportNotice tone="warning" message="This exam is read-only because a student has already started it. Delete it and create a new version if the question structure must change." />}
+              {editLocked && <ImportNotice tone="warning" message="This test is read-only because a student has already started it. Duplicate it from Test Library to make structural changes." />}
               <Card className="flex min-h-[620px] flex-1 flex-col overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border px-4 py-3">
                   <div><h2 className="text-sm font-semibold text-foreground">Import workspace</h2><p className="mt-0.5 text-xs text-muted-foreground">Edit structured text and check the parsed result side by side.</p></div>
@@ -546,7 +552,7 @@ const CreateTestWizard = () => {
                 <section className="min-w-0 border-b border-ui-border p-5 lg:border-b-0 lg:border-r lg:p-6">{selectedQuestion ? <QuestionPreview question={selectedQuestion} subject={form.subject} /> : <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Select a question to review.</div>}</section>
                 <aside className="min-w-0 bg-muted/30 p-5">{selectedQuestion ? <QuestionEditor question={selectedQuestion} domain={selectedDomain} taxonomy={taxonomy} onChange={updateQuestion} /> : null}</aside>
               </div>
-              <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={() => moveQuestion(-1)} disabled={selectedIndex <= 0}><ChevronLeft size={16} />Previous</Button><Button variant="ghost" size="sm" onClick={() => moveQuestion(1)} disabled={selectedIndex < 0 || selectedIndex >= questions.length - 1}>Next<ChevronRight size={16} /></Button></div><div className="flex items-center justify-end gap-2"><Button variant="outline" onClick={() => setStep('IMPORT')}>Replace import</Button><Button disabled={blockingErrors || isSaving || editLocked} onClick={saveTest}><Save size={16} />{isSaving ? 'Saving…' : editTestId ? 'Save changes' : 'Create exam'}</Button></div></Card>
+              <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={() => moveQuestion(-1)} disabled={selectedIndex <= 0}><ChevronLeft size={16} />Previous</Button><Button variant="ghost" size="sm" onClick={() => moveQuestion(1)} disabled={selectedIndex < 0 || selectedIndex >= questions.length - 1}>Next<ChevronRight size={16} /></Button></div><div className="flex flex-wrap items-center justify-end gap-2"><Button variant="outline" onClick={() => setStep('IMPORT')}>Replace import</Button><Button variant="outline" disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('DRAFT')}><Save size={16} />{isSaving ? 'Saving…' : testStatus === 'DRAFT' ? 'Save draft' : 'Move to draft'}</Button><Button disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('PUBLISHED')}><CheckCircle2 size={16} />Publish test</Button></div></Card>
             </div>
           )}
         </div>
@@ -560,7 +566,7 @@ const CreateTestWizard = () => {
 
 function WizardStepper({ step }: { step: Step }) {
   const activeIndex = steps.findIndex(item => item.key === step);
-  return <div className="flex items-center gap-1.5" aria-label="Create exam progress">{steps.map((item, index) => {
+  return <div className="flex items-center gap-1.5" aria-label="Create test progress">{steps.map((item, index) => {
     const active = item.key === step;
     const complete = activeIndex > index;
     return <div key={item.key} className="flex items-center gap-1.5"><span className={`flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-semibold transition-colors duration-200 ${active || complete ? 'border-primary bg-primary-soft text-primary' : 'border-ui-border bg-surface text-muted-foreground'}`}>{complete ? <CheckCircle2 size={14} /> : index + 1}</span><span className={`hidden text-xs font-medium transition-colors duration-200 sm:inline ${active ? 'text-foreground' : 'text-muted-foreground'}`}>{item.label}</span>{index < steps.length - 1 && <span className={`h-px w-5 transition-colors duration-200 lg:w-8 ${complete ? 'bg-primary' : 'bg-border'}`} />}</div>;
