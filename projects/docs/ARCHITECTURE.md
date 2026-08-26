@@ -216,6 +216,15 @@ Express Server (index.js → app.js)
 | `GET` | `/api/notifications` | JWT | Get last 50 notifications |
 | `PUT` | `/api/notifications/read-all` | JWT | Mark all notifications as read |
 
+### 5.11 Admin Overview
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/admin/overview?range=7d\|30d\|90d` | JWT + ADMIN | Platform KPI summary, actionable published System Test integrity issues, test lifecycle counts, and classroom snapshot |
+| `GET` | `/api/admin/overview/activity?range=7d\|30d\|90d` | JWT + ADMIN | Zero-filled Test Attempts, Completed Tests, and Students Taking Tests time series |
+
+Admin Overview uses complete platform days in the configured `APP_TIMEZONE`. It deliberately reports Total Classrooms rather than inferring an active/inactive lifecycle that the current Class model does not yet store. Student Error Logs, ordinary Draft tests, transient imports, and synthetic recent activity are not treated as operational alerts.
+
 **Total: 47+ endpoints**
 
 ---
@@ -291,7 +300,6 @@ Folder ──1:N── Test
 | `/dashboard/class/:classId` | Classroom | Class feed, assignments, students |
 | `/dashboard/class/:classId/assignment/:assignmentId` | AssignmentDetail | View/submit homework |
 | `/dashboard/error-log` | ErrorLog | Wrong answer tracking |
-| `/dashboard/logic-lab` | LogicLab | AI challenge (question generation + evaluation) |
 | `/dashboard/results-analytics` | ResultAnalytics | Performance charts & history |
 | `/test/:id` | ExamRoom | Full-screen test taking interface |
 | `/score-report` | ScoreReport | Post-submission score breakdown |
@@ -356,7 +364,18 @@ Folder ──1:N── Test
 7. Publishing/archiving affects library availability, while existing deliveries and attempt history remain accessible.
 ```
 
-### 8.4 AI Question Generation & Evaluation (LogicLab)
+### 8.5 Admin Overview
+
+```text
+1. DashboardHome dispatches ADMIN to a dedicated AdminOverview; Teacher and Student keep separate workspace homes.
+2. GET /api/admin/overview returns real summary/content/classroom data and published System Test integrity issues.
+3. GET /api/admin/overview/activity loads independently so chart failure does not hide the rest of the page.
+4. Range is stored in the dashboard URL and supports 7, 30, or 90 complete platform days.
+5. Attention links open Admin Test Management with source/status/integrity filters restored from the URL.
+6. Recent Activity remains out of scope until a product AuditEvent model exists.
+```
+
+### 8.6 AI Question Generation & Evaluation (LogicLab)
 
 ```
 1. Student requests a question: POST /api/challenge/generate
@@ -367,7 +386,7 @@ Folder ──1:N── Test
    → Returns correctness, per-option feedback, and summary
 ```
 
-### 8.5 Document Parsing (AI Parser)
+### 8.7 Document Parsing (AI Parser)
 
 ```
 1. Teacher uploads PDF/DOCX: POST /api/ai-parser (multipart/form-data)
@@ -377,7 +396,7 @@ Folder ──1:N── Test
    → Formatted text returned to client
 ```
 
-### 8.6 Real-Time Notifications
+### 8.8 Real-Time Notifications
 
 ```
 1. Client connects: GET /api/notifications/stream (SSE)

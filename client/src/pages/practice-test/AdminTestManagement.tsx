@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
   Archive,
@@ -58,6 +58,7 @@ type ModeFilter = 'ALL' | 'PRACTICE' | 'EXAM';
 type StatusFilter = 'ALL' | TestStatus;
 type SortOrder = 'NEWEST' | 'OLDEST';
 type ViewMode = 'GRID' | 'LIST';
+type IntegrityFilter = 'ALL' | 'NO_SECTIONS' | 'NO_QUESTIONS' | 'EMPTY_SECTION';
 
 interface TestCapabilities {
   canEdit: boolean;
@@ -103,25 +104,42 @@ interface TestActions {
 const subjectLabel = { RW: 'Reading & Writing', MATH: 'Math' } as const;
 const modeLabel = { PRACTICE: 'Practice', EXAM: 'Exam' } as const;
 const statusLabel = { ALL: 'All statuses', DRAFT: 'Draft', PUBLISHED: 'Published', ARCHIVED: 'Archived' } as const;
+const integrityLabel = { ALL: 'All integrity states', NO_SECTIONS: 'No sections', NO_QUESTIONS: 'No questions', EMPTY_SECTION: 'Empty section' } as const;
+
+const enumParam = <T extends string>(value: string | null, allowed: readonly T[], fallback: T): T => allowed.includes(value as T) ? value as T : fallback;
 
 export default function AdminTestManagement() {
   const navigate = useNavigate();
-  const [source, setSource] = useState<AdminSource>('SYSTEM');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const source = enumParam(searchParams.get('source')?.toUpperCase() || null, ['SYSTEM', 'TEACHER'] as const, 'SYSTEM');
+  const search = searchParams.get('search') || '';
+  const subject = enumParam(searchParams.get('subject')?.toUpperCase() || null, ['ALL', 'RW', 'MATH'] as const, 'ALL');
+  const mode = enumParam(searchParams.get('mode')?.toUpperCase() || null, ['ALL', 'PRACTICE', 'EXAM'] as const, 'ALL');
+  const status = enumParam(searchParams.get('status')?.toUpperCase() || null, ['ALL', 'DRAFT', 'PUBLISHED', 'ARCHIVED'] as const, 'ALL');
+  const integrity = source === 'SYSTEM'
+    ? enumParam(searchParams.get('integrity')?.toUpperCase() || null, ['ALL', 'NO_SECTIONS', 'NO_QUESTIONS', 'EMPTY_SECTION'] as const, 'ALL')
+    : 'ALL';
+  const sort = enumParam(searchParams.get('sort')?.toUpperCase() || null, ['NEWEST', 'OLDEST'] as const, 'NEWEST');
+  const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1);
   const [tests, setTests] = useState<AdminTest[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta>({ page: 1, pageSize: 24, total: 0, totalPages: 1 });
   const [sourceCounts, setSourceCounts] = useState({ system: 0, teacher: 0 });
-  const [search, setSearch] = useState('');
-  const [subject, setSubject] = useState<SubjectFilter>('ALL');
-  const [mode, setMode] = useState<ModeFilter>('ALL');
-  const [status, setStatus] = useState<StatusFilter>('ALL');
-  const [sort, setSort] = useState<SortOrder>('NEWEST');
   const [view, setView] = useState<ViewMode>(() => localStorage.getItem('adminTestManagementView') === 'GRID' ? 'GRID' : 'LIST');
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [workingId, setWorkingId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminTest | null>(null);
   const debouncedSearch = useDebounce(search, 250);
+
+  const updateQuery = useCallback((updates: Record<string, string | null>, resetPage = true) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(updates)) {
+      if (!value || value === 'ALL' || value === 'NEWEST' || (key === 'page' && value === '1')) next.delete(key);
+      else next.set(key, value);
+    }
+    if (resetPage && !('page' in updates)) next.delete('page');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const loadTests = useCallback(async (force = false) => {
     setLoading(true);
@@ -132,6 +150,7 @@ export default function AdminTestManagement() {
       if (subject !== 'ALL') params.set('subject', subject);
       if (mode !== 'ALL') params.set('mode', mode);
       if (status !== 'ALL') params.set('status', status);
+      if (integrity !== 'ALL') params.set('integrity', integrity);
       const data = await cachedGet<AdminTestPage>(`/api/tests?${params}`, { ttlMs: 20_000, force });
       setTests(data.items.map(item => ({ ...item, title: capitalizeFirstLetter(item.title) })));
       setPagination(data.pagination);
@@ -142,7 +161,7 @@ export default function AdminTestManagement() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, mode, page, sort, source, status, subject]);
+  }, [debouncedSearch, integrity, mode, page, sort, source, status, subject]);
 
   useEffect(() => { void loadTests(); }, [loadTests]);
 
@@ -152,9 +171,7 @@ export default function AdminTestManagement() {
   };
 
   const changeSource = (nextSource: string) => {
-    setSource(nextSource as AdminSource);
-    setStatus('ALL');
-    setPage(1);
+    updateQuery({ source: nextSource === 'SYSTEM' ? null : nextSource, status: null, integrity: null });
   };
 
   const changeView = (nextView: ViewMode) => {
@@ -228,14 +245,10 @@ export default function AdminTestManagement() {
   };
 
   const resetFilters = () => {
-    setSearch('');
-    setSubject('ALL');
-    setMode('ALL');
-    setStatus('ALL');
-    setPage(1);
+    updateQuery({ search: null, subject: null, mode: null, status: null, integrity: null });
   };
 
-  const activeFilterCount = [subject !== 'ALL', mode !== 'ALL', status !== 'ALL'].filter(Boolean).length;
+  const activeFilterCount = [subject !== 'ALL', mode !== 'ALL', status !== 'ALL', integrity !== 'ALL'].filter(Boolean).length;
   const resultSummary = useMemo(() => {
     if (!pagination.total) return 'No tests';
     return `${(pagination.page - 1) * pagination.pageSize + 1}–${Math.min(pagination.page * pagination.pageSize, pagination.total)} of ${pagination.total}`;
@@ -259,15 +272,17 @@ export default function AdminTestManagement() {
         <AdminToolbar
           source={source}
           search={search}
-          onSearch={value => { setSearch(value); setPage(1); }}
+          onSearch={value => updateQuery({ search: value || null })}
           subject={subject}
-          onSubject={value => { setSubject(value); setPage(1); }}
+          onSubject={value => updateQuery({ subject: value })}
           mode={mode}
-          onMode={value => { setMode(value); setPage(1); }}
+          onMode={value => updateQuery({ mode: value })}
           status={status}
-          onStatus={value => { setStatus(value); setPage(1); }}
+          onStatus={value => updateQuery({ status: value })}
+          integrity={integrity}
+          onIntegrity={value => updateQuery({ integrity: value })}
           sort={sort}
-          onSort={value => { setSort(value); setPage(1); }}
+          onSort={value => updateQuery({ sort: value })}
           view={view}
           onView={changeView}
           activeFilterCount={activeFilterCount}
@@ -296,9 +311,9 @@ export default function AdminTestManagement() {
         {!loading && pagination.total > 0 && <div className="flex flex-col gap-3 border-t border-ui-border px-4 py-4 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-muted-foreground">Showing {resultSummary} tests</p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(current => Math.max(1, current - 1))}><ChevronLeft data-icon="inline-start" />Prev</Button>
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => updateQuery({ page: String(Math.max(1, page - 1)) }, false)}><ChevronLeft data-icon="inline-start" />Prev</Button>
             <span className="min-w-24 text-center text-sm font-medium text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span>
-            <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage(current => current + 1)}>Next<ChevronRight data-icon="inline-end" /></Button>
+            <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => updateQuery({ page: String(page + 1) }, false)}>Next<ChevronRight data-icon="inline-end" /></Button>
           </div>
         </div>}
       </section>
@@ -329,6 +344,8 @@ interface ToolbarProps {
   onMode: (value: ModeFilter) => void;
   status: StatusFilter;
   onStatus: (value: StatusFilter) => void;
+  integrity: IntegrityFilter;
+  onIntegrity: (value: IntegrityFilter) => void;
   sort: SortOrder;
   onSort: (value: SortOrder) => void;
   view: ViewMode;
@@ -340,13 +357,14 @@ interface ToolbarProps {
   onCreate: () => void;
 }
 
-function AdminToolbar({ source, search, onSearch, subject, onSubject, mode, onMode, status, onStatus, sort, onSort, view, onView, activeFilterCount, onReset, loading, onRefresh, onCreate }: ToolbarProps) {
+function AdminToolbar({ source, search, onSearch, subject, onSubject, mode, onMode, status, onStatus, integrity, onIntegrity, sort, onSort, view, onView, activeFilterCount, onReset, loading, onRefresh, onCreate }: ToolbarProps) {
   return <div className="flex flex-col gap-3 border-b border-ui-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
     <div className="flex flex-1 flex-wrap items-center gap-2">
       <label className="relative w-full sm:w-72"><Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input value={search} onChange={event => onSearch(event.target.value)} placeholder={source === 'TEACHER' ? 'Search tests or teachers…' : 'Search system tests…'} aria-label="Search tests" className="bg-background pl-8" /></label>
       <FilterMenu label="Subject" value={subject} onChange={value => onSubject(value as SubjectFilter)} options={[['ALL', 'All subjects'], ['RW', 'Reading & Writing'], ['MATH', 'Math']]} />
       <FilterMenu label="Type" value={mode} onChange={value => onMode(value as ModeFilter)} options={[['ALL', 'All types'], ['PRACTICE', 'Practice'], ['EXAM', 'Exam']]} />
       <FilterMenu label="Status" value={status} onChange={value => onStatus(value as StatusFilter)} options={[['ALL', 'Published & draft'], ['PUBLISHED', 'Published'], ['DRAFT', 'Draft'], ['ARCHIVED', 'Archived']]} />
+      {source === 'SYSTEM' && <FilterMenu label={integrity === 'ALL' ? 'Integrity' : integrityLabel[integrity]} value={integrity} onChange={value => onIntegrity(value as IntegrityFilter)} options={[['ALL', 'All integrity states'], ['NO_SECTIONS', 'No sections'], ['NO_QUESTIONS', 'No questions'], ['EMPTY_SECTION', 'Empty section']]} />}
       {activeFilterCount > 0 && <Button variant="destructive" onClick={onReset}><X data-icon="inline-start" />Reset</Button>}
     </div>
     <div className="flex flex-wrap items-center justify-end gap-2">

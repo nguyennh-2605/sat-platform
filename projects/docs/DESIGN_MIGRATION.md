@@ -41,7 +41,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | --- | --- | --- | --- |
 | Design tokens and primitives | `src/app/globals.css`, `src/components/ui/` | `components.json` | Foundation complete |
 | Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | Implemented; single global toolbar, visual QA pending |
-| Dashboard Home | `dashboard/academy` | `dashboard/default`, `dashboard/productivity` | Implemented; page hierarchy and workspace cards aligned, visual QA pending |
+| Dashboard Home | `dashboard/default`, `dashboard/crm` | `dashboard/academy`, `dashboard/productivity` | Role-dispatched; Admin uses real KPI/activity/attention/content/classroom overview while Teacher and Student retain dedicated workspace homes; visual QA pending |
 | Authentication | `auth/v2` | `auth/v1` | Implemented; visual QA pending |
 | Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Implemented with unified Activities, course, members, performance, assignments, and no local sticky page header |
 | Admin Test Management / Teacher Test Library / Student Practice Center | `dashboard/tasks`, `dashboard/infrastructure` | `dashboard/file-manager`, `dashboard/default` | Admin uses platform-owned System Library and read-only Teacher Tests; Teacher content lifecycle uses My/System sources; Student attempt experience remains separate |

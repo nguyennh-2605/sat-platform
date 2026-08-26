@@ -17,6 +17,7 @@ const testDeliveryRoutes = require('./test-delivery.routes');
 const userPreferenceRoutes = require('./user-preference.routes');
 const vocabularyRoutes = require('./vocabulary.routes');
 const classActivityRoutes = require('./class-activity.routes');
+const adminRoutes = require('./admin.routes');
 
 // Mount routes
 router.use('/classes', classRoutes);
@@ -34,5 +35,6 @@ router.use('/test-deliveries', testDeliveryRoutes);
 router.use('/user-preferences', userPreferenceRoutes);
 router.use('/vocabulary', vocabularyRoutes);
 router.use('/class-activities', classActivityRoutes);
+router.use('/admin', adminRoutes);
 
 module.exports = router;

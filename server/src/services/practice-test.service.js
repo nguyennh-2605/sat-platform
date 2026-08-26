@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const { buildAttemptSummary } = require('../utils/practice-test-progress');
 const { getTaxonomy, validateClassification } = require('../utils/question-taxonomy');
 const { parsePagination, paginationMeta } = require('../utils/pagination');
+const { INTEGRITY_FILTERS, normalizeIntegrityFilter } = require('../utils/test-integrity');
 
 const activeStatuses = { in: ['DRAFT', 'PUBLISHED'] };
 
@@ -111,6 +112,9 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
   const search = String(query.search || '').trim().slice(0, 100);
   const requestedSubject = String(query.subject || '').toUpperCase();
   const requestedMode = String(query.mode || '').toUpperCase();
+  const requestedIntegrity = userRole === 'ADMIN' && access.source === 'SYSTEM'
+    ? normalizeIntegrityFilter(query.integrity)
+    : '';
   const pagination = parsePagination(query, { defaultPageSize: 24, maxPageSize: 48 });
   const filters = [whereCondition];
   if (search) filters.push({ OR: [
@@ -122,6 +126,7 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
   ] });
   if (['RW', 'MATH'].includes(requestedSubject)) filters.push({ subject: requestedSubject });
   if (['PRACTICE', 'EXAM'].includes(requestedMode)) filters.push({ mode: requestedMode });
+  if (requestedIntegrity) filters.push(INTEGRITY_FILTERS[requestedIntegrity]);
   const pagedWhere = { AND: filters };
 
   const operations = [
