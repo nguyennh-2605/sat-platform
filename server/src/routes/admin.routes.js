@@ -7,5 +7,6 @@ const adminOnly = authorizeRole(['ADMIN']);
 
 router.get('/overview', authenticateToken, adminOnly, controller.getOverview);
 router.get('/overview/activity', authenticateToken, adminOnly, controller.getActivity);
+router.get('/audit-events', authenticateToken, adminOnly, controller.getRecentActivity);
 
 module.exports = router;

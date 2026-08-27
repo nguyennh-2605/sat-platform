@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const testDeliveryService = require('./test-delivery.service');
 const { sendNotificationToUser } = require('./notification.service');
 const { CLASS_COLORS, normalizeClassName, resolveAssignmentType, isAllowedClassColor, canManageClass } = require('../utils/classroom');
+const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
 
 const parseUserId = (userId) => parseInt(userId, 10);
 
@@ -93,12 +94,23 @@ exports.createClass = async ({ name, color, userId, userRole }) => {
   if (normalizedName.length > 100) throw new ApiError(400, { error: 'Class name must be 100 characters or fewer.' });
   if (!isAllowedClassColor(normalizedColor)) throw new ApiError(400, { error: 'Choose a valid class color.' });
 
-  return prisma.class.create({
-    data: {
-      name: normalizedName,
-      color: normalizedColor,
-      teacherId: parseUserId(userId),
-    }
+  return prisma.$transaction(async tx => {
+    const classroom = await tx.class.create({
+      data: {
+        name: normalizedName,
+        color: normalizedColor,
+        teacherId: parseUserId(userId),
+      },
+    });
+    await recordAuditEvent(tx, {
+      action: AUDIT_ACTIONS.CLASS_CREATED,
+      actorUserId: userId,
+      actorRole: userRole,
+      entityType: 'CLASS',
+      entityId: classroom.id,
+      entityLabel: classroom.name,
+    });
+    return classroom;
   });
 };
 
@@ -141,8 +153,18 @@ exports.updateClass = async ({ classId, name, color, userId, userRole }) => {
 };
 
 exports.deleteClass = async ({ classId, userId, userRole }) => {
-  await assertClassTeacher({ classId, userId, userRole });
-  await prisma.class.delete({ where: { id: classId } });
+  const classroom = await assertClassTeacher({ classId, userId, userRole });
+  await prisma.$transaction(async tx => {
+    await tx.class.delete({ where: { id: classId } });
+    await recordAuditEvent(tx, {
+      action: AUDIT_ACTIONS.CLASS_DELETED,
+      actorUserId: userId,
+      actorRole: userRole,
+      entityType: 'CLASS',
+      entityId: classroom.id,
+      entityLabel: classroom.name,
+    });
+  });
   return { message: 'Class deleted successfully.' };
 };
 
@@ -177,7 +199,7 @@ exports.getClassDetail = async ({ id, userId, userRole }) => {
   return classDetail;
 };
 
-exports.addStudentToClass = async ({ classId, email, currentUserId }) => {
+exports.addStudentToClass = async ({ classId, email, currentUserId, userRole = 'TEACHER' }) => {
   if (!currentUserId) {
     throw new ApiError(401, { error: "Không tìm thấy thông tin người dùng." });
   }
@@ -201,37 +223,44 @@ exports.addStudentToClass = async ({ classId, email, currentUserId }) => {
     throw new ApiError(404, { error: "Không tìm thấy học sinh với email này" });
   }
 
-  // 3. Cập nhật quan hệ (Connect)
-  await prisma.class.update({
-    where: { id: classId },
-    data: {
-      students: {
-        connect: { id: student.id } // Connect theo ID của User tìm được
-      }
+  await prisma.$transaction(async tx => {
+    await tx.class.update({
+      where: { id: classId },
+      data: { students: { connect: { id: student.id } } },
+    });
+
+    const activeDeliveries = await tx.testDelivery.findMany({
+      where: { classId, status: 'PUBLISHED' },
+      select: { id: true },
+    });
+    if (activeDeliveries.length > 0) {
+      await tx.deliveryAssignee.createMany({
+        data: activeDeliveries.map(delivery => ({ deliveryId: delivery.id, studentId: student.id })),
+        skipDuplicates: true,
+      });
     }
-  });
 
-  const activeDeliveries = await prisma.testDelivery.findMany({
-    where: { classId, status: 'PUBLISHED' },
-    select: { id: true },
-  });
-  if (activeDeliveries.length > 0) {
-    await prisma.deliveryAssignee.createMany({
-      data: activeDeliveries.map(delivery => ({ deliveryId: delivery.id, studentId: student.id })),
-      skipDuplicates: true,
+    const activeActivities = await tx.classActivity.findMany({
+      where: { classId, status: 'PUBLISHED', audience: 'ALL_STUDENTS' },
+      select: { id: true },
     });
-  }
+    if (activeActivities.length > 0) {
+      await tx.activityAssignee.createMany({
+        data: activeActivities.map(activity => ({ activityId: activity.id, studentId: student.id })),
+        skipDuplicates: true,
+      });
+    }
 
-  const activeActivities = await prisma.classActivity.findMany({
-    where: { classId, status: 'PUBLISHED', audience: 'ALL_STUDENTS' },
-    select: { id: true },
-  });
-  if (activeActivities.length > 0) {
-    await prisma.activityAssignee.createMany({
-      data: activeActivities.map(activity => ({ activityId: activity.id, studentId: student.id })),
-      skipDuplicates: true,
+    await recordAuditEvent(tx, {
+      action: AUDIT_ACTIONS.CLASS_STUDENT_ADDED,
+      actorUserId: currentUserId,
+      actorRole: userRole,
+      entityType: 'CLASS',
+      entityId: existingClass.id,
+      entityLabel: existingClass.name,
+      metadata: { memberLabel: student.name || 'Student' },
     });
-  }
+  });
 
   await sendNotificationToUser(
     student.id,
@@ -243,7 +272,7 @@ exports.addStudentToClass = async ({ classId, email, currentUserId }) => {
 };
 
 exports.removeStudentFromClass = async ({ classId, studentId, currentUserId, userRole }) => {
-  await assertClassTeacher({ classId, userId: currentUserId, userRole });
+  const classroom = await assertClassTeacher({ classId, userId: currentUserId, userRole });
 
   const student = await prisma.user.findFirst({
     where: {
@@ -257,19 +286,28 @@ exports.removeStudentFromClass = async ({ classId, studentId, currentUserId, use
     throw new ApiError(404, { error: 'This student is not enrolled in the class.' });
   }
 
-  await prisma.class.update({
-    where: { id: classId },
-    data: { students: { disconnect: { id: student.id } } },
-  });
-
-  await prisma.deliveryAssignee.updateMany({
-    where: { studentId: student.id, delivery: { classId } },
-    data: { excusedAt: new Date() },
-  });
-
-  await prisma.activityAssignee.updateMany({
-    where: { studentId: student.id, activity: { classId } },
-    data: { status: 'EXCUSED', excusedAt: new Date() },
+  await prisma.$transaction(async tx => {
+    await tx.class.update({
+      where: { id: classId },
+      data: { students: { disconnect: { id: student.id } } },
+    });
+    await tx.deliveryAssignee.updateMany({
+      where: { studentId: student.id, delivery: { classId } },
+      data: { excusedAt: new Date() },
+    });
+    await tx.activityAssignee.updateMany({
+      where: { studentId: student.id, activity: { classId } },
+      data: { status: 'EXCUSED', excusedAt: new Date() },
+    });
+    await recordAuditEvent(tx, {
+      action: AUDIT_ACTIONS.CLASS_STUDENT_REMOVED,
+      actorUserId: currentUserId,
+      actorRole: userRole,
+      entityType: 'CLASS',
+      entityId: classroom.id,
+      entityLabel: classroom.name,
+      metadata: { memberLabel: student.name || 'Student' },
+    });
   });
 
   return { message: 'Student removed from class.', student };

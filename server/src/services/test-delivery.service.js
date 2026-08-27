@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
 
 const parseUserId = (value) => Number.parseInt(value, 10);
 const validScorePolicies = new Set(['FIRST', 'BEST', 'LATEST']);
@@ -171,6 +172,19 @@ exports.createDeliveries = async ({ classIds, testIds, studentIds, lessonId, tit
         });
         deliveries.push(delivery);
       }
+      await recordAuditEvent(tx, {
+        action: AUDIT_ACTIONS.TEST_ASSIGNED,
+        actorUserId: userId,
+        actorRole: userRole,
+        entityType: 'CLASS',
+        entityId: classroom.id,
+        entityLabel: classroom.name,
+        metadata: {
+          testTitle: tests[0]?.title,
+          testCount: tests.length,
+          assigneeCount: assigneeIds.length,
+        },
+      });
     }
     return deliveries;
   });

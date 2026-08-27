@@ -51,3 +51,23 @@ export interface AdminActivityResponse {
     studentsTakingTests: number;
   }>;
 }
+
+export type AuditCategory = 'ACCOUNT' | 'CONTENT' | 'CLASSROOM' | 'DELIVERY';
+
+export interface AdminRecentActivityResponse {
+  items: Array<{
+    id: string;
+    action: string;
+    category: AuditCategory;
+    label: string;
+    detail: string;
+    actor: {
+      id: number | null;
+      label: string;
+      role: 'ADMIN' | 'TEACHER' | 'STUDENT' | null;
+    };
+    href: string | null;
+    createdAt: string;
+  }>;
+  nextCursor: string | null;
+}

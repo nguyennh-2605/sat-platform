@@ -9,7 +9,8 @@ import { OverviewKpis } from './OverviewKpis';
 import { PlatformActivity } from './PlatformActivity';
 import { NeedsAttention } from './NeedsAttention';
 import { OverviewSnapshots } from './OverviewSnapshots';
-import type { AdminActivityResponse, AdminOverviewResponse, OverviewRange } from './admin-overview.types';
+import { RecentActivity } from './RecentActivity';
+import type { AdminActivityResponse, AdminOverviewResponse, AdminRecentActivityResponse, OverviewRange } from './admin-overview.types';
 
 const overviewRanges = new Set<OverviewRange>(['7d', '30d', '90d']);
 const normalizeRange = (value: string | null): OverviewRange => overviewRanges.has(value as OverviewRange) ? value as OverviewRange : '30d';
@@ -19,10 +20,13 @@ export default function AdminOverview() {
   const range = normalizeRange(searchParams.get('range'));
   const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
   const [activity, setActivity] = useState<AdminActivityResponse | null>(null);
+  const [recentActivity, setRecentActivity] = useState<AdminRecentActivityResponse | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [activityLoading, setActivityLoading] = useState(true);
+  const [recentActivityLoading, setRecentActivityLoading] = useState(true);
   const [overviewError, setOverviewError] = useState(false);
   const [activityError, setActivityError] = useState(false);
+  const [recentActivityError, setRecentActivityError] = useState(false);
 
   const loadOverview = useCallback(async (force = false) => {
     setOverviewLoading(true);
@@ -37,6 +41,20 @@ export default function AdminOverview() {
       setOverviewLoading(false);
     }
   }, [range]);
+
+  const loadRecentActivity = useCallback(async (force = false) => {
+    setRecentActivityLoading(true);
+    setRecentActivityError(false);
+    try {
+      const data = await cachedGet<AdminRecentActivityResponse>('/api/admin/audit-events?limit=8', { ttlMs: 30_000, force });
+      setRecentActivity(data);
+    } catch (error) {
+      console.error('Unable to load recent activity:', error);
+      setRecentActivityError(true);
+    } finally {
+      setRecentActivityLoading(false);
+    }
+  }, []);
 
   const loadActivity = useCallback(async (force = false) => {
     setActivityLoading(true);
@@ -54,6 +72,7 @@ export default function AdminOverview() {
 
   useEffect(() => { void loadOverview(); }, [loadOverview]);
   useEffect(() => { void loadActivity(); }, [loadActivity]);
+  useEffect(() => { void loadRecentActivity(); }, [loadRecentActivity]);
 
   const changeRange = (nextRange: OverviewRange) => {
     const next = new URLSearchParams(searchParams);
@@ -64,7 +83,10 @@ export default function AdminOverview() {
   const refresh = () => {
     void loadOverview(true);
     void loadActivity(true);
+    void loadRecentActivity(true);
   };
+
+  const refreshing = overviewLoading || activityLoading || recentActivityLoading;
 
   return (
     <div className="h-full overflow-y-auto bg-background">
@@ -83,8 +105,8 @@ export default function AdminOverview() {
                 </SelectGroup>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" disabled={overviewLoading || activityLoading} onClick={refresh} aria-label="Refresh overview">
-              <RefreshCw className={overviewLoading || activityLoading ? 'animate-spin' : ''} />
+            <Button variant="outline" size="icon" disabled={refreshing} onClick={refresh} aria-label="Refresh overview">
+              <RefreshCw className={refreshing ? 'animate-spin' : ''} />
             </Button>
           </div>}
         />
@@ -108,6 +130,7 @@ export default function AdminOverview() {
                 <NeedsAttention items={overview?.attention || []} loading={overviewLoading} error={overviewError} onRetry={() => void loadOverview(true)} />
               </div>
             </section>
+            <RecentActivity data={recentActivity} loading={recentActivityLoading} error={recentActivityError} onRetry={() => void loadRecentActivity(true)} />
             <OverviewSnapshots data={overview} loading={overviewLoading} range={range} />
           </>
         )}

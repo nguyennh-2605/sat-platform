@@ -84,6 +84,7 @@ exports.addStudentToClass = async (req, res) => {
       classId: req.params.classId,
       email: req.body.email,
       currentUserId: req.user?.id || req.user?.userId,
+      userRole: req.user?.role || req.user?.userRole,
     });
     res.json(result);
   } catch (error) {

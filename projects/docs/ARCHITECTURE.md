@@ -222,8 +222,9 @@ Express Server (index.js → app.js)
 | --- | --- | --- | --- |
 | `GET` | `/api/admin/overview?range=7d\|30d\|90d` | JWT + ADMIN | Platform KPI summary, actionable published System Test integrity issues, test lifecycle counts, and classroom snapshot |
 | `GET` | `/api/admin/overview/activity?range=7d\|30d\|90d` | JWT + ADMIN | Zero-filled Test Attempts, Completed Tests, and Students Taking Tests time series |
+| `GET` | `/api/admin/audit-events?limit=8&cursor=...` | JWT + ADMIN | Cursor-paginated, display-safe recent product activity |
 
-Admin Overview uses complete platform days in the configured `APP_TIMEZONE`. It deliberately reports Total Classrooms rather than inferring an active/inactive lifecycle that the current Class model does not yet store. Student Error Logs, ordinary Draft tests, transient imports, and synthetic recent activity are not treated as operational alerts.
+Admin Overview uses complete platform days in the configured `APP_TIMEZONE`. It deliberately reports Total Classrooms rather than inferring an active/inactive lifecycle that the current Class model does not yet store. Student Error Logs, ordinary Draft tests, and transient imports are not treated as operational alerts. Recent Activity begins with real post-migration AuditEvent mutations and is not synthesized from entity timestamps.
 
 **Total: 47+ endpoints**
 
@@ -242,6 +243,7 @@ User ──1:N── Folder
 User ──1:N── Test (authorId)
 User ──1:N── Submission
 User ──1:N── HomeworkSubmission
+User ──1:N── AuditEvent (actorUserId, set null on actor deletion)
 
 Class ──1:N── Assignment
 Class ──1:N── Week
@@ -283,6 +285,8 @@ Folder ──1:N── Test
 **Question**: `id`, `sectionId`, `type` (MCQ | SPR), `blocks` (JSON content), `questionText`, `choices` (JSON), `correctAnswer`, `explanation`, `order`
 
 **Answer**: `id`, `submissionId`, `questionId`, `selectedChoice`, `isCorrect`
+
+**AuditEvent**: durable product-domain mutation history with `action`, `category`, optional actor reference plus actor snapshot, entity identity/label snapshot, allowlisted metadata, and `createdAt`. `AdminAuditLog` remains separate for privileged Admin CLI security operations. Submission analytics and raw operational errors are not duplicated into AuditEvent.
 
 **Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestScope` (SYSTEM, PERSONAL), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR)
 
@@ -372,7 +376,9 @@ Folder ──1:N── Test
 3. GET /api/admin/overview/activity loads independently so chart failure does not hide the rest of the page.
 4. Range is stored in the dashboard URL and supports 7, 30, or 90 complete platform days.
 5. Attention links open Admin Test Management with source/status/integrity filters restored from the URL.
-6. Recent Activity remains out of scope until a product AuditEvent model exists.
+6. Product mutations write AuditEvent in the same transaction; failed mutations do not create activity rows.
+7. GET /api/admin/audit-events loads the independent Recent Activity table. It uses stable createdAt + id cursor ordering and returns no raw metadata.
+8. Existing records are not backfilled into synthetic activity; the empty state is valid immediately after migration.
 ```
 
 ### 8.6 AI Question Generation & Evaluation (LogicLab)

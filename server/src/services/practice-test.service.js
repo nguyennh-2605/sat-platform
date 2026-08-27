@@ -4,6 +4,7 @@ const { buildAttemptSummary } = require('../utils/practice-test-progress');
 const { getTaxonomy, validateClassification } = require('../utils/question-taxonomy');
 const { parsePagination, paginationMeta } = require('../utils/pagination');
 const { INTEGRITY_FILTERS, normalizeIntegrityFilter } = require('../utils/test-integrity');
+const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
 
 const activeStatuses = { in: ['DRAFT', 'PUBLISHED'] };
 
@@ -355,7 +356,8 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
 
   console.log(`Creating test: ${normalizedTitle} (${normalizedSections.length} modules)`);
 
-  const newTest = await prisma.test.create({
+  return prisma.$transaction(async tx => {
+    const newTest = await tx.test.create({
     data: {
       title: normalizedTitle,
       description: null,
@@ -395,10 +397,21 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
         select: { id: true, name: true, questions: { select: { id: true } } }
       }
     }
-  });
+    });
 
-  console.log(`Created test ID: ${newTest.id}`);
-  return newTest;
+    await recordAuditEvent(tx, {
+      action: AUDIT_ACTIONS.TEST_CREATED,
+      actorUserId: userId,
+      actorRole: userRole,
+      entityType: 'TEST',
+      entityId: newTest.id,
+      entityLabel: newTest.title,
+      metadata: { scope: newTest.scope, status: newTest.status },
+    });
+
+    console.log(`Created test ID: ${newTest.id}`);
+    return newTest;
+  });
 };
 
 const serializeBlock = (block) => {
@@ -559,7 +572,7 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
 
   return prisma.$transaction(async tx => {
     await tx.section.deleteMany({ where: { testId: existing.id } });
-    return tx.test.update({
+    const updated = await tx.test.update({
       where: { id: existing.id },
       data: {
         title: normalizedTitle,
@@ -581,6 +594,22 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
         },
       },
     });
+    if (updated.status !== existing.status) {
+      const statusActions = {
+        PUBLISHED: AUDIT_ACTIONS.TEST_PUBLISHED,
+        DRAFT: AUDIT_ACTIONS.TEST_MOVED_TO_DRAFT,
+      };
+      await recordAuditEvent(tx, {
+        action: statusActions[updated.status],
+        actorUserId: userId,
+        actorRole: userRole,
+        entityType: 'TEST',
+        entityId: updated.id,
+        entityLabel: updated.title,
+        metadata: { scope: updated.scope },
+      });
+    }
+    return updated;
   });
 };
 
@@ -590,12 +619,31 @@ exports.updateTestStatus = async ({ testId, status, userId, userRole }) => {
     throw new ApiError(400, { error: 'Test status is invalid.' });
   }
   const test = await manageableTest({ testId, userId, userRole });
-  return prisma.test.update({
-    where: { id: test.id },
-    data: {
-      status: normalizedStatus,
-      isPublic: test.scope === 'SYSTEM' && normalizedStatus === 'PUBLISHED',
-    },
+  return prisma.$transaction(async tx => {
+    const updated = await tx.test.update({
+      where: { id: test.id },
+      data: {
+        status: normalizedStatus,
+        isPublic: test.scope === 'SYSTEM' && normalizedStatus === 'PUBLISHED',
+      },
+    });
+    if (updated.status !== test.status) {
+      const statusActions = {
+        PUBLISHED: AUDIT_ACTIONS.TEST_PUBLISHED,
+        ARCHIVED: AUDIT_ACTIONS.TEST_ARCHIVED,
+        DRAFT: AUDIT_ACTIONS.TEST_MOVED_TO_DRAFT,
+      };
+      await recordAuditEvent(tx, {
+        action: statusActions[updated.status],
+        actorUserId: userId,
+        actorRole: userRole,
+        entityType: 'TEST',
+        entityId: updated.id,
+        entityLabel: updated.title,
+        metadata: { scope: updated.scope },
+      });
+    }
+    return updated;
   });
 };
 
@@ -606,8 +654,9 @@ exports.duplicateTest = async ({ testId, userId, userRole }) => {
     userRole,
     include: { sections: { orderBy: { order: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } } },
   });
-  return prisma.test.create({
-    data: {
+  return prisma.$transaction(async tx => {
+    const duplicate = await tx.test.create({
+      data: {
       title: `Copy of ${source.title}`.slice(0, 200),
       description: source.description,
       duration: source.duration,
@@ -639,7 +688,18 @@ exports.duplicateTest = async ({ testId, userId, userRole }) => {
         })),
       },
     },
-    select: { id: true, title: true, status: true },
+      select: { id: true, title: true, status: true, scope: true },
+    });
+    await recordAuditEvent(tx, {
+      action: AUDIT_ACTIONS.TEST_CREATED,
+      actorUserId: userId,
+      actorRole: userRole,
+      entityType: 'TEST',
+      entityId: duplicate.id,
+      entityLabel: duplicate.title,
+      metadata: { scope: duplicate.scope, status: duplicate.status, sourceTestId: source.id },
+    });
+    return duplicate;
   });
 };
 
@@ -652,8 +712,9 @@ exports.copyTestToSystem = async ({ testId, userId, userRole }) => {
     include: { sections: { orderBy: { order: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } } },
   });
   if (!source) throw new ApiError(404, { error: 'Teacher test not found.' });
-  return prisma.test.create({
-    data: {
+  return prisma.$transaction(async tx => {
+    const copy = await tx.test.create({
+      data: {
       title: `Copy of ${source.title}`.slice(0, 200),
       description: source.description,
       duration: source.duration,
@@ -685,7 +746,18 @@ exports.copyTestToSystem = async ({ testId, userId, userRole }) => {
         })),
       },
     },
-    select: { id: true, title: true, status: true, scope: true },
+      select: { id: true, title: true, status: true, scope: true },
+    });
+    await recordAuditEvent(tx, {
+      action: AUDIT_ACTIONS.TEST_COPIED_TO_SYSTEM,
+      actorUserId: userId,
+      actorRole: userRole,
+      entityType: 'TEST',
+      entityId: copy.id,
+      entityLabel: copy.title,
+      metadata: { sourceTestId: source.id },
+    });
+    return copy;
   });
 };
 
@@ -699,7 +771,18 @@ exports.deleteTest = async ({ testId, userId, userRole }) => {
   if (test._count.submissions > 0 || test._count.deliveries > 0 || test._count.classTests > 0) {
     throw new ApiError(409, { error: 'This test has classroom or attempt history and cannot be permanently deleted. Archive it instead.' });
   }
-  await prisma.test.delete({ where: { id: test.id } });
+  await prisma.$transaction(async tx => {
+    await tx.test.delete({ where: { id: test.id } });
+    await recordAuditEvent(tx, {
+      action: AUDIT_ACTIONS.TEST_DELETED,
+      actorUserId: userId,
+      actorRole: userRole,
+      entityType: 'TEST',
+      entityId: test.id,
+      entityLabel: test.title,
+      metadata: { scope: test.scope },
+    });
+  });
 };
 
 exports.serializeTest = serializeTest;

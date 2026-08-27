@@ -39,6 +39,7 @@ model User {
   activityAssignments   ActivityAssignee[]
   lessonProgress        LessonProgress[]
   resourceProgress      ResourceProgress[]
+  auditEvents           AuditEvent[]             @relation("AuditEventActor")
 }
 
 model RefreshSession {
@@ -662,6 +663,27 @@ model AdminAuditLog {
 
   @@index([targetEmail, createdAt])
   @@index([action, createdAt])
+}
+
+model AuditEvent {
+  id          String   @id @default(uuid())
+  action      String
+  category    String
+  actorUserId Int?
+  actorLabel  String
+  actorRole   Role?
+  entityType  String
+  entityId    String?
+  entityLabel String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("AuditEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt, id])
+  @@index([action, createdAt])
+  @@index([category, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId, createdAt])
 }
 
 model ClassActivity {

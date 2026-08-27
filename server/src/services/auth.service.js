@@ -5,6 +5,7 @@ const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 const ApiError = require('../utils/ApiError');
 const { JWT_SECRET, JWT_ACCESS_EXPIRES_IN, REFRESH_TOKEN_TTL_DAYS } = require('../config/jwt');
+const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const ALLOWED_REGISTER_ROLES = ['STUDENT', 'TEACHER'];
@@ -20,7 +21,7 @@ const findUserByEmail = async (email, database = prisma) => database.user.findFi
   orderBy: { id: 'asc' },
 });
 
-const resolveGoogleUser = async (payload, database = prisma) => {
+const resolveGoogleUser = async (payload, database = prisma, { recordRegistration = false } = {}) => {
   const normalizedEmail = normalizeEmail(payload.email);
   const subjectUser = await database.user.findUnique({ where: { googleSubject: payload.sub } });
   if (subjectUser) return subjectUser;
@@ -52,7 +53,7 @@ const resolveGoogleUser = async (payload, database = prisma) => {
     });
   }
 
-  return database.user.create({
+  const user = await database.user.create({
     data: {
       email: normalizedEmail,
       googleSubject: payload.sub,
@@ -61,6 +62,19 @@ const resolveGoogleUser = async (payload, database = prisma) => {
       password: null,
     },
   });
+  if (recordRegistration) {
+    await recordAuditEvent(database, {
+      action: AUDIT_ACTIONS.USER_REGISTERED,
+      actorUserId: user.id,
+      actorLabel: user.name,
+      actorRole: user.role,
+      entityType: 'USER',
+      entityId: user.id,
+      entityLabel: user.name || 'New student',
+      metadata: { authMethod: 'GOOGLE' },
+    });
+  }
+  return user;
 };
 
 const publicUser = user => ({
@@ -108,8 +122,22 @@ exports.register = async ({ email, password, name, role }) => {
     throw new ApiError(400, { message: 'Vai trò không hợp lệ. Chỉ được chọn Học sinh hoặc Giáo viên.' });
   }
 
-  const user = await prisma.user.create({
-    data: { email: normalizedEmail, password: await bcrypt.hash(password, 10), name, role: requestedRole },
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = await prisma.$transaction(async tx => {
+    const created = await tx.user.create({
+      data: { email: normalizedEmail, password: passwordHash, name, role: requestedRole },
+    });
+    await recordAuditEvent(tx, {
+      action: AUDIT_ACTIONS.USER_REGISTERED,
+      actorUserId: created.id,
+      actorLabel: created.name,
+      actorRole: created.role,
+      entityType: 'USER',
+      entityId: created.id,
+      entityLabel: created.name || `New ${created.role.toLowerCase()}`,
+      metadata: { authMethod: 'PASSWORD' },
+    });
+    return created;
   });
   return createAuthResult(user, 'Đăng ký thành công!');
 };
@@ -142,7 +170,7 @@ exports.googleLogin = async ({ token }) => {
 
   let user;
   try {
-    user = await resolveGoogleUser(payload);
+    user = await prisma.$transaction(transaction => resolveGoogleUser(payload, transaction, { recordRegistration: true }));
   } catch (error) {
     if (error?.code !== 'P2002') throw error;
     user = await prisma.user.findUnique({ where: { googleSubject: payload.sub } });
