@@ -18,6 +18,8 @@ model User {
   role                  Role                     @default(STUDENT)
   avatar                String?
   satTestDate           DateTime?
+  currentSatScore       Int?
+  targetSatScore        Int?
   dashboardBackground   String?
   taughtClasses         Class[]                  @relation("TeacherClasses")
   errorLogs             ErrorLog[]
@@ -30,6 +32,7 @@ model User {
   createdDeliveries     TestDelivery[]           @relation("DeliveryCreator")
   deliveryAssignments   DeliveryAssignee[]
   todoStates            UserTodoState[]
+  studentTasks          StudentTask[]
   refreshSessions       RefreshSession[]
   ownedVocabularySets   VocabularySet[]          @relation("VocabularySetOwner")
   createdVocabularySets VocabularySet[]          @relation("VocabularySetCreator")
@@ -293,13 +296,33 @@ model Notification {
 }
 
 model UserTodoState {
-  userId    Int
-  itemKey   String
-  handledAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  itemKey     String
+  handledAt   DateTime?
+  completedAt DateTime?
+  position    Int?
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, itemKey])
   @@index([userId, handledAt])
+  @@index([userId, position])
+}
+
+model StudentTask {
+  id          String    @id @default(uuid())
+  userId      Int
+  title       String
+  details     String?
+  dueAt       DateTime?
+  completedAt DateTime?
+  position    Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt, dueAt])
+  @@index([userId, position])
 }
 
 enum Role {

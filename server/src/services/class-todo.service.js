@@ -35,7 +35,7 @@ const sortTodos = items => {
 };
 
 const handledKeysFor = async userId => new Set((await prisma.userTodoState.findMany({
-  where: { userId },
+  where: { userId, handledAt: { not: null } },
   select: { itemKey: true },
 })).map(item => item.itemKey));
 
@@ -265,8 +265,8 @@ exports.acknowledgeTodo = async ({ itemKey, userId, userRole }) => {
   }
   await prisma.userTodoState.upsert({
     where: { userId_itemKey: { userId: currentUserId, itemKey: normalizedKey } },
-    update: { handledAt: new Date() },
-    create: { userId: currentUserId, itemKey: normalizedKey },
+    update: { handledAt: new Date(), completedAt: new Date() },
+    create: { userId: currentUserId, itemKey: normalizedKey, handledAt: new Date(), completedAt: new Date() },
   });
   return { acknowledged: true };
 };

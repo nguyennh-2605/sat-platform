@@ -26,6 +26,15 @@ const assertStudent = role => {
   if (role !== 'STUDENT') throw new ApiError(403, { error: 'SAT countdown is available to students only.' });
 };
 
+const parseSatScore = (value, label) => {
+  if (value === null || value === undefined || value === '') return null;
+  const score = Number(value);
+  if (!Number.isInteger(score) || score < 400 || score > 1600 || score % 10 !== 0) {
+    throw new ApiError(400, { error: `${label} must be between 400 and 1600 in 10-point increments.` });
+  }
+  return score;
+};
+
 exports.getSatTestDate = async ({ userId, userRole }) => {
   assertStudent(userRole);
   const user = await prisma.user.findUnique({
@@ -45,6 +54,29 @@ exports.updateSatTestDate = async ({ userId, userRole, satTestDate }) => {
     select: { satTestDate: true },
   });
   return { satTestDate: user.satTestDate };
+};
+
+exports.getSatScoreGoal = async ({ userId, userRole }) => {
+  assertStudent(userRole);
+  const user = await prisma.user.findUnique({
+    where: { id: Number(userId) },
+    select: { currentSatScore: true, targetSatScore: true },
+  });
+  if (!user) throw new ApiError(404, { error: 'User not found.' });
+  return { currentScore: user.currentSatScore, targetScore: user.targetSatScore };
+};
+
+exports.updateSatScoreGoal = async ({ userId, userRole, currentScore, targetScore }) => {
+  assertStudent(userRole);
+  const user = await prisma.user.update({
+    where: { id: Number(userId) },
+    data: {
+      currentSatScore: parseSatScore(currentScore, 'Current SAT score'),
+      targetSatScore: parseSatScore(targetScore, 'Target SAT score'),
+    },
+    select: { currentSatScore: true, targetSatScore: true },
+  });
+  return { currentScore: user.currentSatScore, targetScore: user.targetSatScore };
 };
 
 exports.getDashboardBackground = async ({ userId }) => {
@@ -70,4 +102,5 @@ exports.updateDashboardBackground = async ({ userId, backgroundId }) => {
 };
 
 exports.parseFutureDate = parseFutureDate;
+exports.parseSatScore = parseSatScore;
 exports.DASHBOARD_BACKGROUNDS = DASHBOARD_BACKGROUNDS;

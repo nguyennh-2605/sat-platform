@@ -175,7 +175,7 @@
     --ui-warning-soft: #fffbeb;
     --ui-danger: #b42318;
     --ui-danger-soft: #fef2f2;
-    --ui-overlay: rgb(0 0 0 / 0.48);
+    --ui-overlay: rgb(0 0 0 / 0.22);
     --ui-focus: var(--ring);
     --ui-sidebar: var(--sidebar);
     --ui-sidebar-hover: var(--sidebar-accent);

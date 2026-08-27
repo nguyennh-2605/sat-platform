@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpDown, BookOpen, BookOpenCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Grid2X2, GraduationCap, List, LoaderCircle, Play, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -47,6 +47,8 @@ interface TestPage { items: TestItem[]; pagination: PaginationMeta }
 
 const subjectLabel: Record<TestItem['subject'], string> = { RW: 'Reading & Writing', MATH: 'Math' };
 const modeLabel: Record<TestItem['mode'], string> = { PRACTICE: 'Practice', EXAM: 'Exam' };
+const normalizeSubjectFilter = (value: string | null): SubjectFilter => value === 'RW' || value === 'MATH' ? value : 'ALL';
+const normalizeModeFilter = (value: string | null): ModeFilter => value === 'PRACTICE' || value === 'EXAM' ? value : 'ALL';
 
 const formatLastAttempt = (value?: string | null) => {
   if (!value) return 'Never';
@@ -74,14 +76,15 @@ const PracticeTest = () => {
 
 function PracticeCenter() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [tests, setTests] = useState<TestItem[]>([]);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [subject, setSubject] = useState<SubjectFilter>('ALL');
-  const [mode, setMode] = useState<ModeFilter>('ALL');
+  const [subject, setSubject] = useState<SubjectFilter>(() => normalizeSubjectFilter(searchParams.get('subject')));
+  const [mode, setMode] = useState<ModeFilter>(() => normalizeModeFilter(searchParams.get('mode')));
   const [sortOrder, setSortOrder] = useState<SortOrder>('NEWEST');
   const [classFilter, setClassFilter] = useState('ALL');
   const [viewMode, setViewMode] = useState<ViewMode>(() => localStorage.getItem('practiceCenterView') === 'LIST' ? 'LIST' : 'GRID');
@@ -118,6 +121,17 @@ function PracticeCenter() {
   }, [classFilter, debouncedSearch, mode, page, sortOrder, subject]);
 
   useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    setSubject(normalizeSubjectFilter(searchParams.get('subject')));
+    setMode(normalizeModeFilter(searchParams.get('mode')));
+  }, [searchParams]);
+
+  const updateUrlFilter = (key: 'subject' | 'mode', value: SubjectFilter | ModeFilter) => {
+    const next = new URLSearchParams(searchParams);
+    if (value === 'ALL') next.delete(key);
+    else next.set(key, value);
+    setSearchParams(next, { replace: true });
+  };
 
   const openTest = useCallback((test: TestItem, context?: { classId?: string; deliveryId?: string }) => {
     localStorage.setItem('current_exam_info', JSON.stringify({ id: test.id, title: test.title, description: test.description, duration: test.duration }));
@@ -150,6 +164,10 @@ function PracticeCenter() {
     setMode('ALL');
     setClassFilter('ALL');
     setPage(1);
+    const next = new URLSearchParams(searchParams);
+    next.delete('subject');
+    next.delete('mode');
+    setSearchParams(next, { replace: true });
   };
 
   const changeViewMode = (nextView: ViewMode) => {
@@ -172,7 +190,7 @@ function PracticeCenter() {
           {(!loading || pagination.total > 0 || classes.length > 0) && <div className="flex flex-wrap items-center gap-2">
             <Badge className="gap-1.5 rounded-sm px-2 py-1"><BookOpenCheck size={13} aria-hidden="true" />{pagination.total} tests</Badge>
           </div>}
-          <PracticeToolbar search={search} onSearchChange={value => { setSearch(value); setPage(1); }} subject={subject} onSubjectChange={value => { setSubject(value); setPage(1); }} mode={mode} onModeChange={value => { setMode(value); setPage(1); }} classFilter={classFilter} onClassChange={value => { setClassFilter(value); setPage(1); }} classes={classes} sortOrder={sortOrder} onSortChange={value => { setSortOrder(value); setPage(1); }} activeFilterCount={activeFilterCount} onResetFilters={resetFilters} viewMode={viewMode} onViewModeChange={changeViewMode} loading={loading} onRefresh={() => void loadData(true)} />
+          <PracticeToolbar search={search} onSearchChange={value => { setSearch(value); setPage(1); }} subject={subject} onSubjectChange={value => { setSubject(value); updateUrlFilter('subject', value); setPage(1); }} mode={mode} onModeChange={value => { setMode(value); updateUrlFilter('mode', value); setPage(1); }} classFilter={classFilter} onClassChange={value => { setClassFilter(value); setPage(1); }} classes={classes} sortOrder={sortOrder} onSortChange={value => { setSortOrder(value); setPage(1); }} activeFilterCount={activeFilterCount} onResetFilters={resetFilters} viewMode={viewMode} onViewModeChange={changeViewMode} loading={loading} onRefresh={() => void loadData(true)} />
         </section>
 
         {loadError && tests.length === 0 && !loading ? (

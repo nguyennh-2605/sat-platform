@@ -226,7 +226,19 @@ Express Server (index.js → app.js)
 
 Admin Overview uses complete platform days in the configured `APP_TIMEZONE`. It deliberately reports Total Classrooms rather than inferring an active/inactive lifecycle that the current Class model does not yet store. Student Error Logs, ordinary Draft tests, and transient imports are not treated as operational alerts. Recent Activity begins with real post-migration AuditEvent mutations and is not synthesized from entity timestamps.
 
-**Total: 47+ endpoints**
+### 5.12 Student Overview
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/student/overview` | JWT + STUDENT | Student-focused next action, score/date preferences, 90-day accuracy progress, published System Test picks, and recent completed results |
+| `GET` | `/api/student/tasks` | JWT + STUDENT | Unified personal tasks, announcements, assignments, tests, and vocabulary activities with calendar and weekly summary data |
+| `POST/PATCH/DELETE` | `/api/student/tasks[/:id]` | JWT + STUDENT | Create, edit, and remove student-owned personal tasks |
+| `PUT` | `/api/student/tasks/state` | JWT + STUDENT | Complete or reopen personal tasks and announcements; assessed coursework remains source-driven |
+| `PUT` | `/api/student/tasks/order` | JWT + STUDENT | Persist a student-specific order across unified task sources |
+
+Student Overview uses only persisted product data. Coursework and personal planning are combined in a Productivity-style task surface. Assignment, test, and vocabulary completion comes from their authoritative submission/activity records; only personal tasks and announcements can be checked directly. Accuracy remains evidence-based, while current and target SAT scores are explicitly self-reported preferences.
+
+**Total: 53+ endpoints**
 
 ---
 
@@ -381,7 +393,20 @@ Folder ──1:N── Test
 8. Existing records are not backfilled into synthetic activity; the empty state is valid immediately after migration.
 ```
 
-### 8.6 AI Question Generation & Evaluation (LogicLab)
+### 8.6 Student Overview
+
+```text
+1. DashboardHome dispatches STUDENT to the dedicated StudentOverview rather than the shared workspace home.
+2. GET /api/student/overview aggregates submissions, published System Tests, saved Error Logs, in-progress vocabulary, membership, and the highest-priority classroom work.
+3. Focus prioritizes urgent classroom work, then resumable study, baseline practice, saved mistakes, evidence-backed subject practice, and a published-test fallback.
+4. Subject recommendations require at least 20 recent answers, at least 10 answers in the subject, and at least 70% taxonomy coverage.
+5. Progress and Recent Results use completed submissions from the last 90 days and report accuracy rather than a synthetic SAT score.
+6. Practice Center subject and mode filters are URL-backed so Overview deep links restore the intended context.
+7. Unified Tasks combines coursework with student-created tasks, supports personal ordering, and keeps assessed completion source-driven.
+8. The calendar reads task dates, the Next SAT card uses the saved SAT date, and current/target scores are self-reported preferences rather than inferred analytics.
+```
+
+### 8.7 AI Question Generation & Evaluation (LogicLab)
 
 ```
 1. Student requests a question: POST /api/challenge/generate
@@ -392,7 +417,7 @@ Folder ──1:N── Test
    → Returns correctness, per-option feedback, and summary
 ```
 
-### 8.7 Document Parsing (AI Parser)
+### 8.8 Document Parsing (AI Parser)
 
 ```
 1. Teacher uploads PDF/DOCX: POST /api/ai-parser (multipart/form-data)
@@ -402,7 +427,7 @@ Folder ──1:N── Test
    → Formatted text returned to client
 ```
 
-### 8.8 Real-Time Notifications
+### 8.9 Real-Time Notifications
 
 ```
 1. Client connects: GET /api/notifications/stream (SSE)

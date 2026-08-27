@@ -30,6 +30,30 @@ exports.updateSatTestDate = async (req, res) => {
   }
 };
 
+exports.getSatScoreGoal = async (req, res) => {
+  try {
+    res.json(await preferenceService.getSatScoreGoal({
+      userId: req.user?.userId || req.user?.id,
+      userRole: req.user?.role || req.user?.userRole,
+    }));
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+exports.updateSatScoreGoal = async (req, res) => {
+  try {
+    res.json(await preferenceService.updateSatScoreGoal({
+      userId: req.user?.userId || req.user?.id,
+      userRole: req.user?.role || req.user?.userRole,
+      currentScore: req.body?.currentScore,
+      targetScore: req.body?.targetScore,
+    }));
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
 exports.getDashboardBackground = async (req, res) => {
   try {
     res.json(await preferenceService.getDashboardBackground({
