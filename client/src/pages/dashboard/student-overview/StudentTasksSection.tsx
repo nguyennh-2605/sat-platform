@@ -3,14 +3,13 @@ import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { addDays, endOfDay, format, isSameDay, startOfDay } from 'date-fns';
-import { ArrowUpRight, Edit3, GripVertical, ListChecks, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { ArrowUpRight, CalendarDays, GripVertical, ListChecks, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateTimePicker } from '@/components/ui/DateTimePicker';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/AppUI';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -96,27 +95,42 @@ export function StudentTasksSection({ data, selectedDate, onClearDate, onOpen, o
       </CardHeader>
       <CardContent className="px-0">
         {visible.length === 0 ? <div className="flex min-h-48 flex-col items-center justify-center px-6 text-center"><ListChecks className="size-9 text-muted-foreground" /><p className="mt-3 font-medium">Nothing here yet</p><p className="mt-1 text-sm text-muted-foreground">{view === 'COMPLETED' ? 'Completed tasks will collect here.' : 'Enjoy the open space or add a personal task.'}</p></div> :
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={event => void reorder(event)}><SortableContext items={visible.map(item => item.key)} strategy={verticalListSortingStrategy}><div>{visible.map(task => <SortableTaskRow key={task.key} task={task} busy={workingKey === task.key} onToggle={toggle} onOpen={onOpen} onEdit={setEditor} onDelete={setDeleteTarget} />)}</div></SortableContext></DndContext>}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={event => void reorder(event)}><SortableContext items={visible.map(item => item.key)} strategy={verticalListSortingStrategy}><div className="divide-y">{visible.map(task => <SortableTaskRow key={task.key} task={task} busy={workingKey === task.key} onToggle={toggle} onOpen={onOpen} onEdit={setEditor} />)}</div></SortableContext></DndContext>}
       </CardContent>
     </Card>
-    <TaskEditor task={editor} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await onReload(); }} />
+    <TaskEditor task={editor} onClose={() => setEditor(null)} onDelete={task => { setEditor(null); setDeleteTarget(task); }} onSaved={async () => { setEditor(null); await onReload(); }} />
     <Modal open={Boolean(deleteTarget)} onClose={() => !workingKey && setDeleteTarget(null)} closeOnBackdrop={!workingKey} presentation="content-dialog" title="Delete this task?" subtitle={deleteTarget?.title} className="max-w-md!" footer={<><Button variant="outline" disabled={Boolean(workingKey)} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={Boolean(workingKey)} onClick={() => void remove()}>{workingKey ? 'Deleting…' : 'Delete task'}</Button></>}><p className="text-sm leading-6 text-muted-foreground">This removes the personal task permanently. Coursework from your classes cannot be deleted here.</p></Modal>
   </>;
 }
 
-function SortableTaskRow({ task, busy, onToggle, onOpen, onEdit, onDelete }: { task: StudentTaskItem; busy: boolean; onToggle: (task: StudentTaskItem, completed: boolean) => void; onOpen: (task: StudentTaskItem) => void; onEdit: (task: StudentTaskItem) => void; onDelete: (task: StudentTaskItem) => void }) {
+function SortableTaskRow({ task, busy, onToggle, onOpen, onEdit }: { task: StudentTaskItem; busy: boolean; onToggle: (task: StudentTaskItem, completed: boolean) => void; onOpen: (task: StudentTaskItem) => void; onEdit: (task: StudentTaskItem) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.key });
   const due = task.dueAt ? new Date(task.dueAt) : null;
-  const taskCopy = <div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><span className={cn('font-medium text-foreground', task.completed && 'text-muted-foreground line-through')}>{task.title}</span><Badge variant="outline" className="text-[10px] text-muted-foreground">{sourceLabels[task.type]}</Badge>{task.priority === 'OVERDUE' && !task.completed && <Badge variant="destructive" className="text-[10px]">Overdue</Badge>}</div><p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{task.className || task.description || (task.completed ? 'Completed' : 'Personal study task')}{due ? ` · Due ${format(due, 'MMM d, h:mm a')}` : ''}</p></div>;
-  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={cn('group flex items-start gap-3 border-t px-3 py-3 first:border-t-0 sm:px-4', isDragging && 'relative z-10 bg-card shadow-lg ring-1 ring-foreground/10')}>
-    <Button variant="ghost" size="icon-xs" className="mt-0.5 cursor-grab touch-none text-muted-foreground active:cursor-grabbing" aria-label={`Reorder ${task.title}`} {...attributes} {...listeners}><GripVertical /></Button>
-    <Checkbox className="mt-1" checked={task.completed} disabled={!task.canComplete || busy} onCheckedChange={checked => onToggle(task, Boolean(checked))} aria-label={task.canComplete ? `${task.completed ? 'Reopen' : 'Complete'} ${task.title}` : `${task.title} completion is updated from coursework`} />
-    {task.href ? <Button variant="ghost" onClick={() => onOpen(task)} className="h-auto min-w-0 flex-1 justify-start rounded-md p-0 text-left font-normal whitespace-normal hover:bg-transparent active:translate-y-0">{taskCopy}</Button> : <div className="min-w-0 flex-1 text-left">{taskCopy}</div>}
-    <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={`Actions for ${task.title}`}><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-40">{task.href && <DropdownMenuItem onSelect={() => onOpen(task)}><ArrowUpRight />Open</DropdownMenuItem>}{task.canEdit && <DropdownMenuItem onSelect={() => onEdit(task)}><Edit3 />Edit</DropdownMenuItem>}{task.canDelete && <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => onDelete(task)}><Trash2 />Delete</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu>
+  const hasAction = Boolean(task.href || task.canEdit);
+  const activate = () => task.href ? onOpen(task) : task.canEdit && onEdit(task);
+  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={cn('group flex items-center gap-2 px-4 py-2', isDragging && 'relative z-10 bg-card shadow-raised ring-1 ring-foreground/10')}>
+    <Button variant="ghost" size="icon-xs" className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing" aria-label={`Reorder ${task.title}`} {...attributes} {...listeners}><GripVertical /></Button>
+    <Checkbox checked={task.completed} disabled={!task.canComplete || busy} onCheckedChange={checked => onToggle(task, Boolean(checked))} aria-label={task.canComplete ? `${task.completed ? 'Reopen' : 'Complete'} ${task.title}` : `${task.title} completion is updated from coursework`} />
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className={cn('truncate text-sm font-medium text-foreground', task.completed && 'text-muted-foreground line-through')}>{task.title}</span>
+            <Badge variant="outline" className="px-3 py-1 font-normal text-muted-foreground">{sourceLabels[task.type]}</Badge>
+            {task.priority === 'OVERDUE' && !task.completed && <Badge variant="destructive">Overdue</Badge>}
+          </div>
+          {task.className && <p className="mt-1 truncate text-xs text-muted-foreground">From <span className="font-medium text-foreground">{task.className}</span></p>}
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground lg:shrink-0 lg:flex-nowrap lg:justify-end">
+          {due && <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap', task.priority === 'OVERDUE' && !task.completed && 'text-destructive')}><CalendarDays className="size-4" aria-hidden="true" />{format(due, 'MMM d, h:mm a')}</span>}
+          {hasAction && <Button variant="ghost" size="icon-sm" onClick={activate} aria-label={`${task.href ? 'Open' : 'Edit'} ${task.title}`}><ArrowUpRight /></Button>}
+        </div>
+      </div>
+    </div>
   </div>;
 }
 
-function TaskEditor({ task, onClose, onSaved }: { task: StudentTaskItem | 'NEW' | null; onClose: () => void; onSaved: () => Promise<void> }) {
+function TaskEditor({ task, onClose, onDelete, onSaved }: { task: StudentTaskItem | 'NEW' | null; onClose: () => void; onDelete: (task: StudentTaskItem) => void; onSaved: () => Promise<void> }) {
   const editing = task && task !== 'NEW' ? task : null;
   const [title, setTitle] = useState(''); const [details, setDetails] = useState(''); const [dueAt, setDueAt] = useState(''); const [saving, setSaving] = useState(false);
   useEffect(() => { if (!task) return; setTitle(editing?.title || ''); setDetails(editing?.description || ''); setDueAt(editing?.dueAt || ''); }, [task, editing]);
@@ -127,5 +141,9 @@ function TaskEditor({ task, onClose, onSaved }: { task: StudentTaskItem | 'NEW' 
     catch (error) { toast.error((error as { response?: { data?: { error?: string } } }).response?.data?.error || 'Unable to save task.'); }
     finally { setSaving(false); }
   };
-  return <Modal open={Boolean(task)} onClose={() => !saving && onClose()} closeOnBackdrop={!saving} presentation="content-dialog" title={editing ? 'Edit task' : 'New task'} subtitle="Plan a personal study action alongside your coursework." footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !title.trim()} onClick={() => void save()}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Add task'}</Button></>}><div className="space-y-4"><label className="block space-y-2 text-sm font-medium">Task title<Input autoFocus maxLength={160} value={title} onChange={event => setTitle(event.target.value)} placeholder="What do you want to get done?" /></label><label className="block space-y-2 text-sm font-medium">Notes <span className="font-normal text-muted-foreground">(optional)</span><Textarea maxLength={1000} value={details} onChange={event => setDetails(event.target.value)} placeholder="Add context or a study plan" /></label><label className="block space-y-2 text-sm font-medium">Due date <span className="font-normal text-muted-foreground">(optional)</span><DateTimePicker value={dueAt} onChange={setDueAt} ariaLabel="Task due date" className="w-full" /></label></div></Modal>;
+  const footer = <div className="flex w-full items-center justify-between gap-3">
+    <div>{editing?.canDelete && <Button variant="destructive" disabled={saving} onClick={() => onDelete(editing)}><Trash2 />Delete</Button>}</div>
+    <div className="flex items-center gap-2"><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !title.trim()} onClick={() => void save()}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Add task'}</Button></div>
+  </div>;
+  return <Modal open={Boolean(task)} onClose={() => !saving && onClose()} closeOnBackdrop={!saving} presentation="content-dialog" title={editing ? 'Edit task' : 'New task'} subtitle="Plan a personal study action alongside your coursework." footer={footer}><div className="space-y-4"><label className="block space-y-2 text-sm font-medium">Task title<Input autoFocus maxLength={160} value={title} onChange={event => setTitle(event.target.value)} placeholder="What do you want to get done?" /></label><label className="block space-y-2 text-sm font-medium">Notes <span className="font-normal text-muted-foreground">(optional)</span><Textarea maxLength={1000} value={details} onChange={event => setDetails(event.target.value)} placeholder="Add context or a study plan" /></label><label className="block space-y-2 text-sm font-medium">Due date <span className="font-normal text-muted-foreground">(optional)</span><DateTimePicker value={dueAt} onChange={setDueAt} ariaLabel="Task due date" className="w-full" /></label></div></Modal>;
 }

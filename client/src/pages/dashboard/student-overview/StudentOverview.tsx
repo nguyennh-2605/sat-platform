@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/AppUI';
+import { fallbackSatDate } from '@/features/sat-countdown/sat-dates';
 import { cachedGet } from '@/lib/queryCache';
 import { StudentPracticePicks } from './StudentPracticePicks';
 import { StudentCalendarPanel, NextSatCard, ScoreGoalCard } from './StudentProductivitySidebar';
@@ -13,7 +14,6 @@ import { StudentRecentResults } from './StudentRecentResults';
 import { StudentSummaryCards } from './StudentSummaryCards';
 import { StudentTasksSection } from './StudentTasksSection';
 import type { StudentFocus, StudentOverviewResponse, StudentPracticePick, StudentTaskItem, StudentTasksResponse } from './student-overview.types';
-import { fallbackSatDate } from './sat-overview.utils';
 
 const emptyTasks: StudentTasksResponse = { items: [], summary: { todayRemaining: 0, weekCompleted: 0, weekTotal: 0, weekPercentage: 0 }, calendar: [] };
 

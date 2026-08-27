@@ -311,7 +311,7 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
             : 'w-full max-w-lg overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay',
         className,
       )}>
-        <div className="flex items-start justify-between border-b border-ui-border px-6 py-5">
+        <div className={cx('flex items-start justify-between px-6 pt-5', isContentPanel && 'border-b border-ui-border pb-5')}>
           <div>
             <h2 id={titleId} className="text-heading font-semibold text-foreground">{title}</h2>
             {subtitle && <p id={subtitleId} className="mt-1 text-body text-muted-foreground">{subtitle}</p>}
@@ -321,7 +321,7 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
           </Button>
         </div>
         <div className={isContentPanel || isContentDialog ? 'min-h-0 flex-1 overflow-hidden p-6' : 'p-6'}>{children}</div>
-        {footer && <div className="flex justify-end gap-3 border-t border-ui-border bg-background px-6 py-4">{footer}</div>}
+        {footer && <div className={cx('flex justify-end gap-3 px-6 pb-5', isContentPanel && 'border-t border-ui-border bg-background pt-4')}>{footer}</div>}
       </div>
     </div>
   );

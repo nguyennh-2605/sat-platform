@@ -5,13 +5,13 @@ import toast from 'react-hot-toast';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DateTimePicker } from '@/components/ui/DateTimePicker';
+import { SatDateDialog } from '@/features/sat-countdown/SatDateDialog';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/AppUI';
 import { Progress } from '@/components/ui/progress';
+import { atSatTime, fallbackSatDate, SAT_DATE_OPTIONS } from '@/features/sat-countdown/sat-dates';
 import axiosClient from '@/lib/axios';
 import type { StudentOverviewResponse, StudentTasksResponse } from './student-overview.types';
-import { atSatTime, fallbackSatDate } from './sat-overview.utils';
 
 const dateKey = (date: Date) => format(date, 'yyyy-MM-dd');
 
@@ -34,10 +34,18 @@ export function NextSatCard({ value, onSaved }: { value: string | null; onSaved:
   const effective = value && new Date(value).getTime() > now ? new Date(value) : fallbackSatDate(now);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(dateKey(effective));
+  const [customDate, setCustomDate] = useState('');
   const [saving, setSaving] = useState(false);
   const days = Math.max(0, Math.ceil((effective.getTime() - now) / 86_400_000));
+  const openEditor = () => {
+    const currentDate = dateKey(effective);
+    const isOfficialDate = SAT_DATE_OPTIONS.some(option => option.date === currentDate);
+    setDraft(isOfficialDate ? currentDate : dateKey(fallbackSatDate(now)));
+    setCustomDate(isOfficialDate ? '' : currentDate);
+    setOpen(true);
+  };
   const save = async () => {
-    const target = atSatTime(draft);
+    const target = atSatTime(customDate || draft);
     if (Number.isNaN(target.getTime()) || target.getTime() <= now) return toast.error('Choose a future SAT date.');
     setSaving(true);
     try {
@@ -47,8 +55,19 @@ export function NextSatCard({ value, onSaved }: { value: string | null; onSaved:
     finally { setSaving(false); }
   };
   return <>
-    <Card size="sm"><CardHeader><CardTitle className="flex items-center gap-2"><CalendarDays className="size-4 text-muted-foreground" />Next SAT</CardTitle><CardAction><Button variant="ghost" size="icon-xs" onClick={() => { setDraft(dateKey(effective)); setOpen(true); }} aria-label="Change SAT date"><Edit3 /></Button></CardAction></CardHeader><CardContent><div className="flex items-end justify-between gap-4"><div><p className="text-3xl font-semibold tabular-nums">{days}</p><p className="text-xs text-muted-foreground">days remaining</p></div><p className="text-right text-sm font-medium">{format(effective, 'MMM d, yyyy')}<span className="mt-0.5 block text-xs font-normal text-muted-foreground">7:45 AM</span></p></div></CardContent></Card>
-    <Modal open={open} onClose={() => !saving && setOpen(false)} closeOnBackdrop={!saving} presentation="content-dialog" title="Choose your SAT date" subtitle="Set the date you are preparing for." footer={<><Button variant="outline" disabled={saving} onClick={() => setOpen(false)}>Cancel</Button><Button disabled={saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save date'}</Button></>}><DateTimePicker mode="date" minDate={new Date(now + 86_400_000)} value={draft} onChange={setDraft} clearable={false} className="w-full" /></Modal>
+    <Card size="sm"><CardHeader><CardTitle className="flex items-center gap-2"><CalendarDays className="size-4 text-muted-foreground" />Next SAT</CardTitle><CardAction><Button variant="ghost" size="icon-xs" onClick={openEditor} aria-label="Change SAT date"><Edit3 /></Button></CardAction></CardHeader><CardContent><div className="flex items-end justify-between gap-4"><div><p className="text-3xl font-semibold tabular-nums">{days}</p><p className="text-xs text-muted-foreground">days remaining</p></div><p className="text-right text-sm font-medium">{format(effective, 'MMM d, yyyy')}<span className="mt-0.5 block text-xs font-normal text-muted-foreground">7:45 AM</span></p></div></CardContent></Card>
+    <SatDateDialog
+      open={open}
+      effectiveDate={effective}
+      officialDate={draft}
+      customDate={customDate}
+      saving={saving}
+      now={now}
+      onOfficialDateChange={date => { setDraft(date); setCustomDate(''); }}
+      onCustomDateChange={setCustomDate}
+      onClose={() => !saving && setOpen(false)}
+      onSave={() => void save()}
+    />
   </>;
 }
 
