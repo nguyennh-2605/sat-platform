@@ -4,7 +4,6 @@ import { ArrowUpDown, BookOpen, BookOpenCheck, Check, CheckCircle2, ChevronLeft,
 import toast from 'react-hot-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { capitalizeFirstLetter } from '../../utils/text';
-import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '../../components/ui/AppUI';
 import { cachedGet } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -186,7 +185,7 @@ function PracticeCenter() {
     <div className="h-full overflow-y-auto bg-background">
       <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
         <section className="flex flex-col gap-4">
-          <PageHeader title={<span className="font-medium">Practice Center</span>} description="Find assigned and public SAT tests, then continue where you left off." actions={<SatCountdown />} />
+          <PageHeader title={<span className="font-medium">Practice Center</span>} description="Find assigned and public SAT tests, then continue where you left off."/>
           {(!loading || pagination.total > 0 || classes.length > 0) && <div className="flex flex-wrap items-center gap-2">
             <Badge className="gap-1.5 rounded-sm px-2 py-1"><BookOpenCheck size={13} aria-hidden="true" />{pagination.total} tests</Badge>
           </div>}

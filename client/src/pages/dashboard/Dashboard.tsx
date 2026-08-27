@@ -8,6 +8,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   ArrowLeft,
+  EllipsisVertical,
   LogOut,
   Moon,
   Search,
@@ -29,6 +30,7 @@ import { Separator } from '@/components/ui/separator';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -87,7 +89,7 @@ function NavigationItem({ to, label, icon: Icon, exact = false, activePrefixes =
   );
 }
 
-function AppSidebar() {
+function AppSidebar({ onLogout }: { onLogout: () => void }) {
   const role = localStorage.getItem('userRole') || 'STUDENT';
 
   return (
@@ -121,6 +123,10 @@ function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarAccountMenu onLogout={onLogout} />
+      </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>
@@ -200,31 +206,28 @@ function DashboardSearch() {
   );
 }
 
-function HeaderAccountMenu({ onLogout }: { onLogout: () => void }) {
+function SidebarAccountMenu({ onLogout }: { onLogout: () => void }) {
   const userName = localStorage.getItem('userName') || 'Student';
   const userAvatar = localStorage.getItem('userAvatar') || '';
   const role = localStorage.getItem('userRole') || 'STUDENT';
   const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'S';
+  const { isMobile } = useSidebar();
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full" aria-label="Open account menu">
-          <Avatar className="size-8">
-            <AvatarImage src={userAvatar || undefined} alt={userName} />
-            <AvatarFallback>{initials}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuLabel>
-          <p className="truncate text-sm font-medium">{userName}</p>
-          <p className="truncate text-xs font-normal capitalize text-muted-foreground">{role.toLowerCase()}</p>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onSelect={onLogout}><LogOut aria-hidden="true" />Log out</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <SidebarMenu><SidebarMenuItem><DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground" tooltip={userName}>
+            <Avatar className="size-8 rounded-lg grayscale"><AvatarImage src={userAvatar || undefined} alt={userName} /><AvatarFallback className="rounded-lg">{initials}</AvatarFallback></Avatar>
+            <div className="grid min-w-0 flex-1 text-left text-sm leading-tight"><span className="truncate font-medium">{userName}</span><span className="truncate text-xs capitalize text-muted-foreground">{role.toLowerCase()}</span></div>
+            <EllipsisVertical className="ml-auto size-4" aria-hidden="true" />
+          </SidebarMenuButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side={isMobile ? 'bottom' : 'right'} align="end" sideOffset={4} className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg">
+          <DropdownMenuLabel className="p-0 font-normal"><div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm"><Avatar className="size-8 rounded-lg"><AvatarImage src={userAvatar || undefined} alt={userName} /><AvatarFallback className="rounded-lg">{initials}</AvatarFallback></Avatar><div className="grid min-w-0 flex-1 text-left text-sm leading-tight"><span className="truncate font-medium">{userName}</span><span className="truncate text-xs capitalize text-muted-foreground">{role.toLowerCase()}</span></div></div></DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onSelect={onLogout}><LogOut aria-hidden="true" />Log out</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu></SidebarMenuItem></SidebarMenu>
   );
 }
 
@@ -271,14 +274,13 @@ export default function Dashboard() {
         Skip to content
       </a>
       <DashboardBackProvider>
-        <AppSidebar />
+        <AppSidebar onLogout={() => void logout()} />
         <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
           <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b bg-background/80 px-4 backdrop-blur-sm">
             <DashboardHeaderNavigation />
             <div className="flex items-center gap-1">
               <ThemeToggle />
               <NotificationBell currentUserId={userId} />
-              <HeaderAccountMenu onLogout={() => void logout()} />
             </div>
           </header>
 
