@@ -9,6 +9,7 @@
     "test:deploy": "node scripts/deploy-smoke-test.js",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed:vocabulary": "node prisma/seed-vocabulary.js",
+    "db:seed:teacher-overview": "node scripts/seed-teacher-overview.js",
     "admin:create": "node scripts/admin-cli.js create",
     "admin:promote": "node scripts/admin-cli.js promote",
     "admin:rotate-password": "node scripts/admin-cli.js rotate-password",

@@ -238,7 +238,16 @@ Admin Overview uses complete platform days in the configured `APP_TIMEZONE`. It 
 
 Student Overview uses only persisted product data. Coursework and personal planning are combined in a Productivity-style task surface. Assignment, test, and vocabulary completion comes from their authoritative submission/activity records; only personal tasks and announcements can be checked directly. Accuracy remains evidence-based, while current and target SAT scores are explicitly self-reported preferences.
 
-**Total: 53+ endpoints**
+### 5.13 Teacher Overview
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/teacher/overview?classId=all\|:classId` | JWT + TEACHER | Action-first teaching workflow with deadline attention, upcoming dates, 30-day class pulse, and evidence-based student check-in signals |
+| `GET` | `/api/teacher/overview/insights?classId=all\|:classId&range=7d\|30d\|90d` | JWT + TEACHER | Independently loaded domain and skill accuracy from score-policy-selected classroom test attempts |
+
+Teacher Overview only exposes classes owned by the authenticated teacher. Core workflow data and answer-level learning insights load independently so analytics failures do not hide deadlines or classroom status. Check-in suggestions use explicit overdue, inactivity, or sustained score-decline rules; the page does not invent a manual grading queue for auto-scored activities.
+
+**Total: 55+ endpoints**
 
 ---
 
@@ -406,7 +415,19 @@ Folder ──1:N── Test
 8. The calendar reads task dates, the Next SAT card uses the saved SAT date, and current/target scores are self-reported preferences rather than inferred analytics.
 ```
 
-### 8.7 AI Question Generation & Evaluation (LogicLab)
+### 8.7 Teacher Overview
+
+```text
+1. DashboardHome dispatches TEACHER to the dedicated TeacherOverview rather than the legacy shared workspace home.
+2. GET /api/teacher/overview validates teacher ownership and aggregates published activities, scheduled lessons, class completion, and deterministic check-in signals.
+3. The class scope is URL-backed; all workflow links restore the relevant Classroom Activities, Performance, Progress, or assignment destination.
+4. Needs Attention includes only unresolved published work due within 48 hours or overdue; auto-scored tests and homework are not presented as a fictional review queue.
+5. Class Pulse uses the last 30 days of persisted activities and ActivityAssignee completion/best-score data.
+6. GET /api/teacher/overview/insights loads independently and applies each delivery's FIRST, BEST, or LATEST score policy before aggregating classified answers.
+7. Skill/domain insights require at least 30 classified answers, 70% taxonomy coverage, and per-item evidence from 20 answers across 3 students.
+```
+
+### 8.8 AI Question Generation & Evaluation (LogicLab)
 
 ```
 1. Student requests a question: POST /api/challenge/generate
@@ -417,7 +438,7 @@ Folder ──1:N── Test
    → Returns correctness, per-option feedback, and summary
 ```
 
-### 8.8 Document Parsing (AI Parser)
+### 8.9 Document Parsing (AI Parser)
 
 ```
 1. Teacher uploads PDF/DOCX: POST /api/ai-parser (multipart/form-data)
@@ -427,7 +448,7 @@ Folder ──1:N── Test
    → Formatted text returned to client
 ```
 
-### 8.9 Real-Time Notifications
+### 8.10 Real-Time Notifications
 
 ```
 1. Client connects: GET /api/notifications/stream (SSE)
