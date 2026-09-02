@@ -93,6 +93,22 @@ exports.createLesson = async (req, res) => {
   }
 };
 
+exports.reorderWeeks = async (req, res) => {
+  try {
+    const result = await progressService.reorderWeeks({
+      classId: req.params.classId,
+      orderedIds: req.body.orderedIds,
+      userId: getUserId(req),
+      userRole: getUserRole(req),
+    });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Reorder Weeks Error:', error);
+    res.status(500).json({ success: false, error: 'Lỗi khi sắp xếp tuần học' });
+  }
+};
+
 exports.updateLesson = async (req, res) => {
   try {
     const lesson = await progressService.updateLesson({
@@ -111,6 +127,22 @@ exports.updateLesson = async (req, res) => {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
     console.error('Update Lesson Error:', error);
     res.status(500).json({ success: false, error: 'Lỗi khi cập nhật buổi học' });
+  }
+};
+
+exports.reorderLessons = async (req, res) => {
+  try {
+    const result = await progressService.reorderLessons({
+      weekId: req.params.weekId,
+      orderedIds: req.body.orderedIds,
+      userId: getUserId(req),
+      userRole: getUserRole(req),
+    });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Reorder Lessons Error:', error);
+    res.status(500).json({ success: false, error: 'Lỗi khi sắp xếp buổi học' });
   }
 };
 

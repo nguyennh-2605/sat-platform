@@ -108,7 +108,7 @@ const buildUpcoming = (activities, lessons, now = new Date()) => {
       classId: lesson.week.class.id,
       className: lesson.week.class.name,
       occursAt: occursAt.toISOString(),
-      href: `/dashboard/class/${lesson.week.class.id}?tab=progress`,
+      href: `/dashboard/class/${lesson.week.class.id}?tab=lessons`,
     });
   }
   return events.sort((first, second) => new Date(first.occursAt) - new Date(second.occursAt)).slice(0, 8);

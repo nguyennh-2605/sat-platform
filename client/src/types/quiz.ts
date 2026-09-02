@@ -66,5 +66,13 @@ export interface AssignmentProps {
   links: string[];
   deadline: string | null;
   createdAt: string;
-  selectedTests?: TestItem[];
-}
+    selectedTests?: TestItem[];
+    studentWork?: Array<{
+      student: { id: number; name: string | null; email: string };
+      submitted: boolean;
+      status: string;
+      submittedAt: string | null;
+      textResponse: string | null;
+      fileUrl: string | null;
+    }>;
+  }

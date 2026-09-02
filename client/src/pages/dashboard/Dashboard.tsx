@@ -58,9 +58,13 @@ const navigation = [
   { to: '/dashboard/results-analytics', label: 'Results & Analytics', icon: BarChart3 },
 ] as const;
 
-const navigationForRole = (role: string) => navigation.map(item => item.to === '/dashboard/practice-test'
-  ? { ...item, label: role === 'ADMIN' ? 'Test Management' : role === 'TEACHER' ? 'Test Library' : item.label }
-  : item);
+const navigationForRole = (role: string) => navigation
+  .filter(item => role === 'STUDENT' || !['/dashboard/error-log', '/dashboard/results-analytics'].includes(item.to))
+  .map(item => {
+    if (item.to === '/dashboard/practice-test') return { ...item, label: role === 'ADMIN' ? 'Test Management' : role === 'TEACHER' ? 'Test Library' : item.label };
+    if (item.to === '/dashboard/classes' && role === 'TEACHER') return { ...item, label: 'Classrooms' };
+    return item;
+  });
 
 interface NavigationItemProps {
   to: string;

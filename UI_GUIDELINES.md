@@ -43,6 +43,7 @@ Sử dụng các token đã định nghĩa trong `client/src/index.css` và comp
 | Primary soft | `bg-primary-soft` | `--ui-primary-soft` | neutral selected surface |
 | Accent | `bg-accent` | `--ui-accent` | neutral accent surface |
 | Muted surface | `bg-muted` | `--ui-muted` | neutral muted surface |
+| Section header surface | `bg-section-header` | `--ui-section-header` | stronger neutral surface for hierarchical parent headers |
 | Muted text | `text-muted-foreground` | `--ui-muted-foreground` | `#6B7280` |
 | Secondary text | `text-subtle` | `--ui-subtle-foreground` | `#4B5563` |
 | Border | `border-ui-border` | `--ui-border` | neutral border |
@@ -116,6 +117,7 @@ Các component chuẩn:
 - `DateTimePicker`
 - `Modal`
 - `Tabs`
+- `Collapsible`
 - `TableShell`, `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`
 - `EmptyState`
 - Toast toàn cục qua `APP_TOAST_OPTIONS`; feature mới gọi wrapper `appToast`
@@ -128,6 +130,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - `Input` và `Select`: cao `36px`, focus ring primary; label/helper/error nằm ngoài control và dùng typography chuẩn.
 - `Modal`: dùng `presentation="content-dialog"` trong dashboard; có title, nút đóng, Escape, focus trap và restore focus. Không tự dựng overlay.
 - `Tabs`: bắt buộc cho chuyển đổi panel cùng trang; có `tablist/tab/tabpanel`, Arrow keys, Home/End. Link điều hướng sang route khác không phải Tabs.
+- `Collapsible`: dùng cho outline có nhiều section được mở đồng thời; trigger phải có accessible name và controlled state khi page có Expand/Collapse All.
 - `Card`: surface nội dung mặc định. Không biến mọi section thành card nếu hierarchy không cần.
 - `Table`: luôn đặt trong `TableShell`; table rộng có wrapper `overflow-x-auto`; dùng các table primitives cho header/row/cell.
 - `Badge`: chỉ thể hiện metadata/status, không dùng thay button.
@@ -220,6 +223,23 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Teacher Test Library card dùng anatomy `CardHeader → CardContent → CardFooter`: title và subject cùng hàng, mode là subtitle nằm sát title; question count, duration và source/updated time là các metadata row compact. Footer tách bằng border + muted surface và có hai content action full-width xếp dọc, primary trước và outline sau; lifecycle action phụ nằm trong menu dấu ba chấm.
 - Hiển thị question count, progress percentage, last attempt và score khi có dữ liệu thật.
 - Các trạng thái dùng English: `Not started`, `In progress`, `Completed`.
+
+### Classroom Lessons
+
+- `Lessons` là curriculum builder phân cấp, không phải dashboard, KPI surface, table hay collection card.
+- Anatomy bắt buộc là `Week = bordered surface`, `Session = section row`, `Content = compact interactive row`; không bọc mỗi Session, resource, quiz hoặc homework trong Card riêng.
+- Teacher/Admin mặc định xem curriculum ở read mode. Nút `Edit curriculum` mới bật contextual Add/Edit/Publish/Delete/Reorder; `Done` phải đưa màn hình về read mode và ẩn toàn bộ mutation controls. Student chỉ thấy published outline, content actions và completion phù hợp.
+- `Published` là trạng thái mặc định và không cần lặp badge trên mọi row. Chỉ nhấn `Draft`, `Scheduled`, `Archived` hoặc effective visibility như `Hidden by week`.
+- Week rỗng và Session rỗng dùng content-driven height; không reserve empty panel cao. `Add session` và `Add content` phải xuất hiện tại đúng parent context.
+- Syllabus dài hỗ trợ Compact, Expand All và Collapse All. Đây là client preference theo class, không phải shared curriculum data.
+- Drag handle chỉ xuất hiện khi backend persist được order. Reorder phải có keyboard sensor và `Move up`/`Move down` fallback; không giả lập reorder chỉ ở client.
+- Week và Session có canonical `order` riêng. Không cho drag xen kẽ Resource, TestDelivery, ClassActivity và LessonAssignment cho tới khi các loại content có chung ordering contract.
+- Vùng Lessons tập trung ở `max-w-[1320px]`. Từ viewport `1400px`, dùng grid `minmax(0, 1fr) 280px` với gap `24px`; dưới ngưỡng này curriculum trở lại full-column.
+- Right rail duy nhất được phép là `Course outline` sticky phục vụ navigation Week. Sticky phải đặt trên chính rail/grid item để nó bám viewport trong toàn bộ chiều cao curriculum. Nó có thể hiển thị số Session và trạng thái publication ngoại lệ, nhưng không được lặp KPI, performance, todo, announcement, chart hoặc nội dung của tab khác. Click Week phải scroll tới đúng Week và rail phải phản ánh Week hiện tại.
+- Chỉ Week header dùng muted surface đủ rõ (`bg-section-header`); Week body vẫn là surface trắng. `Week NN` và `Session NN` là structural label `font-semibold`, đặt inline trước title bằng dấu `·` và không dùng muted text.
+- Content phải thụt ít nhất 28px so với Session title và dùng connector cây cong, mảnh bằng semantic border token. `Add content` nằm trên cùng tree branch với các content item.
+- Content row ưu tiên mật độ gọn: khoảng 36px cho một dòng và 44px khi có metadata; khoảng cách từ Session metadata tới content tree khoảng 8px.
+- Content primary label dùng một dòng `Type: Title`; metadata chỉ mở dòng phụ khi có thông tin thật như duration, deadline, provider hoặc completion. Icon là glyph thuần `size-4`, không có box, border hoặc background riêng.
 
 ### Classroom Activities
 

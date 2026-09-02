@@ -59,6 +59,14 @@ exports.updateAssignment = async ({ assignmentId, userId, title, content, fileUr
       deadline: formattedDeadline
     }
   });
+  await prisma.classActivity.updateMany({
+    where: { homework: { assignmentId } },
+    data: {
+      ...(title !== undefined && { title }),
+      ...(content !== undefined && { instructions: content }),
+      ...(deadline !== undefined && { dueAt: formattedDeadline }),
+    },
+  });
   await testDeliveryService.syncClassAssignmentDeliveries({
     assignment: updatedAssignment,
     userId,
@@ -80,9 +88,11 @@ exports.getAssignmentById = async ({ id, userId, userRole }) => {
       class: {
         select: {
           teacherId: true,
-          students: { select: { id: true } }
+          students: { select: { id: true, name: true, email: true } }
         }
-      }
+      },
+      submissions: { include: { student: { select: { id: true, name: true, email: true } } }, orderBy: { submittedAt: 'desc' } },
+      activity: { include: { activity: { select: { status: true, availableAt: true, assignees: { where: { excusedAt: null }, select: { studentId: true } } } } } }
     }
   });
 
@@ -91,7 +101,11 @@ exports.getAssignmentById = async ({ id, userId, userRole }) => {
   }
 
   const isTeacher = assignment.class.teacherId === currentUserId;
-  const isStudent = assignment.class.students.some(student => student.id === currentUserId);
+  const enrolledStudent = assignment.class.students.some(student => student.id === currentUserId);
+  const activityAvailable = !assignment.activity || (assignment.activity.activity.status === 'PUBLISHED'
+    && (!assignment.activity.activity.availableAt || assignment.activity.activity.availableAt <= new Date())
+    && assignment.activity.activity.assignees.some(assignee => assignee.studentId === currentUserId));
+  const isStudent = enrolledStudent && activityAvailable;
 
   if (userRole !== 'ADMIN' && !isTeacher && !isStudent) {
     throw new ApiError(403, { message: "Bạn không có quyền xem bài tập này!" });
@@ -130,9 +144,20 @@ exports.getAssignmentById = async ({ id, userId, userRole }) => {
 
   const assignmentData = { ...assignment };
   delete assignmentData.class;
+  delete assignmentData.submissions;
+  delete assignmentData.activity;
+  const canManage = userRole === 'ADMIN' || isTeacher;
+  const submissionByStudent = new Map(assignment.submissions.map(submission => [submission.studentId, submission]));
 
   return {
     ...assignmentData,
-    selectedTests: formattedSelectedTests
+    selectedTests: formattedSelectedTests,
+    ...(canManage ? { studentWork: assignment.class.students.filter(student => !assignment.activity || assignment.activity.activity.assignees.some(assignee => assignee.studentId === student.id)).map(student => {
+      const submission = submissionByStudent.get(student.id);
+      return {
+        student, submitted: Boolean(submission), status: submission?.status || 'NOT_SUBMITTED',
+        submittedAt: submission?.submittedAt || null, textResponse: submission?.textResponse || null, fileUrl: submission?.fileUrl || null,
+      };
+    }) } : {}),
   };
 };

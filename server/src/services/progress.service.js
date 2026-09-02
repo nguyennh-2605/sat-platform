@@ -26,6 +26,25 @@ const contentStatus = value => {
   return normalized;
 };
 
+const normalizeOrderedIds = orderedIds => {
+  if (!Array.isArray(orderedIds)) {
+    throw new ApiError(400, { success: false, error: 'Thứ tự nội dung không hợp lệ.' });
+  }
+  const normalized = orderedIds.map(value => String(value || '').trim());
+  if (normalized.some(id => !id) || new Set(normalized).size !== normalized.length) {
+    throw new ApiError(400, { success: false, error: 'Thứ tự nội dung chứa mã trống hoặc trùng lặp.' });
+  }
+  return normalized;
+};
+
+const assertCompleteOrder = (orderedIds, existingItems) => {
+  const existingIds = existingItems.map(item => String(item.id));
+  const requested = new Set(orderedIds);
+  if (orderedIds.length !== existingIds.length || existingIds.some(id => !requested.has(id))) {
+    throw new ApiError(400, { success: false, error: 'Thứ tự mới phải chứa đầy đủ nội dung thuộc cùng một cấp.' });
+  }
+};
+
 const validateResource = file => {
   const name = String(file?.name || '').trim();
   const url = String(file?.url || '').trim();
@@ -80,8 +99,11 @@ exports.getWeeks = async ({ classId, userId, userRole }) => {
             include: { test: { select: { id: true, title: true, mode: true, duration: true, subject: true, folderId: true, sections: { select: { _count: { select: { questions: true } } } } } } },
           },
           activities: {
-            where: canManage ? { type: { in: ['VOCABULARY', 'RESOURCE'] } } : { type: { in: ['VOCABULARY', 'RESOURCE'] }, status: 'PUBLISHED', assignees: { some: { studentId: currentUserId, status: { not: 'EXCUSED' } } } },
-            include: { assignees: { where: { studentId: currentUserId }, take: 1 } },
+            where: canManage ? { type: { in: ['VOCABULARY', 'HOMEWORK', 'RESOURCE'] } } : { type: { in: ['VOCABULARY', 'HOMEWORK', 'RESOURCE'] }, status: 'PUBLISHED', assignees: { some: { studentId: currentUserId, status: { not: 'EXCUSED' } } } },
+            include: {
+              assignees: canManage ? true : { where: { studentId: currentUserId }, take: 1 },
+              homework: { include: { assignment: { select: { id: true, content: true, fileUrls: true, links: true, submissions: { where: { studentId: currentUserId }, select: { status: true, submittedAt: true }, take: 1 } } } } },
+            },
           },
           progress: canManage ? true : { where: { studentId: currentUserId }, take: 1 },
         },
@@ -120,24 +142,28 @@ exports.updateWeek = async ({ weekId, title, description, status, availableAt, u
     ...(status !== undefined && { status: nextStatus, publishedAt: nextStatus === 'PUBLISHED' ? (week.publishedAt || new Date()) : week.publishedAt }),
     ...(availableAt !== undefined && { availableAt: dateValue(availableAt) }),
   } });
-  if (week.status !== 'PUBLISHED' && nextStatus === 'PUBLISHED') await notifyStudents(week.class, `Tuần học mới đã được mở: "${updated.title}".`, `/dashboard/class/${week.classId}?tab=progress`);
+  if (week.status !== 'PUBLISHED' && nextStatus === 'PUBLISHED') await notifyStudents(week.class, `Tuần học mới đã được mở: "${updated.title}".`, `/dashboard/class/${week.classId}?tab=lessons`);
   return updated;
 };
 
-const deleteCanonicalAssignments = async lessonIds => {
-  const items = await prisma.lessonAssignment.findMany({ where: { lessonId: { in: lessonIds }, assignmentId: { not: null } }, select: { assignmentId: true } });
-  const ids = items.map(item => item.assignmentId).filter(Boolean);
-  if (ids.length) {
-    await prisma.testDelivery.updateMany({ where: { OR: [{ sourceAssignmentId: { in: ids } }, { lessonId: { in: lessonIds } }] }, data: { status: 'CLOSED' } });
-    await prisma.assignment.deleteMany({ where: { id: { in: ids } } });
-  }
+const reorderWeeksWithDb = async ({ db, classId, orderedIds, userId, userRole }) => {
+  const normalizedIds = normalizeOrderedIds(orderedIds);
+  const classData = await db.class.findUnique({ where: { id: classId }, select: { id: true, teacherId: true } });
+  if (!classData) throw new ApiError(404, { success: false, error: 'Không tìm thấy lớp học.' });
+  assertCanManage({ classData, userId, userRole });
+  const existing = await db.week.findMany({ where: { classId }, select: { id: true } });
+  assertCompleteOrder(normalizedIds, existing);
+  await db.$transaction(normalizedIds.map((id, order) => db.week.update({ where: { id }, data: { order } })));
+  return { orderedIds: normalizedIds };
 };
+
+exports.reorderWeeksWithDb = reorderWeeksWithDb;
+exports.reorderWeeks = args => reorderWeeksWithDb({ db: prisma, ...args });
 
 exports.deleteWeek = async ({ weekId, userId, userRole }) => {
   const week = await prisma.week.findUnique({ where: { id: weekId }, include: { class: true, lessons: { select: { id: true } } } });
   if (!week) throw new ApiError(404, { success: false, error: 'Không tìm thấy tuần học.' });
   assertCanManage({ classData: week.class, userId, userRole });
-  await deleteCanonicalAssignments(week.lessons.map(lesson => lesson.id));
   await prisma.week.delete({ where: { id: weekId } });
 };
 
@@ -164,15 +190,28 @@ exports.updateLesson = async ({ lessonId, title, summary, status, scheduledAt, d
     ...(scheduledAt !== undefined && { scheduledAt: dateValue(scheduledAt) }), ...(availableAt !== undefined && { availableAt: dateValue(availableAt) }),
     ...(durationMinutes !== undefined && { durationMinutes: durationMinutes ? Number(durationMinutes) : null }),
   } });
-  if (lesson.status !== 'PUBLISHED' && nextStatus === 'PUBLISHED') await notifyStudents(lesson.week.class, `Buổi học mới đã được mở: "${updated.title}".`, `/dashboard/class/${lesson.week.classId}?tab=progress`);
+  if (lesson.status !== 'PUBLISHED' && nextStatus === 'PUBLISHED') await notifyStudents(lesson.week.class, `Buổi học mới đã được mở: "${updated.title}".`, `/dashboard/class/${lesson.week.classId}?tab=lessons`);
   return updated;
 };
+
+const reorderLessonsWithDb = async ({ db, weekId, orderedIds, userId, userRole }) => {
+  const normalizedIds = normalizeOrderedIds(orderedIds);
+  const week = await db.week.findUnique({ where: { id: weekId }, include: { class: true } });
+  if (!week) throw new ApiError(404, { success: false, error: 'Không tìm thấy tuần học.' });
+  assertCanManage({ classData: week.class, userId, userRole });
+  const existing = await db.lesson.findMany({ where: { weekId }, select: { id: true } });
+  assertCompleteOrder(normalizedIds, existing);
+  await db.$transaction(normalizedIds.map((id, order) => db.lesson.update({ where: { id }, data: { order } })));
+  return { orderedIds: normalizedIds };
+};
+
+exports.reorderLessonsWithDb = reorderLessonsWithDb;
+exports.reorderLessons = args => reorderLessonsWithDb({ db: prisma, ...args });
 
 exports.deleteLesson = async ({ lessonId, userId, userRole }) => {
   const lesson = await getLessonWithClass(lessonId);
   if (!lesson) throw new ApiError(404, { success: false, error: 'Không tìm thấy buổi học.' });
   assertCanManage({ classData: lesson.week.class, userId, userRole });
-  await deleteCanonicalAssignments([lessonId]);
   await prisma.lesson.delete({ where: { id: lessonId } });
 };
 

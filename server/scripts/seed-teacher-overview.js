@@ -49,6 +49,75 @@ const questionData = index => ({
   skillCode: index % 2 === 0 ? 'RW_CENTRAL_IDEAS_AND_DETAILS' : 'RW_COMMAND_OF_EVIDENCE_TEXTUAL',
 });
 
+const curriculumWeeks = now => [
+  {
+    title: 'Reading Foundations', description: 'Build a reliable process for main ideas and evidence questions.', order: 0, status: 'PUBLISHED', publishedAt: at(now, -28 * DAY),
+    lessons: { create: [
+      { title: 'Central Ideas and Details', summary: 'Identify claims, purpose, and the most relevant supporting details.', order: 0, status: 'PUBLISHED', scheduledAt: at(now, -26 * DAY), durationMinutes: 60, publishedAt: at(now, -28 * DAY), files: { create: [
+        { name: 'Central Ideas Strategy Guide', url: 'https://example.com/sat/central-ideas-guide', kind: 'FILE', order: 0, isRequired: true },
+        { name: 'Worked Passage Walkthrough', url: 'https://example.com/sat/central-ideas-video', kind: 'VIDEO', order: 1 },
+      ] } },
+      { title: 'Command of Evidence', summary: 'Connect textual evidence to claims and conclusions.', order: 1, status: 'PUBLISHED', scheduledAt: at(now, -23 * DAY), durationMinutes: 60, publishedAt: at(now, -28 * DAY), files: { create: [
+        { name: 'Evidence Selection Checklist', url: 'https://example.com/sat/evidence-checklist', kind: 'FILE', order: 0, isRequired: true },
+      ] } },
+    ] },
+  },
+  {
+    title: 'Craft and Structure', description: 'Read for vocabulary, purpose, structure, and cross-text relationships.', order: 1, status: 'PUBLISHED', publishedAt: at(now, -21 * DAY),
+    lessons: { create: [
+      { title: 'Words in Context', order: 0, status: 'PUBLISHED', scheduledAt: at(now, -19 * DAY), durationMinutes: 50, publishedAt: at(now, -21 * DAY), files: { create: [
+        { name: 'Context Clues Practice Set', url: 'https://example.com/sat/context-clues', kind: 'FILE', order: 0, isRequired: true },
+      ] } },
+      { title: 'Text Structure and Purpose', order: 1, status: 'PUBLISHED', scheduledAt: at(now, -16 * DAY), durationMinutes: 55, publishedAt: at(now, -21 * DAY), files: { create: [
+        { name: 'Structure Signal Words', url: 'https://example.com/sat/structure-signals', kind: 'LINK', order: 0 },
+      ] } },
+      { title: 'Cross-Text Connections', order: 2, status: 'PUBLISHED', scheduledAt: at(now, -14 * DAY), durationMinutes: 55, publishedAt: at(now, -21 * DAY), files: { create: [
+        { name: 'Paired Text Comparison Template', url: 'https://example.com/sat/paired-text-template', kind: 'FILE', order: 0 },
+      ] } },
+    ] },
+  },
+  {
+    title: 'Standard English Conventions', description: 'Strengthen sentence boundaries, grammar, and expression of ideas.', order: 2, status: 'PUBLISHED', publishedAt: at(now, -12 * DAY),
+    lessons: { create: [
+      { title: 'Boundaries', order: 0, status: 'PUBLISHED', scheduledAt: at(now, -10 * DAY), durationMinutes: 60, publishedAt: at(now, -12 * DAY), files: { create: [
+        { name: 'Punctuation Decision Tree', url: 'https://example.com/sat/punctuation-tree', kind: 'FILE', order: 0, isRequired: true },
+      ] } },
+      { title: 'Form, Structure, and Sense', order: 1, status: 'PUBLISHED', scheduledAt: at(now, -7 * DAY), durationMinutes: 60, publishedAt: at(now, -12 * DAY), files: { create: [
+        { name: 'Grammar Error Patterns', url: 'https://example.com/sat/grammar-patterns', kind: 'VIDEO', order: 0 },
+      ] } },
+    ] },
+  },
+  {
+    title: 'Algebra Foundations', description: 'Model and solve linear equations, inequalities, and systems.', order: 3, status: 'PUBLISHED', publishedAt: at(now, -5 * DAY),
+    lessons: { create: [
+      { title: 'Linear Equations', order: 0, status: 'PUBLISHED', scheduledAt: at(now, 2 * DAY), durationMinutes: 75, publishedAt: at(now, -5 * DAY), files: { create: [
+        { name: 'Linear Equations Practice', url: 'https://example.com/sat/linear-equations', kind: 'FILE', order: 0, isRequired: true },
+        { name: 'Desmos Linear Models', url: 'https://example.com/sat/desmos-linear-models', kind: 'LINK', order: 1 },
+      ] } },
+      { title: 'Systems of Equations', order: 1, status: 'PUBLISHED', scheduledAt: at(now, 4 * DAY), durationMinutes: 60, publishedAt: at(now, -5 * DAY), files: { create: [
+        { name: 'Systems Strategy Notes', url: 'https://example.com/sat/systems-notes', kind: 'FILE', order: 0 },
+      ] } },
+    ] },
+  },
+  {
+    title: 'Advanced Math', description: 'Prepare nonlinear equations, functions, and equivalent expressions.', order: 4, status: 'DRAFT',
+    lessons: { create: [
+      { title: 'Nonlinear Equations', order: 0, status: 'DRAFT', durationMinutes: 70, files: { create: [
+        { name: 'Quadratics Preview', url: 'https://example.com/sat/quadratics-preview', kind: 'FILE', order: 0 },
+      ] } },
+      { title: 'Functions and Transformations', order: 1, status: 'DRAFT', durationMinutes: 70 },
+    ] },
+  },
+  {
+    title: 'Course Review', description: 'Consolidate strategies and prepare a final practice plan.', order: 5, status: 'DRAFT',
+    lessons: { create: [
+      { title: 'Reading and Writing Strategy Review', order: 0, status: 'DRAFT', durationMinutes: 60 },
+      { title: 'Math Strategy Review', order: 1, status: 'DRAFT', durationMinutes: 60 },
+      { title: 'Final Practice Plan', order: 2, status: 'DRAFT', durationMinutes: 45 },
+    ] },
+  },
+];
+
 const seedTeacher = async (teacher, now) => prisma.$transaction(async tx => {
   const classIds = ['intensive', 'weekend', 'foundation'].map(suffix => demoClassId(teacher.id, suffix));
   await tx.class.deleteMany({ where: { id: { in: classIds }, teacherId: teacher.id } });
@@ -190,17 +259,10 @@ const seedTeacher = async (teacher, now) => prisma.$transaction(async tx => {
     },
   });
 
-  await tx.week.create({
-    data: {
-      title: `${DEMO_PREFIX} Week 4`, order: 4, status: 'PUBLISHED', classId: foundation.id,
-      lessons: { create: [
-        { title: 'Advanced Algebra Workshop', order: 1, status: 'SCHEDULED', scheduledAt: at(now, 2 * DAY), durationMinutes: 75 },
-        { title: 'Reading Strategy Office Hours', order: 2, status: 'SCHEDULED', scheduledAt: at(now, 4 * DAY), durationMinutes: 45 },
-      ] },
-    },
-  });
+  const weekDefinitions = curriculumWeeks(now);
+  for (const week of weekDefinitions) await tx.week.create({ data: { ...week, classId: foundation.id } });
 
-  return { teacher: teacher.email, classes: 3, students: students.length, submissions: 5 };
+  return { teacher: teacher.email, classes: 3, students: students.length, submissions: 5, curriculumWeeks: weekDefinitions.length };
 });
 
 async function main() {

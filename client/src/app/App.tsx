@@ -33,6 +33,11 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return children;
 }
 
+function RequireRole({ roles, children }: { roles: string[]; children: ReactNode }) {
+  const role = localStorage.getItem('userRole') || '';
+  return roles.includes(role) ? children : <Navigate to="/dashboard" replace />;
+}
+
 function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -53,8 +58,8 @@ function App() {
                 <Route path="classes" element={<ClassroomList />} />
                 <Route path="vocabulary" element={<Vocabulary />} />
                 <Route path="class/:classId" element={<Classroom />} />
-                <Route path="error-log" element={<ErrorLog />} />
-                <Route path="results-analytics" element={<ResultAnalytics />} />
+                <Route path="error-log" element={<RequireRole roles={['STUDENT']}><ErrorLog /></RequireRole>} />
+                <Route path="results-analytics" element={<RequireRole roles={['STUDENT']}><ResultAnalytics /></RequireRole>} />
                 <Route path="score-report" element={<ScoreReport />} />
                 <Route path="practice-test/create" element={<CreateTestWizard />} />
                 <Route path="class/:classId/assignment/:assignmentId" element={<AssignmentDetail />} />

@@ -3,6 +3,7 @@ import { BookA, Calendar, CheckCircle2, Clock3, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../../lib/axios';
 import { Badge, Button, Card, EmptyState, Modal } from '../../components/ui/AppUI';
+import { ui } from '../../components/ui/styles';
 
 interface ActivityAssignee {
   studentId: number;
@@ -91,7 +92,7 @@ export default function ClassroomVocabularyPanel({ classId, canManage }: { class
           const completed = activity.assignees.filter(item => item.status === 'COMPLETED').length;
           const myStatus = activity.assignees[0]?.status;
           const overdue = Boolean(activity.dueAt && new Date(activity.dueAt) < new Date() && myStatus !== 'COMPLETED');
-          return <button key={activity.id} type="button" disabled={performanceLoading} onClick={() => void openActivity(activity)} className="group min-h-40 rounded-card border border-ui-border bg-surface p-5 text-left shadow-card transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised disabled:cursor-wait">
+          return <button key={activity.id} type="button" disabled={performanceLoading} onClick={() => void openActivity(activity)} className={`group min-h-40 rounded-card border border-ui-border bg-surface p-5 text-left shadow-card disabled:cursor-wait ${ui.cardInteractive}`}>
             <div className="flex items-start justify-between gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary-soft text-primary"><BookA size={19} /></span>
               <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${overdue ? 'bg-danger-soft text-danger' : myStatus === 'COMPLETED' ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'}`}>

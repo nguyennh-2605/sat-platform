@@ -26,6 +26,7 @@
 
   --color-muted: var(--ui-muted);
   --color-muted-foreground: var(--ui-muted-foreground);
+  --color-section-header: var(--ui-section-header);
 
   --color-subtle: var(--ui-subtle-foreground);
 
@@ -164,6 +165,7 @@
     --ui-accent-soft: var(--accent);
     --ui-muted: var(--muted);
     --ui-muted-foreground: var(--muted-foreground);
+    --ui-section-header: color-mix(in oklch, var(--muted) 94%, var(--foreground));
     --ui-subtle-foreground: color-mix(in oklch, var(--foreground) 72%, var(--background));
     --ui-info: #2563eb;
     --ui-info-soft: #eff6ff;

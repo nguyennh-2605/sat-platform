@@ -1,46 +1,34 @@
-import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react';
-import { AlertTriangle, BarChart3, Bell, Calendar, Check, ClipboardList, Clock, Copy, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
-import { compareAsc, format, formatDistanceToNow, isPast, isToday, isTomorrow } from 'date-fns';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { BarChart3, Bell, Check, ClipboardList, Copy, ExternalLink, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { Button, Card, Input, Modal, PageHeader, TableShell, Tabs, type TabItem } from '../../components/ui/AppUI';
 import { useDashboardBack } from '../../features/navigation/DashboardBackContext';
 import StudentAnalytics from '../../features/analytics/StudentAnalytics';
-import AnnouncementCreator from '../../features/notifications/AnnouncementCreator';
+import AnnouncementDialog from '../../features/classroom/AnnouncementDialog';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
 import ClassroomActivities from '../../features/classroom/ClassroomActivities';
 import { capitalizeFirstLetter } from '../../utils/text';
 
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-type ClassroomTab = 'NOTIFICATIONS' | 'ACTIVITIES' | 'MEMBERS' | 'PROGRESS' | 'PERFORMANCE';
-type NotificationFilter = 'all' | 'assignment' | 'announcement';
+type ClassroomTab = 'LESSONS' | 'ACTIVITIES' | 'PERFORMANCE' | 'MEMBERS' | 'ANNOUNCEMENTS';
 
 interface CurrentUser { id: string; name: string; role: UserRole }
 interface ClassMember { id: number; name: string | null; email: string; createdAt: string }
-interface ClassAssignment {
-  id: string;
-  title: string;
-  type?: 'assignment' | 'announcement';
-  content?: string | null;
-  deadline?: string | null;
-  createdAt: string;
-  testIds?: number[];
-}
 interface ClassDetail {
   id: string;
   name: string;
   color?: string;
   teacher: ClassMember;
   students: ClassMember[];
-  assignments: ClassAssignment[];
+  assignments: unknown[];
 }
-interface AnnouncementData { title: string; content?: string; deadline?: string | null; fileUrls?: string[]; links?: string[]; type?: 'assignment' | 'announcement' }
+interface ClassAnnouncement { id: string; title: string; content?: string | null; fileUrls: string[]; links: string[]; createdAt: string; author: { id: number; name: string | null } }
 
 const AVATAR_COLORS = ['#1B7A5A', '#0F4D38', '#2563EB', '#A16207', '#8B3A62', '#475569'];
 const requestErrorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
-const plainText = (value?: string | null) => String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-const notificationType = (item: ClassAssignment): 'assignment' | 'announcement' => item.type || (item.deadline || item.testIds?.length ? 'assignment' : 'announcement');
 
 export default function Classroom() {
   const { classId } = useParams();
@@ -54,9 +42,9 @@ export default function Classroom() {
   const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [activeTab, setActiveTab] = useState<ClassroomTab>('NOTIFICATIONS');
+  const [activeTab, setActiveTab] = useState<ClassroomTab>('LESSONS');
   const [announcementOpen, setAnnouncementOpen] = useState(false);
-  const [postKind, setPostKind] = useState<'post' | 'homework'>('post');
+  const [announcementVersion, setAnnouncementVersion] = useState(0);
   const [addStudentOpen, setAddStudentOpen] = useState(false);
   const [studentToRemove, setStudentToRemove] = useState<ClassMember | null>(null);
   useDashboardBack(() => navigate('/dashboard/classes'));
@@ -84,9 +72,16 @@ export default function Classroom() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')?.toUpperCase();
-    if (requestedTab === 'NOTIFICATIONS' || requestedTab === 'ACTIVITIES' || requestedTab === 'MEMBERS' || requestedTab === 'PROGRESS') setActiveTab(requestedTab);
-    if (canManage && requestedTab === 'PERFORMANCE') setActiveTab(requestedTab);
-  }, [canManage, searchParams]);
+    const aliases: Record<string, ClassroomTab> = { PROGRESS: 'LESSONS', NOTIFICATIONS: 'ANNOUNCEMENTS' };
+    const resolved = aliases[requestedTab || ''] || requestedTab;
+    if (requestedTab && aliases[requestedTab]) {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', aliases[requestedTab].toLowerCase());
+      setSearchParams(next, { replace: true });
+    }
+    if (resolved === 'LESSONS' || resolved === 'ACTIVITIES' || resolved === 'MEMBERS' || resolved === 'ANNOUNCEMENTS') setActiveTab(resolved);
+    if (canManage && resolved === 'PERFORMANCE') setActiveTab(resolved);
+  }, [canManage, searchParams, setSearchParams]);
 
   const selectTab = (tab: ClassroomTab) => {
     setActiveTab(tab);
@@ -102,19 +97,6 @@ export default function Classroom() {
     next.set('tab', 'performance');
     next.set('deliveryId', deliveryId);
     setSearchParams(next, { replace: true });
-  };
-
-  const createAnnouncement = async (data: AnnouncementData) => {
-    if (!classId) return;
-    try {
-      const type = data.type || (data.deadline ? 'assignment' : 'announcement');
-      await axiosClient.post('/api/classes/posts', { classId, title: data.title, content: data.content, type, deadline: data.deadline || null, driveFiles: data.fileUrls || [], externalLinks: data.links || [], testIds: [] });
-      toast.success(type === 'assignment' ? 'Assignment posted' : 'Announcement posted');
-      setAnnouncementOpen(false);
-      await fetchClassDetail();
-    } catch (error) {
-      toast.error(requestErrorMessage(error, 'Unable to publish announcement.'));
-    }
   };
 
   const addStudent = async (email: string) => {
@@ -134,11 +116,11 @@ export default function Classroom() {
   if (!classDetail || loadError) return <ClassroomError message={loadError} onRetry={() => void fetchClassDetail()} />;
 
   const tabs: Array<TabItem<ClassroomTab>> = [
-    { value: 'NOTIFICATIONS', label: 'Notifications', icon: Bell, panelId: 'classroom-notifications-panel' },
+    { value: 'LESSONS', label: 'Lessons', icon: GitBranch, panelId: 'classroom-lessons-panel' },
     { value: 'ACTIVITIES', label: 'Activities', icon: ClipboardList, panelId: 'classroom-activities-panel' },
-    { value: 'MEMBERS', label: 'Members', icon: Users, panelId: 'classroom-members-panel' },
-    { value: 'PROGRESS', label: 'Course', icon: GitBranch, panelId: 'classroom-progress-panel' },
     ...(canManage ? [{ value: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3, panelId: 'classroom-performance-panel' }] : []),
+    { value: 'MEMBERS', label: 'Members', icon: Users, panelId: 'classroom-members-panel' },
+    { value: 'ANNOUNCEMENTS', label: 'Announcements', icon: Bell, panelId: 'classroom-announcements-panel' },
   ];
 
   return <div className="h-full overflow-y-auto">
@@ -151,14 +133,14 @@ export default function Classroom() {
       />
 
       <div>
-      {activeTab === 'NOTIFICATIONS' && <div id="classroom-notifications-panel" role="tabpanel"><NotificationsTab classroom={classDetail} canManage={canManage} onNewAnnouncement={() => { setPostKind('post'); setAnnouncementOpen(true); }} onOpenAssignment={assignmentId => navigate(`/dashboard/class/${classId}/assignment/${assignmentId}`)} /></div>}
-      {activeTab === 'ACTIVITIES' && <div id="classroom-activities-panel" role="tabpanel"><ClassroomActivities classId={classId || ''} students={classDetail.students} canManage={canManage} onOpenPerformance={openTestPerformance} onNewHomework={() => { setPostKind('homework'); setAnnouncementOpen(true); }} /></div>}
-      {activeTab === 'MEMBERS' && <div id="classroom-members-panel" role="tabpanel"><MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} /></div>}
-      {activeTab === 'PROGRESS' && <div id="classroom-progress-panel" role="tabpanel" className="py-2"><WeeklyProgress canManage={canManage} /></div>}
+      {activeTab === 'LESSONS' && <div id="classroom-lessons-panel" role="tabpanel" className="py-2"><WeeklyProgress canManage={canManage} students={classDetail.students} /></div>}
+      {activeTab === 'ACTIVITIES' && <div id="classroom-activities-panel" role="tabpanel"><ClassroomActivities classId={classId || ''} students={classDetail.students} canManage={canManage} onOpenPerformance={openTestPerformance} /></div>}
       {activeTab === 'PERFORMANCE' && canManage && <div id="classroom-performance-panel" role="tabpanel" className="py-2"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
+      {activeTab === 'MEMBERS' && <div id="classroom-members-panel" role="tabpanel"><MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} /></div>}
+      {activeTab === 'ANNOUNCEMENTS' && <div id="classroom-announcements-panel" role="tabpanel"><AnnouncementsTab classId={classDetail.id} selectedAnnouncementId={searchParams.get('announcementId')} refreshKey={announcementVersion} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} /></div>}
       </div>
 
-    {announcementOpen && <AnnouncementCreator kind={postKind} onClose={() => setAnnouncementOpen(false)} onSubmit={data => void createAnnouncement(data)} />}
+    <AnnouncementDialog open={announcementOpen} onClose={() => setAnnouncementOpen(false)} classId={classDetail.id} onCreated={() => setAnnouncementVersion(value => value + 1)} />
     <AddStudentModal open={addStudentOpen} onClose={() => setAddStudentOpen(false)} onAdd={addStudent} />
     <RemoveStudentModal student={studentToRemove} onClose={() => setStudentToRemove(null)} onRemove={removeStudent} />
     </main>
@@ -167,39 +149,31 @@ export default function Classroom() {
 
 function ClassroomHeader({ className, tabs, activeTab, onSelectTab }: { className: string; tabs: Array<TabItem<ClassroomTab>>; activeTab: ClassroomTab; onSelectTab: (tab: ClassroomTab) => void }) {
   return <div className="flex flex-col gap-4">
-    <PageHeader title={className} description="Manage announcements, activities, members, and class performance." />
+    <PageHeader title={className} description="Manage lessons, activities, members, and class performance." />
     <div className="overflow-x-auto"><Tabs items={tabs} value={activeTab} onValueChange={onSelectTab} ariaLabel="Classroom sections" /></div>
   </div>;
 }
 
-function NotificationsTab({ classroom, canManage, onNewAnnouncement, onOpenAssignment }: { classroom: ClassDetail; canManage: boolean; onNewAnnouncement: () => void; onOpenAssignment: (assignmentId: string) => void }) {
-  const [filter, setFilter] = useState<NotificationFilter>('all');
-  const assignments = useMemo(() => classroom.assignments || [], [classroom.assignments]);
-  const counts = useMemo(() => ({ all: assignments.length, assignment: assignments.filter(item => notificationType(item) === 'assignment').length, announcement: assignments.filter(item => notificationType(item) === 'announcement').length }), [assignments]);
-  const filtered = assignments.filter(item => filter === 'all' || notificationType(item) === filter);
-  const attention = assignments.filter(item => notificationType(item) === 'assignment' && item.deadline).sort((a, b) => compareAsc(new Date(a.deadline as string), new Date(b.deadline as string))).slice(0, 2);
+function AnnouncementsTab({ classId, selectedAnnouncementId, refreshKey, canManage, onNewAnnouncement }: { classId: string; selectedAnnouncementId: string | null; refreshKey: number; canManage: boolean; onNewAnnouncement: () => void }) {
+  const [announcements, setAnnouncements] = useState<ClassAnnouncement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try { setAnnouncements(await axiosClient.get<ClassAnnouncement[], ClassAnnouncement[]>(`/api/classes/${classId}/announcements`)); }
+    catch (requestError) { setError(requestErrorMessage(requestError, 'Announcements could not be loaded.')); }
+    finally { setLoading(false); }
+  }, [classId]);
+  useEffect(() => { void load(); }, [load, refreshKey]);
+  useEffect(() => {
+    if (loading || !selectedAnnouncementId) return;
+    window.requestAnimationFrame(() => document.getElementById(`announcement-${selectedAnnouncementId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }, [loading, selectedAnnouncementId]);
 
-  return <div className="py-2"><div className="flex min-w-0 flex-col gap-6">
-    {canManage && <div className="flex flex-wrap items-center justify-between gap-4"><InviteCodeWidget classId={classroom.id} /><Button size="sm" onClick={onNewAnnouncement}><Plus size={14} />New announcement</Button></div>}
-    <div className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)] lg:gap-8">
-      <aside className="flex min-w-0 flex-col gap-5">
-        <Card className="flex flex-col gap-1 p-3"><FilterButton active={filter === 'all'} icon={Bell} label="All Notifications" count={counts.all} onClick={() => setFilter('all')} /><FilterButton active={filter === 'assignment'} icon={ClipboardList} label="Assignments" count={counts.assignment} onClick={() => setFilter('assignment')} /><FilterButton active={filter === 'announcement'} icon={Megaphone} label="Announcements" count={counts.announcement} onClick={() => setFilter('announcement')} /></Card>
-        <Card className="relative overflow-hidden p-5"><div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-bl-full bg-muted opacity-60" /><h3 className="relative z-10 mb-4 text-sm font-semibold text-foreground">Needs Attention</h3><div className="relative z-10 flex flex-col gap-4">{attention.length === 0 ? <p className="text-xs leading-5 text-muted-foreground">You're all caught up.</p> : attention.map(item => { const urgent = Boolean(item.deadline && (isPast(new Date(item.deadline)) || isToday(new Date(item.deadline)))); return <button key={item.id} type="button" onClick={() => onOpenAssignment(item.id)} className="relative flex gap-3 border-0 py-0 pl-3 text-left"><span aria-hidden className={`absolute inset-y-0 left-0 w-0.5 ${urgent ? 'bg-destructive' : 'bg-amber-500'}`} /><div className="flex min-w-0 flex-col gap-0.5"><p className="line-clamp-1 text-xs font-semibold text-foreground">{item.title}</p><span className={`flex items-center gap-1 text-[11px] font-medium ${urgent ? 'text-destructive' : 'text-muted-foreground'}`}>{urgent ? <AlertTriangle size={11} /> : <Clock size={11} />}{formatAttentionDueDate(item.deadline)}</span></div></button>; })}</div></Card>
-      </aside>
-      <section className="flex min-w-0 flex-col gap-4">{filtered.length === 0 ? <Card className="flex min-h-56 flex-col items-center justify-center p-8 text-center"><Bell size={22} className="text-muted-foreground" /><h3 className="mt-3 text-sm font-semibold text-foreground">No notifications</h3><p className="mt-1 text-xs text-muted-foreground">New announcements and assignments will appear here.</p></Card> : filtered.map(item => <NotificationCard key={item.id} item={item} onOpen={() => onOpenAssignment(item.id)} />)}</section>
-    </div>
-  </div></div>;
-}
-
-function FilterButton({ active, icon: Icon, label, count, onClick }: { active: boolean; icon: ElementType; label: string; count: number; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-xs font-medium transition-colors ${active ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'}`}><span className="flex items-center gap-2.5"><Icon size={14} />{label}</span><span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{count}</span></button>;
-}
-
-function NotificationCard({ item, onOpen }: { item: ClassAssignment; onOpen: () => void }) {
-  const type = notificationType(item);
-  const assignment = type === 'assignment';
-  const body = plainText(item.content);
-  return <Card className={`flex min-w-0 gap-4 overflow-hidden border-l-4 p-4 sm:p-5 ${assignment ? 'border-l-primary' : 'border-l-amber-500'}`}><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${assignment ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'}`}>{assignment ? <ClipboardList size={16} /> : <Megaphone size={16} />}</span><div className="min-w-0 flex-1"><div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1"><span className={`text-[10px] font-semibold tracking-widest ${assignment ? 'text-primary' : 'text-amber-700 dark:text-amber-400'}`}>{assignment ? 'ASSIGNMENT' : 'ANNOUNCEMENT'}</span><span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}</span></div><h3 className="mt-1 wrap-break-word text-sm font-semibold leading-5 text-foreground">{item.title}</h3>{body && <p className="mt-1.5 line-clamp-2 wrap-break-word text-xs leading-5 text-muted-foreground">{body}</p>}<div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3">{item.deadline ? <span className={`flex items-center gap-1.5 text-xs font-medium ${isPast(new Date(item.deadline)) ? 'text-destructive' : 'text-amber-700 dark:text-amber-400'}`}><Calendar size={13} />{formatDueDate(item.deadline)}</span> : <span />}<button type="button" onClick={onOpen} className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">{assignment ? 'View assignment' : 'Read more'}<span aria-hidden>→</span></button></div></div></Card>;
+  return <div className="space-y-4 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-3"><InviteCodeWidget classId={classId} />{canManage && <Button size="sm" onClick={onNewAnnouncement}><Plus size={14} />New announcement</Button>}</div>
+    {loading ? <Card className="h-40 animate-pulse bg-muted/40" /> : error ? <Card className="p-8 text-center"><p className="text-sm font-medium text-foreground">Unable to load announcements</p><p className="mt-1 text-xs text-muted-foreground">{error}</p><Button className="mt-4" variant="outline" size="sm" onClick={() => void load()}>Try again</Button></Card> : announcements.length === 0 ? <Card className="flex min-h-56 flex-col items-center justify-center p-8 text-center"><Megaphone size={22} className="text-muted-foreground" /><h3 className="mt-3 text-sm font-semibold text-foreground">No announcements yet</h3><p className="mt-1 text-xs text-muted-foreground">Class updates from the teacher will appear here.</p></Card> : <div className="grid gap-4">{announcements.map(item => <Card key={item.id} id={`announcement-${item.id}`} className={`p-5 transition-shadow ${selectedAnnouncementId === item.id ? 'ring-2 ring-primary/35' : ''}`}><div className="flex min-w-0 items-start gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary"><Megaphone size={16} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-semibold text-foreground">{item.title}</h3><p className="mt-0.5 text-xs text-muted-foreground">{item.author.name || 'Teacher'} · {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}</p></div></div>{item.content && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{item.content}</p>}{(item.fileUrls.length > 0 || item.links.length > 0) && <div className="mt-4 flex flex-wrap gap-2">{[...item.fileUrls, ...item.links].map(url => <a key={url} href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-control border border-ui-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted"><ExternalLink size={12} />Open link</a>)}</div>}</div></div></Card>)}</div>}
+  </div>;
 }
 
 function InviteCodeWidget({ classId }: { classId: string }) {
@@ -269,13 +243,4 @@ function ClassroomError({ message, onRetry }: { message: string; onRetry: () => 
 }
 
 const initials = (name: string | null) => String(name || 'Student').split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase();
-const formatDueDate = (value?: string | null) => value ? `${isPast(new Date(value)) ? 'Overdue' : 'Due'} ${format(new Date(value), 'MMM d')}` : '';
-const formatAttentionDueDate = (value?: string | null) => {
-  if (!value) return '';
-  const dueDate = new Date(value);
-  if (isToday(dueDate)) return 'Due Today';
-  if (isTomorrow(dueDate)) return 'Due Tomorrow';
-  if (isPast(dueDate)) return `Overdue ${format(dueDate, 'MMM d')}`;
-  return `Due ${format(dueDate, 'MMM d')}`;
-};
 const formatMemberSince = (value?: string | null) => value ? format(new Date(value), 'MMM d, yyyy') : '—';

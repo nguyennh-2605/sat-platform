@@ -48,6 +48,7 @@ const priorityFor = dueAt => {
 const taskHref = item => {
   if (item.type === 'VOCABULARY') return `/dashboard/vocabulary?activity=${item.activityId}`;
   if (item.type === 'TEST') return `/test/${item.testId}?deliveryId=${item.deliveryId}`;
+  if (item.type === 'ANNOUNCEMENT') return `/dashboard/class/${item.classId}?tab=announcements&announcementId=${item.announcementId}`;
   return `/dashboard/class/${item.classId}/assignment/${item.assignmentId}`;
 };
 
@@ -106,11 +107,15 @@ const taskSummary = (tasks, now = new Date()) => {
 };
 
 async function loadTaskSources({ db, userId }) {
-  const [personal, states, posts, deliveries, vocabularyActivities] = await Promise.all([
+  const [personal, states, announcements, posts, deliveries, vocabularyActivities] = await Promise.all([
     db.studentTask.findMany({ where: { userId }, orderBy: [{ position: 'asc' }, { createdAt: 'desc' }], take: MAX_TASKS }),
     db.userTodoState.findMany({ where: { userId }, select: { itemKey: true, handledAt: true, completedAt: true, position: true } }),
+    db.classAnnouncement.findMany({
+      where: { class: { students: { some: { id: userId } } } }, orderBy: { createdAt: 'desc' }, take: MAX_TASKS,
+      select: { id: true, title: true, content: true, createdAt: true, classId: true, class: { select: { name: true } } },
+    }),
     db.assignment.findMany({
-      where: { class: { students: { some: { id: userId } } } },
+      where: { type: { not: 'announcement' }, class: { students: { some: { id: userId } } }, OR: [{ activity: null }, { activity: { activity: { status: 'PUBLISHED', AND: [{ OR: [{ availableAt: null }, { availableAt: { lte: new Date() } }] }], assignees: { some: { studentId: userId, excusedAt: null } } } } }] },
       orderBy: { createdAt: 'desc' },
       take: MAX_TASKS,
       select: {
@@ -142,14 +147,14 @@ async function loadTaskSources({ db, userId }) {
       },
     }),
   ]);
-  return { personal, states, posts, deliveries, vocabularyActivities };
+  return { personal, states, announcements, posts, deliveries, vocabularyActivities };
 }
 
 async function getTasksWithDb({ db, userId, userRole, now = new Date() }) {
   assertStudent(userRole);
   const currentUserId = parseUserId(userId);
   if (!currentUserId) throw new ApiError(401, { error: 'Sign in to view tasks.' });
-  const { personal, states, posts, deliveries, vocabularyActivities } = await loadTaskSources({ db, userId: currentUserId });
+  const { personal, states, announcements, posts, deliveries, vocabularyActivities } = await loadTaskSources({ db, userId: currentUserId });
   const stateByKey = new Map(states.map(state => [state.itemKey, state]));
   const tasks = [];
 
@@ -165,21 +170,34 @@ async function getTasksWithDb({ db, userId, userRole, now = new Date() }) {
     });
   }
 
+  for (const announcement of announcements) {
+    const key = `student-announcement:${announcement.id}`;
+    const state = stateByKey.get(key);
+    const completedAt = state?.completedAt || state?.handledAt || null;
+    tasks.push({
+      key, id: announcement.id, source: 'CLASSROOM', type: 'ANNOUNCEMENT', title: announcement.title,
+      description: stripHtml(announcement.content).slice(0, 160) || 'Class announcement', className: announcement.class.name,
+      classId: announcement.classId, announcementId: announcement.id, assignmentId: null, activityId: null, testId: null, deliveryId: null, durationMinutes: null,
+      createdAt: announcement.createdAt, dueAt: null, completedAt, completed: Boolean(completedAt), completionMode: 'USER',
+      priority: 'NORMAL', position: state?.position ?? null, href: taskHref({ type: 'ANNOUNCEMENT', classId: announcement.classId, announcementId: announcement.id }),
+      canEdit: false, canDelete: false, canComplete: true,
+    });
+  }
+
   for (const post of posts) {
-    const announcement = post.type === 'announcement';
     const key = `student-post:${post.id}`;
     const state = stateByKey.get(key);
     const submittedAt = post.submissions[0]?.submittedAt || null;
-    const completedAt = announcement ? (state?.completedAt || state?.handledAt || null) : submittedAt;
+    const completedAt = submittedAt;
     tasks.push({
-      key, id: post.id, source: 'CLASSROOM', type: announcement ? 'ANNOUNCEMENT' : 'ASSIGNMENT', title: post.title,
-      description: stripHtml(post.content).slice(0, 160) || (announcement ? 'Class announcement' : 'Class assignment'),
+      key, id: post.id, source: 'CLASSROOM', type: 'ASSIGNMENT', title: post.title,
+      description: stripHtml(post.content).slice(0, 160) || 'Class assignment',
       className: post.class.name, classId: post.classId, assignmentId: post.id, createdAt: post.createdAt, dueAt: post.deadline,
       activityId: null, testId: null, deliveryId: null, durationMinutes: null,
-      completedAt, completed: Boolean(completedAt), completionMode: announcement ? 'USER' : 'SOURCE',
-      priority: completedAt || announcement ? 'NORMAL' : priorityFor(post.deadline), position: state?.position ?? null,
-      href: taskHref({ type: announcement ? 'ANNOUNCEMENT' : 'ASSIGNMENT', classId: post.classId, assignmentId: post.id }),
-      canEdit: false, canDelete: false, canComplete: announcement,
+      completedAt, completed: Boolean(completedAt), completionMode: 'SOURCE',
+      priority: completedAt ? 'NORMAL' : priorityFor(post.deadline), position: state?.position ?? null,
+      href: taskHref({ type: 'ASSIGNMENT', classId: post.classId, assignmentId: post.id }),
+      canEdit: false, canDelete: false, canComplete: false,
     });
   }
 
@@ -263,10 +281,10 @@ exports.updateTaskState = async ({ itemKey, completed, userId, userRole }) => {
   if (key.startsWith('personal:')) {
     return exports.updateTask({ taskId: key.slice('personal:'.length), userId: currentUserId, userRole, data: { completed } });
   }
-  if (!key.startsWith('student-post:')) throw new ApiError(400, { error: 'Complete this coursework from its learning activity.' });
-  const assignmentId = key.slice('student-post:'.length);
-  const announcement = await prisma.assignment.findFirst({
-    where: { id: assignmentId, type: 'announcement', class: { students: { some: { id: currentUserId } } } },
+  if (!key.startsWith('student-announcement:')) throw new ApiError(400, { error: 'Complete this coursework from its learning activity.' });
+  const announcementId = key.slice('student-announcement:'.length);
+  const announcement = await prisma.classAnnouncement.findFirst({
+    where: { id: announcementId, class: { students: { some: { id: currentUserId } } } },
     select: { id: true },
   });
   if (!announcement) throw new ApiError(404, { error: 'Announcement not found.' });

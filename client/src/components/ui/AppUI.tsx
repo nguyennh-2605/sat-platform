@@ -143,8 +143,12 @@ export function BackButton({ label = 'Back', className, ...props }: BackButtonPr
   );
 }
 
-export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx(ui.card, className)} {...props} />;
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  interactive?: boolean;
+}
+
+export function Card({ interactive = false, className, ...props }: CardProps) {
+  return <div className={cx(ui.card, interactive && ui.cardInteractive, className)} {...props} />;
 }
 
 export function LoadingBar({ active, className }: { active: boolean; className?: string }) {

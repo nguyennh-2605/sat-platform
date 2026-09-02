@@ -129,7 +129,9 @@ Express Server (index.js → app.js)
 | `GET` | `/api/classes/:testId/report` | JWT + TEACHER/ADMIN | Test analytics (leaderboard, question stats) |
 | `POST` | `/api/classes` | JWT + TEACHER/ADMIN | Create a new class |
 | `POST` | `/api/classes/:classId/students` | JWT + TEACHER/ADMIN | Add student by email |
-| `POST` | `/api/classes/posts` | JWT + TEACHER/ADMIN | Create an assignment/post + notify students |
+| `GET/POST` | `/api/classes/:classId/announcements` | JWT / JWT + TEACHER/ADMIN | List or publish class announcements from the dedicated announcement source |
+| `PATCH/DELETE` | `/api/classes/:classId/announcements/:announcementId` | JWT + TEACHER/ADMIN | Edit or delete an announcement |
+| `POST` | `/api/classes/posts` | JWT + TEACHER/ADMIN | Legacy compatibility endpoint; announcements are routed to the dedicated source |
 | `POST` | `/api/classes/submissions` | JWT | Submit homework for an assignment |
 
 ### 5.3 Assignments
@@ -152,6 +154,7 @@ Express Server (index.js → app.js)
 | `POST` | `/api/tests/:id/copy-to-system` | JWT + ADMIN | Copy a Teacher-owned Personal test into a platform-owned System Draft |
 | `PATCH` | `/api/tests/:id/status` | JWT + TEACHER/ADMIN | Publish, archive, or restore an owned test |
 | `GET` | `/api/class-activities/class/:classId` | JWT | List unified class activities visible to staff or an enrolled student |
+| `POST` | `/api/class-activities/homework` | JWT + TEACHER/ADMIN | Publish homework to all or selected students, optionally linked to a lesson |
 | `POST` | `/api/test-deliveries` | JWT + TEACHER/ADMIN | Publish a Classroom test activity with availability, attempts, score policy, and audience |
 | `GET` | `/api/test/:id` | JWT | Start or resume a test session |
 | `POST` | `/api/test/:id/save-progress` | JWT | Auto-save answers, time, current question |
@@ -174,10 +177,13 @@ Express Server (index.js → app.js)
 |---|---|---|---|
 | `GET` | `/api/progress/class/:classId/weeks` | JWT | Get weeks with nested lessons, files, assignments |
 | `POST` | `/api/progress/class/:classId/weeks` | JWT | Create a week (teacher only) |
-| `PUT` | `/api/progress/weeks/:weekId` | JWT | Update week title/expanded state (teacher only) |
-| `DELETE` | `/api/progress/weeks/:weekId` | JWT | Delete week (teacher only) |
+| `PUT` | `/api/progress/class/:classId/weeks/reorder` | JWT | Persist the complete week order (owning teacher/admin only) |
+| `PUT` | `/api/progress/weeks/:weekId` | JWT | Update week details and visibility (owning teacher/admin only) |
+| `DELETE` | `/api/progress/weeks/:weekId` | JWT | Delete week and unlink its published activities (teacher only) |
 | `POST` | `/api/progress/weeks/:weekId/lessons` | JWT | Create lesson (teacher only) |
-| `DELETE` | `/api/progress/lessons/:lessonId` | JWT | Delete lesson (teacher only) |
+| `PUT` | `/api/progress/weeks/:weekId/lessons/reorder` | JWT | Persist the complete lesson order within one week (owning teacher/admin only) |
+| `PUT` | `/api/progress/lessons/:lessonId` | JWT | Update lesson details, schedule, and visibility (owning teacher/admin only) |
+| `DELETE` | `/api/progress/lessons/:lessonId` | JWT | Delete lesson and unlink its published activities (teacher only) |
 | `POST` | `/api/progress/lessons/:lessonId/files` | JWT | Add files to lesson (teacher only) |
 | `DELETE` | `/api/progress/files/:fileId` | JWT | Delete file (teacher only) |
 | `POST` | `/api/progress/lessons/:lessonId/assignment` | JWT | Create/update lesson assignment (teacher only) |
@@ -187,8 +193,8 @@ Express Server (index.js → app.js)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/results-analytics` | JWT | Analytics data (charts + history) for past N days |
-| `GET` | `/api/results-analytics/submission/:id` | JWT | Detailed submission with every question/answer |
+| `GET` | `/api/results-analytics` | JWT + STUDENT | Analytics data (charts + history) for past N days |
+| `GET` | `/api/results-analytics/submission/:id` | JWT + STUDENT | Detailed submission with every question/answer |
 
 ### 5.8 Error Logs
 
@@ -267,6 +273,7 @@ User ──1:N── HomeworkSubmission
 User ──1:N── AuditEvent (actorUserId, set null on actor deletion)
 
 Class ──1:N── Assignment
+Class ──1:N── ClassAnnouncement
 Class ──1:N── Week
 Class ──1:N── ClassTest (join table)
 
@@ -322,7 +329,7 @@ Folder ──1:N── Test
 | `/dashboard/practice-test` | PracticeTest | Test listing & filters |
 | `/dashboard/practice-test/my-bank/:folderId?` | TestBank | Folder-based test organization |
 | `/dashboard/practice-test/create` | CreateTestWizard | Multi-step test creation |
-| `/dashboard/class/:classId` | Classroom | Class feed, assignments, students |
+| `/dashboard/class/:classId` | Classroom | Lessons, canonical activities, performance (teacher), members, and announcements |
 | `/dashboard/class/:classId/assignment/:assignmentId` | AssignmentDetail | View/submit homework |
 | `/dashboard/error-log` | ErrorLog | Wrong answer tracking |
 | `/dashboard/results-analytics` | ResultAnalytics | Performance charts & history |

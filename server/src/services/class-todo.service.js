@@ -108,9 +108,13 @@ const getTeacherTodos = async userId => {
 
 const getStudentTodos = async userId => {
   const handled = await handledKeysFor(userId);
-  const [posts, deliveries, vocabularyActivities] = await Promise.all([
+  const [announcements, posts, deliveries, vocabularyActivities] = await Promise.all([
+    prisma.classAnnouncement.findMany({
+      where: { class: { students: { some: { id: userId } } } }, orderBy: { createdAt: 'desc' },
+      select: { id: true, title: true, content: true, createdAt: true, classId: true, class: { select: { name: true } } },
+    }),
     prisma.assignment.findMany({
-      where: { class: { students: { some: { id: userId } } } },
+      where: { type: { not: 'announcement' }, class: { students: { some: { id: userId } } }, OR: [{ activity: null }, { activity: { activity: { status: 'PUBLISHED', AND: [{ OR: [{ availableAt: null }, { availableAt: { lte: new Date() } }] }], assignees: { some: { studentId: userId, excusedAt: null } } } } }] },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -181,23 +185,28 @@ const getStudentTodos = async userId => {
   ]);
 
   const items = [];
+  for (const announcement of announcements) {
+    const key = `student-announcement:${announcement.id}`;
+    if (handled.has(key)) continue;
+    items.push({ key, type: 'ANNOUNCEMENT', classId: announcement.classId, className: announcement.class.name, title: announcement.title,
+      description: stripHtml(announcement.content).slice(0, 120) || 'New class announcement', createdAt: announcement.createdAt,
+      dueAt: null, priority: 'NORMAL', announcementId: announcement.id });
+  }
   for (const post of posts) {
-    const isAnnouncement = post.type === 'announcement';
     const key = `student-post:${post.id}`;
-    if (isAnnouncement && handled.has(key)) continue;
-    if (!isAnnouncement && post.submissions.length > 0) continue;
+    if (post.submissions.length > 0) continue;
     const hasStandaloneWork = Boolean(stripHtml(post.content) || post.fileUrls.length || post.links.length || post.testIds.length === 0);
-    if (!isAnnouncement && !hasStandaloneWork) continue;
+    if (!hasStandaloneWork) continue;
     items.push({
       key,
-      type: isAnnouncement ? 'ANNOUNCEMENT' : 'ASSIGNMENT',
+      type: 'ASSIGNMENT',
       classId: post.classId,
       className: post.class.name,
       title: post.title,
-      description: stripHtml(post.content).slice(0, 120) || (isAnnouncement ? 'New class announcement' : 'Class assignment'),
+      description: stripHtml(post.content).slice(0, 120) || 'Class assignment',
       createdAt: post.createdAt,
       dueAt: post.deadline,
-      priority: isAnnouncement ? 'NORMAL' : priorityFor(post.deadline),
+      priority: priorityFor(post.deadline),
       assignmentId: post.id,
     });
   }

@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const errorLogController = require('../controllers/error-log.controller');
-const { authenticateToken } = require('../middleware/auth.middleware');
+const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
 
-router.get('/', authenticateToken, errorLogController.getErrorLogs);
-router.post('/', authenticateToken, errorLogController.createErrorLog);
-router.put('/:id', authenticateToken, errorLogController.updateErrorLog);
-router.delete('/:id', authenticateToken, errorLogController.deleteErrorLog);
+router.use(authenticateToken, authorizeRole(['STUDENT']));
+
+router.get('/', errorLogController.getErrorLogs);
+router.post('/', errorLogController.createErrorLog);
+router.put('/:id', errorLogController.updateErrorLog);
+router.delete('/:id', errorLogController.deleteErrorLog);
 
 module.exports = router;

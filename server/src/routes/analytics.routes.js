@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const analyticsController = require('../controllers/analytics.controller');
-const { authenticateToken } = require('../middleware/auth.middleware'); 
+const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
 
-router.get('/', authenticateToken, analyticsController.getData);
-router.get('/submission/:id', authenticateToken, analyticsController.getSubmissionDetail);
+router.get('/', authenticateToken, authorizeRole(['STUDENT']), analyticsController.getData);
+router.get('/submission/:id', authenticateToken, authorizeRole(['STUDENT']), analyticsController.getSubmissionDetail);
 
 module.exports = router

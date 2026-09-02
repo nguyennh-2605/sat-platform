@@ -1,34 +1,53 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, CalendarDays, Check, ChevronDown, ChevronRight, CirclePlay, ClipboardCheck, Clock3, ExternalLink, FileText, Link2, MoreHorizontal, Pencil, Plus, Rocket, Trash2, Video } from 'lucide-react';
+import { Children, useCallback, useEffect, useState } from 'react';
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { AlertCircle, BookA, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight, ChevronsUpDown, CirclePlay, ClipboardCheck, Clock3, ExternalLink, FileText, GripVertical, Link2, ListCollapse, LoaderCircle, MoreHorizontal, MoveDown, MoveUp, Pencil, Plus, RefreshCw, Rocket, Trash2, Video } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import TestAssignmentManager from '../assignment/TestAssignmentManager';
-import { ClassroomTodoPanel } from '../classroom/ClassroomTodoPanel';
+import HomeworkActivityDialog from '../classroom/HomeworkActivityDialog';
 import { Badge, Button, Card, EmptyState, Input, Modal, Select } from '../../components/ui/AppUI';
+import { DateTimePicker } from '../../components/ui/DateTimePicker';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../components/ui/collapsible';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../../components/ui/dropdown-menu';
+import { Separator } from '../../components/ui/separator';
+import { Checkbox } from '../../components/ui/checkbox';
+import { Textarea } from '../../components/ui/textarea';
 import axiosClient from '../../lib/axios';
 
 type ContentStatus = 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED';
 type ResourceKind = 'FILE' | 'VIDEO' | 'LINK' | 'EMBED';
+type SortableData = { type: 'week' | 'lesson'; weekId: string };
 
 interface ResourceProgress { completedAt?: string | null }
 interface Resource { id: string; name: string; url: string; kind: ResourceKind; provider?: string | null; isRequired: boolean; progress: ResourceProgress[] }
 interface Assignment { id: string; lessonAssignmentId?: string; title: string; content?: string | null; dueDate?: string | null; testIds?: number[]; assignment?: { submissions?: Array<{ status: string; submittedAt: string; score?: number | null }> } }
 interface Delivery { id: string; title: string; status: string; dueAt?: string | null; test: { id: number; title: string; mode: 'EXAM' | 'PRACTICE'; duration: number; subject: string; folderId: number | null; sections?: Array<{ _count: { questions: number } }> } }
-interface Activity { id: string; type: 'VOCABULARY' | 'RESOURCE'; title: string; dueAt?: string | null; assignees?: Array<{ status: string }> }
+interface Activity { id: string; type: 'VOCABULARY' | 'HOMEWORK' | 'RESOURCE'; title: string; dueAt?: string | null; assignees?: Array<{ status: string }>; homework?: { assignmentId: string; assignment?: { submissions?: Array<{ status: string; submittedAt: string }> } } | null }
 interface LessonProgress { status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED'; progress: number }
-interface Lesson { id: string; title: string; summary?: string | null; status: ContentStatus; scheduledAt?: string | null; durationMinutes?: number | null; files: Resource[]; assignments: Assignment[]; deliveries: Delivery[]; activities: Activity[]; studentProgress?: LessonProgress | null; progressSummary?: { completed: number; started: number } | null }
-interface Week { id: string; title: string; description?: string | null; status: ContentStatus; availableAt?: string | null; lessons: Lesson[] }
-
+interface Lesson { id: string; order: number; title: string; summary?: string | null; status: ContentStatus; scheduledAt?: string | null; durationMinutes?: number | null; files: Resource[]; assignments: Assignment[]; deliveries: Delivery[]; activities: Activity[]; studentProgress?: LessonProgress | null; progressSummary?: { completed: number; started: number } | null }
+interface Week { id: string; order: number; title: string; description?: string | null; status: ContentStatus; availableAt?: string | null; lessons: Lesson[] }
 interface CourseForm { title: string; description: string; summary: string; status: ContentStatus; scheduledAt: string; durationMinutes: string }
+
 const EMPTY_FORM: CourseForm = { title: '', description: '', summary: '', status: 'DRAFT', scheduledAt: '', durationMinutes: '' };
 
-const WeeklyProgress = ({ canManage = true }: { canManage?: boolean }) => {
+const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boolean; students?: Array<{ id: number; name: string | null; email: string }> }) => {
   const { classId } = useParams();
   const navigate = useNavigate();
   const [weeks, setWeeks] = useState<Week[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [compact, setCompact] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [activeWeekId, setActiveWeekId] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ kind: 'week' | 'lesson'; weekId?: string; item?: Week | Lesson } | null>(null);
   const [form, setForm] = useState<CourseForm>(EMPTY_FORM);
   const [resourceLesson, setResourceLesson] = useState<{ weekId: string; lessonId: string } | null>(null);
@@ -36,37 +55,93 @@ const WeeklyProgress = ({ canManage = true }: { canManage?: boolean }) => {
   const [homeworkLesson, setHomeworkLesson] = useState<{ weekId: string; lesson: Lesson } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ kind: 'week' | 'lesson' | 'resource'; id: string; name: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [busyItem, setBusyItem] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
+  const expandedStorageKey = classId ? `classroom-lessons:${classId}:expanded` : '';
+  const compactStorageKey = classId ? `classroom-lessons:${classId}:compact` : '';
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
-  const loadCourse = useCallback(async () => {
+  const loadCourse = useCallback(async (showSkeleton = true) => {
     if (!classId) return;
+    if (showSkeleton) setLoading(true);
+    setLoadError('');
     try {
-      setLoading(true);
-      const response = await axiosClient.get(`/api/progress/class/${classId}/weeks`);
+      const response = await axiosClient.get<{ success: boolean; data: unknown }>(`/api/progress/class/${classId}/weeks`);
       const items = normalizeWeeks(response.data);
       setWeeks(items);
-      setExpanded(current => current.size ? current : new Set(items.slice(0, 1).map(week => week.id)));
+      setExpanded(readExpandedPreference(`classroom-lessons:${classId}:expanded`, items));
     } catch (error) {
       console.error(error);
-      toast.error('Unable to load the course curriculum.');
-    } finally { setLoading(false); }
+      setLoadError(requestErrorMessage(error, 'The curriculum could not be loaded.'));
+    } finally {
+      if (showSkeleton) setLoading(false);
+    }
   }, [classId]);
 
   useEffect(() => { void loadCourse(); }, [loadCourse]);
+  useEffect(() => {
+    if (!compactStorageKey) return;
+    setCompact(localStorage.getItem(compactStorageKey) === 'true');
+  }, [compactStorageKey]);
+  useEffect(() => {
+    if (!expandedStorageKey || loading) return;
+    localStorage.setItem(expandedStorageKey, JSON.stringify([...expanded]));
+  }, [expanded, expandedStorageKey, loading]);
+  useEffect(() => {
+    if (weeks.length === 0) {
+      setActiveWeekId(null);
+      return;
+    }
 
-  const metrics = useMemo(() => {
-    const lessons = weeks.flatMap(week => week.lessons);
-    return { weeks: weeks.length, lessons: lessons.length, resources: lessons.reduce((sum, lesson) => sum + lesson.files.length, 0), published: lessons.filter(lesson => lesson.status === 'PUBLISHED').length };
+    setActiveWeekId(current => current && weeks.some(week => week.id === current) ? current : weeks[0].id);
+    if (!('IntersectionObserver' in window)) return;
+
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries
+        .filter(entry => entry.isIntersecting)
+        .sort((left, right) => Math.abs(left.boundingClientRect.top - 112) - Math.abs(right.boundingClientRect.top - 112));
+      const weekId = visible[0]?.target.getAttribute('data-week-id');
+      if (weekId) setActiveWeekId(weekId);
+    }, { rootMargin: '-96px 0px -70% 0px', threshold: 0 });
+
+    weeks.forEach(week => {
+      const element = document.getElementById(weekAnchorId(week.id));
+      if (element) observer.observe(element);
+    });
+    return () => observer.disconnect();
   }, [weeks]);
 
-  const toggleWeek = (weekId: string) => setExpanded(current => {
+  const toggleWeek = (weekId: string, open?: boolean) => setExpanded(current => {
     const next = new Set(current);
-    if (next.has(weekId)) next.delete(weekId); else next.add(weekId);
+    const shouldOpen = open ?? !next.has(weekId);
+    if (shouldOpen) next.add(weekId); else next.delete(weekId);
     return next;
   });
 
+  const toggleCompact = () => setCompact(current => {
+    const next = !current;
+    if (compactStorageKey) localStorage.setItem(compactStorageKey, String(next));
+    return next;
+  });
+
+  const toggleAll = () => {
+    const allOpen = weeks.length > 0 && weeks.every(week => expanded.has(week.id));
+    setExpanded(allOpen ? new Set() : new Set(weeks.map(week => week.id)));
+  };
+
+  const navigateToWeek = (weekId: string) => {
+    const target = document.getElementById(weekAnchorId(weekId));
+    if (!target) return;
+    setActiveWeekId(weekId);
+    target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  };
+
   const openEditor = (kind: 'week' | 'lesson', item?: Week | Lesson, weekId?: string) => {
     setEditor({ kind, item, weekId });
-    setForm({ title: item?.title || '', description: kind === 'week' ? ((item as Week | undefined)?.description || '') : '', summary: kind === 'lesson' ? ((item as Lesson | undefined)?.summary || '') : '', status: item?.status || 'DRAFT', scheduledAt: kind === 'lesson' && (item as Lesson | undefined)?.scheduledAt ? toLocalDateTime((item as Lesson).scheduledAt as string) : '', durationMinutes: kind === 'lesson' ? String((item as Lesson | undefined)?.durationMinutes || '') : '' });
+    setForm({ title: item?.title || '', description: kind === 'week' ? ((item as Week | undefined)?.description || '') : '', summary: kind === 'lesson' ? ((item as Lesson | undefined)?.summary || '') : '', status: item?.status || 'DRAFT', scheduledAt: kind === 'lesson' && (item as Lesson | undefined)?.scheduledAt ? String((item as Lesson).scheduledAt) : '', durationMinutes: kind === 'lesson' ? String((item as Lesson | undefined)?.durationMinutes || '') : '' });
   };
 
   const saveEditor = async () => {
@@ -79,19 +154,22 @@ const WeeklyProgress = ({ canManage = true }: { canManage?: boolean }) => {
       if (editor.item) await axiosClient.put(`/api/progress/${editor.kind === 'week' ? 'weeks' : 'lessons'}/${editor.item.id}`, payload);
       else if (editor.kind === 'week') await axiosClient.post(`/api/progress/class/${classId}/weeks`, payload);
       else await axiosClient.post(`/api/progress/weeks/${editor.weekId}/lessons`, payload);
-      toast.success(editor.item ? 'Curriculum updated.' : `${editor.kind === 'week' ? 'Week' : 'Lesson'} created.`);
+      toast.success(editor.item ? 'Curriculum updated.' : `${editor.kind === 'week' ? 'Week' : 'Session'} created.`);
       setEditor(null);
-      await loadCourse();
-    } catch (error) { console.error(error); toast.error('Unable to save this curriculum item.'); }
+      await loadCourse(false);
+    } catch (error) { console.error(error); toast.error(requestErrorMessage(error, 'Unable to save this curriculum item.')); }
     finally { setSaving(false); }
   };
 
   const publishItem = async (kind: 'week' | 'lesson', item: Week | Lesson) => {
+    const key = `${kind}:${item.id}`;
+    setBusyItem(key);
     try {
       await axiosClient.put(`/api/progress/${kind === 'week' ? 'weeks' : 'lessons'}/${item.id}`, { status: item.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED' });
       toast.success(item.status === 'PUBLISHED' ? 'Moved back to draft.' : 'Published to students.');
-      await loadCourse();
-    } catch (error) { console.error(error); toast.error('Unable to update publication status.'); }
+      await loadCourse(false);
+    } catch (error) { console.error(error); toast.error(requestErrorMessage(error, 'Unable to update publication status.')); }
+    finally { setBusyItem(null); }
   };
 
   const addResource = async () => {
@@ -102,8 +180,8 @@ const WeeklyProgress = ({ canManage = true }: { canManage?: boolean }) => {
       toast.success('Resource added.');
       setResourceLesson(null);
       setResourceForm({ name: '', url: '', kind: 'FILE', isRequired: false });
-      await loadCourse();
-    } catch (error) { console.error(error); toast.error('Unable to add this resource. Check the URL.'); }
+      await loadCourse(false);
+    } catch (error) { console.error(error); toast.error(requestErrorMessage(error, 'Unable to add this resource. Check the URL.')); }
     finally { setSaving(false); }
   };
 
@@ -115,8 +193,8 @@ const WeeklyProgress = ({ canManage = true }: { canManage?: boolean }) => {
       await axiosClient.delete(endpoint);
       toast.success('Removed from the curriculum.');
       setDeleteTarget(null);
-      await loadCourse();
-    } catch (error) { console.error(error); toast.error('Unable to remove this item.'); }
+      await loadCourse(false);
+    } catch (error) { console.error(error); toast.error(requestErrorMessage(error, 'Unable to remove this item.')); }
     finally { setSaving(false); }
   };
 
@@ -125,26 +203,18 @@ const WeeklyProgress = ({ canManage = true }: { canManage?: boolean }) => {
       try { await axiosClient.put(`/api/progress/files/${resource.id}/progress`, { completed: resource.kind !== 'VIDEO' }); } catch (error) { console.error(error); }
     }
     window.open(resource.url, '_blank', 'noopener,noreferrer');
-    if (!canManage) await loadCourse();
+    if (!canManage) await loadCourse(false);
   };
 
   const completeLesson = async (lesson: Lesson) => {
+    const key = `lesson:${lesson.id}`;
+    setBusyItem(key);
     try {
       await axiosClient.put(`/api/progress/lessons/${lesson.id}/progress`, { completed: lesson.studentProgress?.status !== 'COMPLETED' });
-      toast.success(lesson.studentProgress?.status === 'COMPLETED' ? 'Lesson marked in progress.' : 'Lesson completed.');
-      await loadCourse();
-    } catch (error) { console.error(error); toast.error('Unable to update your progress.'); }
-  };
-
-  const saveHomework = async (data: { title: string; content: string; deadline: string | null; testIds: number[] }) => {
-    if (!homeworkLesson) return;
-    try {
-      await axiosClient.post(`/api/progress/lessons/${homeworkLesson.lesson.id}/assignment`, { title: data.title, content: data.content, dueDate: data.deadline, testIds: data.testIds });
-      toast.success('Homework published and added to student To Do lists.');
-      setHomeworkLesson(null);
-      window.dispatchEvent(new Event('classroom-todos:refresh'));
-      await loadCourse();
-    } catch (error) { console.error(error); toast.error('Unable to publish homework.'); }
+      toast.success(lesson.studentProgress?.status === 'COMPLETED' ? 'Session marked in progress.' : 'Session completed.');
+      await loadCourse(false);
+    } catch (error) { console.error(error); toast.error(requestErrorMessage(error, 'Unable to update your progress.')); }
+    finally { setBusyItem(null); }
   };
 
   const startDelivery = (delivery: Delivery) => {
@@ -152,72 +222,263 @@ const WeeklyProgress = ({ canManage = true }: { canManage?: boolean }) => {
     navigate(`/test/${delivery.test.id}?deliveryId=${delivery.id}`);
   };
 
-  if (loading) return <CourseSkeleton />;
+  const persistWeekOrder = async (fromIndex: number, toIndex: number) => {
+    if (!classId || reordering || fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || toIndex >= weeks.length) return;
+    const previous = weeks;
+    const next = arrayMove(weeks, fromIndex, toIndex);
+    setWeeks(next);
+    setReordering(true);
+    try {
+      await axiosClient.put(`/api/progress/class/${classId}/weeks/reorder`, { orderedIds: next.map(week => week.id) });
+    } catch (error) {
+      setWeeks(previous);
+      toast.error(requestErrorMessage(error, 'Unable to save the new week order.'));
+    } finally { setReordering(false); }
+  };
 
-  return <div className="space-y-6">
-    <CourseHero canManage={canManage} metrics={metrics} onAddWeek={() => openEditor('week')} />
-    <div className={`grid min-w-0 items-start gap-6 ${canManage ? '' : 'xl:grid-cols-[minmax(0,1fr)_320px]'}`}>
-      <section className="min-w-0 space-y-4" aria-label="Course curriculum">
-        {weeks.length === 0 ? <EmptyState icon={<BookOpen size={20} />} title="Build your course roadmap" description={canManage ? 'Create the first week, then add lessons, resources, quizzes and end-of-session homework.' : 'Your teacher has not published the course roadmap yet.'} action={canManage ? <Button onClick={() => openEditor('week')}><Plus size={15} />Create first week</Button> : undefined} /> : weeks.map((week, weekIndex) => <WeekCard key={week.id} week={week} index={weekIndex} open={expanded.has(week.id)} canManage={canManage} onToggle={() => toggleWeek(week.id)} onAddLesson={() => openEditor('lesson', undefined, week.id)} onEdit={() => openEditor('week', week)} onPublish={() => void publishItem('week', week)} onDelete={() => setDeleteTarget({ kind: 'week', id: week.id, name: week.title })}>
-          {week.lessons.length === 0 ? <EmptyState surface={false} compact title="No sessions in this week" description={canManage ? 'Add a session to begin structuring this week.' : 'More sessions are coming soon.'} action={canManage ? <Button size="sm" variant="outline" onClick={() => openEditor('lesson', undefined, week.id)}><Plus size={14} />Add session</Button> : undefined} /> : <div className="space-y-3 p-4 sm:p-5">{week.lessons.map((lesson, lessonIndex) => <LessonCard key={lesson.id} lesson={lesson} number={lessonIndex + 1} canManage={canManage} onEdit={() => openEditor('lesson', lesson, week.id)} onPublish={() => void publishItem('lesson', lesson)} onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id, name: lesson.title })} onAddResource={() => setResourceLesson({ weekId: week.id, lessonId: lesson.id })} onHomework={() => setHomeworkLesson({ weekId: week.id, lesson })} onResource={resource => void openResource(resource)} onDeleteResource={resource => setDeleteTarget({ kind: 'resource', id: resource.id, name: resource.name })} onAssignment={assignment => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} onDelivery={startDelivery} onActivity={activity => navigate(`/dashboard/vocabulary?activity=${activity.id}`)} onComplete={() => void completeLesson(lesson)} />)}</div>}
-        </WeekCard>)}
-      </section>
-      {!canManage && <ClassroomTodoPanel />}
+  const persistLessonOrder = async (weekId: string, fromIndex: number, toIndex: number) => {
+    if (reordering || fromIndex === toIndex || fromIndex < 0) return;
+    const week = weeks.find(item => item.id === weekId);
+    if (!week || toIndex < 0 || toIndex >= week.lessons.length) return;
+    const previous = weeks;
+    const nextLessons = arrayMove(week.lessons, fromIndex, toIndex);
+    const next = weeks.map(item => item.id === weekId ? { ...item, lessons: nextLessons } : item);
+    setWeeks(next);
+    setReordering(true);
+    try {
+      await axiosClient.put(`/api/progress/weeks/${weekId}/lessons/reorder`, { orderedIds: nextLessons.map(lesson => lesson.id) });
+    } catch (error) {
+      setWeeks(previous);
+      toast.error(requestErrorMessage(error, 'Unable to save the new session order.'));
+    } finally { setReordering(false); }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    if (!canManage || !editing || !event.over || event.active.id === event.over.id) return;
+    const active = event.active.data.current as SortableData | undefined;
+    const over = event.over.data.current as SortableData | undefined;
+    if (!active || !over) return;
+    if (active.type === 'week') {
+      await persistWeekOrder(weeks.findIndex(week => week.id === active.weekId), weeks.findIndex(week => week.id === over.weekId));
+      return;
+    }
+    if (over.type !== 'lesson' || active.weekId !== over.weekId) return;
+    const lessonList = weeks.find(week => week.id === active.weekId)?.lessons || [];
+    await persistLessonOrder(active.weekId, lessonList.findIndex(lesson => `lesson:${lesson.id}` === event.active.id), lessonList.findIndex(lesson => `lesson:${lesson.id}` === event.over?.id));
+  };
+
+  if (loading) return <div className="mx-auto w-full max-w-[1320px]"><CourseSkeleton /></div>;
+  const allExpanded = weeks.length > 0 && weeks.every(week => expanded.has(week.id));
+  const showOutline = !loadError && weeks.length > 0;
+
+  return <div className="mx-auto w-full max-w-[1320px] space-y-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h2 className="text-heading font-semibold text-foreground">Lessons</h2>
+        <p className="mt-1 text-body text-muted-foreground">{canManage ? 'Organize the class curriculum by weeks and sessions.' : 'Follow published sessions, materials, and class activities.'}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {weeks.length >= 3 && <Button size="sm" variant="ghost" onClick={toggleAll} title={allExpanded ? 'Collapse all weeks' : 'Expand all weeks'}><ChevronsUpDown size={14} /><span className="hidden sm:inline">{allExpanded ? 'Collapse all' : 'Expand all'}</span></Button>}
+        {weeks.length > 0 && <Button size="sm" variant={compact ? 'accent' : 'ghost'} onClick={toggleCompact} aria-pressed={compact} title="Toggle compact curriculum view"><ListCollapse size={14} /><span className="hidden sm:inline">Compact</span></Button>}
+        {canManage && <Button size="sm" variant={editing ? 'accent' : 'outline'} onClick={() => setEditing(current => !current)} aria-pressed={editing}>{editing ? <Check size={15} /> : <Pencil size={15} />}{editing ? 'Done' : 'Edit curriculum'}</Button>}
+        {canManage && editing && <Button size="sm" onClick={() => openEditor('week')}><Plus size={15} />Add week</Button>}
+      </div>
+    </div>
+
+    <div className={showOutline ? 'min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1fr)_280px] min-[1400px]:items-start min-[1400px]:gap-6' : undefined}>
+      {loadError ? <CourseLoadError message={loadError} onRetry={() => void loadCourse()} /> : <section className="min-w-0 space-y-3" aria-label="Course curriculum">
+        {weeks.length === 0 ? <EmptyState icon={<BookOpen size={20} />} title={canManage ? 'No weeks yet' : 'No lessons yet'} description={canManage ? editing ? 'Create the first week to start building the class curriculum.' : 'Enter edit mode to start building the class curriculum.' : 'Published weeks and sessions from your teacher will appear here.'} action={canManage && editing ? <Button size="sm" onClick={() => openEditor('week')}><Plus size={15} />Create first week</Button> : undefined} /> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={event => void handleDragEnd(event)}>
+          <SortableContext items={weeks.map(week => `week:${week.id}`)} strategy={verticalListSortingStrategy}>
+            {weeks.map((week, weekIndex) => <SortableWeekOutline key={week.id} week={week} index={weekIndex} open={expanded.has(week.id)} compact={compact} canManage={canManage} editing={editing} disabled={reordering} onOpenChange={open => toggleWeek(week.id, open)} onAddLesson={() => openEditor('lesson', undefined, week.id)} onEdit={() => openEditor('week', week)} onPublish={() => void publishItem('week', week)} onDelete={() => setDeleteTarget({ kind: 'week', id: week.id, name: week.title })} onMoveUp={() => void persistWeekOrder(weekIndex, weekIndex - 1)} onMoveDown={() => void persistWeekOrder(weekIndex, weekIndex + 1)} canMoveUp={weekIndex > 0} canMoveDown={weekIndex < weeks.length - 1} busy={busyItem === `week:${week.id}` || reordering}>
+              {week.lessons.length === 0 ? <div className="flex flex-col items-start justify-between gap-2 px-4 py-3 sm:flex-row sm:items-center sm:px-5"><div><p className="text-body font-medium text-foreground">No sessions in this week</p><p className="mt-0.5 text-caption text-muted-foreground">{canManage && editing ? 'Add a session to begin structuring this module.' : canManage ? 'Enter edit mode to add the first session.' : 'More sessions are coming soon.'}</p></div>{canManage && editing && <Button size="sm" variant="ghost" onClick={() => openEditor('lesson', undefined, week.id)}><Plus size={14} />Add session</Button>}</div> : <SortableContext items={week.lessons.map(lesson => `lesson:${lesson.id}`)} strategy={verticalListSortingStrategy}>
+                {week.lessons.map((lesson, lessonIndex) => <SortableLessonOutline key={lesson.id} weekId={week.id} weekStatus={week.status} lesson={lesson} number={lessonIndex + 1} compact={compact} canManage={canManage} editing={editing} disabled={reordering} busy={busyItem === `lesson:${lesson.id}` || reordering} onEdit={() => openEditor('lesson', lesson, week.id)} onPublish={() => void publishItem('lesson', lesson)} onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id, name: lesson.title })} onMoveUp={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex - 1)} onMoveDown={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex + 1)} canMoveUp={lessonIndex > 0} canMoveDown={lessonIndex < week.lessons.length - 1} onAddResource={() => setResourceLesson({ weekId: week.id, lessonId: lesson.id })} onHomework={() => setHomeworkLesson({ weekId: week.id, lesson })} onManageActivities={() => navigate(`/dashboard/class/${classId}?tab=activities`)} onResource={resource => void openResource(resource)} onDeleteResource={resource => setDeleteTarget({ kind: 'resource', id: resource.id, name: resource.name })} onAssignment={assignment => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} onDelivery={startDelivery} onActivity={activity => activity.type === 'HOMEWORK' && activity.homework ? navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}`) : activity.type === 'VOCABULARY' ? navigate(`/dashboard/vocabulary?activity=${activity.id}`) : navigate(`/dashboard/class/${classId}?tab=activities`)} onComplete={() => void completeLesson(lesson)} isLast={lessonIndex === week.lessons.length - 1} />)}
+              </SortableContext>}
+            </SortableWeekOutline>)}
+          </SortableContext>
+        </DndContext>}
+      </section>}
+      {showOutline && <CourseOutline weeks={weeks} activeWeekId={activeWeekId} showStatuses={canManage} onNavigate={navigateToWeek} />}
     </div>
 
     <CurriculumEditor editor={editor} form={form} setForm={setForm} saving={saving} onClose={() => setEditor(null)} onSave={() => void saveEditor()} />
     <ResourceEditor open={Boolean(resourceLesson)} form={resourceForm} setForm={setResourceForm} saving={saving} onClose={() => setResourceLesson(null)} onSave={() => void addResource()} />
-    <Modal open={Boolean(deleteTarget)} closeOnBackdrop onClose={() => setDeleteTarget(null)} title={`Delete ${deleteTarget?.kind || 'item'}?`} subtitle="This action cannot be undone. Student progress and linked course data will also be removed." footer={<><Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>{saving ? 'Deleting…' : 'Delete'}</Button></>}><p className="text-body text-muted-foreground">Remove <strong className="text-foreground">{deleteTarget?.name}</strong> from this course?</p></Modal>
-    {homeworkLesson && <TestAssignmentManager onClose={() => setHomeworkLesson(null)} onSubmit={saveHomework} initialData={homeworkLesson.lesson.assignments[0] ? { title: homeworkLesson.lesson.assignments[0].title, content: homeworkLesson.lesson.assignments[0].content || '', deadline: homeworkLesson.lesson.assignments[0].dueDate || undefined, selectedTests: homeworkLesson.lesson.deliveries.filter(delivery => homeworkLesson.lesson.assignments[0].testIds?.includes(delivery.test.id)).map(delivery => ({ id: delivery.test.id, title: delivery.test.title, subject: delivery.test.subject, mode: delivery.test.mode, duration: delivery.test.duration, folderId: delivery.test.folderId, questionCount: (delivery.test.sections || []).reduce((sum, section) => sum + section._count.questions, 0), deliveryId: delivery.id })) } : undefined} />}
+    <Modal open={Boolean(deleteTarget)} closeOnBackdrop presentation="content-dialog" onClose={() => setDeleteTarget(null)} title={`Delete ${deleteTarget?.kind || 'item'}?`} subtitle={deleteTarget?.kind === 'resource' ? 'This action cannot be undone. Its viewing progress will also be removed.' : 'The curriculum item will be removed. Published activities stay available in the Activities tab.'} footer={<><Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>{saving ? 'Deleting…' : 'Delete'}</Button></>}><p className="text-body text-muted-foreground">Remove <strong className="text-foreground">{deleteTarget?.name}</strong> from this course?</p></Modal>
+    {homeworkLesson && classId && <HomeworkActivityDialog open classId={classId} lessonId={homeworkLesson.lesson.id} students={students} onClose={() => setHomeworkLesson(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
   </div>;
 };
 
-function CourseHero({ canManage, metrics, onAddWeek }: { canManage: boolean; metrics: { weeks: number; lessons: number; resources: number; published: number }; onAddWeek: () => void }) {
-  return <Card className="overflow-hidden"><div className="flex flex-col gap-5 bg-linear-to-r from-primary-soft via-surface to-accent-soft/50 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"><div><Badge tone="green">COURSE ROADMAP</Badge><h2 className="mt-3 text-xl font-semibold tracking-tight text-foreground">{canManage ? 'Design the learning journey' : 'Continue your learning journey'}</h2><p className="mt-1 max-w-2xl text-body leading-6 text-muted-foreground">{canManage ? 'Organize sessions, publish materials, assign quizzes and place homework at the end of every lesson.' : 'Follow each week in order, open the materials, complete classwork and submit the homework.'}</p></div>{canManage && <Button onClick={onAddWeek}><Plus size={16} />Add week</Button>}</div><div className="grid grid-cols-2 divide-x divide-ui-border border-t border-ui-border sm:grid-cols-4">{[['Weeks', metrics.weeks], ['Sessions', metrics.lessons], ['Resources', metrics.resources], ['Published', metrics.published]].map(([label, value]) => <div key={label} className="px-5 py-3"><p className="text-lg font-semibold text-foreground">{value}</p><p className="text-caption text-muted-foreground">{label}</p></div>)}</div></Card>;
+interface WeekOutlineProps {
+  week: Week; index: number; open: boolean; compact: boolean; canManage: boolean; editing: boolean; disabled: boolean; busy: boolean;
+  onOpenChange: (open: boolean) => void; onAddLesson: () => void; onEdit: () => void; onPublish: () => void; onDelete: () => void;
+  onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean; children: React.ReactNode;
 }
 
-function WeekCard({ week, index, open, canManage, onToggle, onAddLesson, onEdit, onPublish, onDelete, children }: { week: Week; index: number; open: boolean; canManage: boolean; onToggle: () => void; onAddLesson: () => void; onEdit: () => void; onPublish: () => void; onDelete: () => void; children: React.ReactNode }) {
-  return <Card className="overflow-hidden"><div className="flex items-center gap-3 border-b border-ui-border bg-surface p-4 sm:p-5"><button type="button" onClick={onToggle} className="app-icon-button h-8 w-8 shrink-0" aria-label={`${open ? 'Collapse' : 'Expand'} ${week.title}`}>{open ? <ChevronDown size={17} /> : <ChevronRight size={17} />}</button><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-primary-soft text-caption font-bold text-primary">{String(index + 1).padStart(2, '0')}</span><button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left"><span className="flex flex-wrap items-center gap-2"><span className="text-title font-semibold text-foreground">{week.title}</span><StatusBadge status={week.status} /></span><span className="mt-1 block text-caption text-muted-foreground">{week.description || `${week.lessons.length} session${week.lessons.length === 1 ? '' : 's'}`}</span></button>{canManage && <div className="flex items-center gap-1"><Button size="sm" variant="outline" onClick={onAddLesson}><Plus size={14} />Session</Button><ActionMenu onEdit={onEdit} onPublish={onPublish} onDelete={onDelete} published={week.status === 'PUBLISHED'} /></div>}</div>{open && children}</Card>;
+function SortableWeekOutline(props: WeekOutlineProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `week:${props.week.id}`, data: { type: 'week', weekId: props.week.id } satisfies SortableData, disabled: !props.canManage || !props.editing || props.disabled });
+  const dragHandle = props.canManage && props.editing ? <Button variant="ghost" size="icon" className="size-8 cursor-grab touch-none opacity-100 active:cursor-grabbing sm:opacity-0 sm:group-hover/week:opacity-100 sm:focus:opacity-100" disabled={props.disabled} aria-label={`Reorder ${props.week.title}`} {...attributes} {...listeners}><GripVertical size={16} /></Button> : undefined;
+  return <div id={weekAnchorId(props.week.id)} data-week-id={props.week.id} ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`scroll-mt-24 ${isDragging ? 'relative z-10 opacity-70' : ''}`}><WeekOutline {...props} dragHandle={dragHandle} /></div>;
 }
 
-function LessonCard({ lesson, number, canManage, onEdit, onPublish, onDelete, onAddResource, onHomework, onResource, onDeleteResource, onAssignment, onDelivery, onActivity, onComplete }: { lesson: Lesson; number: number; canManage: boolean; onEdit: () => void; onPublish: () => void; onDelete: () => void; onAddResource: () => void; onHomework: () => void; onResource: (item: Resource) => void; onDeleteResource: (item: Resource) => void; onAssignment: (item: Assignment) => void; onDelivery: (item: Delivery) => void; onActivity: (item: Activity) => void; onComplete: () => void }) {
+function WeekOutline({ week, index, open, compact, canManage, editing, busy, onOpenChange, onAddLesson, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, children, dragHandle }: WeekOutlineProps & { dragHandle?: React.ReactNode }) {
+  const itemCount = week.lessons.reduce((total, lesson) => total + lessonItemCount(lesson), 0);
+  const metadata = `${week.availableAt ? `Available ${formatDate(week.availableAt)} · ` : ''}${week.lessons.length} session${week.lessons.length === 1 ? '' : 's'} · ${itemCount} item${itemCount === 1 ? '' : 's'}`;
+  const contentId = `week-${week.id}-content`;
+  return <Collapsible open={open} onOpenChange={onOpenChange}><Card className="group/week overflow-hidden shadow-none">
+    <div className={`flex items-center gap-1 bg-section-header px-2 sm:px-3 ${compact ? 'min-h-14 py-2' : 'min-h-16 py-3'}`}>
+      {dragHandle}
+      <CollapsibleTrigger asChild><button type="button" className="flex min-w-0 flex-1 items-center gap-2 rounded-control text-left outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-controls={contentId} aria-label={`${open ? 'Collapse' : 'Expand'} ${week.title}`}>
+        <span className="flex size-8 shrink-0 items-center justify-center text-muted-foreground">{open ? <ChevronDown size={17} /> : <ChevronRight size={17} />}</span>
+        <span className="min-w-0 flex-1"><span className="flex items-center gap-2 text-title text-foreground"><span className="shrink-0 font-semibold">Week {String(index + 1).padStart(2, '0')}</span><span className="text-muted-foreground" aria-hidden="true">·</span><span className="truncate font-medium">{week.title}</span></span><span className="mt-0.5 block truncate text-caption text-muted-foreground">{!compact && week.description ? `${week.description} · ${metadata}` : metadata}</span></span>
+      </button></CollapsibleTrigger>
+      {canManage && (editing || week.status !== 'PUBLISHED') && <div className="flex shrink-0 items-center gap-1"><StatusBadge status={week.status} hidePublished />{editing && <><Button size="sm" variant="ghost" onClick={onAddLesson}><Plus size={14} /><span className="hidden md:inline">Session</span></Button><ActionMenu label={`${week.title} actions`} onEdit={onEdit} onPublish={onPublish} onDelete={onDelete} onMoveUp={onMoveUp} onMoveDown={onMoveDown} canMoveUp={canMoveUp} canMoveDown={canMoveDown} published={week.status === 'PUBLISHED'} busy={busy} /></>}</div>}
+    </div>
+    <CollapsibleContent id={contentId} className="border-t border-ui-border">{children}</CollapsibleContent>
+  </Card></Collapsible>;
+}
+
+interface LessonOutlineProps {
+  weekId: string; lesson: Lesson; weekStatus: ContentStatus; number: number; compact: boolean; canManage: boolean; editing: boolean; disabled: boolean; busy: boolean; isLast: boolean;
+  onEdit: () => void; onPublish: () => void; onDelete: () => void; onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean;
+  onAddResource: () => void; onHomework: () => void; onManageActivities: () => void; onResource: (item: Resource) => void; onDeleteResource: (item: Resource) => void;
+  onAssignment: (item: Assignment) => void; onDelivery: (item: Delivery) => void; onActivity: (item: Activity) => void; onComplete: () => void;
+}
+
+function SortableLessonOutline(props: LessonOutlineProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `lesson:${props.lesson.id}`, data: { type: 'lesson', weekId: props.weekId } satisfies SortableData, disabled: !props.canManage || !props.editing || props.disabled });
+  const dragHandle = props.canManage && props.editing ? <Button variant="ghost" size="icon" className="size-8 cursor-grab touch-none opacity-100 active:cursor-grabbing sm:opacity-0 sm:group-hover/session:opacity-100 sm:focus:opacity-100" disabled={props.disabled} aria-label={`Reorder ${props.lesson.title}`} {...attributes} {...listeners}><GripVertical size={16} /></Button> : undefined;
+  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={isDragging ? 'relative z-10 bg-surface opacity-70' : undefined}><LessonOutline {...props} dragHandle={dragHandle} />{!props.isLast && <Separator />}</div>;
+}
+
+function LessonOutline({ lesson, weekStatus, number, compact, canManage, editing, busy, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onAddResource, onHomework, onManageActivities, onResource, onDeleteResource, onAssignment, onDelivery, onActivity, onComplete, dragHandle }: LessonOutlineProps & { dragHandle?: React.ReactNode }) {
   const completed = lesson.studentProgress?.status === 'COMPLETED';
-  return <article className="overflow-hidden rounded-card border border-ui-border bg-surface shadow-xs"><header className="flex items-start gap-3 border-b border-ui-border p-4"><span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-caption font-semibold ${completed ? 'bg-success text-white' : 'bg-surface-subtle text-muted-foreground'}`}>{completed ? <Check size={15} /> : number}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h4 className="text-title font-semibold text-foreground">{lesson.title}</h4>{canManage && <StatusBadge status={lesson.status} />}</div>{lesson.summary && <p className="mt-1 text-body leading-5 text-muted-foreground">{lesson.summary}</p>}<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-subtle">{lesson.scheduledAt && <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{format(new Date(lesson.scheduledAt), 'MMM d, h:mm a')}</span>}{lesson.durationMinutes && <span className="inline-flex items-center gap-1"><Clock3 size={13} />{lesson.durationMinutes} min</span>}{canManage && lesson.progressSummary && <span>{lesson.progressSummary.completed} completed · {lesson.progressSummary.started} in progress</span>}</div></div>{canManage ? <ActionMenu onEdit={onEdit} onPublish={onPublish} onDelete={onDelete} published={lesson.status === 'PUBLISHED'} /> : <Button size="sm" variant={completed ? 'outline' : 'primary'} onClick={onComplete}>{completed ? 'Completed' : 'Mark complete'}</Button>}</header>
-    <div className="divide-y divide-ui-border">
-      <LessonSection title="Materials" icon={<FileText size={15} />} action={canManage ? <button className="text-caption font-semibold text-primary hover:underline" onClick={onAddResource}>+ Add resource</button> : undefined}>{lesson.files.length === 0 ? <SectionEmpty text="No materials added" /> : lesson.files.map(resource => <ResourceRow key={resource.id} resource={resource} canManage={canManage} onOpen={() => onResource(resource)} onDelete={() => onDeleteResource(resource)} />)}</LessonSection>
-      {(lesson.deliveries.length > 0 || lesson.activities.length > 0 || canManage) && <LessonSection title="Classwork & quizzes" icon={<CirclePlay size={15} />}>{lesson.deliveries.filter(delivery => delivery.status !== 'CLOSED').map(delivery => <ActivityRow key={delivery.id} title={delivery.title} meta={`${delivery.test.mode === 'EXAM' ? 'Timed test' : 'Practice quiz'} · ${delivery.test.duration} min`} dueAt={delivery.dueAt} onClick={() => onDelivery(delivery)} />)}{lesson.activities.map(activity => <ActivityRow key={activity.id} title={activity.title} meta={activity.type === 'VOCABULARY' ? 'Vocabulary practice' : 'Learning activity'} dueAt={activity.dueAt} onClick={() => onActivity(activity)} />)}{lesson.deliveries.length === 0 && lesson.activities.length === 0 && <SectionEmpty text="No classwork added" />}</LessonSection>}
-      <LessonSection title="Session homework" icon={<ClipboardCheck size={15} />} accent action={canManage ? <button className="text-caption font-semibold text-primary hover:underline" onClick={onHomework}>{lesson.assignments.length ? 'Edit homework' : '+ Add homework'}</button> : undefined}>{lesson.assignments.length === 0 ? <SectionEmpty text={canManage ? 'Add the end-of-session assignment' : 'No homework for this session'} /> : lesson.assignments.map(assignment => <button key={assignment.id} type="button" onClick={() => onAssignment(assignment)} className="group flex w-full items-center gap-3 rounded-control border border-accent/50 bg-accent-soft/40 p-3 text-left hover:border-primary/40 hover:bg-primary-soft"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-surface text-warning"><ClipboardCheck size={17} /></span><span className="min-w-0 flex-1"><span className="block truncate text-body font-semibold text-foreground group-hover:text-primary">{assignment.title}</span><span className="mt-0.5 block text-caption text-muted-foreground">{assignment.assignment?.submissions?.length ? 'Submitted' : assignment.dueDate ? `Due ${format(new Date(assignment.dueDate), 'MMM d, h:mm a')}` : 'No deadline'}{assignment.testIds?.length ? ` · ${assignment.testIds.length} linked quiz${assignment.testIds.length === 1 ? '' : 'zes'}` : ''}</span></span><ExternalLink size={15} className="text-subtle" /></button>)}</LessonSection>
+  const { deliveries, activities, assignments } = lessonContent(lesson);
+  const itemCount = lesson.files.length + deliveries.length + activities.length + assignments.length;
+  const hiddenByWeek = canManage && lesson.status === 'PUBLISHED' && weekStatus !== 'PUBLISHED';
+  return <article className={`group/session px-3 sm:px-4 ${compact ? 'py-2.5' : 'py-4'}`}>
+    <header className="flex items-start gap-1 sm:gap-2">
+      {dragHandle}
+      <div className="min-w-0 flex-1">
+        <h3 className="flex min-w-0 items-center gap-2 text-title text-foreground">{completed && <Check size={15} className="shrink-0 text-success" aria-label="Completed" />}<span className="shrink-0 font-semibold">Session {String(number).padStart(2, '0')}</span><span className="text-muted-foreground" aria-hidden="true">·</span><span className="truncate font-medium">{lesson.title}</span></h3>
+        {!compact && lesson.summary && <p className="mt-0.5 line-clamp-1 text-body text-muted-foreground">{lesson.summary}</p>}
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted-foreground">{lesson.scheduledAt && <span className="inline-flex items-center gap-1.5"><CalendarDays size={13} />{formatDateTime(lesson.scheduledAt)}</span>}{lesson.durationMinutes && <span className="inline-flex items-center gap-1.5"><Clock3 size={13} />{lesson.durationMinutes} min</span>}{itemCount > 0 && <span>{itemCount} item{itemCount === 1 ? '' : 's'}</span>}</div>
+      </div>
+      {canManage ? (editing || hiddenByWeek || lesson.status !== 'PUBLISHED') && <div className="flex shrink-0 items-center gap-1">{hiddenByWeek ? <Badge tone="neutral">Hidden by week</Badge> : <StatusBadge status={lesson.status} hidePublished />}{editing && <ActionMenu label={`${lesson.title} actions`} onEdit={onEdit} onPublish={onPublish} onDelete={onDelete} onMoveUp={onMoveUp} onMoveDown={onMoveDown} canMoveUp={canMoveUp} canMoveDown={canMoveDown} published={lesson.status === 'PUBLISHED'} busy={busy} />}</div> : <Button size="sm" variant={completed ? 'outline' : 'primary'} disabled={busy} onClick={onComplete}>{busy && <LoaderCircle size={14} className="animate-spin" />}{completed ? 'Completed' : 'Mark complete'}</Button>}
+    </header>
+
+    <div className={`mt-2 ml-6 ${editing ? 'sm:ml-24' : 'sm:ml-14'}`}>
+      <CurriculumTree>
+        {lesson.files.map(resource => <ResourceRow key={resource.id} resource={resource} canEdit={canManage && editing} compact={compact} onOpen={() => onResource(resource)} onDelete={() => onDeleteResource(resource)} />)}
+        {deliveries.map(delivery => <CurriculumRow key={delivery.id} compact={compact} icon={<CirclePlay size={16} />} typeLabel={delivery.test.mode === 'EXAM' ? 'Test' : 'Quiz'} title={delivery.title} meta={`${delivery.test.duration} min${delivery.dueAt ? ` · Due ${formatDate(delivery.dueAt)}` : ''}`} onOpen={() => onDelivery(delivery)} />)}
+        {activities.map(activity => <CurriculumRow key={activity.id} compact={compact} icon={activity.type === 'VOCABULARY' ? <BookA size={16} /> : activity.type === 'HOMEWORK' ? <ClipboardCheck size={16} /> : <Link2 size={16} />} typeLabel={activity.type === 'VOCABULARY' ? 'Vocabulary' : activity.type === 'HOMEWORK' ? 'Homework' : 'Material'} title={activity.title} meta={activity.dueAt ? `Due ${formatDate(activity.dueAt)}` : undefined} onOpen={() => onActivity(activity)} />)}
+        {assignments.map(assignment => <CurriculumRow key={assignment.id} compact={compact} icon={<ClipboardCheck size={16} />} typeLabel="Assignment" title={assignment.title} meta={assignment.assignment?.submissions?.length ? 'Submitted' : assignment.dueDate ? `Due ${formatDateTime(assignment.dueDate)}` : undefined} onOpen={() => onAssignment(assignment)} />)}
+        {canManage && editing && <AddContentMenu onAddResource={onAddResource} onHomework={onHomework} onManageActivities={onManageActivities} />}
+        {itemCount === 0 && (!canManage || !editing) && <p className="px-2 py-1 text-caption text-muted-foreground">No materials in this session yet.</p>}
+      </CurriculumTree>
     </div>
   </article>;
 }
 
-function LessonSection({ title, icon, action, accent, children }: { title: string; icon: React.ReactNode; action?: React.ReactNode; accent?: boolean; children: React.ReactNode }) { return <section className={accent ? 'bg-accent-soft/20 p-4' : 'p-4'}><div className="mb-3 flex items-center justify-between gap-3"><h5 className="flex items-center gap-2 text-caption font-semibold uppercase tracking-[0.08em] text-muted-foreground">{icon}{title}</h5>{action}</div><div className="space-y-2">{children}</div></section>; }
-function SectionEmpty({ text }: { text: string }) { return <p className="rounded-control border border-dashed border-ui-border px-3 py-2.5 text-caption text-muted-foreground">{text}</p>; }
+function CurriculumTree({ children }: { children: React.ReactNode }) {
+  const branches = Children.toArray(children);
+  return <div>{branches.map((branch, index) => <div key={index} className="relative pl-8">
+    <span className={`pointer-events-none absolute left-0 top-0 border-l border-ui-border ${index === branches.length - 1 ? 'bottom-1/2' : 'bottom-0'}`} aria-hidden="true" />
+    <span className="pointer-events-none absolute left-0 top-1/2 h-4 w-6 -translate-y-full rounded-bl-xl border-b border-l border-ui-border" aria-hidden="true" />
+    {branch}
+  </div>)}</div>;
+}
 
-function ResourceRow({ resource, canManage, onOpen, onDelete }: { resource: Resource; canManage: boolean; onOpen: () => void; onDelete: () => void }) {
+function CurriculumRow({ icon, typeLabel, title, meta, onOpen, trailing, action, compact }: { icon: React.ReactNode; typeLabel: string; title: string; meta?: string; onOpen: () => void; trailing?: React.ReactNode; action?: React.ReactNode; compact: boolean }) {
+  return <div className={`group flex items-center gap-3 rounded-control px-2 transition-colors hover:bg-muted/50 ${compact || !meta ? 'min-h-9 py-0.5' : 'min-h-11 py-1.5'}`}>
+    <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">{icon}</span>
+    <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring"><span className="block truncate text-body text-foreground"><span className="font-semibold">{typeLabel}:</span> <span className="font-medium">{title}</span></span>{meta && <span className="block truncate text-caption text-muted-foreground">{meta}</span>}</button>
+    {trailing}
+    {action || <ChevronRight size={15} className="shrink-0 text-muted-foreground" aria-hidden="true" />}
+  </div>;
+}
+
+function ResourceRow({ resource, canEdit, compact, onOpen, onDelete }: { resource: Resource; canEdit: boolean; compact: boolean; onOpen: () => void; onDelete: () => void }) {
   const Icon = resource.kind === 'VIDEO' ? Video : resource.kind === 'LINK' ? Link2 : FileText;
-  return <div className="flex items-center gap-3 rounded-control border border-ui-border px-3 py-2.5 hover:bg-surface-subtle"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-primary-soft text-primary"><Icon size={15} /></span><button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left"><span className="flex items-center gap-2"><span className="truncate text-body font-medium text-foreground hover:text-primary hover:underline">{resource.name}</span>{resource.isRequired && <Badge tone="gold">Required</Badge>}</span><span className="text-caption text-muted-foreground">{resource.provider === 'GOOGLE_DRIVE' ? 'Google Drive' : resource.kind.toLowerCase()}{resource.progress?.[0]?.completedAt ? ' · Viewed' : ''}</span></button><ExternalLink size={14} className="text-subtle" />{canManage && <button type="button" className="app-icon-button h-8 w-8 text-muted-foreground hover:text-danger" onClick={onDelete} aria-label={`Delete ${resource.name}`}><Trash2 size={14} /></button>}</div>;
+  const typeLabel = resource.kind === 'VIDEO' ? 'Video' : resource.kind === 'LINK' ? 'Link' : resource.kind === 'EMBED' ? 'Activity' : 'Material';
+  const metadata = [resource.provider === 'GOOGLE_DRIVE' ? 'Google Drive' : null, resource.progress?.[0]?.completedAt ? 'Viewed' : null].filter(Boolean).join(' · ') || undefined;
+  return <CurriculumRow compact={compact} icon={<Icon size={16} />} typeLabel={typeLabel} title={resource.name} meta={metadata} onOpen={onOpen} trailing={resource.isRequired ? <Badge tone="neutral">Required</Badge> : undefined} action={canEdit ? <ResourceMenu name={resource.name} onDelete={onDelete} /> : <ExternalLink size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />} />;
 }
 
-function ActivityRow({ title, meta, dueAt, onClick }: { title: string; meta: string; dueAt?: string | null; onClick: () => void }) { return <button type="button" onClick={onClick} className="group flex w-full items-center gap-3 rounded-control border border-ui-border px-3 py-2.5 text-left hover:border-primary/40 hover:bg-primary-soft"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-primary-soft text-primary"><CirclePlay size={15} /></span><span className="min-w-0 flex-1"><span className="block truncate text-body font-medium text-foreground group-hover:text-primary">{title}</span><span className="text-caption text-muted-foreground">{meta}{dueAt ? ` · Due ${format(new Date(dueAt), 'MMM d')}` : ''}</span></span><ChevronRight size={15} className="text-subtle" /></button>; }
-
-function ActionMenu({ onEdit, onPublish, onDelete, published }: { onEdit: () => void; onPublish: () => void; onDelete: () => void; published: boolean }) {
-  const [open, setOpen] = useState(false);
-  return <div className="relative"><button type="button" className="app-icon-button h-8 w-8" onClick={() => setOpen(value => !value)} aria-label="More actions"><MoreHorizontal size={17} /></button>{open && <div className="absolute right-0 top-9 z-30 w-44 overflow-hidden rounded-control border border-ui-border bg-surface p-1 shadow-overlay"><MenuButton icon={<Pencil size={14} />} text="Edit details" onClick={() => { setOpen(false); onEdit(); }} /><MenuButton icon={<Rocket size={14} />} text={published ? 'Move to draft' : 'Publish'} onClick={() => { setOpen(false); onPublish(); }} /><MenuButton danger icon={<Trash2 size={14} />} text="Delete" onClick={() => { setOpen(false); onDelete(); }} /></div>}</div>;
+function AddContentMenu({ onAddResource, onHomework, onManageActivities }: { onAddResource: () => void; onHomework: () => void; onManageActivities: () => void }) {
+  return <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm" variant="ghost"><Plus size={14} />Add content</Button></DropdownMenuTrigger><DropdownMenuContent align="start" className="w-52"><DropdownMenuItem onSelect={onAddResource}><FileText />Material</DropdownMenuItem><DropdownMenuItem onSelect={onHomework}><ClipboardCheck />Homework</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={onManageActivities}><CirclePlay />Manage tests & activities</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
 }
-function MenuButton({ icon, text, onClick, danger }: { icon: React.ReactNode; text: string; onClick: () => void; danger?: boolean }) { return <button type="button" onClick={onClick} className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-caption font-medium hover:bg-surface-subtle ${danger ? 'text-danger' : 'text-foreground'}`}>{icon}{text}</button>; }
-function StatusBadge({ status }: { status?: ContentStatus }) { const safeStatus = status || 'PUBLISHED'; const tone = safeStatus === 'PUBLISHED' ? 'success' : safeStatus === 'SCHEDULED' ? 'gold' : safeStatus === 'ARCHIVED' ? 'neutral' : 'warning'; return <Badge tone={tone}>{safeStatus[0] + safeStatus.slice(1).toLowerCase()}</Badge>; }
+
+function ResourceMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
+  return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8" aria-label={`${name} actions`}><MoreHorizontal size={16} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem variant="destructive" onSelect={onDelete}><Trash2 />Delete material</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
+}
+
+function ActionMenu({ label, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, published, busy }: { label: string; onEdit: () => void; onPublish: () => void; onDelete: () => void; onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean; published: boolean; busy: boolean }) {
+  return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8" aria-label={label} disabled={busy}>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <MoreHorizontal size={17} />}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem disabled={!canMoveUp} onSelect={onMoveUp}><MoveUp />Move up</DropdownMenuItem><DropdownMenuItem disabled={!canMoveDown} onSelect={onMoveDown}><MoveDown />Move down</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={onEdit}><Pencil />Edit details</DropdownMenuItem><DropdownMenuItem onSelect={onPublish}><Rocket />{published ? 'Move to draft' : 'Publish'}</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={onDelete}><Trash2 />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
+}
+
+function StatusBadge({ status, hidePublished = false }: { status?: ContentStatus; hidePublished?: boolean }) { const safeStatus = status || 'PUBLISHED'; if (hidePublished && safeStatus === 'PUBLISHED') return null; const tone = safeStatus === 'PUBLISHED' ? 'success' : safeStatus === 'SCHEDULED' || safeStatus === 'ARCHIVED' ? 'neutral' : 'warning'; return <Badge tone={tone}>{safeStatus[0] + safeStatus.slice(1).toLowerCase()}</Badge>; }
+
+function CourseOutline({ weeks, activeWeekId, showStatuses, onNavigate }: { weeks: Week[]; activeWeekId: string | null; showStatuses: boolean; onNavigate: (weekId: string) => void }) {
+  return <aside className="hidden min-[1400px]:sticky min-[1400px]:top-4 min-[1400px]:block min-[1400px]:self-start" aria-label="Course outline navigation">
+    <Card className="p-4 shadow-none">
+      <div>
+        <h3 className="text-body font-semibold text-foreground">Course outline</h3>
+        <p className="mt-0.5 text-caption text-muted-foreground">Jump to any week</p>
+      </div>
+      <nav className="relative mt-3 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1" aria-label="Weeks">
+        <span className="pointer-events-none absolute bottom-4 left-1 top-4 border-l border-ui-border" aria-hidden="true" />
+        <div className="space-y-1">
+          {weeks.map((week, index) => {
+            const active = week.id === activeWeekId;
+            return <button key={week.id} type="button" aria-current={active ? 'location' : undefined} onClick={() => onNavigate(week.id)} className={`group/outline relative flex w-full items-start gap-3 rounded-control py-2 pl-5 pr-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${active ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}`}>
+              <span className={`absolute left-0 top-3.5 size-2 rounded-full border ${active ? 'border-primary bg-primary' : 'border-ui-border-strong bg-surface group-hover/outline:border-foreground'}`} aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="flex min-w-0 items-center gap-1.5 text-body"><span className="shrink-0 font-semibold text-foreground">Week {String(index + 1).padStart(2, '0')}</span><span aria-hidden="true">·</span><span className="truncate font-medium">{week.title}</span></span>
+                <span className="mt-0.5 block text-caption text-muted-foreground">{week.lessons.length} session{week.lessons.length === 1 ? '' : 's'}</span>
+              </span>
+              {showStatuses && week.status !== 'PUBLISHED' && <StatusBadge status={week.status} />}
+            </button>;
+          })}
+        </div>
+      </nav>
+    </Card>
+  </aside>;
+}
 
 function CurriculumEditor({ editor, form, setForm, saving, onClose, onSave }: { editor: { kind: 'week' | 'lesson'; item?: Week | Lesson } | null; form: CourseForm; setForm: React.Dispatch<React.SetStateAction<CourseForm>>; saving: boolean; onClose: () => void; onSave: () => void }) {
   const lesson = editor?.kind === 'lesson';
-  return <Modal open={Boolean(editor)} closeOnBackdrop onClose={onClose} title={`${editor?.item ? 'Edit' : 'Add'} ${lesson ? 'session' : 'week'}`} subtitle={lesson ? 'Set the session overview, timing and visibility.' : 'Create a clear module in the course roadmap.'} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !form.title.trim()} onClick={onSave}>{saving ? 'Saving…' : 'Save'}</Button></>}><div className="space-y-4"><Field label="Title"><Input autoFocus className="w-full" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={lesson ? 'Session 1: Reading foundations' : 'Week 1: Foundations'} /></Field><Field label={lesson ? 'Session overview' : 'Week description'}><textarea className="min-h-24 w-full rounded-control border border-ui-border bg-surface p-3 text-body outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20" value={lesson ? form.summary : form.description} onChange={event => setForm(current => ({ ...current, [lesson ? 'summary' : 'description']: event.target.value }))} placeholder="What will students learn?" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Visibility"><Select className="w-full" value={form.status} onChange={event => setForm(current => ({ ...current, status: event.target.value as ContentStatus }))}><option value="DRAFT">Draft</option><option value="PUBLISHED">Published</option>{lesson && <option value="SCHEDULED">Scheduled</option>}<option value="ARCHIVED">Archived</option></Select></Field>{lesson && <Field label="Duration (minutes)"><Input type="number" min="1" className="w-full" value={form.durationMinutes} onChange={event => setForm(current => ({ ...current, durationMinutes: event.target.value }))} /></Field>}</div>{lesson && <Field label="Session date & time"><Input type="datetime-local" className="w-full" value={form.scheduledAt} onChange={event => setForm(current => ({ ...current, scheduledAt: event.target.value }))} /></Field>}<p className="rounded-control bg-primary-soft px-3 py-2 text-caption leading-5 text-primary">Publishing makes this item visible to enrolled students and sends a notification.</p></div></Modal>;
+  return <Modal open={Boolean(editor)} closeOnBackdrop presentation="content-dialog" onClose={onClose} title={`${editor?.item ? 'Edit' : 'Add'} ${lesson ? 'session' : 'week'}`} subtitle={lesson ? 'Set the session overview, timing and visibility.' : 'Create a clear module in the curriculum.'} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !form.title.trim()} onClick={onSave}>{saving ? 'Saving…' : 'Save'}</Button></>}><div className="space-y-4"><Field label="Title"><Input autoFocus className="w-full" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={lesson ? 'Session 1: Reading foundations' : 'Week 1: Foundations'} /></Field><Field label={lesson ? 'Session overview' : 'Week description'}><Textarea className="min-h-24 w-full" value={lesson ? form.summary : form.description} onChange={event => setForm(current => ({ ...current, [lesson ? 'summary' : 'description']: event.target.value }))} placeholder="What will students learn?" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Visibility"><Select className="w-full" value={form.status} onChange={event => setForm(current => ({ ...current, status: event.target.value as ContentStatus }))}><option value="DRAFT">Draft</option><option value="PUBLISHED">Published</option>{lesson && <option value="SCHEDULED">Scheduled</option>}<option value="ARCHIVED">Archived</option></Select></Field>{lesson && <Field label="Duration (minutes)"><Input type="number" min="1" className="w-full" value={form.durationMinutes} onChange={event => setForm(current => ({ ...current, durationMinutes: event.target.value }))} /></Field>}</div>{lesson && <Field label="Session date & time"><DateTimePicker value={form.scheduledAt} onChange={value => setForm(current => ({ ...current, scheduledAt: value }))} placeholder="Choose date and time" ariaLabel="Session date and time" /></Field>}<p className="rounded-control bg-primary-soft px-3 py-2 text-caption leading-5 text-primary">Publishing makes this item visible to enrolled students and sends a notification.</p></div></Modal>;
 }
 
-function ResourceEditor({ open, form, setForm, saving, onClose, onSave }: { open: boolean; form: { name: string; url: string; kind: ResourceKind; isRequired: boolean }; setForm: React.Dispatch<React.SetStateAction<{ name: string; url: string; kind: ResourceKind; isRequired: boolean }>>; saving: boolean; onClose: () => void; onSave: () => void }) { return <Modal open={open} closeOnBackdrop onClose={onClose} title="Add learning resource" subtitle="Attach a document, video, website or embeddable activity. Google Drive files must already be shared with the class." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !form.name.trim() || !form.url.trim()} onClick={onSave}>{saving ? 'Adding…' : 'Add resource'}</Button></>}><div className="space-y-4"><Field label="Resource type"><Select className="w-full" value={form.kind} onChange={event => setForm(current => ({ ...current, kind: event.target.value as ResourceKind }))}><option value="FILE">Document / file</option><option value="VIDEO">Video</option><option value="LINK">Website link</option><option value="EMBED">Embedded activity</option></Select></Field><Field label="Display name"><Input autoFocus className="w-full" value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="SAT Reading strategy guide" /></Field><Field label="Secure URL"><Input type="url" className="w-full" value={form.url} onChange={event => setForm(current => ({ ...current, url: event.target.value }))} placeholder="https://…" /></Field><label className="flex items-center gap-2 text-body text-foreground"><input type="checkbox" checked={form.isRequired} onChange={event => setForm(current => ({ ...current, isRequired: event.target.checked }))} className="h-4 w-4 accent-primary" />Required material</label><p className="rounded-control border border-ui-border bg-surface-subtle p-3 text-caption leading-5 text-muted-foreground">For privacy, the app no longer changes Drive permissions automatically. Share the file only with the class or organization before adding its URL.</p></div></Modal>; }
+function ResourceEditor({ open, form, setForm, saving, onClose, onSave }: { open: boolean; form: { name: string; url: string; kind: ResourceKind; isRequired: boolean }; setForm: React.Dispatch<React.SetStateAction<{ name: string; url: string; kind: ResourceKind; isRequired: boolean }>>; saving: boolean; onClose: () => void; onSave: () => void }) { return <Modal open={open} closeOnBackdrop presentation="content-dialog" onClose={onClose} title="Add learning resource" subtitle="Attach a document, video, website or embeddable activity. Google Drive files must already be shared with the class." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !form.name.trim() || !form.url.trim()} onClick={onSave}>{saving ? 'Adding…' : 'Add resource'}</Button></>}><div className="space-y-4"><Field label="Resource type"><Select className="w-full" value={form.kind} onChange={event => setForm(current => ({ ...current, kind: event.target.value as ResourceKind }))}><option value="FILE">Document / file</option><option value="VIDEO">Video</option><option value="LINK">Website link</option><option value="EMBED">Embedded activity</option></Select></Field><Field label="Display name"><Input autoFocus className="w-full" value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="SAT Reading strategy guide" /></Field><Field label="Secure URL"><Input type="url" className="w-full" value={form.url} onChange={event => setForm(current => ({ ...current, url: event.target.value }))} placeholder="https://…" /></Field><label className="flex items-center gap-2 text-body text-foreground"><Checkbox checked={form.isRequired} onCheckedChange={checked => setForm(current => ({ ...current, isRequired: Boolean(checked) }))} />Required material</label><p className="rounded-control border border-ui-border bg-surface-subtle p-3 text-caption leading-5 text-muted-foreground">For privacy, the app no longer changes Drive permissions automatically. Share the file only with the class or organization before adding its URL.</p></div></Modal>; }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1.5 block text-caption font-semibold text-foreground">{label}</span>{children}</label>; }
-function CourseSkeleton() { return <div className="space-y-4" aria-label="Loading course"><div className="h-44 animate-pulse rounded-card bg-muted" />{[1, 2].map(item => <div key={item} className="h-32 animate-pulse rounded-card bg-surface-subtle" />)}</div>; }
-function toLocalDateTime(value: string) { const date = new Date(value); const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); }
+function CourseSkeleton() { return <div className="space-y-4" aria-label="Loading lessons"><div className="flex items-center justify-between"><div className="space-y-2"><span className="block h-5 w-24 animate-pulse rounded-sm bg-muted" /><span className="block h-4 w-72 max-w-full animate-pulse rounded-sm bg-muted" /></div><span className="h-8 w-24 animate-pulse rounded-control bg-muted" /></div>{[1, 2, 3].map(item => <div key={item} className="h-16 animate-pulse rounded-card border border-ui-border bg-surface" />)}</div>; }
+function CourseLoadError({ message, onRetry }: { message: string; onRetry: () => void }) { return <Card className="flex items-start gap-3 p-4 shadow-none" role="alert"><span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-danger-soft text-danger"><AlertCircle size={17} /></span><div className="min-w-0 flex-1"><p className="text-body font-semibold text-foreground">Unable to load lessons</p><p className="mt-0.5 text-caption text-muted-foreground">{message}</p></div><Button size="sm" variant="outline" onClick={onRetry}><RefreshCw size={14} />Retry</Button></Card>; }
+
+function lessonContent(lesson: Lesson) {
+  const deliveries = lesson.deliveries.filter(delivery => delivery.status !== 'CLOSED');
+  const canonicalHomeworkIds = new Set(lesson.activities.flatMap(activity => activity.homework?.assignmentId ? [activity.homework.assignmentId] : []));
+  const assignments = lesson.assignments.filter(assignment => !canonicalHomeworkIds.has(assignment.id));
+  return { deliveries, activities: lesson.activities, assignments };
+}
+
+function lessonItemCount(lesson: Lesson) { const content = lessonContent(lesson); return lesson.files.length + content.deliveries.length + content.activities.length + content.assignments.length; }
+function weekAnchorId(weekId: string) { return `curriculum-week-${weekId}`; }
+function requestErrorMessage(error: unknown, fallback: string) { const body = (error as { response?: { data?: { error?: string; message?: string } } })?.response?.data; return body?.error || body?.message || fallback; }
+function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Date unavailable' : format(date, 'MMM d'); }
+function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Date unavailable' : format(date, 'MMM d, HH:mm'); }
+
+function readExpandedPreference(storageKey: string, weeks: Week[]) {
+  const knownIds = new Set(weeks.map(week => week.id));
+  const stored = localStorage.getItem(storageKey);
+  if (stored !== null) {
+    try {
+      const ids = JSON.parse(stored);
+      if (Array.isArray(ids)) return new Set(ids.map(String).filter(id => knownIds.has(id)));
+    } catch { localStorage.removeItem(storageKey); }
+  }
+  return new Set(weeks.slice(0, 1).map(week => week.id));
+}
 
 function normalizeWeeks(value: unknown): Week[] {
   if (!Array.isArray(value)) return [];
@@ -227,34 +488,11 @@ function normalizeWeeks(value: unknown): Week[] {
       const lesson = rawLesson as Partial<Lesson>;
       const files = Array.isArray(lesson.files) ? lesson.files.map(rawResource => {
         const resource = rawResource as Partial<Resource>;
-        return {
-          ...resource,
-          id: String(resource.id || ''),
-          name: String(resource.name || 'Untitled resource'),
-          url: String(resource.url || ''),
-          kind: resource.kind || 'FILE',
-          isRequired: Boolean(resource.isRequired),
-          progress: Array.isArray(resource.progress) ? resource.progress : [],
-        } as Resource;
+        return { ...resource, id: String(resource.id || ''), name: String(resource.name || 'Untitled resource'), url: String(resource.url || ''), kind: resource.kind || 'FILE', isRequired: Boolean(resource.isRequired), progress: Array.isArray(resource.progress) ? resource.progress : [] } as Resource;
       }) : [];
-      return {
-        ...lesson,
-        id: String(lesson.id || ''),
-        title: String(lesson.title || 'Untitled session'),
-        status: lesson.status || 'PUBLISHED',
-        files,
-        assignments: Array.isArray(lesson.assignments) ? lesson.assignments : [],
-        deliveries: Array.isArray(lesson.deliveries) ? lesson.deliveries : [],
-        activities: Array.isArray(lesson.activities) ? lesson.activities : [],
-      } as Lesson;
+      return { ...lesson, id: String(lesson.id || ''), order: Number(lesson.order) || 0, title: String(lesson.title || 'Untitled session'), status: lesson.status || 'PUBLISHED', files, assignments: Array.isArray(lesson.assignments) ? lesson.assignments : [], deliveries: Array.isArray(lesson.deliveries) ? lesson.deliveries : [], activities: Array.isArray(lesson.activities) ? lesson.activities : [] } as Lesson;
     }) : [];
-    return {
-      ...week,
-      id: String(week.id || ''),
-      title: String(week.title || 'Untitled week'),
-      status: week.status || 'PUBLISHED',
-      lessons,
-    } as Week;
+    return { ...week, id: String(week.id || ''), order: Number(week.order) || 0, title: String(week.title || 'Untitled week'), status: week.status || 'PUBLISHED', lessons } as Week;
   });
 }
 

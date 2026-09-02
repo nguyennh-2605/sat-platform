@@ -9,6 +9,7 @@ import { Badge, Button, EmptyState, Input, Modal, Select, TableShell, Tabs } fro
 import { DateTimePicker } from '@/components/ui/DateTimePicker';
 import axiosClient from '@/lib/axios';
 import { capitalizeFirstLetter } from '@/utils/text';
+import HomeworkActivityDialog from './HomeworkActivityDialog';
 
 type ActivityType = 'TEST' | 'VOCABULARY' | 'HOMEWORK' | 'RESOURCE';
 type ActivityFilter = 'ALL' | ActivityType;
@@ -27,7 +28,7 @@ interface ClassActivity {
 interface LibraryTest { id: number; title: string; duration: number; subject: 'RW' | 'MATH'; mode: 'PRACTICE' | 'EXAM'; questionCount: number }
 interface TestPage { items: LibraryTest[] }
 
-export default function ClassroomActivities({ classId, students, canManage, onOpenPerformance, onNewHomework }: { classId: string; students: Student[]; canManage: boolean; onOpenPerformance: (deliveryId: string) => void; onNewHomework: () => void }) {
+export default function ClassroomActivities({ classId, students, canManage, onOpenPerformance }: { classId: string; students: Student[]; canManage: boolean; onOpenPerformance: (deliveryId: string) => void }) {
   const navigate = useNavigate();
   const [activities, setActivities] = useState<ClassActivity[]>([]);
   const [filter, setFilter] = useState<ActivityFilter>('ALL');
@@ -35,6 +36,7 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
+  const [homeworkOpen, setHomeworkOpen] = useState(false);
 
   const loadActivities = useCallback(async () => {
     setLoading(true);
@@ -78,11 +80,12 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
   };
 
   return <div className="space-y-4 py-2">
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-2"><label className="relative min-w-0 flex-1"><Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input controlSize="sm" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search activities…" aria-label="Search activities" className="w-full pl-8" /></label><div className="flex flex-wrap items-center gap-2"><ActivityFilterMenu value={filter} onChange={setFilter} counts={counts} />{canManage && <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Plus size={16} />Add activity</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52"><DropdownMenuLabel>Activity type</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => setAssignOpen(true)}><BookOpenCheck />Test</DropdownMenuItem><DropdownMenuItem onSelect={() => navigate(`/dashboard/vocabulary?classId=${classId}`)}><BookA />Vocabulary</DropdownMenuItem><DropdownMenuItem onSelect={onNewHomework}><FileText />Homework</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}</div></div>
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-2"><label className="relative min-w-0 flex-1"><Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input controlSize="sm" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search activities…" aria-label="Search activities" className="w-full pl-8" /></label><div className="flex flex-wrap items-center gap-2"><ActivityFilterMenu value={filter} onChange={setFilter} counts={counts} />{canManage && <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Plus size={16} />Add activity</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52"><DropdownMenuLabel>Activity type</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => setAssignOpen(true)}><BookOpenCheck />Test</DropdownMenuItem><DropdownMenuItem onSelect={() => navigate(`/dashboard/vocabulary?classId=${classId}`)}><BookA />Vocabulary</DropdownMenuItem><DropdownMenuItem onSelect={() => setHomeworkOpen(true)}><FileText />Homework</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}</div></div>
 
     {loading ? <ActivitySkeleton /> : error ? <EmptyState icon={<ClipboardList size={22} />} title="Unable to load activities" description={error} action={<Button variant="outline" onClick={() => void loadActivities()}>Try again</Button>} /> : filtered.length === 0 ? <EmptyState icon={<ClipboardList size={22} />} title="No activities found" description={activities.length ? 'Adjust the search or activity filter.' : canManage ? 'Add a test, vocabulary set, or homework activity for this class.' : 'Your teacher has not published any activities yet.'} action={canManage && activities.length === 0 ? <Button onClick={() => setAssignOpen(true)}><Plus size={16} />Add test activity</Button> : undefined} /> : <TableShell className="shadow-none"><div className="divide-y divide-ui-border">{filtered.map(activity => <ActivityRow key={activity.id} activity={activity} canManage={canManage} onOpen={() => openActivity(activity)} />)}</div></TableShell>}
 
     <AssignTestActivity open={assignOpen} onClose={() => setAssignOpen(false)} classId={classId} students={students} onCreated={async () => { setAssignOpen(false); await loadActivities(); }} />
+    <HomeworkActivityDialog open={homeworkOpen} onClose={() => setHomeworkOpen(false)} classId={classId} students={students} onCreated={loadActivities} />
   </div>;
 }
 

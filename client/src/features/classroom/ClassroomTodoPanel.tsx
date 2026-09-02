@@ -16,6 +16,7 @@ export interface ClassroomTodoItem {
   dueAt?: string | null;
   priority: 'NORMAL' | 'DUE_SOON' | 'OVERDUE';
   assignmentId?: string;
+  announcementId?: string;
   deliveryId?: string;
   testId?: number;
   activityId?: string;
@@ -128,15 +129,17 @@ export function ClassroomTodoPanel() {
       setSelectedTest(item);
       return;
     }
+    if (item.type === 'ANNOUNCEMENT' && item.announcementId) {
+      void acknowledge(item);
+      navigate(`/dashboard/class/${item.classId}?tab=announcements&announcementId=${item.announcementId}`);
+      return;
+    }
     if (item.type === 'TEST_RESULT' && item.deliveryId) {
       void acknowledge(item);
       navigate(`/dashboard/class/${item.classId}?tab=performance&deliveryId=${item.deliveryId}`);
       return;
     }
-    if (item.assignmentId) {
-      if (item.type === 'ANNOUNCEMENT') void acknowledge(item);
-      navigate(`/dashboard/class/${item.classId}/assignment/${item.assignmentId}`);
-    }
+    if (item.assignmentId) navigate(`/dashboard/class/${item.classId}/assignment/${item.assignmentId}`);
   };
 
   return (

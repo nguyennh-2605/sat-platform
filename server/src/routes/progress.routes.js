@@ -6,11 +6,13 @@ const { authenticateToken } = require('../middleware/auth.middleware');
 // Week routes
 router.get('/class/:classId/weeks', authenticateToken, progressController.getWeeks);
 router.post('/class/:classId/weeks', authenticateToken, progressController.createWeek);
+router.put('/class/:classId/weeks/reorder', authenticateToken, progressController.reorderWeeks);
 router.put('/weeks/:weekId', authenticateToken, progressController.updateWeek);
 router.delete('/weeks/:weekId', authenticateToken, progressController.deleteWeek);
 
 // Lesson routes
 router.post('/weeks/:weekId/lessons', authenticateToken, progressController.createLesson);
+router.put('/weeks/:weekId/lessons/reorder', authenticateToken, progressController.reorderLessons);
 router.put('/lessons/:lessonId', authenticateToken, progressController.updateLesson);
 router.delete('/lessons/:lessonId', authenticateToken, progressController.deleteLesson);
 router.put('/lessons/:lessonId/progress', authenticateToken, progressController.completeLesson);

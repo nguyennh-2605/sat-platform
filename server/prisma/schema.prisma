@@ -39,6 +39,7 @@ model User {
   vocabularyProgress    VocabularyTermProgress[]
   vocabularySessions    VocabularyStudySession[]
   createdActivities     ClassActivity[]          @relation("ActivityCreator")
+  createdAnnouncements  ClassAnnouncement[]      @relation("AnnouncementAuthor")
   activityAssignments   ActivityAssignee[]
   lessonProgress        LessonProgress[]
   resourceProgress      ResourceProgress[]
@@ -71,6 +72,7 @@ model Class {
   weeks       Week[]
   deliveries  TestDelivery[]
   activities  ClassActivity[]
+  announcements ClassAnnouncement[]
 
   @@index([teacherId, createdAt])
 }
@@ -91,6 +93,23 @@ model Assignment {
   testSubmissions  Submission[]
   activity         HomeworkActivity?
   lessonAssignment LessonAssignment?
+}
+
+model ClassAnnouncement {
+  id        String   @id @default(uuid())
+  classId   String
+  authorId  Int
+  title     String
+  content   String?
+  fileUrls  String[]
+  links     String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  author    User     @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([classId, createdAt])
+  @@index([authorId, createdAt])
 }
 
 model HomeworkSubmission {

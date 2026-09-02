@@ -4,6 +4,7 @@ const testDeliveryService = require('./test-delivery.service');
 const { sendNotificationToUser } = require('./notification.service');
 const { CLASS_COLORS, normalizeClassName, resolveAssignmentType, isAllowedClassColor, canManageClass } = require('../utils/classroom');
 const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
+const classAnnouncementService = require('./class-announcement.service');
 
 const parseUserId = (userId) => parseInt(userId, 10);
 
@@ -82,6 +83,34 @@ const toClassSummary = (classroom, currentUserId, userRole) => ({
   canManage: canManageClass({ teacherId: classroom.teacherId, userId: currentUserId, userRole }),
 });
 
+const enrichClassSummaries = ({ summaries, dueActivities, activityUpdates, announcementUpdates }) => {
+  const dueByClass = new Map();
+  for (const activity of dueActivities) {
+    const items = dueByClass.get(activity.classId) || [];
+    items.push(activity);
+    dueByClass.set(activity.classId, items);
+  }
+  const activityUpdatedByClass = new Map(activityUpdates.map(item => [item.classId, item._max.updatedAt]));
+  const announcementUpdatedByClass = new Map(announcementUpdates.map(item => [item.classId, item._max.updatedAt]));
+  return summaries.map(classroom => {
+    const upcoming = dueByClass.get(classroom.id) || [];
+    const updateDates = [activityUpdatedByClass.get(classroom.id), announcementUpdatedByClass.get(classroom.id)].filter(Boolean);
+    return {
+      ...classroom,
+      dueInNext7DaysCount: upcoming.length,
+      nextActivity: upcoming[0] ? {
+        id: upcoming[0].id,
+        type: upcoming[0].type,
+        title: upcoming[0].title,
+        dueAt: upcoming[0].dueAt,
+      } : null,
+      lastContentUpdateAt: updateDates.length ? new Date(Math.max(...updateDates.map(value => new Date(value).getTime()))) : null,
+    };
+  });
+};
+
+exports.enrichClassSummaries = enrichClassSummaries;
+
 exports.createClass = async ({ name, color, userId, userRole }) => {
   // Validation: Chỉ giáo viên mới được tạo lớp
   if (userRole !== 'TEACHER' && userRole !== 'ADMIN') {
@@ -128,7 +157,31 @@ exports.getMyClasses = async ({ userId, userRole }) => {
     orderBy: { createdAt: 'desc' },
     select: classSummarySelect,
   });
-  return classes.map(classroom => toClassSummary(classroom, currentUserId, userRole));
+  const summaries = classes.map(classroom => toClassSummary(classroom, currentUserId, userRole));
+  if (!summaries.length) return summaries;
+
+  const now = new Date();
+  const horizon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const classIds = summaries.map(classroom => classroom.id);
+  const studentActivityScope = userRole === 'STUDENT'
+    ? { assignees: { some: { studentId: currentUserId, excusedAt: null } } }
+    : {};
+  const [dueActivities, activityUpdates, announcementUpdates] = await Promise.all([
+    prisma.classActivity.findMany({
+      where: { classId: { in: classIds }, status: 'PUBLISHED', dueAt: { gte: now, lte: horizon }, ...studentActivityScope },
+      orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true, classId: true, type: true, title: true, dueAt: true },
+    }),
+    prisma.classActivity.groupBy({
+      by: ['classId'],
+      where: { classId: { in: classIds }, status: 'PUBLISHED', ...studentActivityScope },
+      _max: { updatedAt: true },
+    }),
+    prisma.classAnnouncement.groupBy({
+      by: ['classId'], where: { classId: { in: classIds } }, _max: { updatedAt: true },
+    }),
+  ]);
+  return enrichClassSummaries({ summaries, dueActivities, activityUpdates, announcementUpdates });
 };
 
 exports.updateClass = async ({ classId, name, color, userId, userRole }) => {
@@ -322,7 +375,13 @@ exports.createAssignment = async ({ title, content, type, deadline, classId, dri
   const classData = await assertClassTeacher({ classId, userId: currentUserId, userRole });
   // A post with a due date is always actionable coursework, even if an older
   // client still sends the default announcement type.
-  const assignmentType = resolveAssignmentType({ type, deadline });
+    const assignmentType = resolveAssignmentType({ type, deadline });
+    if (assignmentType === 'announcement') {
+      return classAnnouncementService.create({
+        classId, userId: currentUserId, userRole,
+        data: { title, content, fileUrls: driveFiles || [], links: externalLinks || [] },
+      });
+    }
 
   const newAssignment = await prisma.assignment.create({
     data: {
@@ -399,10 +458,11 @@ exports.createSubmission = async ({ assignmentId, textResponse, fileUrl, student
     throw new ApiError(401, { error: "Không tìm thấy thông tin học sinh." });
   }
 
-  const assignmentInfo = await prisma.assignment.findUnique({
-    where: { id: assignmentId },
-    include: {
-      class: {
+    const assignmentInfo = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        activity: { include: { activity: { include: { assignees: { where: { studentId: currentStudentId, excusedAt: null }, select: { studentId: true }, take: 1 } } } } },
+        class: {
         include: {
           students: { select: { id: true } }
         }
@@ -414,11 +474,14 @@ exports.createSubmission = async ({ assignmentId, textResponse, fileUrl, student
     throw new ApiError(404, { error: "Không tìm thấy bài tập" });
   }
 
-  const isEnrolledStudent = assignmentInfo.class.students.some(student => student.id === currentStudentId);
+    const isEnrolledStudent = assignmentInfo.class.students.some(student => student.id === currentStudentId);
+    const activityAvailable = !assignmentInfo.activity || (assignmentInfo.activity.activity.status === 'PUBLISHED'
+      && (!assignmentInfo.activity.activity.availableAt || assignmentInfo.activity.activity.availableAt <= new Date())
+      && assignmentInfo.activity.activity.assignees.length > 0);
 
-  if (!isEnrolledStudent) {
-    throw new ApiError(403, { error: "Bạn không có quyền nộp bài tập này." });
-  }
+    if (!isEnrolledStudent || !activityAvailable) {
+      throw new ApiError(403, { error: "Bạn không có quyền nộp bài tập này." });
+    }
 
   // Kiểm tra xem đã nộp chưa (dùng upsert để hỗ trợ nộp lại)
   const submission = await prisma.homeworkSubmission.upsert({
