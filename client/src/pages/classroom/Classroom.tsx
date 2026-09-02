@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { BarChart3, Bell, Check, ClipboardList, Copy, ExternalLink, GitBranch, Megaphone, Plus, Trash2, Users } from 'lucide-react';
+import { Check, Copy, ExternalLink, Megaphone, Plus, Trash2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -116,11 +116,11 @@ export default function Classroom() {
   if (!classDetail || loadError) return <ClassroomError message={loadError} onRetry={() => void fetchClassDetail()} />;
 
   const tabs: Array<TabItem<ClassroomTab>> = [
-    { value: 'LESSONS', label: 'Lessons', icon: GitBranch, panelId: 'classroom-lessons-panel' },
-    { value: 'ACTIVITIES', label: 'Activities', icon: ClipboardList, panelId: 'classroom-activities-panel' },
-    ...(canManage ? [{ value: 'PERFORMANCE' as ClassroomTab, label: 'Performance', icon: BarChart3, panelId: 'classroom-performance-panel' }] : []),
-    { value: 'MEMBERS', label: 'Members', icon: Users, panelId: 'classroom-members-panel' },
-    { value: 'ANNOUNCEMENTS', label: 'Announcements', icon: Bell, panelId: 'classroom-announcements-panel' },
+    { value: 'LESSONS', label: 'Lessons', panelId: 'classroom-lessons-panel' },
+    { value: 'ACTIVITIES', label: 'Activities', panelId: 'classroom-activities-panel' },
+    ...(canManage ? [{ value: 'PERFORMANCE' as ClassroomTab, label: 'Performance', panelId: 'classroom-performance-panel' }] : []),
+    { value: 'MEMBERS', label: 'Members', panelId: 'classroom-members-panel' },
+    { value: 'ANNOUNCEMENTS', label: 'Announcements', panelId: 'classroom-announcements-panel' },
   ];
 
   return <div className="h-full overflow-y-auto">
