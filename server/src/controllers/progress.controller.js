@@ -93,6 +93,17 @@ exports.createLesson = async (req, res) => {
   }
 };
 
+exports.getOutline = async (req, res) => {
+  try {
+    const outline = await progressService.getOutline({ classId: req.params.classId, userId: getUserId(req), userRole: getUserRole(req) });
+    res.json({ success: true, data: outline });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Get Course Outline Error:', error);
+    res.status(500).json({ success: false, error: 'Unable to load the course outline.' });
+  }
+};
+
 exports.reorderWeeks = async (req, res) => {
   try {
     const result = await progressService.reorderWeeks({

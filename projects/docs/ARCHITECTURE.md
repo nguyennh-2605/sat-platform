@@ -153,9 +153,10 @@ Express Server (index.js → app.js)
 | `POST` | `/api/tests/:id/duplicate` | JWT + TEACHER/ADMIN | Duplicate an accessible test into an owned Draft |
 | `POST` | `/api/tests/:id/copy-to-system` | JWT + ADMIN | Copy a Teacher-owned Personal test into a platform-owned System Draft |
 | `PATCH` | `/api/tests/:id/status` | JWT + TEACHER/ADMIN | Publish, archive, or restore an owned test |
-| `GET` | `/api/class-activities/class/:classId` | JWT | List unified class activities visible to staff or an enrolled student |
-| `POST` | `/api/class-activities/homework` | JWT + TEACHER/ADMIN | Publish homework to all or selected students, optionally linked to a lesson |
-| `POST` | `/api/test-deliveries` | JWT + TEACHER/ADMIN | Publish a Classroom test activity with availability, attempts, score policy, and audience |
+| `GET` | `/api/class-activities/class/:classId` | JWT | List Assignment and Test activities visible to staff or an enrolled student |
+| `POST` | `/api/class-activities/assignments` | JWT + TEACHER/ADMIN | Publish an Assignment to all or selected students, optionally linked to a lesson |
+| `POST` | `/api/class-activities/homework` | JWT + TEACHER/ADMIN | Compatibility alias for Assignment creation; new clients must use `/assignments` |
+| `POST` | `/api/test-deliveries` | JWT + TEACHER/ADMIN | Bulk-publish one or more tests; one request creates one independent TestDelivery and ClassActivity per selected test |
 | `GET` | `/api/test/:id` | JWT | Start or resume a test session |
 | `POST` | `/api/test/:id/save-progress` | JWT | Auto-save answers, time, current question |
 | `POST` | `/api/test/:id/submit` | JWT | Submit test → auto-grade → store results → notify teacher |
@@ -176,6 +177,7 @@ Express Server (index.js → app.js)
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/progress/class/:classId/weeks` | JWT | Get weeks with nested lessons, files, assignments |
+| `GET` | `/api/progress/class/:classId/outline` | JWT | Get the lightweight Week/Session outline used by shared activity placement controls |
 | `POST` | `/api/progress/class/:classId/weeks` | JWT | Create a week (teacher only) |
 | `PUT` | `/api/progress/class/:classId/weeks/reorder` | JWT | Persist the complete week order (owning teacher/admin only) |
 | `PUT` | `/api/progress/weeks/:weekId` | JWT | Update week details and visibility (owning teacher/admin only) |
@@ -376,12 +378,13 @@ Folder ──1:N── Test
 ```text
 1. Teacher creates or edits content in Test Library.
 2. Save draft keeps the test private and unavailable for delivery.
-3. Publish test makes it selectable from Classroom → Activities.
-4. Classroom → Add Activity → Test lists Published My Tests and Published System Tests.
-5. Teacher configures availability, deadline, attempts, score policy, and all/selected students.
-6. POST /api/test-deliveries creates TestDelivery + canonical ClassActivity + assignees and notifications.
+3. Publish test makes it selectable from the shared Assign Tests composer in Test Library, Classroom Activities, or Lessons.
+4. The composer lists Published My Tests and Published System Tests and supports multi-select.
+5. Teacher configures availability, deadline, attempts, score policy, audience, and optional Session placement once.
+6. POST /api/test-deliveries creates one TestDelivery + canonical ClassActivity + assignees and notifications per selected test in one transaction.
 7. Classroom Activities owns completion/performance; Test Library never displays student attempt state.
 8. Archiving prevents new delivery but preserves existing deliveries and student access/history.
+9. Assignment is a separate activity type. New Assignment flows never write tests into legacy Assignment.testIds[].
 ```
 
 ### 8.4 Admin Test Management

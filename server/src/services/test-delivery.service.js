@@ -52,7 +52,7 @@ const median = (values) => {
   return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 };
 
-exports.createDeliveries = async ({ classIds, testIds, studentIds, lessonId, title, availableAt, dueAt, maxAttempts, scorePolicy, userId, userRole }) => {
+const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lessonId, title, availableAt, dueAt, maxAttempts, scorePolicy, userId, userRole }) => {
   const normalizedClassIds = [...new Set((Array.isArray(classIds) ? classIds : []).map(String).filter(Boolean))];
   const normalizedTestIds = [...new Set((Array.isArray(testIds) ? testIds : []).map(Number).filter(Number.isInteger))];
   const normalizedStudentIds = [...new Set((Array.isArray(studentIds) ? studentIds : []).map(parseUserId).filter(Number.isInteger))];
@@ -74,7 +74,7 @@ exports.createDeliveries = async ({ classIds, testIds, studentIds, lessonId, tit
     throw new ApiError(400, { error: 'Selected students can only be used when assigning to one class.' });
   }
 
-  return prisma.$transaction(async tx => {
+  return db.$transaction(async tx => {
     const classes = [];
     for (const classId of normalizedClassIds) {
       classes.push(await assertClassManager(tx, { classId, userId, userRole }));
@@ -189,6 +189,9 @@ exports.createDeliveries = async ({ classIds, testIds, studentIds, lessonId, tit
     return deliveries;
   });
 };
+
+exports.createDeliveriesWithDb = createDeliveriesWithDb;
+exports.createDeliveries = args => createDeliveriesWithDb({ db: prisma, ...args });
 
 exports.listClassDeliveries = async ({ classId, userId, userRole }) => {
   await assertClassManager(prisma, { classId, userId, userRole });

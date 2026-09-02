@@ -196,7 +196,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Test đã có Classroom delivery hoặc attempt history không được sửa cấu trúc hoặc xóa vĩnh viễn; Duplicate tạo phiên bản Draft mới.
 - Navigation copy phải role-aware và nhất quán ở Sidebar, Dashboard search và Dashboard Home: Student `Practice Center`, Teacher `Test Library`, Admin `Test Management`.
 
-- Với Teacher, route này hiển thị `Test Library`: chỉ tạo, quản lý lifecycle và xem nội dung test. Mọi thao tác giao test, deadline, attempts, audience và theo dõi completion nằm trong `Classroom → Activities`.
+- Với Teacher, route này hiển thị `Test Library`: tạo, quản lý lifecycle, xem nội dung và khởi chạy shared Assign Tests composer. Deadline, attempts, audience, Session placement và completion vẫn thuộc Classroom delivery, không thuộc Test content.
 - Teacher dùng hai nguồn `My Tests` và `System Tests`. `My Tests` chỉ gồm test giáo viên sở hữu; `System Tests` chỉ gồm test Published do Admin/platform cung cấp.
 - `Draft`, `Published`, `Archived` là lifecycle filter bên trong `My Tests`, không phải source tab. `All` chỉ gồm Draft + Published; Archived chỉ xuất hiện khi chọn riêng.
 - Teacher card không hiển thị attempt status, progress, last score hoặc Continue. Card chỉ hiển thị subject/source, title, type, question count, duration, updated time và content actions; lifecycle được thể hiện qua filter và list view, không lặp lại trên card.
@@ -243,9 +243,12 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ### Classroom Activities
 
-- `Activities` thay thế `Coursework` và hợp nhất Test, Vocabulary, Homework/Resource bằng `ClassActivity` thật; `Course` vẫn là cây tuần/buổi học riêng.
-- Teacher tạo test activity từ bên trong Classroom, chọn Published My Test hoặc Published System Test rồi cấu hình availability, deadline, attempts, score policy và audience.
-- Activity list hiển thị type, deadline, audience/completion summary và mở đúng destination: test performance, vocabulary activity hoặc homework detail.
+- `Activities` là work-management view và chỉ có hai user-facing type: `Assignment` và `Test`. Backend `HOMEWORK` là compatibility name; không được hiển thị cho người dùng.
+- Vocabulary, File, Link và Video là learning resources, không phải Activity. Không cho tạo mới `VOCABULARY` hoặc `RESOURCE` từ Add activity; legacy data được giữ nguyên và tiếp tục truy cập từ owning feature.
+- `AssignmentComposer` và `AssignTestsComposer` là shared feature components dùng chung từ Activities, Lessons và Test Library/Test Detail. Shared Delivery gồm availability, due date, audience và optional Week/Session placement.
+- Assign Tests hỗ trợ multi-select. Một bulk action tạo N Test activities độc lập; không tạo một activity bundle và không ghi `Assignment.testIds[]` trong flow mới.
+- Activity list hiển thị type, Week/Session placement, deadline, audience/completion summary và mở đúng destination: Test Performance hoặc Assignment Detail.
+- Lessons → Add content chia `Student work` (Assignment, Test) và `Learning material` (File, Link, Video). Composer mở tại chỗ với Session được prefill, không điều hướng giáo viên sang tab khác.
 - Archive test trong Test Library không được làm mất quyền truy cập vào delivery đã Published; archive chỉ ảnh hưởng content library và việc tạo assignment mới.
 
 ## 8. Analytics

@@ -29,7 +29,7 @@ const activityHref = activity => {
 const activityAction = activity => activity.type === 'TEST'
   ? 'View performance'
   : activity.type === 'HOMEWORK'
-    ? 'Open homework'
+    ? 'Open assignment'
     : 'Open activity';
 
 const activityStats = (activity, now) => {

@@ -16,9 +16,9 @@ exports.listForClass = async (req, res) => {
   }
 };
 
-exports.createHomework = async (req, res) => {
+exports.createAssignment = async (req, res) => {
   try {
-    const activity = await classActivityService.createHomeworkActivity({
+    const activity = await classActivityService.createAssignmentActivity({
       ...req.body,
       userId: req.user.userId || req.user.id,
       userRole: req.user.role,
@@ -26,7 +26,10 @@ exports.createHomework = async (req, res) => {
     res.status(201).json(activity);
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
-    console.error('Create homework activity error:', error);
-    res.status(500).json({ error: 'Unable to create the homework activity.' });
+    console.error('Create assignment activity error:', error);
+    res.status(500).json({ error: 'Unable to create the assignment activity.' });
   }
 };
+
+// Compatibility alias for older clients. New UI uses /assignments.
+exports.createHomework = exports.createAssignment;

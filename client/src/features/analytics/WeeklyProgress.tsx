@@ -6,7 +6,7 @@ import { AlertCircle, BookA, BookOpen, CalendarDays, Check, ChevronDown, Chevron
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import HomeworkActivityDialog from '../classroom/HomeworkActivityDialog';
+import { AssignmentComposer, AssignTestsComposer } from '../classroom/activity-composer/ActivityComposers';
 import { Badge, Button, Card, EmptyState, Input, Modal, Select } from '../../components/ui/AppUI';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../components/ui/collapsible';
@@ -14,6 +14,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
@@ -52,7 +53,7 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
   const [form, setForm] = useState<CourseForm>(EMPTY_FORM);
   const [resourceLesson, setResourceLesson] = useState<{ weekId: string; lessonId: string } | null>(null);
   const [resourceForm, setResourceForm] = useState({ name: '', url: '', kind: 'FILE' as ResourceKind, isRequired: false });
-  const [homeworkLesson, setHomeworkLesson] = useState<{ weekId: string; lesson: Lesson } | null>(null);
+  const [activityComposer, setActivityComposer] = useState<{ kind: 'ASSIGNMENT' | 'TEST'; lessonId: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ kind: 'week' | 'lesson' | 'resource'; id: string; name: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyItem, setBusyItem] = useState<string | null>(null);
@@ -291,7 +292,7 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
           <SortableContext items={weeks.map(week => `week:${week.id}`)} strategy={verticalListSortingStrategy}>
             {weeks.map((week, weekIndex) => <SortableWeekOutline key={week.id} week={week} index={weekIndex} open={expanded.has(week.id)} compact={compact} canManage={canManage} editing={editing} disabled={reordering} onOpenChange={open => toggleWeek(week.id, open)} onAddLesson={() => openEditor('lesson', undefined, week.id)} onEdit={() => openEditor('week', week)} onPublish={() => void publishItem('week', week)} onDelete={() => setDeleteTarget({ kind: 'week', id: week.id, name: week.title })} onMoveUp={() => void persistWeekOrder(weekIndex, weekIndex - 1)} onMoveDown={() => void persistWeekOrder(weekIndex, weekIndex + 1)} canMoveUp={weekIndex > 0} canMoveDown={weekIndex < weeks.length - 1} busy={busyItem === `week:${week.id}` || reordering}>
               {week.lessons.length === 0 ? <div className="flex flex-col items-start justify-between gap-2 px-4 py-3 sm:flex-row sm:items-center sm:px-5"><div><p className="text-body font-medium text-foreground">No sessions in this week</p><p className="mt-0.5 text-caption text-muted-foreground">{canManage && editing ? 'Add a session to begin structuring this module.' : canManage ? 'Enter edit mode to add the first session.' : 'More sessions are coming soon.'}</p></div>{canManage && editing && <Button size="sm" variant="ghost" onClick={() => openEditor('lesson', undefined, week.id)}><Plus size={14} />Add session</Button>}</div> : <SortableContext items={week.lessons.map(lesson => `lesson:${lesson.id}`)} strategy={verticalListSortingStrategy}>
-                {week.lessons.map((lesson, lessonIndex) => <SortableLessonOutline key={lesson.id} weekId={week.id} weekStatus={week.status} lesson={lesson} number={lessonIndex + 1} compact={compact} canManage={canManage} editing={editing} disabled={reordering} busy={busyItem === `lesson:${lesson.id}` || reordering} onEdit={() => openEditor('lesson', lesson, week.id)} onPublish={() => void publishItem('lesson', lesson)} onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id, name: lesson.title })} onMoveUp={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex - 1)} onMoveDown={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex + 1)} canMoveUp={lessonIndex > 0} canMoveDown={lessonIndex < week.lessons.length - 1} onAddResource={() => setResourceLesson({ weekId: week.id, lessonId: lesson.id })} onHomework={() => setHomeworkLesson({ weekId: week.id, lesson })} onManageActivities={() => navigate(`/dashboard/class/${classId}?tab=activities`)} onResource={resource => void openResource(resource)} onDeleteResource={resource => setDeleteTarget({ kind: 'resource', id: resource.id, name: resource.name })} onAssignment={assignment => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} onDelivery={startDelivery} onActivity={activity => activity.type === 'HOMEWORK' && activity.homework ? navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}`) : activity.type === 'VOCABULARY' ? navigate(`/dashboard/vocabulary?activity=${activity.id}`) : navigate(`/dashboard/class/${classId}?tab=activities`)} onComplete={() => void completeLesson(lesson)} isLast={lessonIndex === week.lessons.length - 1} />)}
+                {week.lessons.map((lesson, lessonIndex) => <SortableLessonOutline key={lesson.id} weekId={week.id} weekStatus={week.status} lesson={lesson} number={lessonIndex + 1} compact={compact} canManage={canManage} editing={editing} disabled={reordering} busy={busyItem === `lesson:${lesson.id}` || reordering} onEdit={() => openEditor('lesson', lesson, week.id)} onPublish={() => void publishItem('lesson', lesson)} onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id, name: lesson.title })} onMoveUp={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex - 1)} onMoveDown={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex + 1)} canMoveUp={lessonIndex > 0} canMoveDown={lessonIndex < week.lessons.length - 1} onAddResource={() => setResourceLesson({ weekId: week.id, lessonId: lesson.id })} onAddAssignment={() => setActivityComposer({ kind: 'ASSIGNMENT', lessonId: lesson.id })} onAddTest={() => setActivityComposer({ kind: 'TEST', lessonId: lesson.id })} onResource={resource => void openResource(resource)} onDeleteResource={resource => setDeleteTarget({ kind: 'resource', id: resource.id, name: resource.name })} onAssignment={assignment => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} onDelivery={startDelivery} onActivity={activity => activity.type === 'HOMEWORK' && activity.homework ? navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}`) : activity.type === 'VOCABULARY' ? navigate(`/dashboard/vocabulary?activity=${activity.id}`) : navigate(`/dashboard/class/${classId}?tab=activities`)} onComplete={() => void completeLesson(lesson)} isLast={lessonIndex === week.lessons.length - 1} />)}
               </SortableContext>}
             </SortableWeekOutline>)}
           </SortableContext>
@@ -303,7 +304,8 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
     <CurriculumEditor editor={editor} form={form} setForm={setForm} saving={saving} onClose={() => setEditor(null)} onSave={() => void saveEditor()} />
     <ResourceEditor open={Boolean(resourceLesson)} form={resourceForm} setForm={setResourceForm} saving={saving} onClose={() => setResourceLesson(null)} onSave={() => void addResource()} />
     <Modal open={Boolean(deleteTarget)} closeOnBackdrop presentation="content-dialog" onClose={() => setDeleteTarget(null)} title={`Delete ${deleteTarget?.kind || 'item'}?`} subtitle={deleteTarget?.kind === 'resource' ? 'This action cannot be undone. Its viewing progress will also be removed.' : 'The curriculum item will be removed. Published activities stay available in the Activities tab.'} footer={<><Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>{saving ? 'Deleting…' : 'Delete'}</Button></>}><p className="text-body text-muted-foreground">Remove <strong className="text-foreground">{deleteTarget?.name}</strong> from this course?</p></Modal>
-    {homeworkLesson && classId && <HomeworkActivityDialog open classId={classId} lessonId={homeworkLesson.lesson.id} students={students} onClose={() => setHomeworkLesson(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
+    {classId && <AssignmentComposer open={activityComposer?.kind === 'ASSIGNMENT'} classId={classId} initialLessonId={activityComposer?.lessonId} students={students} onClose={() => setActivityComposer(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
+    {classId && <AssignTestsComposer open={activityComposer?.kind === 'TEST'} classId={classId} initialLessonId={activityComposer?.lessonId} students={students} onClose={() => setActivityComposer(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
   </div>;
 };
 
@@ -339,7 +341,7 @@ function WeekOutline({ week, index, open, compact, canManage, editing, busy, onO
 interface LessonOutlineProps {
   weekId: string; lesson: Lesson; weekStatus: ContentStatus; number: number; compact: boolean; canManage: boolean; editing: boolean; disabled: boolean; busy: boolean; isLast: boolean;
   onEdit: () => void; onPublish: () => void; onDelete: () => void; onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean;
-  onAddResource: () => void; onHomework: () => void; onManageActivities: () => void; onResource: (item: Resource) => void; onDeleteResource: (item: Resource) => void;
+  onAddResource: () => void; onAddAssignment: () => void; onAddTest: () => void; onResource: (item: Resource) => void; onDeleteResource: (item: Resource) => void;
   onAssignment: (item: Assignment) => void; onDelivery: (item: Delivery) => void; onActivity: (item: Activity) => void; onComplete: () => void;
 }
 
@@ -349,7 +351,7 @@ function SortableLessonOutline(props: LessonOutlineProps) {
   return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={isDragging ? 'relative z-10 bg-surface opacity-70' : undefined}><LessonOutline {...props} dragHandle={dragHandle} />{!props.isLast && <Separator />}</div>;
 }
 
-function LessonOutline({ lesson, weekStatus, number, compact, canManage, editing, busy, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onAddResource, onHomework, onManageActivities, onResource, onDeleteResource, onAssignment, onDelivery, onActivity, onComplete, dragHandle }: LessonOutlineProps & { dragHandle?: React.ReactNode }) {
+function LessonOutline({ lesson, weekStatus, number, compact, canManage, editing, busy, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onAddResource, onAddAssignment, onAddTest, onResource, onDeleteResource, onAssignment, onDelivery, onActivity, onComplete, dragHandle }: LessonOutlineProps & { dragHandle?: React.ReactNode }) {
   const completed = lesson.studentProgress?.status === 'COMPLETED';
   const { deliveries, activities, assignments } = lessonContent(lesson);
   const itemCount = lesson.files.length + deliveries.length + activities.length + assignments.length;
@@ -369,9 +371,9 @@ function LessonOutline({ lesson, weekStatus, number, compact, canManage, editing
       <CurriculumTree>
         {lesson.files.map(resource => <ResourceRow key={resource.id} resource={resource} canEdit={canManage && editing} compact={compact} onOpen={() => onResource(resource)} onDelete={() => onDeleteResource(resource)} />)}
         {deliveries.map(delivery => <CurriculumRow key={delivery.id} compact={compact} icon={<CirclePlay size={16} />} typeLabel={delivery.test.mode === 'EXAM' ? 'Test' : 'Quiz'} title={delivery.title} meta={`${delivery.test.duration} min${delivery.dueAt ? ` · Due ${formatDate(delivery.dueAt)}` : ''}`} onOpen={() => onDelivery(delivery)} />)}
-        {activities.map(activity => <CurriculumRow key={activity.id} compact={compact} icon={activity.type === 'VOCABULARY' ? <BookA size={16} /> : activity.type === 'HOMEWORK' ? <ClipboardCheck size={16} /> : <Link2 size={16} />} typeLabel={activity.type === 'VOCABULARY' ? 'Vocabulary' : activity.type === 'HOMEWORK' ? 'Homework' : 'Material'} title={activity.title} meta={activity.dueAt ? `Due ${formatDate(activity.dueAt)}` : undefined} onOpen={() => onActivity(activity)} />)}
+        {activities.map(activity => <CurriculumRow key={activity.id} compact={compact} icon={activity.type === 'VOCABULARY' ? <BookA size={16} /> : activity.type === 'HOMEWORK' ? <ClipboardCheck size={16} /> : <Link2 size={16} />} typeLabel={activity.type === 'VOCABULARY' ? 'Vocabulary' : activity.type === 'HOMEWORK' ? 'Assignment' : 'Material'} title={activity.title} meta={activity.dueAt ? `Due ${formatDate(activity.dueAt)}` : undefined} onOpen={() => onActivity(activity)} />)}
         {assignments.map(assignment => <CurriculumRow key={assignment.id} compact={compact} icon={<ClipboardCheck size={16} />} typeLabel="Assignment" title={assignment.title} meta={assignment.assignment?.submissions?.length ? 'Submitted' : assignment.dueDate ? `Due ${formatDateTime(assignment.dueDate)}` : undefined} onOpen={() => onAssignment(assignment)} />)}
-        {canManage && editing && <AddContentMenu onAddResource={onAddResource} onHomework={onHomework} onManageActivities={onManageActivities} />}
+        {canManage && editing && <AddContentMenu onAddResource={onAddResource} onAddAssignment={onAddAssignment} onAddTest={onAddTest} />}
         {itemCount === 0 && (!canManage || !editing) && <p className="px-2 py-1 text-caption text-muted-foreground">No materials in this session yet.</p>}
       </CurriculumTree>
     </div>
@@ -403,8 +405,8 @@ function ResourceRow({ resource, canEdit, compact, onOpen, onDelete }: { resourc
   return <CurriculumRow compact={compact} icon={<Icon size={16} />} typeLabel={typeLabel} title={resource.name} meta={metadata} onOpen={onOpen} trailing={resource.isRequired ? <Badge tone="neutral">Required</Badge> : undefined} action={canEdit ? <ResourceMenu name={resource.name} onDelete={onDelete} /> : <ExternalLink size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />} />;
 }
 
-function AddContentMenu({ onAddResource, onHomework, onManageActivities }: { onAddResource: () => void; onHomework: () => void; onManageActivities: () => void }) {
-  return <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm" variant="ghost"><Plus size={14} />Add content</Button></DropdownMenuTrigger><DropdownMenuContent align="start" className="w-52"><DropdownMenuItem onSelect={onAddResource}><FileText />Material</DropdownMenuItem><DropdownMenuItem onSelect={onHomework}><ClipboardCheck />Homework</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={onManageActivities}><CirclePlay />Manage tests & activities</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
+function AddContentMenu({ onAddResource, onAddAssignment, onAddTest }: { onAddResource: () => void; onAddAssignment: () => void; onAddTest: () => void }) {
+  return <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm" variant="ghost"><Plus size={14} />Add content</Button></DropdownMenuTrigger><DropdownMenuContent align="start" className="w-60"><DropdownMenuLabel>Student work</DropdownMenuLabel><DropdownMenuItem onSelect={onAddAssignment}><ClipboardCheck />Assignment</DropdownMenuItem><DropdownMenuItem onSelect={onAddTest}><CirclePlay />Test</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuLabel>Learning material</DropdownMenuLabel><DropdownMenuItem onSelect={onAddResource}><FileText />File, link, or video</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
 }
 
 function ResourceMenu({ name, onDelete }: { name: string; onDelete: () => void }) {

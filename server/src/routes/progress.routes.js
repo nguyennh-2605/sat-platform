@@ -5,6 +5,7 @@ const { authenticateToken } = require('../middleware/auth.middleware');
 
 // Week routes
 router.get('/class/:classId/weeks', authenticateToken, progressController.getWeeks);
+router.get('/class/:classId/outline', authenticateToken, progressController.getOutline);
 router.post('/class/:classId/weeks', authenticateToken, progressController.createWeek);
 router.put('/class/:classId/weeks/reorder', authenticateToken, progressController.reorderWeeks);
 router.put('/weeks/:weekId', authenticateToken, progressController.updateWeek);

@@ -21,6 +21,7 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
   return prisma.classActivity.findMany({
     where: {
       classId: String(classId),
+      type: { in: ['TEST', 'HOMEWORK'] },
       ...(canManage ? {} : {
         status: 'PUBLISHED',
         assignees: { some: { studentId: intId(userId), excusedAt: null } },
@@ -42,6 +43,7 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
       audience: true,
       createdAt: true,
       updatedAt: true,
+      lesson: { select: { id: true, title: true, week: { select: { id: true, title: true, order: true } } } },
       assignees: canManage
         ? { select: { studentId: true, status: true, bestScore: true, attemptCount: true, excusedAt: true } }
         : { where: { studentId: intId(userId) }, select: { studentId: true, status: true, bestScore: true, attemptCount: true, excusedAt: true } },
@@ -83,13 +85,13 @@ const normalizeUrls = (value, fieldName) => {
   });
 };
 
-exports.createHomeworkActivity = async ({ classId, lessonId, title, instructions, availableAt, dueAt, fileUrls, links, studentIds, userId, userRole }) => {
+exports.createAssignmentActivity = async ({ classId, lessonId, title, instructions, availableAt, dueAt, fileUrls, links, studentIds, userId, userRole }) => {
   const teacherId = intId(userId);
   const normalizedTitle = String(title || '').trim().replace(/\s+/g, ' ');
-  if (!classId || !normalizedTitle) throw new ApiError(400, { error: 'Class and homework title are required.' });
-  if (normalizedTitle.length > 160) throw new ApiError(400, { error: 'Homework title must be 160 characters or fewer.' });
+  if (!classId || !normalizedTitle) throw new ApiError(400, { error: 'Class and assignment title are required.' });
+  if (normalizedTitle.length > 160) throw new ApiError(400, { error: 'Assignment title must be 160 characters or fewer.' });
   const normalizedInstructions = String(instructions || '').trim() || null;
-  if (normalizedInstructions && normalizedInstructions.length > 20_000) throw new ApiError(400, { error: 'Homework instructions are too long.' });
+  if (normalizedInstructions && normalizedInstructions.length > 20_000) throw new ApiError(400, { error: 'Assignment instructions are too long.' });
   const startsAt = normalizeDate(availableAt, 'Availability date');
   const deadline = normalizeDate(dueAt, 'Due date');
   if (startsAt && deadline && deadline <= startsAt) throw new ApiError(400, { error: 'Due date must be after the availability date.' });
@@ -111,7 +113,7 @@ exports.createHomeworkActivity = async ({ classId, lessonId, title, instructions
     const requestedIds = Array.isArray(studentIds) ? [...new Set(studentIds.map(intId).filter(Number.isInteger))] : [];
     if (requestedIds.some(id => !enrolledIds.has(id))) throw new ApiError(400, { error: 'One or more selected students are not in this class.' });
     const assigneeIds = requestedIds.length ? requestedIds : [...enrolledIds];
-    if (!assigneeIds.length) throw new ApiError(400, { error: 'This class has no students to receive the homework.' });
+    if (!assigneeIds.length) throw new ApiError(400, { error: 'This class has no students to receive the assignment.' });
 
     const assignment = await tx.assignment.create({ data: {
       classId: classroom.id, title: normalizedTitle, type: 'assignment', content: normalizedInstructions,
@@ -133,8 +135,10 @@ exports.createHomeworkActivity = async ({ classId, lessonId, title, instructions
 
   await Promise.all(result.assigneeIds.map(studentId => sendNotificationToUser(
     studentId,
-    `New homework in ${result.classroom.name}: "${result.assignment.title}"`,
+    `New assignment in ${result.classroom.name}: "${result.assignment.title}"`,
     `/dashboard/class/${result.classroom.id}/assignment/${result.assignment.id}`,
   )));
   return result.activity;
 };
+
+exports.createHomeworkActivity = exports.createAssignmentActivity;

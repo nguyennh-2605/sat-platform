@@ -136,7 +136,7 @@ function ClassCard({ classroom, showTeacher, onOpen, onEdit, onDelete }: { class
     : classroom.nextActivity?.type === 'VOCABULARY'
       ? 'Vocabulary'
       : classroom.nextActivity?.type === 'HOMEWORK'
-        ? 'Homework'
+        ? 'Assignment'
         : 'Resource';
 
   const copyClassCode = async () => {

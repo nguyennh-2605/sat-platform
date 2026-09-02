@@ -148,7 +148,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData, kind = 'post' }: 
         <div className="flex items-center gap-2 md:gap-4">
           <Button onClick={onClose} variant="ghost" size="icon" className="h-8 w-8" aria-label="Close post editor"><X size={18} /></Button>
           <h2 className="text-base font-semibold tracking-tight text-foreground">
-            {isEditMode ? 'Edit post' : kind === 'homework' ? 'New homework' : 'New post'}
+            {isEditMode ? 'Edit post' : kind === 'homework' ? 'New assignment' : 'New post'}
           </h2>
         </div>
 
@@ -174,7 +174,7 @@ const AnnouncementCreator = ({ onClose, onSubmit, initialData, kind = 'post' }: 
                   <Input
                     type="text"
                     id="post-title"
-                    placeholder={kind === 'homework' ? 'Homework title…' : 'Post title…'}
+                    placeholder={kind === 'homework' ? 'Assignment title…' : 'Post title…'}
                     className="w-full"
                     value={form.title}
                     onChange={e => setForm({ ...form, title: e.target.value })}

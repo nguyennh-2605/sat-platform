@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { Archive, ArrowUpDown, BookOpen, Check, ChevronLeft, ChevronRight, Clock3, Copy, FilePenLine, Grid2X2, History, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, UserRound, X } from 'lucide-react';
+import { Archive, ArrowUpDown, BookOpen, Check, ChevronLeft, ChevronRight, Clock3, Copy, FilePenLine, Grid2X2, History, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, RefreshCw, RotateCcw, Search, Send, SlidersHorizontal, Trash2, UserRound, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,8 @@ import axiosClient from '@/lib/axios';
 import { cachedGet, invalidateQueryCache } from '@/lib/queryCache';
 import { useDebounce } from '@/hooks/useDebounce';
 import { capitalizeFirstLetter } from '@/utils/text';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AssignTestsComposer } from '@/features/classroom/activity-composer/ActivityComposers';
 
 type LibrarySource = 'MY' | 'SYSTEM';
 type TestStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
@@ -56,6 +58,8 @@ export default function TeacherTestLibrary() {
   const [error, setError] = useState('');
   const [workingId, setWorkingId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LibraryTest | null>(null);
+  const [selectedTests, setSelectedTests] = useState<LibraryTest[]>([]);
+  const [assignOpen, setAssignOpen] = useState(false);
   const debouncedSearch = useDebounce(search, 250);
 
   const loadTests = useCallback(async (force = false) => {
@@ -146,6 +150,8 @@ export default function TeacherTestLibrary() {
     archive: test => void updateStatus(test, 'ARCHIVED'),
     restore: test => void updateStatus(test, 'PUBLISHED'),
     delete: setDeleteTarget,
+    selected: test => selectedTests.some(item => item.id === test.id),
+    toggleSelected: test => setSelectedTests(current => current.some(item => item.id === test.id) ? current.filter(item => item.id !== test.id) : [...current, test]),
   };
 
   const resetFilters = () => {
@@ -172,6 +178,7 @@ export default function TeacherTestLibrary() {
       ]} value={source} onValueChange={changeSource} ariaLabel="Test library source" /></div>
       <section className="overflow-hidden rounded-card border border-ui-border bg-background" aria-label={source === 'MY' ? 'My Tests' : 'System Tests'}>
         <LibraryToolbar source={source} search={search} onSearch={value => { setSearch(value); setPage(1); }} subject={subject} onSubject={value => { setSubject(value); setPage(1); }} mode={mode} onMode={value => { setMode(value); setPage(1); }} status={status} onStatus={value => { setStatus(value); setPage(1); }} sort={sort} onSort={value => { setSort(value); setPage(1); }} view={view} onView={changeView} hasActiveFilters={hasStructuredFilters} onReset={resetFilters} loading={loading} onRefresh={() => void refresh()} onCreate={() => navigate('/dashboard/practice-test/create')} />
+        {selectedTests.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border bg-muted/30 px-4 py-3"><p className="text-body font-medium text-foreground">{selectedTests.length} published test{selectedTests.length === 1 ? '' : 's'} selected</p><div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={() => setSelectedTests([])}>Clear</Button><Button size="sm" onClick={() => setAssignOpen(true)}><Send size={15} />Assign {selectedTests.length} test{selectedTests.length === 1 ? '' : 's'}</Button></div></div>}
 
         {error && !loading && tests.length === 0 ? <EmptyState surface={false} className="rounded-none border-0" icon={<RefreshCw size={22} />} title="Unable to load tests" description={error} action={<Button variant="outline" onClick={() => void refresh()}><RefreshCw size={17} />Try again</Button>} />
           : loading ? <LibrarySkeleton view={view} />
@@ -184,6 +191,7 @@ export default function TeacherTestLibrary() {
     </main>
 
     <Modal open={Boolean(deleteTarget)} onClose={() => workingId === null && setDeleteTarget(null)} closeOnBackdrop={workingId === null} presentation="content-dialog" title="Delete test?" subtitle={deleteTarget?.title} className="max-w-md!" footer={<><Button variant="outline" disabled={workingId !== null} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={workingId !== null} onClick={() => void remove()}>{workingId !== null ? 'Deleting…' : 'Delete permanently'}</Button></>}><p className="text-sm leading-6 text-muted-foreground">Only tests that have never been assigned or attempted can be permanently deleted. Tests with classroom history must be archived instead.</p></Modal>
+    <AssignTestsComposer open={assignOpen} onClose={() => setAssignOpen(false)} initialTests={selectedTests} initialSource={source} onCreated={() => { setSelectedTests([]); invalidateQueryCache('/api/tests', '/api/class-activities'); }} />
   </div>;
 }
 
@@ -221,7 +229,7 @@ function RadioFilter({ icon, label, value, onChange, options, align = 'start' }:
   return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={`border-dashed ${active ? 'border-solid bg-muted text-foreground' : ''}`}>{icon || <SlidersHorizontal size={16} />}{label}</Button></DropdownMenuTrigger><DropdownMenuContent align={align} className="w-52"><DropdownMenuLabel>{label}</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuRadioGroup value={value} onValueChange={onChange}>{options.map(([optionValue, optionLabel]) => <DropdownMenuRadioItem key={optionValue} value={optionValue}>{optionLabel}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuContent></DropdownMenu>;
 }
 
-interface TestActions { preview: (test: LibraryTest) => void; edit: (test: LibraryTest) => void; duplicate: (test: LibraryTest) => void; archive: (test: LibraryTest) => void; restore: (test: LibraryTest) => void; delete: (test: LibraryTest) => void }
+interface TestActions { preview: (test: LibraryTest) => void; edit: (test: LibraryTest) => void; duplicate: (test: LibraryTest) => void; archive: (test: LibraryTest) => void; restore: (test: LibraryTest) => void; delete: (test: LibraryTest) => void; selected: (test: LibraryTest) => boolean; toggleSelected: (test: LibraryTest) => void }
 
 function LibraryCard({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
   const system = source === 'SYSTEM';
@@ -229,6 +237,7 @@ function LibraryCard({ test, source, working, actions }: { test: LibraryTest; so
     <CardHeader className="gap-1 px-4 pb-0 pt-4">
       <CardTitle className="line-clamp-2 min-w-0 pr-2 text-title font-bold text-foreground">{test.title}</CardTitle>
       <CardAction className="flex items-center gap-1.5 pl-2">
+        {test.status === 'PUBLISHED' && <Checkbox checked={actions.selected(test)} onCheckedChange={() => actions.toggleSelected(test)} aria-label={`Select ${test.title} for assignment`} />}
         <Badge className="font-medium text-muted-foreground">{subjectLabel[test.subject]}</Badge>
         <TestMenu test={test} source={source} working={working} actions={actions} />
       </CardAction>
@@ -272,7 +281,7 @@ function TestMenu({ test, source, working, actions }: { test: LibraryTest; sourc
 }
 
 function LibraryTable({ tests, source, workingId, actions }: { tests: LibraryTest[]; source: LibrarySource; workingId: number | null; actions: TestActions }) {
-  return <div className="overflow-x-auto"><Table className="min-w-[900px]"><TableHeader><TableRow><TableHead>Test</TableHead><TableHead>Subject</TableHead><TableHead>Type</TableHead><TableHead>Questions</TableHead><TableHead>{source === 'MY' ? 'Status' : 'Source'}</TableHead><TableHead>Updated</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{tests.map(test => <TableRow key={test.id}><TableCell><Button variant="ghost" size="sm" className="h-auto max-w-full justify-start p-0 text-left text-foreground hover:bg-transparent hover:underline" onClick={() => actions.preview(test)}><span className="truncate font-bold text-foreground" title={test.title}>{test.title}</span></Button></TableCell><TableCell className="text-muted-foreground">{subjectLabel[test.subject]}</TableCell><TableCell className="text-muted-foreground">{modeLabel[test.mode]}</TableCell><TableCell className="text-muted-foreground">{test.questionCount}</TableCell><TableCell>{source === 'MY' ? <StatusBadge status={test.status} /> : <span className="text-muted-foreground">SAT Platform</span>}</TableCell><TableCell className="text-muted-foreground">{relativeTime(test.updatedAt)}</TableCell><TableCell><div className="flex justify-end gap-2"><CardPrimaryActions test={test} source={source} working={workingId === test.id} actions={actions} /><TestMenu test={test} source={source} working={workingId === test.id} actions={actions} /></div></TableCell></TableRow>)}</TableBody></Table></div>;
+  return <div className="overflow-x-auto"><Table className="min-w-[940px]"><TableHeader><TableRow><TableHead className="w-10"><span className="sr-only">Select</span></TableHead><TableHead>Test</TableHead><TableHead>Subject</TableHead><TableHead>Type</TableHead><TableHead>Questions</TableHead><TableHead>{source === 'MY' ? 'Status' : 'Source'}</TableHead><TableHead>Updated</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{tests.map(test => <TableRow key={test.id}><TableCell>{test.status === 'PUBLISHED' && <Checkbox checked={actions.selected(test)} onCheckedChange={() => actions.toggleSelected(test)} aria-label={`Select ${test.title} for assignment`} />}</TableCell><TableCell><Button variant="ghost" size="sm" className="h-auto max-w-full justify-start p-0 text-left text-foreground hover:bg-transparent hover:underline" onClick={() => actions.preview(test)}><span className="truncate font-bold text-foreground" title={test.title}>{test.title}</span></Button></TableCell><TableCell className="text-muted-foreground">{subjectLabel[test.subject]}</TableCell><TableCell className="text-muted-foreground">{modeLabel[test.mode]}</TableCell><TableCell className="text-muted-foreground">{test.questionCount}</TableCell><TableCell>{source === 'MY' ? <StatusBadge status={test.status} /> : <span className="text-muted-foreground">SAT Platform</span>}</TableCell><TableCell className="text-muted-foreground">{relativeTime(test.updatedAt)}</TableCell><TableCell><div className="flex justify-end gap-2"><CardPrimaryActions test={test} source={source} working={workingId === test.id} actions={actions} /><TestMenu test={test} source={source} working={workingId === test.id} actions={actions} /></div></TableCell></TableRow>)}</TableBody></Table></div>;
 }
 
 function StatusBadge({ status }: { status: TestStatus }) {

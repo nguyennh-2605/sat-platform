@@ -122,6 +122,31 @@ exports.getWeeks = async ({ classId, userId, userRole }) => {
   }));
 };
 
+exports.getOutline = async ({ classId, userId, userRole }) => {
+  const currentUserId = userIdNumber(userId);
+  const classroom = await prisma.class.findUnique({
+    where: { id: classId },
+    select: { teacherId: true, students: { where: { id: currentUserId }, select: { id: true }, take: 1 } },
+  });
+  if (!classroom) throw new ApiError(404, { success: false, error: 'Class not found.' });
+  if (!canReadProgress({ teacherId: classroom.teacherId, studentIds: classroom.students.map(item => item.id), userId: currentUserId, userRole })) {
+    throw new ApiError(403, { success: false, error: 'You do not have access to this class.' });
+  }
+  const canManage = canManageProgress({ teacherId: classroom.teacherId, userId: currentUserId, userRole });
+  return prisma.week.findMany({
+    where: { classId, ...(canManage ? {} : { status: 'PUBLISHED' }) },
+    orderBy: { order: 'asc' },
+    select: {
+      id: true, title: true, order: true,
+      lessons: {
+        where: canManage ? {} : { status: 'PUBLISHED' },
+        orderBy: { order: 'asc' },
+        select: { id: true, title: true, order: true },
+      },
+    },
+  });
+};
+
 exports.createWeek = async ({ classId, title, description, status, availableAt, userId, userRole }) => {
   if (!String(title || '').trim()) throw new ApiError(400, { success: false, error: 'Tiêu đề tuần không được để trống.' });
   const classData = await prisma.class.findUnique({ where: { id: classId } });

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { TeacherActivityType, TeacherOverviewResponse } from './teacher-overview.types';
 
-const labelFor = (type: TeacherActivityType) => type === 'TEST' ? 'Test' : type === 'VOCABULARY' ? 'Vocabulary' : type === 'HOMEWORK' ? 'Homework' : 'Resource';
+const labelFor = (type: TeacherActivityType) => type === 'TEST' ? 'Test' : type === 'VOCABULARY' ? 'Vocabulary' : type === 'HOMEWORK' ? 'Assignment' : 'Resource';
 
 export function TeacherNeedsAttention({ items }: { items: TeacherOverviewResponse['needsAttention'] }) {
   const navigate = useNavigate();
