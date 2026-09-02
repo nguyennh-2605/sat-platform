@@ -3,6 +3,8 @@ import { BookA, Calendar, CheckCircle2, Clock3, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../../lib/axios';
 import { Badge, Button, Card, EmptyState, Modal } from '../../components/ui/AppUI';
+import { DataSurface } from '@/components/ui/data-surface';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ui } from '../../components/ui/styles';
 
 interface ActivityAssignee {
@@ -123,12 +125,12 @@ function PerformanceDialog({ performance, onClose, onOpenSet }: { performance: A
         <Metric label="Average score" value={performance.stats.averageScore === null ? '—' : `${performance.stats.averageScore}%`} />
         <Metric label="Missing" value={String(performance.stats.missing)} />
       </div>
-      <div className="overflow-x-auto rounded-card border border-ui-border">
-        <table className="w-full min-w-[600px] text-left text-body">
-          <thead className="border-b border-ui-border bg-background text-caption text-muted-foreground"><tr><th className="px-4 py-3 font-semibold">Student</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Best score</th><th className="px-4 py-3 font-semibold">Attempts</th></tr></thead>
-          <tbody>{performance.students.map(student => <tr key={student.id} className="border-b border-ui-border last:border-b-0"><td className="px-4 py-3"><p className="font-medium text-foreground">{student.name}</p><p className="text-caption text-muted-foreground">{student.email}</p></td><td className="px-4 py-3"><Badge tone={student.status === 'COMPLETED' ? 'success' : student.status === 'IN_PROGRESS' ? 'warning' : 'neutral'}>{student.status.replace('_', ' ').toLowerCase()}</Badge></td><td className="px-4 py-3">{student.bestScore === null ? '—' : `${student.bestScore}%`}</td><td className="px-4 py-3">{student.attemptCount}</td></tr>)}</tbody>
-        </table>
-      </div>
+      <DataSurface>
+        <Table className="min-w-[600px]">
+          <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Status</TableHead><TableHead>Best score</TableHead><TableHead>Attempts</TableHead></TableRow></TableHeader>
+          <TableBody>{performance.students.map(student => <TableRow key={student.id}><TableCell><p className="font-medium text-foreground">{student.name}</p><p className="text-caption text-muted-foreground">{student.email}</p></TableCell><TableCell><Badge tone={student.status === 'COMPLETED' ? 'success' : student.status === 'IN_PROGRESS' ? 'warning' : 'neutral'}>{student.status.replace('_', ' ').toLowerCase()}</Badge></TableCell><TableCell className="tabular-nums">{student.bestScore === null ? '—' : `${student.bestScore}%`}</TableCell><TableCell className="tabular-nums">{student.attemptCount}</TableCell></TableRow>)}</TableBody>
+        </Table>
+      </DataSurface>
       {performance.mostMissed.length > 0 && <div><h3 className="font-semibold text-foreground">Most missed words</h3><div className="mt-3 flex flex-wrap gap-2">{performance.mostMissed.map(item => <Badge key={item.word} tone="danger">{item.word} · {item.incorrect}</Badge>)}</div></div>}
     </div>}
   </Modal>;

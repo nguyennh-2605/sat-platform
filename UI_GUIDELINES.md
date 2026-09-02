@@ -75,7 +75,7 @@ Không dùng radius tùy ý như `rounded-[11px]` trong feature mới.
 
 | Mức | Class | Dùng cho |
 | --- | --- | --- |
-| 1 | `shadow-card` | Card và table mặc định |
+| 1 | `shadow-card` | Card mặc định; không dùng cho data surface dày đặc |
 | 2 | `shadow-raised` | Dropdown, popover, toast, card hover |
 | 3 | `shadow-overlay` | Modal/dialog |
 
@@ -103,6 +103,8 @@ Nội dung đề Math dùng strict LaTeX trong toàn bộ luồng import, previe
 
 ```text
 client/src/components/ui/AppUI.tsx
+client/src/components/ui/table.tsx
+client/src/components/ui/data-surface.tsx
 client/src/components/ui/styles.ts
 ```
 
@@ -118,7 +120,8 @@ Các component chuẩn:
 - `Modal`
 - `Tabs`
 - `Collapsible`
-- `TableShell`, `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`
+- `DataSurface`, `DataToolbar`, `DataToolbarSearch`, `DataToolbarGroup`, `DataToolbarActions`, `DataPagination`
+- `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`
 - `EmptyState`
 - Toast toàn cục qua `APP_TOAST_OPTIONS`; feature mới gọi wrapper `appToast`
 
@@ -132,7 +135,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - `Tabs`: bắt buộc cho chuyển đổi panel cùng trang; có `tablist/tab/tabpanel`, Arrow keys, Home/End. Link điều hướng sang route khác không phải Tabs.
 - `Collapsible`: dùng cho outline có nhiều section được mở đồng thời; trigger phải có accessible name và controlled state khi page có Expand/Collapse All.
 - `Card`: surface nội dung mặc định. Không biến mọi section thành card nếu hierarchy không cần.
-- `Table`: luôn đặt trong `TableShell`; table rộng có wrapper `overflow-x-auto`; dùng các table primitives cho header/row/cell.
+- `Table`: management table luôn nằm trong `DataSurface`; `Table` tự chịu horizontal overflow; dùng các table primitives cho header/row/cell. `TableShell` chỉ là compatibility alias trong thời gian migration.
 - `Badge`: chỉ thể hiện metadata/status, không dùng thay button.
 - `Toast`: success 3 giây, error 5 giây, mặc định 4 giây; không chứa thao tác nghiệp vụ bắt buộc.
 - `EmptyState`: luôn có title; description giải thích bước tiếp theo; action chỉ thêm khi người dùng có hành động hợp lệ.
@@ -185,7 +188,23 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Back controller phải giữ được custom behavior như unsaved-change confirmation hoặc quay lại nested workspace, không được mặc định dùng browser history khi parent route đã biết rõ.
 - Điều hướng Previous/Next trong bảng, carousel hoặc question review là workflow control, không phải page-level Back và tiếp tục dùng variant phù hợp với ngữ cảnh đó.
 
-## 7. Practice Center
+## 7. Data surfaces
+
+- Không tạo một generic DataTable chứa API, filter, sort và domain actions. Feature sở hữu behavior; shared primitive chỉ sở hữu visual anatomy và accessibility.
+- Chỉ có ba variant: `management` cho dữ liệu so sánh theo cột, `rich list` cho collection có title/metadata/action, và `embedded` cho summary nằm trong Card.
+- Management table dùng một `DataSurface` phẳng: `rounded-card border border-ui-border bg-surface shadow-none`. Toolbar, header, body, state và pagination phải nằm trong cùng surface.
+- `DataToolbar` nằm một hàng từ desktop: search cố định `w-64`, controls `size="sm"` cùng độ đậm, `gap-2`, secondary/view controls và primary action nằm bên phải. Không dùng search `flex-1` tạo khoảng trống lớn hoặc wrap ngẫu nhiên thành hai hàng.
+- Khi không đủ chỗ, gom controls phụ vào `Filter & sort`; mobile cho search một hàng riêng. Reset chỉ hiện khi có filter đang hoạt động.
+- Header cao `44px`, dùng `bg-muted/20 text-caption font-medium text-muted-foreground`, title case và không có vertical border.
+- Cell mặc định `px-4 py-3`; row dùng divider `border-ui-border/60`, hover `bg-muted/30`, selected `bg-muted/60`. Chỉ có density compact `44–48px` và regular `56–64px`.
+- Primary cell có title `text-body font-medium text-foreground` và tối đa một dòng metadata `text-caption text-muted-foreground`. Numeric cell dùng `tabular-nums`; missing value dùng `—`.
+- Row action là ghost icon button ở cột cuối rộng `44–48px`, có accessible label và không kích hoạt row navigation.
+- Loading giữ nguyên shell/header và dùng skeleton rows. Empty dataset, no filter results và error là ba state riêng nhưng đều nằm trong body của cùng surface; error có Retry, filtered-empty có Clear filters.
+- Pagination nằm trong footer của cùng surface và có border trên. Table rộng horizontal-scroll; chỉ ẩn cột phụ khi dữ liệu vẫn truy cập được ở primary cell hoặc detail view.
+- Embedded table/list không tạo thêm border/radius bên trong Card nhưng vẫn dùng cùng typography, divider, hover và states.
+- Lessons hierarchy, Exam Room, question content và print-content table không dùng Data Surface contract này.
+
+## 8. Practice Center
 
 - Với Admin, route này hiển thị `Test Management`, không dùng composition hoặc label của Teacher `Test Library`.
 - Admin dùng hai collection `System Library | Teacher Tests`. Collection trả lời ownership/source; `Draft`, `Published`, `Archived` tiếp tục là lifecycle filter.
@@ -196,7 +215,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Test đã có Classroom delivery hoặc attempt history không được sửa cấu trúc hoặc xóa vĩnh viễn; Duplicate tạo phiên bản Draft mới.
 - Navigation copy phải role-aware và nhất quán ở Sidebar, Dashboard search và Dashboard Home: Student `Practice Center`, Teacher `Test Library`, Admin `Test Management`.
 
-- Với Teacher, route này hiển thị `Test Library`: tạo, quản lý lifecycle, xem nội dung và khởi chạy shared Assign Tests composer. Deadline, attempts, audience, Session placement và completion vẫn thuộc Classroom delivery, không thuộc Test content.
+- Với Teacher, route này hiển thị `Test Library`: tạo, quản lý lifecycle và xem nội dung. Không assign Test cho Classroom từ Test Library; delivery được tạo duy nhất từ Classroom Activities hoặc Lessons để tránh hai entry point trùng chức năng.
 - Teacher dùng hai nguồn `My Tests` và `System Tests`. `My Tests` chỉ gồm test giáo viên sở hữu; `System Tests` chỉ gồm test Published do Admin/platform cung cấp.
 - `Draft`, `Published`, `Archived` là lifecycle filter bên trong `My Tests`, không phải source tab. `All` chỉ gồm Draft + Published; Archived chỉ xuất hiện khi chọn riêng.
 - Teacher card không hiển thị attempt status, progress, last score hoặc Continue. Card chỉ hiển thị subject/source, title, type, question count, duration, updated time và content actions; lifecycle được thể hiện qua filter và list view, không lặp lại trên card.
@@ -220,7 +239,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Học sinh thấy đề admin đăng và đề giáo viên giao cho lớp của mình.
 - Practice Center của Student tiếp tục hiển thị attempt status, progress, last attempt và score từ dữ liệu thật.
 - Card phải gọn; title, metadata, progress và action không được cách nhau quá xa.
-- Teacher Test Library card dùng anatomy `CardHeader → CardContent → CardFooter`: title và subject cùng hàng, mode là subtitle nằm sát title; question count, duration và source/updated time là các metadata row compact. Footer tách bằng border + muted surface và có hai content action full-width xếp dọc, primary trước và outline sau; lifecycle action phụ nằm trong menu dấu ba chấm.
+- Teacher Test Library card dùng anatomy `CardHeader → CardContent → CardFooter`: title và subject cùng hàng, mode là subtitle nằm sát title; question count, duration và source/updated time là các metadata row compact. Footer chỉ có một content action; lifecycle và duplicate nằm trong menu dấu ba chấm.
 - Hiển thị question count, progress percentage, last attempt và score khi có dữ liệu thật.
 - Các trạng thái dùng English: `Not started`, `In progress`, `Completed`.
 
@@ -245,13 +264,13 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 - `Activities` là work-management view và chỉ có hai user-facing type: `Assignment` và `Test`. Backend `HOMEWORK` là compatibility name; không được hiển thị cho người dùng.
 - Vocabulary, File, Link và Video là learning resources, không phải Activity. Không cho tạo mới `VOCABULARY` hoặc `RESOURCE` từ Add activity; legacy data được giữ nguyên và tiếp tục truy cập từ owning feature.
-- `AssignmentComposer` và `AssignTestsComposer` là shared feature components dùng chung từ Activities, Lessons và Test Library/Test Detail. Shared Delivery gồm availability, due date, audience và optional Week/Session placement.
+- `AssignmentComposer` và `AssignTestsComposer` là shared feature components dùng chung từ Activities và Lessons. Shared Delivery gồm availability, due date, audience và optional Week/Session placement.
 - Assign Tests hỗ trợ multi-select. Một bulk action tạo N Test activities độc lập; không tạo một activity bundle và không ghi `Assignment.testIds[]` trong flow mới.
 - Activity list hiển thị type, Week/Session placement, deadline, audience/completion summary và mở đúng destination: Test Performance hoặc Assignment Detail.
 - Lessons → Add content chia `Student work` (Assignment, Test) và `Learning material` (File, Link, Video). Composer mở tại chỗ với Session được prefill, không điều hướng giáo viên sang tab khác.
 - Archive test trong Test Library không được làm mất quyền truy cập vào delivery đã Published; archive chỉ ảnh hưởng content library và việc tạo assignment mới.
 
-## 8. Analytics
+## 9. Analytics
 
 - Bám sát `dashboard/analytics` và `dashboard/default`: KPI strip, Score Progress, Activity Heatmap, Section Performance và Recent Activity.
 - Giáo viên dùng bố cục Test Performance: KPI strip, Question Performance Breakdown và Student Rankings.
@@ -260,7 +279,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Ngày và heatmap phải xử lý UTC ở backend để không phụ thuộc timezone của Vercel/Render.
 - Table header nhỏ, uppercase khi phù hợp; row gọn và có hover rất nhẹ.
 
-## 9. Responsive và accessibility
+## 10. Responsive và accessibility
 
 - Mọi page phải dùng được ở mobile, tablet và desktop.
 - Grid nhiều cột phải thu về một cột trên màn hình nhỏ.
@@ -274,7 +293,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Không dùng màu là tín hiệu duy nhất cho status.
 - Target cảm ứng quan trọng tối thiểu `36×36px`; ưu tiên `40×40px` trên mobile.
 
-## 10. Quy tắc dữ liệu và trạng thái
+## 11. Quy tắc dữ liệu và trạng thái
 
 - Luôn dùng dữ liệu thật từ API.
 - Phải có loading, empty, error và disabled state.
@@ -282,7 +301,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Không tính score, progress hay thời gian khác với logic backend.
 - Không dùng thời gian local của server cho logic nghiệp vụ. Lưu và so sánh thời gian bằng UTC; chỉ format timezone khi hiển thị.
 
-## 11. Checklist trước khi hoàn thành
+## 12. Checklist trước khi hoàn thành
 
 - [ ] Đã đối chiếu màn hình Studio Admin tương ứng trong `projects/docs/DESIGN_MIGRATION.md`.
 - [ ] Dùng đúng font, màu, radius và spacing trong tài liệu này.

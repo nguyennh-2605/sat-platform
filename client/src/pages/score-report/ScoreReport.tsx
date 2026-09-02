@@ -18,7 +18,9 @@ import type { ContentBlock } from '../../types/quiz';
 import ReviewModal from '../../features/quiz/ReviewModal';
 import axiosClient from '../../lib/axios';
 import { invalidateQueryCache } from '../../lib/queryCache';
-import { Badge, Button, Card, PageHeader, Select, TableShell } from '../../components/ui/AppUI';
+import { Badge, Button, Card, PageHeader, Select } from '../../components/ui/AppUI';
+import { DataPagination, DataSurface, DataToolbar, DataToolbarActions } from '@/components/ui/data-surface';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDashboardBack } from '../../features/navigation/DashboardBackContext';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { capitalizeFirstLetter } from '../../utils/text';
@@ -209,44 +211,40 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
           <StatCard label="Incorrect" value={incorrectCount} icon={<XCircle size={20} />} border="border-l-red-500" iconClass="bg-red-50 text-red-500" />
         </div>
 
-        <TableShell className="mb-8">
-          <div className="flex flex-col justify-between gap-3 border-b px-6 py-5 sm:flex-row sm:items-center">
-            <h3 className="text-lg font-semibold text-foreground">Question Review</h3>
-            <div className="flex items-center gap-2">
+        <DataSurface className="mb-8">
+          <DataToolbar>
+            <h3 className="text-sm font-medium text-foreground">Question Review</h3>
+            <DataToolbarActions>
               <Filter size={16} className="text-muted-foreground" aria-hidden="true" />
               <Select value={filter} onChange={event => { setFilter(event.target.value as ReviewFilter); setPage(1); }} aria-label="Filter questions">
                 <option value="ALL">All questions</option>
                 <option value="CORRECT">Correct only</option>
                 <option value="INCORRECT">Incorrect only</option>
               </Select>
-            </div>
-          </div>
+            </DataToolbarActions>
+          </DataToolbar>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
-              <thead className="border-b bg-muted/50 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <tr><th className="w-28 px-6 py-4">Question</th><th className="px-6 py-4 text-center">Status</th><th className="px-6 py-4 text-center">Correct Answer</th><th className="px-6 py-4 text-center">Your Answer</th><th className="px-6 py-4 text-center">Time Spent</th><th className="px-6 py-4 text-right">Action</th></tr>
-              </thead>
-              <tbody className="divide-y">
+            <Table className="min-w-[860px]">
+              <TableHeader><TableRow><TableHead className="w-28">Question</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-center">Correct answer</TableHead><TableHead className="text-center">Your answer</TableHead><TableHead className="text-center">Time spent</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+              <TableBody>
                 {pageQuestions.map(question => {
                   const logged = loggedQuestions.has(question.id);
                   return (
-                    <tr key={question.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-6 py-4"><p className="font-semibold text-foreground">Q{question.questionNumber}</p><p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{question.module}</p></td>
-                      <td className="px-6 py-4"><div className="flex justify-center">{question.isCorrect ? <CheckCircle2 size={20} className="text-success" aria-label="Correct" /> : <XCircle size={20} className="text-danger" aria-label="Incorrect" />}</div></td>
-                      <td className="px-6 py-4 text-center font-semibold text-foreground">{question.correctAnswer}</td>
-                      <td className={`px-6 py-4 text-center font-semibold ${question.isCorrect ? 'text-success' : 'text-danger'}`}>{question.userAnswer || 'Omitted'}</td>
-                      <td className="whitespace-nowrap px-6 py-4 text-center font-medium text-foreground">{formatQuestionDuration(question.activeDurationMs)}</td>
-                      <td className="px-6 py-4"><div className="flex items-center justify-end gap-2"><Button variant={logged ? 'accent' : 'ghost'} size="sm" disabled={logged} onClick={() => handleAddToErrorLog(question)} title={logged ? 'Added to Error Log' : 'Add to Error Log'}><Bookmark size={14} className={logged ? 'fill-current' : ''} />{logged ? 'Logged' : 'Log'}</Button><Button size="sm" onClick={() => setReviewingQuestion(question)}><Eye size={14} /> Review</Button></div></td>
-                    </tr>
+                    <TableRow key={question.id}>
+                      <TableCell><p className="font-medium text-foreground">Q{question.questionNumber}</p><p className="mt-0.5 text-xs text-muted-foreground">{question.module}</p></TableCell>
+                      <TableCell><div className="flex justify-center">{question.isCorrect ? <CheckCircle2 size={20} className="text-success" aria-label="Correct" /> : <XCircle size={20} className="text-danger" aria-label="Incorrect" />}</div></TableCell>
+                      <TableCell className="text-center font-semibold text-foreground">{question.correctAnswer}</TableCell>
+                      <TableCell className={`text-center font-semibold ${question.isCorrect ? 'text-success' : 'text-danger'}`}>{question.userAnswer || 'Omitted'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-center font-medium text-foreground">{formatQuestionDuration(question.activeDurationMs)}</TableCell>
+                      <TableCell><div className="flex items-center justify-end gap-2"><Button variant={logged ? 'accent' : 'ghost'} size="sm" disabled={logged} onClick={() => handleAddToErrorLog(question)} title={logged ? 'Added to Error Log' : 'Add to Error Log'}><Bookmark size={14} className={logged ? 'fill-current' : ''} />{logged ? 'Logged' : 'Log'}</Button><Button size="sm" onClick={() => setReviewingQuestion(question)}><Eye size={14} /> Review</Button></div></TableCell>
+                    </TableRow>
                   );
                 })}
-                {pageQuestions.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground">No questions match this filter.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+                {pageQuestions.length === 0 && <TableRow className="hover:bg-transparent"><TableCell colSpan={6} className="h-40 text-center text-muted-foreground">No questions match this filter.</TableCell></TableRow>}
+              </TableBody>
+            </Table>
 
-          <div className="flex flex-col items-center justify-between gap-3 border-t px-6 py-4 text-sm text-muted-foreground sm:flex-row">
+          <DataPagination className="text-sm text-muted-foreground">
             <span className="font-medium">Showing {firstShown} to {lastShown} of {filteredQuestions.length} entries</span>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setPage(value => Math.max(1, value - 1))} aria-label="Previous page"><ChevronLeft size={18} /></Button>
@@ -254,8 +252,8 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
               <span className="px-1 text-xs">of {totalPages}</span>
               <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))} aria-label="Next page"><ChevronRight size={18} /></Button>
             </div>
-          </div>
-        </TableShell>
+          </DataPagination>
+        </DataSurface>
       </main>
 
       {reviewingQuestion && <ReviewModal

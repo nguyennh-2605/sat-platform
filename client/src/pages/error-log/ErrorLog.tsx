@@ -4,7 +4,9 @@ import { capitalizeFirstLetter } from '../../utils/text';
 import toast from 'react-hot-toast';
 import { Textarea } from '@/components/ui/textarea';
 import axiosClient from '../../lib/axios';
-import { Button, Card, EmptyState, Input, Modal, PageHeader, TableShell } from '../../components/ui/AppUI';
+import { Button, Card, EmptyState, Input, Modal, PageHeader } from '../../components/ui/AppUI';
+import { DataPagination, DataSurface, DataToolbar, DataToolbarGroup } from '@/components/ui/data-surface';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -124,44 +126,37 @@ export default function ErrorLog() {
   return <div className="h-full overflow-y-auto">
     <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
         <PageHeader title="Error Log" description="Review mistakes and turn them into study notes." actions={<><SatCountdown /><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Add entry</Button></>} />
-        <Card className="mb-4 flex flex-col justify-between gap-4 p-4 md:flex-row md:items-center">
-          <div>
-            <h2 className="flex items-center gap-2 text-heading font-semibold text-foreground"><AlertCircle className="text-danger" size={20} aria-hidden="true" />Mistake review</h2>
-            <p className="mt-1 text-caption font-medium text-muted-foreground">{isLoading ? 'Syncing…' : `${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'}`}</p>
-          </div>
-          <div className="flex w-full items-center gap-3 md:w-auto">
+        <DataSurface className="relative hidden md:block">
+          {isLoading && <LoadingOverlay />}
+          <DataToolbar>
+          <DataToolbarGroup className="w-full">
+            <div className="mr-2 shrink-0">
+              <h2 className="flex items-center gap-2 text-sm font-medium text-foreground"><AlertCircle className="text-danger" size={18} aria-hidden="true" />Mistake review</h2>
+              <p className="mt-0.5 text-caption text-muted-foreground">{isLoading ? 'Syncing…' : `${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'}`}</p>
+            </div>
             <label className="relative min-w-0 flex-1 md:w-72">
               <span className="sr-only">Search error log</span>
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input type="search" placeholder="Search entries…" className="w-full pl-9" value={searchTerm} onChange={event => { setSearchTerm(event.target.value); setCurrentPage(1); }} />
             </label>
-          </div>
-        </Card>
-
-        <TableShell className="relative hidden md:block">
-          {isLoading && <LoadingOverlay />}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] border-collapse text-left text-body">
-              <thead className="sticky top-0 z-10 border-b border-ui-border bg-surface-subtle text-caption font-semibold uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="w-44 px-5 py-3">Category</th><th className="w-56 px-5 py-3">Source</th><th className="w-24 px-4 py-3 text-center">Yours</th><th className="w-24 px-4 py-3 text-center">Correct</th><th className="min-w-[260px] px-5 py-3">Why it was wrong</th><th className="min-w-[260px] px-5 py-3">Why this is right</th><th className="w-24 px-4 py-3 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ui-border">
-                {!isLoading && logs.length === 0 ? <tr><td colSpan={7}><EmptyState compact surface={false} icon={<AlertCircle size={20} />} title={searchTerm ? 'No matching entries' : 'No entries yet'} description={searchTerm ? 'Try a different search.' : 'Add a mistake to turn it into a study note.'} /></td></tr> : logs.map(log => <tr key={log.id} className="group transition-colors hover:bg-surface-subtle">
-                  <td className="px-5 py-4 align-top"><span className={`inline-flex rounded-control border px-2.5 py-1 text-[11px] font-semibold ${getCategoryStyle(log.category)}`}>{log.category}</span></td>
-                  <td className="px-5 py-4 align-top font-medium text-subtle-foreground"><div className="flex items-start gap-2"><FileText size={14} className="mt-1 shrink-0 text-muted-foreground" aria-hidden="true" /><span className="line-clamp-2" title={capitalizeFirstLetter(log.source)}>{capitalizeFirstLetter(log.source)}</span></div></td>
-                  <td className="px-4 py-4 align-top text-center"><AnswerMark value={log.userAnswer === 'Omitted' ? 'X' : log.userAnswer} correct={false} /></td>
-                  <td className="px-4 py-4 align-top text-center"><AnswerMark value={log.correctAnswer} correct /></td>
-                  <td className="px-5 py-4 align-top"><p className="line-clamp-3 leading-relaxed text-subtle-foreground hover:line-clamp-none">{log.whyWrong || '—'}</p></td>
-                  <td className="px-5 py-4 align-top"><p className="line-clamp-3 leading-relaxed text-subtle-foreground hover:line-clamp-none">{log.whyRight || '—'}</p></td>
-                  <td className="px-4 py-4 align-top"><div className="flex justify-center gap-1"><IconAction label="Edit entry" onClick={() => openEdit(log)}><Edit3 size={16} /></IconAction><IconAction danger label="Delete entry" onClick={() => setDeleteTarget(log)}><Trash2 size={16} /></IconAction></div></td>
-                </tr>)}
-              </tbody>
-            </table>
-          </div>
-          <PaginationFooter first={firstItem} last={lastItem} total={totalEntries} page={currentPage} pages={totalPages} onPage={setCurrentPage} />
-        </TableShell>
+          </DataToolbarGroup>
+          </DataToolbar>
+            <Table className="min-w-[1000px] table-fixed">
+              <TableHeader className="sticky top-0 z-10"><TableRow><TableHead className="w-44">Category</TableHead><TableHead className="w-56">Source</TableHead><TableHead className="w-24 text-center">Yours</TableHead><TableHead className="w-24 text-center">Correct</TableHead><TableHead className="min-w-[260px]">Why it was wrong</TableHead><TableHead className="min-w-[260px]">Why this is right</TableHead><TableHead className="w-24 text-center">Actions</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {!isLoading && logs.length === 0 ? <TableRow className="hover:bg-transparent"><TableCell colSpan={7}><EmptyState compact surface={false} icon={<AlertCircle size={20} />} title={searchTerm ? 'No matching entries' : 'No entries yet'} description={searchTerm ? 'Try a different search.' : 'Add a mistake to turn it into a study note.'} /></TableCell></TableRow> : logs.map(log => <TableRow key={log.id} className="group align-top">
+                  <TableCell><span className={`inline-flex rounded-control border px-2.5 py-1 text-[11px] font-semibold ${getCategoryStyle(log.category)}`}>{log.category}</span></TableCell>
+                  <TableCell className="font-medium text-subtle-foreground"><div className="flex items-start gap-2"><FileText size={14} className="mt-1 shrink-0 text-muted-foreground" aria-hidden="true" /><span className="line-clamp-2" title={capitalizeFirstLetter(log.source)}>{capitalizeFirstLetter(log.source)}</span></div></TableCell>
+                  <TableCell className="text-center"><AnswerMark value={log.userAnswer === 'Omitted' ? 'X' : log.userAnswer} correct={false} /></TableCell>
+                  <TableCell className="text-center"><AnswerMark value={log.correctAnswer} correct /></TableCell>
+                  <TableCell><p className="line-clamp-3 leading-relaxed text-subtle-foreground hover:line-clamp-none">{log.whyWrong || '—'}</p></TableCell>
+                  <TableCell><p className="line-clamp-3 leading-relaxed text-subtle-foreground hover:line-clamp-none">{log.whyRight || '—'}</p></TableCell>
+                  <TableCell><div className="flex justify-center gap-1"><IconAction label="Edit entry" onClick={() => openEdit(log)}><Edit3 size={16} /></IconAction><IconAction danger label="Delete entry" onClick={() => setDeleteTarget(log)}><Trash2 size={16} /></IconAction></div></TableCell>
+                </TableRow>)}
+              </TableBody>
+            </Table>
+          <DataPagination><PaginationFooter compact first={firstItem} last={lastItem} total={totalEntries} page={currentPage} pages={totalPages} onPage={setCurrentPage} /></DataPagination>
+        </DataSurface>
 
         <div className="relative space-y-3 md:hidden">
           {isLoading && <LoadingOverlay />}
@@ -217,7 +212,7 @@ function LoadingOverlay() {
   return <div className="absolute inset-0 z-20 flex min-h-48 items-center justify-center bg-surface/80"><div className="flex flex-col items-center gap-2 text-primary"><Loader2 size={28} className="animate-spin" aria-hidden="true" /><span className="text-caption font-semibold">Loading entries…</span></div></div>;
 }
 
-function PaginationFooter({ first, last, total, page, pages, onPage }: { first: number; last: number; total: number; page: number; pages: number; onPage: (page: number) => void }) {
+function PaginationFooter({ first, last, total, page, pages, onPage, compact = false }: { first: number; last: number; total: number; page: number; pages: number; onPage: (page: number) => void; compact?: boolean }) {
   if (total === 0) return null;
-  return <div className="flex items-center justify-between gap-3 border-t border-ui-border bg-surface-subtle p-3"><p className="text-caption text-muted-foreground">Showing <strong>{first}–{last}</strong> of <strong>{total}</strong></p><div className="flex items-center gap-2"><Button variant="outline" size="icon" disabled={page === 1} onClick={() => onPage(page - 1)} aria-label="Previous page"><ChevronLeft size={16} /></Button><span className="min-w-20 text-center text-caption font-semibold text-subtle-foreground">{page} / {pages}</span><Button variant="outline" size="icon" disabled={page === pages} onClick={() => onPage(page + 1)} aria-label="Next page"><ChevronRight size={16} /></Button></div></div>;
+  return <div className={compact ? 'contents' : 'flex items-center justify-between gap-3 border-t border-ui-border bg-surface-subtle p-3'}><p className="text-caption text-muted-foreground">Showing <strong>{first}–{last}</strong> of <strong>{total}</strong></p><div className="flex items-center gap-2"><Button variant="outline" size="icon" disabled={page === 1} onClick={() => onPage(page - 1)} aria-label="Previous page"><ChevronLeft size={16} /></Button><span className="min-w-20 text-center text-caption font-semibold text-subtle-foreground">{page} / {pages}</span><Button variant="outline" size="icon" disabled={page === pages} onClick={() => onPage(page + 1)} aria-label="Next page"><ChevronRight size={16} /></Button></div></div>;
 }

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, BarChart3, CheckCircle2, Clock3, Eye, FileText, Target, Trophy, Users } from 'lucide-react';
 import axiosClient from '../../lib/axios';
-import { Badge, Button, Card, EmptyState, Modal, Select, TableShell } from '../../components/ui/AppUI';
+import { Badge, Button, Card, EmptyState, Modal, Select } from '../../components/ui/AppUI';
+import { DataSurface } from '@/components/ui/data-surface';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDashboardBack } from '../navigation/DashboardBackContext';
 import { capitalizeFirstLetter } from '../../utils/text';
 
@@ -107,7 +109,7 @@ function QuestionBreakdown({ questions, showTiming }: { questions: QuestionRow[]
 }
 function StudentRankings({ students, totalQuestions, showTiming, onView }: { students: StudentRow[]; totalQuestions: number; showTiming: boolean; onView: (student: StudentRow) => void }) {
   const ordered = useMemo(() => [...students].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)), [students]);
-  return <TableShell><div className="flex items-center gap-2 border-b border-ui-border p-5"><Users size={16} className="text-primary" /><h3 className="text-sm font-semibold">Student Rankings</h3></div><div className="overflow-auto"><table className="w-full text-left text-xs"><thead className="bg-muted text-[10px] tracking-wide text-muted-foreground"><tr><th className="px-5 py-3">STUDENT</th><th className="px-4 py-3 text-center">STATUS</th><th className="px-4 py-3 text-center">SCORE</th>{showTiming && <th className="px-4 py-3 text-center">TIME</th>}<th className="px-5 py-3 text-right">ACTION</th></tr></thead><tbody className="divide-y divide-ui-border">{ordered.map(student => <tr key={student.id} className="hover:bg-muted/50"><td className="px-5 py-3"><div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-soft text-[10px] font-semibold text-primary">{initials(student.name)}</span><div><p className="font-medium text-foreground">{student.name}</p><p className="text-[10px] text-muted-foreground">{student.email}</p></div></div></td><td className="px-4 py-3 text-center"><StatusBadge status={student.status} /></td><td className="px-4 py-3 text-center font-semibold text-primary">{correctScore(student.rawScore, totalQuestions)}</td>{showTiming && <td className="px-4 py-3 text-center text-muted-foreground">{formatDuration(student.completionTimeMs)}</td>}<td className="px-5 py-3 text-right"><Button variant="ghost" size="icon" onClick={() => onView(student)} aria-label={`View ${student.name}`}><Eye size={16} /></Button></td></tr>)}</tbody></table>{students.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">No students are assigned.</p>}</div></TableShell>;
+  return <DataSurface><div className="flex items-center gap-2 border-b border-ui-border px-4 py-3"><Users size={16} className="text-primary" /><h3 className="text-sm font-medium">Student Rankings</h3></div><Table><TableHeader><TableRow><TableHead>Student</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-center">Score</TableHead>{showTiming && <TableHead className="text-center">Time</TableHead>}<TableHead className="w-12 text-right"><span className="sr-only">Actions</span></TableHead></TableRow></TableHeader><TableBody>{ordered.length === 0 ? <TableRow className="hover:bg-transparent"><TableCell colSpan={showTiming ? 5 : 4} className="h-40 text-center text-muted-foreground">No students are assigned.</TableCell></TableRow> : ordered.map(student => <TableRow key={student.id}><TableCell><div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-soft text-[10px] font-semibold text-primary">{initials(student.name)}</span><div className="min-w-0"><p className="truncate font-medium text-foreground">{student.name}</p><p className="truncate text-xs text-muted-foreground">{student.email}</p></div></div></TableCell><TableCell className="text-center"><StatusBadge status={student.status} /></TableCell><TableCell className="text-center font-semibold tabular-nums text-primary">{correctScore(student.rawScore, totalQuestions)}</TableCell>{showTiming && <TableCell className="text-center text-muted-foreground">{formatDuration(student.completionTimeMs)}</TableCell>}<TableCell className="text-right"><Button variant="ghost" size="icon" className="size-9 shadow-none" onClick={() => onView(student)} aria-label={`View ${student.name}`}><Eye size={16} /></Button></TableCell></TableRow>)}</TableBody></Table></DataSurface>;
 }
 function HardestQuestions({ questions }: { questions: QuestionRow[] }) {
   return <Card className="p-5"><h3 className="text-sm font-semibold">Hardest Questions</h3><p className="mt-1 text-xs text-muted-foreground">Lowest class accuracy</p><div className="mt-5 space-y-4">{questions.map(question => <div key={question.id} className="flex items-center gap-3 border-b border-ui-border pb-4 last:border-0 last:pb-0"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-danger-soft text-xs font-semibold text-danger">Q{question.number}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{question.skill || question.domain || question.sectionName}</p><div className="mt-2 h-1.5 overflow-hidden rounded-xs bg-danger-soft"><div className="h-full bg-danger" style={{ width: `${question.correctPercentage}%` }} /></div></div><span className="text-xs font-semibold text-danger">{question.correctPercentage}%</span></div>)}{questions.length === 0 && <p className="text-xs text-muted-foreground">No completed submissions yet.</p>}</div></Card>;
@@ -156,49 +158,47 @@ function StudentDetailModal({ deliveryId, student, onClose }: { deliveryId: stri
               </div>
             </div>
 
-            <TableShell className="max-w-full shadow-none">
-              <div className="max-w-full overflow-x-auto">
-                <table className="w-full min-w-[860px] table-fixed text-left text-xs">
-                  <thead className="sticky top-0 z-10 bg-muted text-[10px] tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="w-20 px-4 py-3">QUESTION</th>
-                      <th className="w-60 px-4 py-3">DOMAIN / SKILL</th>
-                      <th className="w-24 px-4 py-3 text-center">SELECTED</th>
-                      <th className="w-24 px-4 py-3 text-center">CORRECT</th>
-                      <th className="w-28 px-4 py-3 text-center">RESULT</th>
+            <DataSurface className="max-w-full">
+                <Table className="w-full min-w-[860px] table-fixed">
+                  <TableHeader className="sticky top-0 z-10">
+                    <TableRow>
+                      <TableHead className="w-20">Question</TableHead>
+                      <TableHead className="w-60">Domain / skill</TableHead>
+                      <TableHead className="w-24 text-center">Selected</TableHead>
+                      <TableHead className="w-24 text-center">Correct</TableHead>
+                      <TableHead className="w-28 text-center">Result</TableHead>
                       {detail.testMode === 'EXAM' && (
                         <>
-                          <th className="w-28 px-4 py-3 text-center">ACTIVE TIME</th>
-                          <th className="w-20 px-4 py-3 text-center">VISITS</th>
+                          <TableHead className="w-28 text-center">Active time</TableHead>
+                          <TableHead className="w-20 text-center">Visits</TableHead>
                         </>
                       )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-ui-border">
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {attempt?.questions.map(question => (
-                      <tr key={question.id} className="align-top hover:bg-muted/50">
-                        <td className="px-4 py-3 font-medium">Q{question.number}</td>
-                        <td className="px-4 py-3">
+                      <TableRow key={question.id} className="align-top">
+                        <TableCell className="font-medium">Q{question.number}</TableCell>
+                        <TableCell>
                           <p className="wrap-break-word font-medium text-foreground">{question.domain || 'Uncategorized'}</p>
-                          <p className="mt-0.5 wrap-break-word text-[10px] leading-4 text-muted-foreground">{question.skill || question.sectionName}</p>
-                        </td>
-                        <td className="break-all px-4 py-3 text-center">{question.selectedChoice || '—'}</td>
-                        <td className="break-all px-4 py-3 text-center font-semibold">{question.correctAnswer}</td>
-                        <td className="px-4 py-3 text-center">
+                          <p className="mt-0.5 wrap-break-word text-xs text-muted-foreground">{question.skill || question.sectionName}</p>
+                        </TableCell>
+                        <TableCell className="break-all text-center">{question.selectedChoice || '—'}</TableCell>
+                        <TableCell className="break-all text-center font-semibold">{question.correctAnswer}</TableCell>
+                        <TableCell className="text-center">
                           <Badge tone={question.isCorrect ? 'success' : 'danger'}>{question.isCorrect ? 'Correct' : 'Incorrect'}</Badge>
-                        </td>
+                        </TableCell>
                         {detail.testMode === 'EXAM' && (
                           <>
-                            <td className="whitespace-nowrap px-4 py-3 text-center">{formatDuration(question.activeDurationMs)}</td>
-                            <td className="px-4 py-3 text-center">{question.visitCount || 0}</td>
+                            <TableCell className="whitespace-nowrap text-center">{formatDuration(question.activeDurationMs)}</TableCell>
+                            <TableCell className="text-center tabular-nums">{question.visitCount || 0}</TableCell>
                           </>
                         )}
-                      </tr>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </TableShell>
+                  </TableBody>
+                </Table>
+            </DataSurface>
           </>
         )}
       </div>

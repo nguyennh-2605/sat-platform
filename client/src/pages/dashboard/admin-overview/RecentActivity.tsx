@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { TableShell } from '@/components/ui/AppUI';
+import { DataSurface } from '@/components/ui/data-surface';
 import type { AdminRecentActivityResponse, AuditCategory } from './admin-overview.types';
 
 const categoryDetails: Record<AuditCategory, { label: string; icon: typeof FileText }> = {
@@ -88,14 +88,14 @@ export function RecentActivity({ data, loading, error, onRetry }: {
         </CardAction>
       </CardHeader>
       <CardContent className="px-0">
-        <TableShell className="rounded-none border-x-0 shadow-none">
+        <DataSurface variant="embedded">
           <Table className="min-w-[520px]">
-            <TableHeader className="bg-muted/15">
+            <TableHeader>
               <TableRow>
-                <TableHead className="h-11 p-3">Activity</TableHead>
-                <TableHead className="hidden h-11 p-3 md:table-cell">Category</TableHead>
-                <TableHead className="hidden h-11 p-3 sm:table-cell">Actor</TableHead>
-                <TableHead className="h-11 p-3 text-right">Time</TableHead>
+                <TableHead>Activity</TableHead>
+                <TableHead className="hidden md:table-cell">Category</TableHead>
+                <TableHead className="hidden sm:table-cell">Actor</TableHead>
+                <TableHead className="text-right">Time</TableHead>
                 <TableHead className="w-12"><span className="sr-only">Open</span></TableHead>
               </TableRow>
             </TableHeader>
@@ -115,7 +115,7 @@ export function RecentActivity({ data, loading, error, onRetry }: {
               ) : <ActivityRows items={data.items} />}
             </TableBody>
           </Table>
-        </TableShell>
+        </DataSurface>
       </CardContent>
     </Card>
   );

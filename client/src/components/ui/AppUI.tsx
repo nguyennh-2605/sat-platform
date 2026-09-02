@@ -6,15 +6,14 @@ import type {
   KeyboardEvent,
   ReactNode,
   SelectHTMLAttributes,
-  TableHTMLAttributes,
-  TdHTMLAttributes,
-  ThHTMLAttributes,
 } from 'react';
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Inbox, X } from 'lucide-react';
 import NotificationBell from '../../features/notifications/NotificationBell';
 import { cx, ui } from './styles';
+import { DataSurface } from './data-surface';
+export { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from './table';
 
 interface AppHeaderProps {
   title: ReactNode;
@@ -334,31 +333,7 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
 }
 
 export function TableShell({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx('overflow-hidden rounded-card border border-ui-border bg-surface shadow-card', className)} {...props} />;
-}
-
-export function Table({ className, ...props }: TableHTMLAttributes<HTMLTableElement>) {
-  return <table className={cx('w-full text-left text-body', className)} {...props} />;
-}
-
-export function TableHeader({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cx('border-b border-ui-border-strong bg-background text-caption font-medium text-subtle', className)} {...props} />;
-}
-
-export function TableBody({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody className={cx('divide-y divide-ui-border', className)} {...props} />;
-}
-
-export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cx('transition-colors hover:bg-background/70', className)} {...props} />;
-}
-
-export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th className={cx('px-5 py-3 text-left font-medium', className)} {...props} />;
-}
-
-export function TableCell({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cx('px-5 py-3', className)} {...props} />;
+  return <DataSurface className={className} {...props} />;
 }
 
 interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {

@@ -18,7 +18,7 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
     throw new ApiError(403, { error: 'You do not have access to this class.' });
   }
 
-  return prisma.classActivity.findMany({
+  const activities = await prisma.classActivity.findMany({
     where: {
       classId: String(classId),
       type: { in: ['TEST', 'HOMEWORK'] },
@@ -27,7 +27,7 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
         assignees: { some: { studentId: intId(userId), excusedAt: null } },
       }),
     },
-    orderBy: [{ dueAt: 'asc' }, { createdAt: 'desc' }],
+    orderBy: [{ createdAt: 'desc' }],
     select: {
       id: true,
       type: true,
@@ -45,8 +45,8 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
       updatedAt: true,
       lesson: { select: { id: true, title: true, week: { select: { id: true, title: true, order: true } } } },
       assignees: canManage
-        ? { select: { studentId: true, status: true, bestScore: true, attemptCount: true, excusedAt: true } }
-        : { where: { studentId: intId(userId) }, select: { studentId: true, status: true, bestScore: true, attemptCount: true, excusedAt: true } },
+        ? { select: { studentId: true, status: true, assignedAt: true, bestScore: true, attemptCount: true, excusedAt: true } }
+        : { where: { studentId: intId(userId) }, select: { studentId: true, status: true, assignedAt: true, bestScore: true, attemptCount: true, excusedAt: true } },
       test: {
         select: {
           testDeliveryId: true,
@@ -62,6 +62,15 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
       homework: { select: { assignmentId: true } },
     },
   });
+
+  return activities
+    .map(activity => ({
+      ...activity,
+      assignedAt: activity.assignees.reduce((earliest, assignee) => (
+        !earliest || assignee.assignedAt < earliest ? assignee.assignedAt : earliest
+      ), null),
+    }))
+    .sort((left, right) => (right.assignedAt?.getTime() || 0) - (left.assignedAt?.getTime() || 0));
 };
 
 const normalizeDate = (value, fieldName) => {

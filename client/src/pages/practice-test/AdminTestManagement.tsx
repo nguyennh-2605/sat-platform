@@ -21,7 +21,6 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
-  Search,
   SlidersHorizontal,
   Trash2,
   UserRound,
@@ -41,7 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
+import { DataPagination, DataSurface, DataToolbar, DataToolbarActions, DataToolbarGroup, DataToolbarSearch } from '@/components/ui/data-surface';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EmptyState, Modal, PageHeader } from '@/components/ui/AppUI';
@@ -268,7 +267,7 @@ export default function AdminTestManagement() {
         </TabsList>
       </Tabs>
 
-      <section className="overflow-hidden rounded-card border border-ui-border bg-background" aria-label={source === 'SYSTEM' ? 'System Library' : 'Teacher Tests'}>
+      <DataSurface aria-label={source === 'SYSTEM' ? 'System Library' : 'Teacher Tests'}>
         <AdminToolbar
           source={source}
           search={search}
@@ -308,15 +307,15 @@ export default function AdminTestManagement() {
                 ? <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{tests.map(test => <AdminTestCard key={test.id} test={test} source={source} working={workingId === test.id} actions={actions} />)}</div>
                 : <AdminTestTable tests={tests} source={source} workingId={workingId} actions={actions} />}
 
-        {!loading && pagination.total > 0 && <div className="flex flex-col gap-3 border-t border-ui-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+        {!loading && pagination.total > 0 && <DataPagination>
           <p className="text-sm text-muted-foreground">Showing {resultSummary} tests</p>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => updateQuery({ page: String(Math.max(1, page - 1)) }, false)}><ChevronLeft data-icon="inline-start" />Prev</Button>
             <span className="min-w-24 text-center text-sm font-medium text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span>
             <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => updateQuery({ page: String(page + 1) }, false)}>Next<ChevronRight data-icon="inline-end" /></Button>
           </div>
-        </div>}
-      </section>
+        </DataPagination>}
+      </DataSurface>
     </main>
 
     <Modal
@@ -358,31 +357,31 @@ interface ToolbarProps {
 }
 
 function AdminToolbar({ source, search, onSearch, subject, onSubject, mode, onMode, status, onStatus, integrity, onIntegrity, sort, onSort, view, onView, activeFilterCount, onReset, loading, onRefresh, onCreate }: ToolbarProps) {
-  return <div className="flex flex-col gap-3 border-b border-ui-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-    <div className="flex flex-1 flex-wrap items-center gap-2">
-      <label className="relative w-full sm:w-72"><Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input value={search} onChange={event => onSearch(event.target.value)} placeholder={source === 'TEACHER' ? 'Search tests or teachers…' : 'Search system tests…'} aria-label="Search tests" className="bg-background pl-8" /></label>
+  return <DataToolbar>
+    <DataToolbarGroup>
+      <DataToolbarSearch value={search} onChange={event => onSearch(event.target.value)} placeholder={source === 'TEACHER' ? 'Search tests or teachers…' : 'Search system tests…'} label="Search tests" />
       <FilterMenu label="Subject" value={subject} onChange={value => onSubject(value as SubjectFilter)} options={[['ALL', 'All subjects'], ['RW', 'Reading & Writing'], ['MATH', 'Math']]} />
       <FilterMenu label="Type" value={mode} onChange={value => onMode(value as ModeFilter)} options={[['ALL', 'All types'], ['PRACTICE', 'Practice'], ['EXAM', 'Exam']]} />
       <FilterMenu label="Status" value={status} onChange={value => onStatus(value as StatusFilter)} options={[['ALL', 'Published & draft'], ['PUBLISHED', 'Published'], ['DRAFT', 'Draft'], ['ARCHIVED', 'Archived']]} />
       {source === 'SYSTEM' && <FilterMenu label={integrity === 'ALL' ? 'Integrity' : integrityLabel[integrity]} value={integrity} onChange={value => onIntegrity(value as IntegrityFilter)} options={[['ALL', 'All integrity states'], ['NO_SECTIONS', 'No sections'], ['NO_QUESTIONS', 'No questions'], ['EMPTY_SECTION', 'Empty section']]} />}
-      {activeFilterCount > 0 && <Button variant="destructive" onClick={onReset}><X data-icon="inline-start" />Reset</Button>}
-    </div>
-    <div className="flex flex-wrap items-center justify-end gap-2">
+      {activeFilterCount > 0 && <Button variant="destructive" size="sm" onClick={onReset}><X data-icon="inline-start" />Reset</Button>}
+    </DataToolbarGroup>
+    <DataToolbarActions>
       <FilterMenu icon={<ArrowUpDown />} label={sort === 'NEWEST' ? 'Newest' : 'Oldest'} value={sort} onChange={value => onSort(value as SortOrder)} options={[['NEWEST', 'Recently updated'], ['OLDEST', 'Oldest updated']]} align="end" />
       <div className="flex h-8 items-center rounded-lg border border-ui-border bg-background p-0.5" role="group" aria-label="Display mode">
         <Button variant="ghost" size="sm" className={cn('h-7 px-2', view === 'GRID' && 'bg-muted text-foreground')} onClick={() => onView('GRID')} aria-label="Card view" aria-pressed={view === 'GRID'}>{view === 'GRID' && <Check className="size-3" aria-hidden="true" />}<Grid2X2 aria-hidden="true" /></Button>
         <Button variant="ghost" size="sm" className={cn('h-7 px-2', view === 'LIST' && 'bg-muted text-foreground')} onClick={() => onView('LIST')} aria-label="List view" aria-pressed={view === 'LIST'}>{view === 'LIST' && <Check className="size-3" aria-hidden="true" />}<List aria-hidden="true" /></Button>
       </div>
-      <Button variant="outline" size="icon" onClick={onRefresh} disabled={loading} aria-label="Refresh tests"><RefreshCw className={cn(loading && 'animate-spin')} aria-hidden="true" /></Button>
-      {source === 'SYSTEM' && <Button onClick={onCreate}><Plus data-icon="inline-start" />Create test</Button>}
-    </div>
-  </div>;
+      <Button variant="outline" size="icon-sm" onClick={onRefresh} disabled={loading} aria-label="Refresh tests"><RefreshCw className={cn(loading && 'animate-spin')} aria-hidden="true" /></Button>
+      {source === 'SYSTEM' && <Button size="sm" onClick={onCreate}><Plus data-icon="inline-start" />Create test</Button>}
+    </DataToolbarActions>
+  </DataToolbar>;
 }
 
 function FilterMenu({ icon, label, value, onChange, options, align = 'start' }: { icon?: ReactNode; label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]>; align?: 'start' | 'end' }) {
   const active = value !== 'ALL' && value !== 'NEWEST';
   return <DropdownMenu>
-    <DropdownMenuTrigger asChild><Button variant="outline" className={cn('border-dashed', active && 'border-solid bg-muted text-foreground')}>{icon || <SlidersHorizontal data-icon="inline-start" />}{label}</Button></DropdownMenuTrigger>
+    <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={cn('border-dashed', active && 'border-solid bg-muted text-foreground')}>{icon || <SlidersHorizontal data-icon="inline-start" />}{label}</Button></DropdownMenuTrigger>
     <DropdownMenuContent align={align} className="w-52">
       <DropdownMenuLabel>{label}</DropdownMenuLabel>
       <DropdownMenuSeparator />

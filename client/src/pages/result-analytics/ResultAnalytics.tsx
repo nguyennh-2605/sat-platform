@@ -12,7 +12,9 @@ import {
 import { format } from 'date-fns';
 import { ArrowRight, BookmarkCheck, Calendar, CheckCircle2, PenTool } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Badge, Button, Card, EmptyState, PageHeader, TableShell } from '../../components/ui/AppUI';
+import { Badge, Button, Card, EmptyState, PageHeader } from '../../components/ui/AppUI';
+import { DataSurface } from '@/components/ui/data-surface';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
 import { cachedGet } from '../../lib/queryCache';
 import { capitalizeFirstLetter } from '../../utils/text';
@@ -207,33 +209,29 @@ const ResultAnalytics = () => {
             </div>
           </Card>
 
-          <TableShell className="mb-8">
+          <DataSurface className="mb-8">
             <div className="border-b p-5">
               <h2 className="font-semibold text-foreground">Recent Activity</h2>
               <p className="text-xs text-muted-foreground">Detailed history of your latest attempts</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[680px] text-left text-sm">
-                <thead className="border-b bg-muted/50 text-xs font-semibold uppercase text-muted-foreground">
-                  <tr><th className="px-5 py-3">Test Name</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Date</th><th className="px-5 py-3 text-right">Action</th></tr>
-                </thead>
-                <tbody className="divide-y">
+              <Table className="min-w-[680px]">
+                <TableHeader><TableRow><TableHead>Test name</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                <TableBody>
                   {loading ? (
-                    [1, 2, 3].map(row => <tr key={row}><td colSpan={4} className="px-5 py-4"><div className="h-8 animate-pulse rounded-sm bg-muted" /></td></tr>)
+                    [1, 2, 3].map(row => <TableRow key={row}><TableCell colSpan={4}><div className="h-8 animate-pulse rounded-sm bg-muted" /></TableCell></TableRow>)
                   ) : history.length === 0 ? (
-                    <tr><td colSpan={4} className="px-5 py-12 text-center text-sm text-muted-foreground">No recent activity yet.</td></tr>
+                    <TableRow className="hover:bg-transparent"><TableCell colSpan={4} className="h-40 text-center text-muted-foreground">No recent activity yet.</TableCell></TableRow>
                   ) : history.map(item => (
-                    <tr key={item.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-5 py-4 font-medium text-foreground">{capitalizeFirstLetter(item.test.title)}</td>
-                      <td className="px-5 py-4"><Badge tone={item.status === 'COMPLETED' ? 'success' : 'warning'}>{item.status === 'COMPLETED' ? 'Completed' : 'Incomplete'}</Badge></td>
-                      <td className="px-5 py-4 text-xs font-medium text-muted-foreground">{format(new Date(item.createdAt), 'MMM d, yyyy')}</td>
-                      <td className="px-5 py-4 text-right"><Button variant="outline" size="sm" disabled={item.status !== 'COMPLETED'} onClick={() => navigate('/dashboard/score-report', { state: { resultId: item.id } })}>View Details <ArrowRight size={12} /></Button></td>
-                    </tr>
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium text-foreground">{capitalizeFirstLetter(item.test.title)}</TableCell>
+                      <TableCell><Badge tone={item.status === 'COMPLETED' ? 'success' : 'warning'}>{item.status === 'COMPLETED' ? 'Completed' : 'Incomplete'}</Badge></TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{format(new Date(item.createdAt), 'MMM d, yyyy')}</TableCell>
+                      <TableCell className="text-right"><Button variant="outline" size="sm" disabled={item.status !== 'COMPLETED'} onClick={() => navigate('/dashboard/score-report', { state: { resultId: item.id } })}>View Details <ArrowRight size={12} /></Button></TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </TableShell>
+                </TableBody>
+              </Table>
+          </DataSurface>
       </main>
     </div>
   );
