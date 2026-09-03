@@ -43,7 +43,7 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
       audience: true,
       createdAt: true,
       updatedAt: true,
-      lesson: { select: { id: true, title: true, week: { select: { id: true, title: true, order: true } } } },
+      lesson: { select: { id: true, title: true, order: true, week: { select: { id: true, title: true, order: true } } } },
       assignees: canManage
         ? { select: { studentId: true, status: true, assignedAt: true, bestScore: true, attemptCount: true, excusedAt: true } }
         : { where: { studentId: intId(userId) }, select: { studentId: true, status: true, assignedAt: true, bestScore: true, attemptCount: true, excusedAt: true } },

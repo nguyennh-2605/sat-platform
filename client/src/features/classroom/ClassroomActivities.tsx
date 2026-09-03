@@ -64,7 +64,7 @@ interface ClassActivity {
   scorePolicy: 'FIRST' | 'BEST' | 'LATEST';
   createdAt: string;
   assignees: ActivityAssignee[];
-  lesson?: { id: string; title: string; week: { id: string; title: string; order: number } } | null;
+  lesson?: { id: string; title: string; order: number; week: { id: string; title: string; order: number } } | null;
   test?: { testDeliveryId: string; testDelivery: { testId: number; test: { title: string; subject: 'RW' | 'MATH'; mode: 'PRACTICE' | 'EXAM'; duration: number; sections: Array<{ _count: { questions: number } }> } } } | null;
   homework?: { assignmentId: string } | null;
 }
@@ -395,10 +395,11 @@ function completionDetail(activity: ClassActivity, assignees: ActivityAssignee[]
 }
 
 function activityMetadata(activity: ClassActivity) {
-  const parts = [activity.type === 'TEST' ? 'Test' : 'Assignment'];
-  if (activity.lesson) parts.push(activity.lesson.week.title, activity.lesson.title);
-  else parts.push('No session');
-  return parts.join(' · ');
+  const type = activity.type === 'TEST' ? 'Test' : 'Assignment';
+  if (!activity.lesson) return `${type} · No week · No session`;
+  const weekNumber = String(activity.lesson.week.order + 1).padStart(2, '0');
+  const sessionNumber = String(activity.lesson.order + 1).padStart(2, '0');
+  return `${type} · Week ${weekNumber} · Session ${sessionNumber}`;
 }
 
 function compareActivities(left: ClassActivity, right: ClassActivity, sort: ActivitySort) {

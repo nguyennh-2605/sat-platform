@@ -15,7 +15,7 @@ export function TestDetailsStep({ form, isAdmin }: TestDetailsStepProps) {
   const category = form.watch('category');
 
   return (
-    <div className="min-h-0 overflow-y-auto pr-1">
+    <div className="min-h-0 overflow-y-auto px-1">
       <FieldGroup>
         <Field data-invalid={Boolean(errors.title)}>
           <FieldLabel htmlFor="test-title">Test name</FieldLabel>

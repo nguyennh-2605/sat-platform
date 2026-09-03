@@ -7,8 +7,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { AssignmentComposer, AssignTestsComposer } from '../classroom/activity-composer/ActivityComposers';
-import { Badge, Button, Card, EmptyState, Input, Modal, Select } from '../../components/ui/AppUI';
+import { Badge, Button, Card, EmptyState, Modal } from '../../components/ui/AppUI';
+import { Button as DialogButton } from '../../components/ui/button';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
+import { Input as DialogInput } from '../../components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../components/ui/collapsible';
 import {
   DropdownMenu,
@@ -20,6 +22,7 @@ import {
 } from '../../components/ui/dropdown-menu';
 import { Separator } from '../../components/ui/separator';
 import { Checkbox } from '../../components/ui/checkbox';
+import { Select as FormSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
 import axiosClient from '../../lib/axios';
 
@@ -303,7 +306,7 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
 
     <CurriculumEditor editor={editor} form={form} setForm={setForm} saving={saving} onClose={() => setEditor(null)} onSave={() => void saveEditor()} />
     <ResourceEditor open={Boolean(resourceLesson)} form={resourceForm} setForm={setResourceForm} saving={saving} onClose={() => setResourceLesson(null)} onSave={() => void addResource()} />
-    <Modal open={Boolean(deleteTarget)} closeOnBackdrop presentation="content-dialog" onClose={() => setDeleteTarget(null)} title={`Delete ${deleteTarget?.kind || 'item'}?`} subtitle={deleteTarget?.kind === 'resource' ? 'This action cannot be undone. Its viewing progress will also be removed.' : 'The curriculum item will be removed. Published activities stay available in the Activities tab.'} footer={<><Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>{saving ? 'Deleting…' : 'Delete'}</Button></>}><p className="text-body text-muted-foreground">Remove <strong className="text-foreground">{deleteTarget?.name}</strong> from this course?</p></Modal>
+    <Modal open={Boolean(deleteTarget)} closeOnBackdrop presentation="content-dialog" onClose={() => setDeleteTarget(null)} title={`Delete ${deleteTarget?.kind || 'item'}?`} subtitle={deleteTarget?.kind === 'resource' ? 'This action cannot be undone. Its viewing progress will also be removed.' : 'The curriculum item will be removed. Published activities stay available in the Activities tab.'} footer={<><DialogButton variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</DialogButton><DialogButton variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>{saving ? 'Deleting…' : 'Delete'}</DialogButton></>}><p className="text-body text-muted-foreground">Remove <strong className="text-foreground">{deleteTarget?.name}</strong> from this course?</p></Modal>
     {classId && <AssignmentComposer open={activityComposer?.kind === 'ASSIGNMENT'} classId={classId} initialLessonId={activityComposer?.lessonId} students={students} onClose={() => setActivityComposer(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
     {classId && <AssignTestsComposer open={activityComposer?.kind === 'TEST'} classId={classId} initialLessonId={activityComposer?.lessonId} students={students} onClose={() => setActivityComposer(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
   </div>;
@@ -448,12 +451,85 @@ function CourseOutline({ weeks, activeWeekId, showStatuses, onNavigate }: { week
 
 function CurriculumEditor({ editor, form, setForm, saving, onClose, onSave }: { editor: { kind: 'week' | 'lesson'; item?: Week | Lesson } | null; form: CourseForm; setForm: React.Dispatch<React.SetStateAction<CourseForm>>; saving: boolean; onClose: () => void; onSave: () => void }) {
   const lesson = editor?.kind === 'lesson';
-  return <Modal open={Boolean(editor)} closeOnBackdrop presentation="content-dialog" onClose={onClose} title={`${editor?.item ? 'Edit' : 'Add'} ${lesson ? 'session' : 'week'}`} subtitle={lesson ? 'Set the session overview, timing and visibility.' : 'Create a clear module in the curriculum.'} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !form.title.trim()} onClick={onSave}>{saving ? 'Saving…' : 'Save'}</Button></>}><div className="space-y-4"><Field label="Title"><Input autoFocus className="w-full" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={lesson ? 'Session 1: Reading foundations' : 'Week 1: Foundations'} /></Field><Field label={lesson ? 'Session overview' : 'Week description'}><Textarea className="min-h-24 w-full" value={lesson ? form.summary : form.description} onChange={event => setForm(current => ({ ...current, [lesson ? 'summary' : 'description']: event.target.value }))} placeholder="What will students learn?" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Visibility"><Select className="w-full" value={form.status} onChange={event => setForm(current => ({ ...current, status: event.target.value as ContentStatus }))}><option value="DRAFT">Draft</option><option value="PUBLISHED">Published</option>{lesson && <option value="SCHEDULED">Scheduled</option>}<option value="ARCHIVED">Archived</option></Select></Field>{lesson && <Field label="Duration (minutes)"><Input type="number" min="1" className="w-full" value={form.durationMinutes} onChange={event => setForm(current => ({ ...current, durationMinutes: event.target.value }))} /></Field>}</div>{lesson && <Field label="Session date & time"><DateTimePicker value={form.scheduledAt} onChange={value => setForm(current => ({ ...current, scheduledAt: value }))} placeholder="Choose date and time" ariaLabel="Session date and time" /></Field>}<p className="rounded-control bg-primary-soft px-3 py-2 text-caption leading-5 text-primary">Publishing makes this item visible to enrolled students and sends a notification.</p></div></Modal>;
+  return <Modal
+    open={Boolean(editor)}
+    closeOnBackdrop
+    presentation="content-dialog"
+    onClose={onClose}
+    title={`${editor?.item ? 'Edit' : 'Add'} ${lesson ? 'session' : 'week'}`}
+    subtitle={lesson ? 'Set the session overview, timing and visibility.' : 'Create a clear module in the curriculum.'}
+    footer={<>
+      <DialogButton variant="outline" onClick={onClose}>Cancel</DialogButton>
+      <DialogButton disabled={saving || !form.title.trim()} onClick={onSave}>{saving ? 'Saving…' : 'Save'}</DialogButton>
+    </>}
+  >
+    <div className="space-y-4">
+      <Field label="Title" htmlFor="curriculum-title">
+        <DialogInput id="curriculum-title" autoFocus value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={lesson ? 'Session 1: Reading foundations' : 'Week 1: Foundations'} />
+      </Field>
+      <Field label={lesson ? 'Session overview' : 'Week description'} htmlFor="curriculum-description">
+        <Textarea id="curriculum-description" className="min-h-24" value={lesson ? form.summary : form.description} onChange={event => setForm(current => ({ ...current, [lesson ? 'summary' : 'description']: event.target.value }))} placeholder="What will students learn?" />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Visibility" htmlFor="curriculum-visibility">
+          <FormSelect value={form.status} onValueChange={value => setForm(current => ({ ...current, status: value as ContentStatus }))}>
+            <SelectTrigger id="curriculum-visibility" className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DRAFT">Draft</SelectItem>
+              <SelectItem value="PUBLISHED">Published</SelectItem>
+              {lesson && <SelectItem value="SCHEDULED">Scheduled</SelectItem>}
+              <SelectItem value="ARCHIVED">Archived</SelectItem>
+            </SelectContent>
+          </FormSelect>
+        </Field>
+        {lesson && <Field label="Duration (minutes)" htmlFor="curriculum-duration">
+          <DialogInput id="curriculum-duration" type="number" min="1" value={form.durationMinutes} onChange={event => setForm(current => ({ ...current, durationMinutes: event.target.value }))} />
+        </Field>}
+      </div>
+      {lesson && <Field label="Session date & time"><DateTimePicker value={form.scheduledAt} onChange={value => setForm(current => ({ ...current, scheduledAt: value }))} placeholder="Choose date and time" ariaLabel="Session date and time" /></Field>}
+      <p className="rounded-control bg-primary-soft px-3 py-2 text-caption leading-5 text-primary">Publishing makes this item visible to enrolled students and sends a notification.</p>
+    </div>
+  </Modal>;
 }
 
-function ResourceEditor({ open, form, setForm, saving, onClose, onSave }: { open: boolean; form: { name: string; url: string; kind: ResourceKind; isRequired: boolean }; setForm: React.Dispatch<React.SetStateAction<{ name: string; url: string; kind: ResourceKind; isRequired: boolean }>>; saving: boolean; onClose: () => void; onSave: () => void }) { return <Modal open={open} closeOnBackdrop presentation="content-dialog" onClose={onClose} title="Add learning resource" subtitle="Attach a document, video, website or embeddable activity. Google Drive files must already be shared with the class." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !form.name.trim() || !form.url.trim()} onClick={onSave}>{saving ? 'Adding…' : 'Add resource'}</Button></>}><div className="space-y-4"><Field label="Resource type"><Select className="w-full" value={form.kind} onChange={event => setForm(current => ({ ...current, kind: event.target.value as ResourceKind }))}><option value="FILE">Document / file</option><option value="VIDEO">Video</option><option value="LINK">Website link</option><option value="EMBED">Embedded activity</option></Select></Field><Field label="Display name"><Input autoFocus className="w-full" value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="SAT Reading strategy guide" /></Field><Field label="Secure URL"><Input type="url" className="w-full" value={form.url} onChange={event => setForm(current => ({ ...current, url: event.target.value }))} placeholder="https://…" /></Field><label className="flex items-center gap-2 text-body text-foreground"><Checkbox checked={form.isRequired} onCheckedChange={checked => setForm(current => ({ ...current, isRequired: Boolean(checked) }))} />Required material</label><p className="rounded-control border border-ui-border bg-surface-subtle p-3 text-caption leading-5 text-muted-foreground">For privacy, the app no longer changes Drive permissions automatically. Share the file only with the class or organization before adding its URL.</p></div></Modal>; }
+function ResourceEditor({ open, form, setForm, saving, onClose, onSave }: { open: boolean; form: { name: string; url: string; kind: ResourceKind; isRequired: boolean }; setForm: React.Dispatch<React.SetStateAction<{ name: string; url: string; kind: ResourceKind; isRequired: boolean }>>; saving: boolean; onClose: () => void; onSave: () => void }) {
+  return <Modal
+    open={open}
+    closeOnBackdrop
+    presentation="content-dialog"
+    onClose={onClose}
+    title="Add learning resource"
+    subtitle="Attach a document, video, website or embeddable activity. Google Drive files must already be shared with the class."
+    footer={<>
+      <DialogButton variant="outline" onClick={onClose}>Cancel</DialogButton>
+      <DialogButton disabled={saving || !form.name.trim() || !form.url.trim()} onClick={onSave}>{saving ? 'Adding…' : 'Add resource'}</DialogButton>
+    </>}
+  >
+    <div className="space-y-4">
+      <Field label="Resource type" htmlFor="resource-type">
+        <FormSelect value={form.kind} onValueChange={value => setForm(current => ({ ...current, kind: value as ResourceKind }))}>
+          <SelectTrigger id="resource-type" className="w-full"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="FILE">Document / file</SelectItem>
+            <SelectItem value="VIDEO">Video</SelectItem>
+            <SelectItem value="LINK">Website link</SelectItem>
+            <SelectItem value="EMBED">Embedded activity</SelectItem>
+          </SelectContent>
+        </FormSelect>
+      </Field>
+      <Field label="Display name" htmlFor="resource-name">
+        <DialogInput id="resource-name" autoFocus value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="SAT Reading strategy guide" />
+      </Field>
+      <Field label="Secure URL" htmlFor="resource-url">
+        <DialogInput id="resource-url" type="url" value={form.url} onChange={event => setForm(current => ({ ...current, url: event.target.value }))} placeholder="https://…" />
+      </Field>
+      <label className="flex items-center gap-2 text-body text-foreground"><Checkbox checked={form.isRequired} onCheckedChange={checked => setForm(current => ({ ...current, isRequired: Boolean(checked) }))} />Required material</label>
+      <p className="rounded-control border border-ui-border bg-surface-subtle p-3 text-caption leading-5 text-muted-foreground">For privacy, the app no longer changes Drive permissions automatically. Share the file only with the class or organization before adding its URL.</p>
+    </div>
+  </Modal>;
+}
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1.5 block text-caption font-semibold text-foreground">{label}</span>{children}</label>; }
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) { return <div className="space-y-2"><label htmlFor={htmlFor} className="block text-caption font-medium text-foreground">{label}</label>{children}</div>; }
 function CourseSkeleton() { return <div className="space-y-4" aria-label="Loading lessons"><div className="flex items-center justify-between"><div className="space-y-2"><span className="block h-5 w-24 animate-pulse rounded-sm bg-muted" /><span className="block h-4 w-72 max-w-full animate-pulse rounded-sm bg-muted" /></div><span className="h-8 w-24 animate-pulse rounded-control bg-muted" /></div>{[1, 2, 3].map(item => <div key={item} className="h-16 animate-pulse rounded-card border border-ui-border bg-surface" />)}</div>; }
 function CourseLoadError({ message, onRetry }: { message: string; onRetry: () => void }) { return <Card className="flex items-start gap-3 p-4 shadow-none" role="alert"><span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-danger-soft text-danger"><AlertCircle size={17} /></span><div className="min-w-0 flex-1"><p className="text-body font-semibold text-foreground">Unable to load lessons</p><p className="mt-0.5 text-caption text-muted-foreground">{message}</p></div><Button size="sm" variant="outline" onClick={onRetry}><RefreshCw size={14} />Retry</Button></Card>; }
 

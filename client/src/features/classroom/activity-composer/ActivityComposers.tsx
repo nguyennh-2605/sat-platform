@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BookOpenCheck, Check, LoaderCircle, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Badge, Button, Input, Modal, Select, Tabs } from '@/components/ui/AppUI';
+import { Modal, Tabs } from '@/components/ui/AppUI';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateTimePicker } from '@/components/ui/DateTimePicker';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import axiosClient from '@/lib/axios';
+import { cn } from '@/lib/utils';
 import { capitalizeFirstLetter } from '@/utils/text';
 
 export interface ActivityStudent { id: number; name: string | null; email: string }
@@ -17,6 +22,7 @@ interface OutlineResponse { success: boolean; data: OutlineWeek[] }
 interface ClassDetail { id: string; students: ActivityStudent[] }
 type TestSource = 'MY' | 'SYSTEM';
 const EMPTY_TESTS: ComposerTest[] = [];
+const NO_SESSION = 'NO_SESSION';
 
 interface BaseComposerProps {
   open: boolean;
@@ -45,10 +51,18 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
     setLessonId(initialLessonId || '');
     void loadOutline(classId, setOutline);
   }, [classId, initialLessonId, open]);
+
   useEffect(() => {
     if (open) return;
-    setTitle(''); setInstructions(''); setAvailableAt(''); setDueAt(''); setFileUrls(''); setLinks('');
-    setAllStudents(true); setStudentIds([]); setOutline([]);
+    setTitle('');
+    setInstructions('');
+    setAvailableAt('');
+    setDueAt('');
+    setFileUrls('');
+    setLinks('');
+    setAllStudents(true);
+    setStudentIds([]);
+    setOutline([]);
   }, [open]);
 
   const submit = async () => {
@@ -59,23 +73,72 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
     setSaving(true);
     try {
       await axiosClient.post('/api/class-activities/assignments', {
-        classId, lessonId: lessonId || null, title: title.trim(), instructions: instructions.trim() || null,
-        availableAt: isoOrNull(availableAt), dueAt: isoOrNull(dueAt),
-        fileUrls: urlLines(fileUrls), links: urlLines(links), ...(!allStudents ? { studentIds } : {}),
+        classId,
+        lessonId: lessonId || null,
+        title: title.trim(),
+        instructions: instructions.trim() || null,
+        availableAt: isoOrNull(availableAt),
+        dueAt: isoOrNull(dueAt),
+        fileUrls: urlLines(fileUrls),
+        links: urlLines(links),
+        ...(!allStudents ? { studentIds } : {}),
       });
       toast.success('Assignment published');
       await onCreated();
       onClose();
     } catch (error) {
       toast.error(errorMessage(error, 'Unable to publish this assignment.'));
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
-  return <Modal open={open} onClose={() => !saving && onClose()} closeOnBackdrop={!saving} presentation="content-dialog" title="Add assignment" subtitle={initialLessonId ? 'Create student work for this session.' : 'Create student work with instructions and submissions.'} className="max-w-3xl!" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !title.trim() || !students.length || (!allStudents && !studentIds.length)} onClick={() => void submit()}>{saving ? <><LoaderCircle size={15} className="animate-spin" />Publishing…</> : 'Publish assignment'}</Button></>}>
-    <div className="max-h-[70vh] space-y-5 overflow-y-auto pr-1">
+  return <Modal
+    open={open}
+    onClose={() => !saving && onClose()}
+    closeOnBackdrop={!saving}
+    presentation="content-dialog"
+    title="Add assignment"
+    subtitle={initialLessonId ? 'Create student work for this session.' : 'Create student work with instructions and submissions.'}
+    className="max-w-3xl!"
+    footer={<>
+      <Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button>
+      <Button disabled={saving || !title.trim() || !students.length || (!allStudents && !studentIds.length)} onClick={() => void submit()}>
+        {saving ? <><LoaderCircle className="animate-spin" />Publishing…</> : 'Publish assignment'}
+      </Button>
+    </>}
+  >
+    <div className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
       {!students.length && <Notice>Add at least one student to this class before publishing an assignment.</Notice>}
-      <section className="space-y-4"><SectionTitle title="Assignment" description="Instructions and resources students need to complete." /><Field label="Title"><Input autoFocus className="w-full" value={title} onChange={event => setTitle(event.target.value)} placeholder="e.g. Complete practice set 3" /></Field><Field label="Instructions"><Textarea value={instructions} onChange={event => setInstructions(event.target.value)} rows={4} placeholder="What should students complete or submit?" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="File URLs"><Textarea value={fileUrls} onChange={event => setFileUrls(event.target.value)} rows={3} placeholder="One URL per line" /></Field><Field label="Reference links"><Textarea value={links} onChange={event => setLinks(event.target.value)} rows={3} placeholder="One URL per line" /></Field></div><div className="rounded-control border border-ui-border bg-muted/30 px-3 py-2.5"><p className="text-body font-medium text-foreground">Submission required</p><p className="mt-0.5 text-caption text-muted-foreground">Students submit a written response or share a work link.</p></div></section>
-      <DeliveryFields availableAt={availableAt} onAvailableAt={setAvailableAt} dueAt={dueAt} onDueAt={setDueAt} outline={outline} lessonId={lessonId} onLessonId={setLessonId} students={students} allStudents={allStudents} onAllStudents={setAllStudents} studentIds={studentIds} onStudentIds={setStudentIds} />
+      <Field label="Title" htmlFor="assignment-title">
+        <Input id="assignment-title" autoFocus value={title} onChange={event => setTitle(event.target.value)} placeholder="e.g. Complete practice set 3" />
+      </Field>
+      <Field label="Instructions" htmlFor="assignment-instructions">
+        <Textarea id="assignment-instructions" value={instructions} onChange={event => setInstructions(event.target.value)} rows={4} placeholder="What should students complete or submit?" />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="File URLs" htmlFor="assignment-file-urls">
+          <Textarea id="assignment-file-urls" value={fileUrls} onChange={event => setFileUrls(event.target.value)} rows={3} placeholder="One URL per line" />
+        </Field>
+        <Field label="Reference links" htmlFor="assignment-reference-links">
+          <Textarea id="assignment-reference-links" value={links} onChange={event => setLinks(event.target.value)} rows={3} placeholder="One URL per line" />
+        </Field>
+      </div>
+      <DeliveryFields
+        idPrefix="assignment"
+        availableAt={availableAt}
+        onAvailableAt={setAvailableAt}
+        dueAt={dueAt}
+        onDueAt={setDueAt}
+        outline={outline}
+        lessonId={lessonId}
+        onLessonId={setLessonId}
+        students={students}
+        allStudents={allStudents}
+        onAllStudents={setAllStudents}
+        studentIds={studentIds}
+        onStudentIds={setStudentIds}
+      />
     </div>
   </Modal>;
 }
@@ -119,31 +182,62 @@ export function AssignTestsComposer({ open, onClose, classId, students: fixedStu
       const page = await axiosClient.get<TestPage, TestPage>(`/api/tests?${params}`);
       const combined = [...initialTests, ...page.items].map(item => ({ ...item, title: capitalizeFirstLetter(item.title) }));
       setTests([...new Map(combined.map(item => [item.id, item])).values()]);
-    } catch (error) { toast.error(errorMessage(error, 'Unable to load published tests.')); }
-    finally { setLoading(false); }
+    } catch (error) {
+      toast.error(errorMessage(error, 'Unable to load published tests.'));
+    } finally {
+      setLoading(false);
+    }
   }, [initialTests, open, search, source]);
 
-  useEffect(() => { const timeout = window.setTimeout(() => void loadTests(), 200); return () => window.clearTimeout(timeout); }, [loadTests]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => void loadTests(), 200);
+    return () => window.clearTimeout(timeout);
+  }, [loadTests]);
+
   useEffect(() => {
     if (!open || classId) return;
-    axiosClient.get<ClassOption[], ClassOption[]>('/api/tests/classes').then(setClasses).catch(error => toast.error(errorMessage(error, 'Unable to load classes.')));
+    axiosClient.get<ClassOption[], ClassOption[]>('/api/tests/classes')
+      .then(setClasses)
+      .catch(error => toast.error(errorMessage(error, 'Unable to load classes.')));
   }, [classId, open]);
+
   useEffect(() => {
     if (!open) return;
-    setSource(initialSource); setSelectedClassId(classId || ''); setStudents(fixedStudents || []); setLessonId(initialLessonId || ''); setSelectedIds(initialTests.map(test => test.id));
+    setSource(initialSource);
+    setSelectedClassId(classId || '');
+    setStudents(fixedStudents || []);
+    setLessonId(initialLessonId || '');
+    setSelectedIds(initialTests.map(test => test.id));
   }, [classId, fixedStudents, initialLessonId, initialSource, initialTests, open]);
+
   useEffect(() => {
-    if (!open || !selectedClassId) { setOutline([]); return; }
+    if (!open || !selectedClassId) {
+      setOutline([]);
+      return;
+    }
     void loadOutline(selectedClassId, setOutline);
-    if (!classId) axiosClient.get<ClassDetail, ClassDetail>(`/api/classes/${selectedClassId}`).then(result => setStudents(result.students || [])).catch(error => toast.error(errorMessage(error, 'Unable to load class members.')));
+    if (!classId) {
+      axiosClient.get<ClassDetail, ClassDetail>(`/api/classes/${selectedClassId}`)
+        .then(result => setStudents(result.students || []))
+        .catch(error => toast.error(errorMessage(error, 'Unable to load class members.')));
+    }
   }, [classId, open, selectedClassId]);
+
   useEffect(() => {
     if (open) return;
-    setSearch(''); setAvailableAt(''); setDueAt(''); setMaxAttempts(1); setScorePolicy('FIRST'); setAllStudents(true); setStudentIds([]); setOutline([]);
+    setSearch('');
+    setAvailableAt('');
+    setDueAt('');
+    setMaxAttempts(1);
+    setScorePolicy('FIRST');
+    setAllStudents(true);
+    setStudentIds([]);
+    setOutline([]);
   }, [open]);
 
   const selectedTests = useMemo(() => tests.filter(test => selectedIds.includes(test.id)), [selectedIds, tests]);
   const toggleTest = (testId: number) => setSelectedIds(current => current.includes(testId) ? current.filter(id => id !== testId) : [...current, testId]);
+
   const submit = async () => {
     if (!selectedClassId) return toast.error('Select a class');
     if (!selectedIds.length) return toast.error('Select at least one published test');
@@ -153,39 +247,211 @@ export function AssignTestsComposer({ open, onClose, classId, students: fixedStu
     setSaving(true);
     try {
       await axiosClient.post('/api/test-deliveries', {
-        classIds: [selectedClassId], testIds: selectedIds, lessonId: lessonId || null,
-        availableAt: isoOrNull(availableAt), dueAt: isoOrNull(dueAt), maxAttempts, scorePolicy,
+        classIds: [selectedClassId],
+        testIds: selectedIds,
+        lessonId: lessonId || null,
+        availableAt: isoOrNull(availableAt),
+        dueAt: isoOrNull(dueAt),
+        maxAttempts,
+        scorePolicy,
         ...(!allStudents ? { studentIds } : {}),
       });
       toast.success(`${selectedIds.length} test${selectedIds.length === 1 ? '' : 's'} assigned`);
       await onCreated();
       onClose();
-    } catch (error) { toast.error(errorMessage(error, 'Unable to assign the selected tests.')); }
-    finally { setSaving(false); }
+    } catch (error) {
+      toast.error(errorMessage(error, 'Unable to assign the selected tests.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
-  return <Modal open={open} onClose={() => !saving && onClose()} closeOnBackdrop={!saving} presentation="content-dialog" title="Assign tests" subtitle="Each selected test becomes an independent activity." className="max-w-4xl!" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !selectedClassId || !selectedIds.length || !students.length || (!allStudents && !studentIds.length)} onClick={() => void submit()}>{saving ? <><LoaderCircle size={15} className="animate-spin" />Assigning…</> : `Assign ${selectedIds.length || ''} test${selectedIds.length === 1 ? '' : 's'}`}</Button></>}>
-    <div className="max-h-[72vh] space-y-5 overflow-y-auto pr-1">
-      {!classId && <Field label="Class"><Select className="w-full" value={selectedClassId} onChange={event => { setSelectedClassId(event.target.value); setStudentIds([]); setAllStudents(true); setLessonId(''); }}><option value="">Select a class</option>{classes.map(item => <option key={item.id} value={item.id}>{item.name}{item._count ? ` · ${item._count.students} students` : ''}</option>)}</Select></Field>}
-      <section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-3"><SectionTitle title="Choose tests" description="Bulk assignment creates one activity per test." /><Badge tone="neutral">{selectedIds.length} selected</Badge></div><div className="overflow-x-auto"><Tabs items={[{ value: 'MY' as const, label: 'My Tests' }, { value: 'SYSTEM' as const, label: 'System Tests' }]} value={source} onValueChange={setSource} ariaLabel="Test source" /></div><label className="relative block"><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search published tests…" className="w-full pl-9" /></label><div className="max-h-64 overflow-y-auto rounded-card border border-ui-border p-2">{loading ? <p className="py-10 text-center text-body text-muted-foreground">Loading tests…</p> : tests.length === 0 ? <p className="py-10 text-center text-body text-muted-foreground">No published tests found.</p> : <div className="space-y-1">{tests.map(test => <label key={test.id} className={`flex cursor-pointer items-center gap-3 rounded-control p-3 transition-colors hover:bg-muted/50 ${selectedIds.includes(test.id) ? 'bg-accent' : ''}`}><Checkbox checked={selectedIds.includes(test.id)} onCheckedChange={() => toggleTest(test.id)} /><span className="flex size-9 shrink-0 items-center justify-center rounded-control border border-ui-border bg-surface"><BookOpenCheck size={17} /></span><span className="min-w-0 flex-1"><span className="block truncate text-body font-medium text-foreground">{test.title}</span><span className="mt-0.5 block text-caption text-muted-foreground">{test.subject === 'MATH' ? 'Math' : 'Reading & Writing'} · {test.mode === 'EXAM' ? 'Exam' : 'Practice'} · {test.questionCount} questions</span></span>{selectedIds.includes(test.id) && <Check size={16} className="text-primary" />}</label>)}</div>}</div>{selectedTests.length > 1 && <p className="text-caption text-muted-foreground">Delivery settings below apply to all {selectedTests.length} tests. Titles remain independent.</p>}</section>
-      {selectedClassId && <><div className="grid gap-4 border-t border-ui-border pt-5 sm:grid-cols-2"><Field label="Attempts"><Input className="w-full" type="number" min={1} max={10} value={maxAttempts} onChange={event => setMaxAttempts(Math.min(10, Math.max(1, Number(event.target.value))))} /></Field><Field label="Score policy"><Select className="w-full" value={scorePolicy} onChange={event => setScorePolicy(event.target.value as typeof scorePolicy)}><option value="FIRST">First attempt</option><option value="BEST">Best attempt</option><option value="LATEST">Latest attempt</option></Select></Field></div><DeliveryFields availableAt={availableAt} onAvailableAt={setAvailableAt} dueAt={dueAt} onDueAt={setDueAt} outline={outline} lessonId={lessonId} onLessonId={setLessonId} students={students} allStudents={allStudents} onAllStudents={setAllStudents} studentIds={studentIds} onStudentIds={setStudentIds} /></>}
+  return <Modal
+    open={open}
+    onClose={() => !saving && onClose()}
+    closeOnBackdrop={!saving}
+    presentation="content-dialog"
+    title="Assign tests"
+    subtitle="Each selected test becomes an independent activity."
+    className="max-w-4xl!"
+    footer={<>
+      <Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button>
+      <Button disabled={saving || !selectedClassId || !selectedIds.length || !students.length || (!allStudents && !studentIds.length)} onClick={() => void submit()}>
+        {saving ? <><LoaderCircle className="animate-spin" />Assigning…</> : `Assign ${selectedIds.length || ''} test${selectedIds.length === 1 ? '' : 's'}`}
+      </Button>
+    </>}
+  >
+    <div className="max-h-[72vh] space-y-4 overflow-y-auto px-1">
+      {!classId && <Field label="Class" htmlFor="test-class">
+        <Select value={selectedClassId || undefined} onValueChange={value => {
+          setSelectedClassId(value);
+          setStudentIds([]);
+          setAllStudents(true);
+          setLessonId('');
+        }}>
+          <SelectTrigger id="test-class" className="w-full"><SelectValue placeholder="Select a class" /></SelectTrigger>
+          <SelectContent position="popper">
+            {classes.map(item => <SelectItem key={item.id} value={item.id}>{item.name}{item._count ? ` · ${item._count.students} students` : ''}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </Field>}
+
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="min-w-0 overflow-x-auto">
+          <Tabs items={[{ value: 'MY' as const, label: 'My Tests' }, { value: 'SYSTEM' as const, label: 'System Tests' }]} value={source} onValueChange={setSource} ariaLabel="Test source" />
+        </div>
+        <Badge variant="outline" className="shrink-0 text-muted-foreground">{selectedIds.length} selected</Badge>
+      </div>
+
+      <label className="relative block" htmlFor="test-search">
+        <span className="sr-only">Search published tests</span>
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input id="test-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search published tests…" className="pl-8" />
+      </label>
+
+      <div className="max-h-64 overflow-y-auto rounded-card border border-ui-border p-1">
+        {loading
+          ? <p className="py-10 text-center text-body text-muted-foreground">Loading tests…</p>
+          : tests.length === 0
+            ? <p className="py-10 text-center text-body text-muted-foreground">No published tests found.</p>
+            : <div>{tests.map(test => {
+              const selected = selectedIds.includes(test.id);
+              return <label key={test.id} className={cn('flex cursor-pointer items-center gap-3 rounded-control px-2.5 py-2 transition-colors hover:bg-muted/50', selected && 'bg-accent')}>
+                <Checkbox checked={selected} onCheckedChange={() => toggleTest(test.id)} />
+                <BookOpenCheck className="size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-body font-medium text-foreground">{test.title}</span>
+                  <span className="block truncate text-caption text-muted-foreground">{test.subject === 'MATH' ? 'Math' : 'Reading & Writing'} · {test.mode === 'EXAM' ? 'Exam' : 'Practice'} · {test.questionCount} questions</span>
+                </span>
+                {selected && <Check className="size-4 shrink-0 text-primary" />}
+              </label>;
+            })}</div>}
+      </div>
+
+      {selectedTests.length > 1 && <p className="text-caption text-muted-foreground">The settings below apply to all {selectedTests.length} tests. Each test remains an independent activity.</p>}
+
+      {selectedClassId && <>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Attempts" htmlFor="test-attempts">
+            <Input id="test-attempts" type="number" min={1} max={10} value={maxAttempts} onChange={event => setMaxAttempts(Math.min(10, Math.max(1, Number(event.target.value))))} />
+          </Field>
+          <Field label="Score policy" htmlFor="test-score-policy">
+            <Select value={scorePolicy} onValueChange={value => setScorePolicy(value as typeof scorePolicy)}>
+              <SelectTrigger id="test-score-policy" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="FIRST">First attempt</SelectItem>
+                <SelectItem value="BEST">Best attempt</SelectItem>
+                <SelectItem value="LATEST">Latest attempt</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+        <DeliveryFields
+          idPrefix="test"
+          availableAt={availableAt}
+          onAvailableAt={setAvailableAt}
+          dueAt={dueAt}
+          onDueAt={setDueAt}
+          outline={outline}
+          lessonId={lessonId}
+          onLessonId={setLessonId}
+          students={students}
+          allStudents={allStudents}
+          onAllStudents={setAllStudents}
+          studentIds={studentIds}
+          onStudentIds={setStudentIds}
+        />
+      </>}
     </div>
   </Modal>;
 }
 
-function DeliveryFields({ availableAt, onAvailableAt, dueAt, onDueAt, outline, lessonId, onLessonId, students, allStudents, onAllStudents, studentIds, onStudentIds }: { availableAt: string; onAvailableAt: (value: string) => void; dueAt: string; onDueAt: (value: string) => void; outline: OutlineWeek[]; lessonId: string; onLessonId: (value: string) => void; students: ActivityStudent[]; allStudents: boolean; onAllStudents: (value: boolean) => void; studentIds: number[]; onStudentIds: (value: number[]) => void }) {
-  const toggleStudent = (studentId: number) => onStudentIds(studentIds.includes(studentId) ? studentIds.filter(id => id !== studentId) : [...studentIds, studentId]);
-  return <section className="space-y-4 border-t border-ui-border pt-5"><SectionTitle title="Delivery" description="Control timing, audience, and curriculum placement." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Available from"><DateTimePicker value={availableAt} onChange={onAvailableAt} placeholder="Available now" ariaLabel="Available from" /></Field><Field label="Due date"><DateTimePicker value={dueAt} minDate={availableAt || undefined} onChange={onDueAt} placeholder="No deadline" ariaLabel="Due date" /></Field></div><Field label="Curriculum placement"><Select className="w-full" value={lessonId} onChange={event => onLessonId(event.target.value)}><option value="">No session</option>{outline.map((week, weekIndex) => <optgroup key={week.id} label={`Week ${String(weekIndex + 1).padStart(2, '0')} · ${week.title}`}>{week.lessons.map((lesson, lessonIndex) => <option key={lesson.id} value={lesson.id}>Session {String(lessonIndex + 1).padStart(2, '0')} · {lesson.title}</option>)}</optgroup>)}</Select></Field><div><div className="flex items-center justify-between gap-3"><div><p className="text-body font-medium text-foreground">Students</p><p className="mt-0.5 text-caption text-muted-foreground">Assign to the whole class or selected students.</p></div><label className="flex items-center gap-2 text-body"><Checkbox checked={allStudents} onCheckedChange={checked => { onAllStudents(Boolean(checked)); onStudentIds([]); }} />All students</label></div>{!allStudents && <div className="mt-3 grid gap-2 sm:grid-cols-2">{students.map(student => <label key={student.id} className="flex items-center gap-3 rounded-control border border-ui-border p-3 hover:bg-muted/30"><Checkbox checked={studentIds.includes(student.id)} onCheckedChange={() => toggleStudent(student.id)} /><span className="min-w-0"><span className="block truncate text-body font-medium">{student.name || student.email}</span><span className="block truncate text-caption text-muted-foreground">{student.email}</span></span></label>)}</div>}</div></section>;
+interface DeliveryFieldsProps {
+  idPrefix: string;
+  availableAt: string;
+  onAvailableAt: (value: string) => void;
+  dueAt: string;
+  onDueAt: (value: string) => void;
+  outline: OutlineWeek[];
+  lessonId: string;
+  onLessonId: (value: string) => void;
+  students: ActivityStudent[];
+  allStudents: boolean;
+  onAllStudents: (value: boolean) => void;
+  studentIds: number[];
+  onStudentIds: (value: number[]) => void;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label><span className="mb-2 block text-caption font-medium text-foreground">{label}</span>{children}</label>; }
-function SectionTitle({ title, description }: { title: string; description: string }) { return <div><h3 className="text-body font-semibold text-foreground">{title}</h3><p className="mt-0.5 text-caption text-muted-foreground">{description}</p></div>; }
-function Notice({ children }: { children: ReactNode }) { return <p className="rounded-control border border-ui-border bg-muted p-3 text-caption text-muted-foreground">{children}</p>; }
+function DeliveryFields({ idPrefix, availableAt, onAvailableAt, dueAt, onDueAt, outline, lessonId, onLessonId, students, allStudents, onAllStudents, studentIds, onStudentIds }: DeliveryFieldsProps) {
+  const toggleStudent = (studentId: number) => onStudentIds(studentIds.includes(studentId) ? studentIds.filter(id => id !== studentId) : [...studentIds, studentId]);
+
+  return <>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Available from"><DateTimePicker value={availableAt} onChange={onAvailableAt} placeholder="Available now" ariaLabel="Available from" /></Field>
+      <Field label="Due date"><DateTimePicker value={dueAt} minDate={availableAt || undefined} onChange={onDueAt} placeholder="No deadline" ariaLabel="Due date" /></Field>
+    </div>
+
+    <Field label="Curriculum placement" htmlFor={`${idPrefix}-curriculum-placement`}>
+      <Select value={lessonId || NO_SESSION} onValueChange={value => onLessonId(value === NO_SESSION ? '' : value)}>
+        <SelectTrigger id={`${idPrefix}-curriculum-placement`} className="w-full"><SelectValue /></SelectTrigger>
+        <SelectContent position="popper">
+          <SelectItem value={NO_SESSION}>No session</SelectItem>
+          {outline.map((week, weekIndex) => <SelectGroup key={week.id}>
+            <SelectLabel>Week {String(weekIndex + 1).padStart(2, '0')} · {week.title}</SelectLabel>
+            {week.lessons.map((lesson, lessonIndex) => <SelectItem key={lesson.id} value={lesson.id}>Session {String(lessonIndex + 1).padStart(2, '0')} · {lesson.title}</SelectItem>)}
+          </SelectGroup>)}
+        </SelectContent>
+      </Select>
+    </Field>
+
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-body font-medium text-foreground">Students</p>
+          <p className="text-caption text-muted-foreground">Assign to the whole class or selected students.</p>
+        </div>
+        <label className="flex shrink-0 items-center gap-2 text-body text-foreground">
+          <Checkbox checked={allStudents} onCheckedChange={checked => {
+            onAllStudents(Boolean(checked));
+            onStudentIds([]);
+          }} />
+          All students
+        </label>
+      </div>
+      {!allStudents && <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {students.map(student => <label key={student.id} className="flex items-center gap-3 rounded-control border border-ui-border px-3 py-2 hover:bg-muted/30">
+          <Checkbox checked={studentIds.includes(student.id)} onCheckedChange={() => toggleStudent(student.id)} />
+          <span className="min-w-0">
+            <span className="block truncate text-body font-medium text-foreground">{student.name || student.email}</span>
+            <span className="block truncate text-caption text-muted-foreground">{student.email}</span>
+          </span>
+        </label>)}
+      </div>}
+    </div>
+  </>;
+}
+
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
+  return <div className="space-y-2">
+    <label htmlFor={htmlFor} className="block text-caption font-medium text-foreground">{label}</label>
+    {children}
+  </div>;
+}
+
+function Notice({ children }: { children: ReactNode }) {
+  return <p className="rounded-control border border-ui-border bg-muted p-3 text-caption text-muted-foreground">{children}</p>;
+}
+
 const isoOrNull = (value: string) => value ? new Date(value).toISOString() : null;
 const validDates = (availableAt: string, dueAt: string) => !availableAt || !dueAt || new Date(availableAt) < new Date(dueAt);
 const urlLines = (value: string) => value.split(/\r?\n/).map(item => item.trim()).filter(Boolean);
 const errorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
+
 async function loadOutline(classId: string, setOutline: (value: OutlineWeek[]) => void) {
-  try { const result = await axiosClient.get<OutlineResponse, OutlineResponse>(`/api/progress/class/${classId}/outline`); setOutline(result.data || []); }
-  catch (error) { toast.error(errorMessage(error, 'Unable to load curriculum placement.')); }
+  try {
+    const result = await axiosClient.get<OutlineResponse, OutlineResponse>(`/api/progress/class/${classId}/outline`);
+    setOutline(result.data || []);
+  } catch (error) {
+    toast.error(errorMessage(error, 'Unable to load curriculum placement.'));
+  }
 }

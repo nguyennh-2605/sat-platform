@@ -314,17 +314,25 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
             : 'w-full max-w-lg overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay',
         className,
       )}>
-        <div className={cx('flex items-start justify-between px-6 pt-5', isContentPanel && 'border-b border-ui-border pb-5')}>
+        <div className={cx(
+          'flex items-start justify-between',
+          isContentDialog ? 'px-4 pt-4' : 'px-6 pt-5',
+          isContentPanel && 'border-b border-ui-border pb-5',
+        )}>
           <div>
-            <h2 id={titleId} className="text-heading font-semibold text-foreground">{title}</h2>
+            <h2 id={titleId} className={cx(isContentDialog ? 'text-title font-medium' : 'text-heading font-semibold', 'text-foreground')}>{title}</h2>
             {subtitle && <p id={subtitleId} className="mt-1 text-body text-muted-foreground">{subtitle}</p>}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+          <Button variant="ghost" size="icon" className={isContentDialog ? '!h-8 !w-8' : undefined} onClick={onClose} aria-label="Close">
             <X size={18} />
           </Button>
         </div>
-        <div className={isContentPanel || isContentDialog ? 'min-h-0 flex-1 overflow-hidden p-6' : 'p-6'}>{children}</div>
-        {footer && <div className={cx('flex justify-end gap-3 px-6 pb-5', isContentPanel && 'border-t border-ui-border bg-background pt-4')}>{footer}</div>}
+        <div className={isContentPanel ? 'min-h-0 flex-1 overflow-hidden p-6' : isContentDialog ? 'min-h-0 flex-1 overflow-hidden p-4' : 'p-6'}>{children}</div>
+        {footer && <div className={cx(
+          'flex justify-end',
+          isContentDialog ? 'gap-2 border-t border-ui-border bg-muted/50 px-4 py-4 [&>button]:h-8' : 'gap-3 px-6 pb-5',
+          isContentPanel && 'border-t border-ui-border bg-background pt-4',
+        )}>{footer}</div>}
       </div>
     </div>
   );
