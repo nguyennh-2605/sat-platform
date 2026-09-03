@@ -136,7 +136,7 @@ export function ClassroomTodoPanel() {
     }
     if (item.type === 'TEST_RESULT' && item.deliveryId) {
       void acknowledge(item);
-      navigate(`/dashboard/class/${item.classId}?tab=performance&deliveryId=${item.deliveryId}`);
+      navigate(`/dashboard/class/${item.classId}?tab=results&deliveryId=${item.deliveryId}`);
       return;
     }
     if (item.assignmentId) navigate(`/dashboard/class/${item.classId}/assignment/${item.assignmentId}`);

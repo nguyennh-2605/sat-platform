@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FileText, Clock, Link as LinkIcon, Send, Github, Globe, YoutubeIcon, Edit, MoreHorizontal, Trash2, ClipboardList, ChevronRight, TriangleAlert, CheckCircle2, CircleDashed, ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -43,6 +43,7 @@ interface APIResponse {
 const AssignmentDetail = () => {
   const { classId, assignmentId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const userRole = localStorage.getItem('userRole');
 
@@ -76,6 +77,11 @@ const AssignmentDetail = () => {
       fetchAssignmentDetail();
     }
   }, [assignmentId, fetchAssignmentDetail]);
+
+  useEffect(() => {
+    if (!assignment || new URLSearchParams(location.search).get('view') !== 'student-work') return;
+    window.requestAnimationFrame(() => document.getElementById('student-work')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [assignment, location.search]);
 
   // Hàm nộp bài của bạn (đã được tinh chỉnh xíu cho mượt)
   const handleSubmitAssignment = async () => {
@@ -199,7 +205,7 @@ const AssignmentDetail = () => {
               ))}
             </div></Card>}
 
-            {!isStudent && assignment.studentWork && <Card className="overflow-hidden"><div className="flex items-center justify-between gap-3 border-b border-ui-border px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">Student work</h2><p className="mt-0.5 text-xs text-muted-foreground">{assignment.studentWork.filter(item => item.submitted).length} of {assignment.studentWork.length} submitted</p></div><Badge tone="neutral">Teacher check</Badge></div><div className="divide-y divide-ui-border">{assignment.studentWork.length === 0 ? <p className="px-5 py-8 text-center text-sm text-muted-foreground">No students are enrolled in this class.</p> : assignment.studentWork.map(item => <div key={item.student.id} className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center"><span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${item.submitted ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>{item.submitted ? <CheckCircle2 size={16} /> : <CircleDashed size={16} />}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-foreground">{item.student.name || item.student.email}</p><p className="truncate text-xs text-muted-foreground">{item.student.email}</p></div><div className="flex items-center justify-between gap-3 sm:justify-end"><span className="text-xs text-muted-foreground">{item.submittedAt ? format(parseISO(item.submittedAt), 'MMM d, yyyy · HH:mm') : 'Not submitted'}</span>{item.fileUrl && <a href={item.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">Open work<ExternalLink size={12} /></a>}</div>{item.textResponse && <p className="rounded-control bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground sm:max-w-sm">{item.textResponse}</p>}</div>)}</div></Card>}
+            {!isStudent && assignment.studentWork && <Card id="student-work" className="scroll-mt-6 overflow-hidden"><div className="flex items-center justify-between gap-3 border-b border-ui-border px-5 py-4"><div><h2 className="text-base font-semibold text-foreground">Student work</h2><p className="mt-0.5 text-xs text-muted-foreground">{assignment.studentWork.filter(item => item.submitted).length} of {assignment.studentWork.length} submitted</p></div><Badge tone="neutral">Teacher check</Badge></div><div className="divide-y divide-ui-border">{assignment.studentWork.length === 0 ? <p className="px-5 py-8 text-center text-sm text-muted-foreground">No students are enrolled in this class.</p> : assignment.studentWork.map(item => <div key={item.student.id} className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center"><span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${item.submitted ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>{item.submitted ? <CheckCircle2 size={16} /> : <CircleDashed size={16} />}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-foreground">{item.student.name || item.student.email}</p><p className="truncate text-xs text-muted-foreground">{item.student.email}</p></div><div className="flex items-center justify-between gap-3 sm:justify-end"><span className="text-xs text-muted-foreground">{item.submittedAt ? format(parseISO(item.submittedAt), 'MMM d, yyyy · HH:mm') : 'Not submitted'}</span>{item.fileUrl && <a href={item.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">Open work<ExternalLink size={12} /></a>}</div>{item.textResponse && <p className="rounded-control bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground sm:max-w-sm">{item.textResponse}</p>}</div>)}</div></Card>}
 
           {assignment.selectedTests && assignment.selectedTests.length > 0 && (
             <button onClick={() => setShowTestsModal(true)} className="flex w-full items-center gap-3 rounded-card border border-ui-border bg-surface p-4 text-left transition-colors hover:bg-muted"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-primary-soft text-primary"><ClipboardList size={18} /></span><span className="min-w-0 flex-1"><span className="block font-semibold text-foreground">Attached tests ({assignment.selectedTests.length})</span><span className="block text-sm text-muted-foreground">View the full list of assigned tests</span></span><ChevronRight size={18} className="text-muted-foreground" /></button>

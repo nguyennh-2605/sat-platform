@@ -15,7 +15,7 @@ import ClassroomActivities from '../../features/classroom/ClassroomActivities';
 import { capitalizeFirstLetter } from '../../utils/text';
 
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-type ClassroomTab = 'LESSONS' | 'ACTIVITIES' | 'PERFORMANCE' | 'MEMBERS' | 'ANNOUNCEMENTS';
+type ClassroomTab = 'LESSONS' | 'ACTIVITIES' | 'RESULTS' | 'MEMBERS' | 'ANNOUNCEMENTS';
 
 interface CurrentUser { id: string; name: string; role: UserRole }
 interface ClassMember { id: number; name: string | null; email: string; createdAt: string }
@@ -74,7 +74,7 @@ export default function Classroom() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')?.toUpperCase();
-    const aliases: Record<string, ClassroomTab> = { PROGRESS: 'LESSONS', NOTIFICATIONS: 'ANNOUNCEMENTS' };
+    const aliases: Record<string, ClassroomTab> = { PROGRESS: 'LESSONS', PERFORMANCE: 'RESULTS', NOTIFICATIONS: 'ANNOUNCEMENTS' };
     const resolved = aliases[requestedTab || ''] || requestedTab;
     if (requestedTab && aliases[requestedTab]) {
       const next = new URLSearchParams(searchParams);
@@ -82,21 +82,21 @@ export default function Classroom() {
       setSearchParams(next, { replace: true });
     }
     if (resolved === 'LESSONS' || resolved === 'ACTIVITIES' || resolved === 'MEMBERS' || resolved === 'ANNOUNCEMENTS') setActiveTab(resolved);
-    if (canManage && resolved === 'PERFORMANCE') setActiveTab(resolved);
+    if (canManage && resolved === 'RESULTS') setActiveTab(resolved);
   }, [canManage, searchParams, setSearchParams]);
 
   const selectTab = (tab: ClassroomTab) => {
     setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
     next.set('tab', tab.toLowerCase());
-    if (tab !== 'PERFORMANCE') next.delete('deliveryId');
+    if (tab !== 'RESULTS') next.delete('deliveryId');
     setSearchParams(next, { replace: true });
   };
 
   const openTestPerformance = (deliveryId: string) => {
-    setActiveTab('PERFORMANCE');
+    setActiveTab('RESULTS');
     const next = new URLSearchParams(searchParams);
-    next.set('tab', 'performance');
+    next.set('tab', 'results');
     next.set('deliveryId', deliveryId);
     setSearchParams(next, { replace: true });
   };
@@ -120,7 +120,7 @@ export default function Classroom() {
   const tabs: Array<TabItem<ClassroomTab>> = [
     { value: 'LESSONS', label: 'Lessons', panelId: 'classroom-lessons-panel' },
     { value: 'ACTIVITIES', label: 'Activities', panelId: 'classroom-activities-panel' },
-    ...(canManage ? [{ value: 'PERFORMANCE' as ClassroomTab, label: 'Performance', panelId: 'classroom-performance-panel' }] : []),
+    ...(canManage ? [{ value: 'RESULTS' as ClassroomTab, label: 'Results', panelId: 'classroom-results-panel' }] : []),
     { value: 'MEMBERS', label: 'Members', panelId: 'classroom-members-panel' },
     { value: 'ANNOUNCEMENTS', label: 'Announcements', panelId: 'classroom-announcements-panel' },
   ];
@@ -137,7 +137,7 @@ export default function Classroom() {
       <div>
       {activeTab === 'LESSONS' && <div id="classroom-lessons-panel" role="tabpanel" className="py-2"><WeeklyProgress canManage={canManage} students={classDetail.students} /></div>}
       {activeTab === 'ACTIVITIES' && <div id="classroom-activities-panel" role="tabpanel"><ClassroomActivities classId={classId || ''} students={classDetail.students} canManage={canManage} onOpenPerformance={openTestPerformance} /></div>}
-      {activeTab === 'PERFORMANCE' && canManage && <div id="classroom-performance-panel" role="tabpanel" className="py-2"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
+      {activeTab === 'RESULTS' && canManage && <div id="classroom-results-panel" role="tabpanel" className="py-2"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
       {activeTab === 'MEMBERS' && <div id="classroom-members-panel" role="tabpanel"><MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} /></div>}
       {activeTab === 'ANNOUNCEMENTS' && <div id="classroom-announcements-panel" role="tabpanel"><AnnouncementsTab classId={classDetail.id} selectedAnnouncementId={searchParams.get('announcementId')} refreshKey={announcementVersion} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} /></div>}
       </div>
@@ -151,7 +151,7 @@ export default function Classroom() {
 
 function ClassroomHeader({ className, tabs, activeTab, onSelectTab }: { className: string; tabs: Array<TabItem<ClassroomTab>>; activeTab: ClassroomTab; onSelectTab: (tab: ClassroomTab) => void }) {
   return <div className="flex flex-col gap-4">
-    <PageHeader title={className} description="Manage lessons, activities, members, and class performance." />
+    <PageHeader title={className} description="Manage lessons, activities, results, members, and announcements." />
     <div className="overflow-x-auto"><Tabs items={tabs} value={activeTab} onValueChange={onSelectTab} ariaLabel="Classroom sections" /></div>
   </div>;
 }

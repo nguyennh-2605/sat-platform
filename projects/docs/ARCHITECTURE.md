@@ -154,6 +154,7 @@ Express Server (index.js → app.js)
 | `POST` | `/api/tests/:id/copy-to-system` | JWT + ADMIN | Copy a Teacher-owned Personal test into a platform-owned System Draft |
 | `PATCH` | `/api/tests/:id/status` | JWT + TEACHER/ADMIN | Publish, archive, or restore an owned test |
 | `GET` | `/api/class-activities/class/:classId` | JWT | List Assignment and Test activities visible to staff or an enrolled student |
+| `GET` | `/api/class-activities/class/:classId/results` | JWT + TEACHER/ADMIN | List the unified Assignment and Test results projection used by the action-oriented Results view |
 | `POST` | `/api/class-activities/assignments` | JWT + TEACHER/ADMIN | Publish an Assignment to all or selected students, optionally linked to a lesson |
 | `POST` | `/api/class-activities/homework` | JWT + TEACHER/ADMIN | Compatibility alias for Assignment creation; new clients must use `/assignments` |
 | `POST` | `/api/test-deliveries` | JWT + TEACHER/ADMIN | Bulk-publish one or more tests; one request creates one independent TestDelivery and ClassActivity per selected test |
@@ -331,7 +332,7 @@ Folder ──1:N── Test
 | `/dashboard/practice-test` | PracticeTest | Test listing & filters |
 | `/dashboard/practice-test/my-bank/:folderId?` | TestBank | Folder-based test organization |
 | `/dashboard/practice-test/create` | CreateTestWizard | Multi-step test creation |
-| `/dashboard/class/:classId` | Classroom | Lessons, canonical activities, performance (teacher), members, and announcements |
+| `/dashboard/class/:classId` | Classroom | Lessons, canonical activities, results (teacher), members, and announcements |
 | `/dashboard/class/:classId/assignment/:assignmentId` | AssignmentDetail | View/submit homework |
 | `/dashboard/error-log` | ErrorLog | Wrong answer tracking |
 | `/dashboard/results-analytics` | ResultAnalytics | Performance charts & history |

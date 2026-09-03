@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowRight, BarChart3, CheckCircle2, Clock3, Eye, FileText, Target, Trophy, Users } from 'lucide-react';
+import { BarChart3, CheckCircle2, Clock3, Eye, Target, Trophy, Users } from 'lucide-react';
 import axiosClient from '../../lib/axios';
 import { Badge, Button, Card, EmptyState, Modal, Select } from '../../components/ui/AppUI';
 import { DataSurface } from '@/components/ui/data-surface';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useDashboardBack } from '../navigation/DashboardBackContext';
 import { capitalizeFirstLetter } from '../../utils/text';
+import ClassroomResultsOverview from './ClassroomResultsOverview';
 
 interface DeliveryListItem {
   id: string; title: string; createdAt: string; dueAt: string | null; maxAttempts: number; scorePolicy: 'FIRST' | 'BEST' | 'LATEST';
@@ -37,18 +39,10 @@ const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(-2).m
 
 export default function StudentAnalytics({ classId, initialDeliveryId }: { classId?: string; initialDeliveryId?: string | null }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [deliveries, setDeliveries] = useState<DeliveryListItem[]>([]);
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(initialDeliveryId || null);
   const [report, setReport] = useState<PerformanceReport | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!classId) return;
-    axiosClient.get(`/api/test-deliveries/class/${classId}`)
-      .then(data => setDeliveries(Array.isArray(data) ? data : []))
-      .catch(error => console.error('Unable to load assigned tests:', error))
-      .finally(() => setLoading(false));
-  }, [classId]);
   useEffect(() => {
     if (!selectedDeliveryId) return;
     axiosClient.get(`/api/test-deliveries/${selectedDeliveryId}/performance`)
@@ -62,7 +56,7 @@ export default function StudentAnalytics({ classId, initialDeliveryId }: { class
     setLoading(true);
     setSelectedDeliveryId(deliveryId);
     const next = new URLSearchParams(searchParams);
-    next.set('tab', 'performance');
+    next.set('tab', 'results');
     next.set('deliveryId', deliveryId);
     setSearchParams(next, { replace: true });
   };
@@ -75,19 +69,12 @@ export default function StudentAnalytics({ classId, initialDeliveryId }: { class
   };
   useDashboardBack(closeReport, Boolean(selectedDeliveryId), 10);
   if (selectedDeliveryId) return <PerformanceDashboard report={report} loading={loading} />;
-  return <div className="space-y-5 animate-fade-in-up">
-    <div><h2 className="text-lg font-semibold text-foreground">Test Performance</h2><p className="mt-1 text-xs text-muted-foreground">Select an assigned test to review submissions and question-level performance.</p></div>
-    {loading ? <EmptyState title="Loading assigned tests…" compact /> : deliveries.length === 0 ? <EmptyState title="No assigned tests" description="Tests assigned to this class will appear here." /> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{deliveries.map(delivery => <Card key={delivery.id} interactive role="button" tabIndex={0} className="group cursor-pointer p-5" onClick={() => openReport(delivery.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openReport(delivery.id); } }}>
-      <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary"><FileText size={19} /></div><div className="min-w-0"><h3 className="truncate text-sm font-semibold text-foreground">{capitalizeFirstLetter(delivery.title)}</h3><p className="mt-1 text-xs text-muted-foreground">{delivery.lesson ? `${delivery.lesson.week.title} · ${delivery.lesson.title}` : 'Direct assignment'}</p></div></div><ArrowRight size={17} className="mt-1 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" /></div>
-      <div className="mt-5 grid grid-cols-3 border-t border-ui-border pt-4 text-center"><Metric value={`${delivery.stats.completed}/${delivery.stats.assigned}`} label="Submitted" /><Metric value={delivery.stats.averageScore === null ? '—' : `${delivery.stats.averageScore}%`} label="Average" bordered /><Metric value={String(delivery.stats.inProgress)} label="In progress" /></div>
-      <div className="mt-4 flex items-center justify-between text-[11px] text-muted-foreground"><Badge tone={delivery.test.mode === 'EXAM' ? 'green' : 'gold'}>{delivery.test.mode === 'EXAM' ? 'Test' : 'Practice'}</Badge><span>{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleDateString()}` : 'No deadline'}</span></div>
-    </Card>)}</div>}
-  </div>;
+  return classId ? <ClassroomResultsOverview classId={classId} onOpenTest={openReport} /> : <EmptyState title="Class results unavailable" />;
 }
 
 function PerformanceDashboard({ report, loading }: { report: PerformanceReport | null; loading: boolean }) {
   const [selectedStudent, setSelectedStudent] = useState<StudentRow | null>(null);
-  if (loading || !report) return <div className="space-y-5"><PageHeading title="Test Performance" subtitle="Loading report…" /><EmptyState title="Loading performance data…" compact /></div>;
+  if (loading || !report) return <div className="space-y-5"><PageHeading title="Test results" subtitle="Loading report…" /><EmptyState title="Loading results…" compact /></div>;
   const kpis = [
     { label: 'AVERAGE SCORE', value: correctScore(report.kpis.averageCorrect, report.delivery.test.questionCount), detail: `Median ${score(report.kpis.medianScore)}`, icon: Target },
     { label: 'HIGHEST SCORE', value: correctScore(report.kpis.highestCorrect, report.delivery.test.questionCount), detail: 'Top result', icon: Trophy },
@@ -97,9 +84,9 @@ function PerformanceDashboard({ report, loading }: { report: PerformanceReport |
     { label: 'AVERAGE TIME', value: report.delivery.test.mode === 'EXAM' ? formatDuration(report.kpis.averageTimeMs) : 'N/A', detail: report.delivery.test.mode === 'EXAM' ? 'Active test duration' : 'Test mode only', icon: Clock3 },
   ];
   return <div className="space-y-6">
-    <PageHeading title={capitalizeFirstLetter(report.delivery.title)} subtitle={`${capitalizeFirstLetter(report.delivery.test.title)} · ${report.delivery.test.mode === 'EXAM' ? 'Test mode' : 'Practice mode'} · ${report.delivery.test.questionCount} questions`} />
+    <PageHeading title={capitalizeFirstLetter(report.delivery.title)} subtitle={`${report.delivery.lesson ? `${capitalizeFirstLetter(report.delivery.lesson.week.title)} · ${capitalizeFirstLetter(report.delivery.lesson.title)} · ` : 'Direct assignment · '}${capitalizeFirstLetter(report.delivery.test.title)} · ${report.delivery.test.mode === 'EXAM' ? 'Test mode' : 'Practice mode'} · ${report.delivery.test.questionCount} questions`} />
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{kpis.map(({ label, value, detail, icon: Icon }) => <Card key={label} className="min-h-[116px] p-4"><div className="flex items-start justify-between"><span className="text-[10px] font-semibold tracking-[0.08em] text-muted-foreground">{label}</span><Icon size={15} className="text-primary" /></div><p className="mt-4 text-2xl font-semibold text-foreground">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{detail}</p></Card>)}</div>
-    <div className="grid items-start gap-6 xl:grid-cols-12"><div className="space-y-6 xl:col-span-8"><QuestionBreakdown questions={report.questions} showTiming={report.delivery.test.mode === 'EXAM'} /><StudentRankings students={report.students} totalQuestions={report.delivery.test.questionCount} showTiming={report.delivery.test.mode === 'EXAM'} onView={setSelectedStudent} /></div><div className="space-y-6 xl:col-span-4"><HardestQuestions questions={report.hardestQuestions} /><ScoreDistribution items={report.scoreDistribution} /></div></div>
+    <div className="grid items-start gap-6 xl:grid-cols-12"><div className="space-y-6 xl:col-span-8"><StudentsTable students={report.students} totalQuestions={report.delivery.test.questionCount} showTiming={report.delivery.test.mode === 'EXAM'} onView={setSelectedStudent} /><QuestionBreakdown questions={report.questions} showTiming={report.delivery.test.mode === 'EXAM'} /></div><div className="space-y-6 xl:col-span-4"><HardestQuestions questions={report.hardestQuestions} /><ScoreDistribution items={report.scoreDistribution} /></div></div>
     {selectedStudent && <StudentDetailModal deliveryId={report.delivery.id} student={selectedStudent} onClose={() => setSelectedStudent(null)} />}
   </div>;
 }
@@ -107,9 +94,11 @@ function PerformanceDashboard({ report, loading }: { report: PerformanceReport |
 function QuestionBreakdown({ questions, showTiming }: { questions: QuestionRow[]; showTiming: boolean }) {
   return <Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border p-5"><div><h3 className="text-sm font-semibold">Question Performance Breakdown</h3><p className="mt-1 text-xs text-muted-foreground">Accuracy across counted submissions</p></div><div className="flex gap-4 text-xs text-muted-foreground"><Legend color="var(--primary)" label="Correct" /><Legend color="var(--danger)" label="Incorrect" /></div></div><div className="max-h-[520px] space-y-5 overflow-y-auto p-5">{questions.map(question => <div key={question.id}><div className="mb-2 flex items-center gap-3"><span className="w-8 text-xs font-semibold text-muted-foreground">Q{question.number}</span><div className="flex h-3 flex-1 overflow-hidden rounded-xs bg-danger-soft"><div className="bg-primary" style={{ width: `${question.correctPercentage}%` }} /></div><span className="w-10 text-right text-xs font-semibold">{question.correctPercentage}%</span></div><div className="ml-11 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground"><span>{question.correct} correct · {question.incorrect} incorrect</span>{question.domain && <Badge>{question.domain}</Badge>}{question.skill && <Badge tone="green">{question.skill}</Badge>}{showTiming && <span className="ml-auto">Avg. {formatDuration(question.averageTimeMs)}</span>}</div></div>)}{questions.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">No question data yet.</p>}</div></Card>;
 }
-function StudentRankings({ students, totalQuestions, showTiming, onView }: { students: StudentRow[]; totalQuestions: number; showTiming: boolean; onView: (student: StudentRow) => void }) {
-  const ordered = useMemo(() => [...students].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)), [students]);
-  return <DataSurface><div className="flex items-center gap-2 border-b border-ui-border px-4 py-3"><Users size={16} className="text-primary" /><h3 className="text-sm font-medium">Student Rankings</h3></div><Table><TableHeader><TableRow><TableHead>Student</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-center">Score</TableHead>{showTiming && <TableHead className="text-center">Time</TableHead>}<TableHead className="w-12 text-right"><span className="sr-only">Actions</span></TableHead></TableRow></TableHeader><TableBody>{ordered.length === 0 ? <TableRow className="hover:bg-transparent"><TableCell colSpan={showTiming ? 5 : 4} className="h-40 text-center text-muted-foreground">No students are assigned.</TableCell></TableRow> : ordered.map(student => <TableRow key={student.id}><TableCell><div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-soft text-[10px] font-semibold text-primary">{initials(student.name)}</span><div className="min-w-0"><p className="truncate font-medium text-foreground">{student.name}</p><p className="truncate text-xs text-muted-foreground">{student.email}</p></div></div></TableCell><TableCell className="text-center"><StatusBadge status={student.status} /></TableCell><TableCell className="text-center font-semibold tabular-nums text-primary">{correctScore(student.rawScore, totalQuestions)}</TableCell>{showTiming && <TableCell className="text-center text-muted-foreground">{formatDuration(student.completionTimeMs)}</TableCell>}<TableCell className="text-right"><Button variant="ghost" size="icon" className="size-9 shadow-none" onClick={() => onView(student)} aria-label={`View ${student.name}`}><Eye size={16} /></Button></TableCell></TableRow>)}</TableBody></Table></DataSurface>;
+function StudentsTable({ students, totalQuestions, showTiming, onView }: { students: StudentRow[]; totalQuestions: number; showTiming: boolean; onView: (student: StudentRow) => void }) {
+  const [status, setStatus] = useState<'ALL' | StudentRow['status']>('ALL');
+  const ordered = useMemo(() => students.filter(student => status === 'ALL' || student.status === status).sort((a, b) => (b.score ?? -1) - (a.score ?? -1)), [status, students]);
+  const labels = { ALL: 'All students', COMPLETED: 'Completed', IN_PROGRESS: 'In progress', MISSING: 'Missing', ASSIGNED: 'Not started' } as const;
+  return <DataSurface><div className="flex items-center gap-2 border-b border-ui-border px-4 py-3"><Users size={16} className="text-primary" /><h3 className="text-sm font-medium">Students</h3><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="ml-auto">{labels[status]}</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuRadioGroup value={status} onValueChange={value => setStatus(value as typeof status)}>{Object.entries(labels).map(([value, label]) => <DropdownMenuRadioItem key={value} value={value}>{label}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuContent></DropdownMenu></div><Table><TableHeader><TableRow><TableHead>Student</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-center">Score</TableHead>{showTiming && <TableHead className="text-center">Time</TableHead>}<TableHead className="w-12 text-right"><span className="sr-only">Actions</span></TableHead></TableRow></TableHeader><TableBody>{ordered.length === 0 ? <TableRow className="hover:bg-transparent"><TableCell colSpan={showTiming ? 5 : 4} className="h-40 text-center text-muted-foreground">No students match this status.</TableCell></TableRow> : ordered.map(student => <TableRow key={student.id}><TableCell><div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-soft text-[10px] font-semibold text-primary">{initials(student.name)}</span><div className="min-w-0"><p className="truncate font-medium text-foreground">{student.name}</p><p className="truncate text-xs text-muted-foreground">{student.email}</p></div></div></TableCell><TableCell className="text-center"><StatusBadge status={student.status} /></TableCell><TableCell className="text-center font-semibold tabular-nums text-primary">{correctScore(student.rawScore, totalQuestions)}</TableCell>{showTiming && <TableCell className="text-center text-muted-foreground">{formatDuration(student.completionTimeMs)}</TableCell>}<TableCell className="text-right"><Button variant="ghost" size="icon" className="size-9 shadow-none" onClick={() => onView(student)} aria-label={`View ${student.name}`}><Eye size={16} /></Button></TableCell></TableRow>)}</TableBody></Table></DataSurface>;
 }
 function HardestQuestions({ questions }: { questions: QuestionRow[] }) {
   return <Card className="p-5"><h3 className="text-sm font-semibold">Hardest Questions</h3><p className="mt-1 text-xs text-muted-foreground">Lowest class accuracy</p><div className="mt-5 space-y-4">{questions.map(question => <div key={question.id} className="flex items-center gap-3 border-b border-ui-border pb-4 last:border-0 last:pb-0"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-danger-soft text-xs font-semibold text-danger">Q{question.number}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{question.skill || question.domain || question.sectionName}</p><div className="mt-2 h-1.5 overflow-hidden rounded-xs bg-danger-soft"><div className="h-full bg-danger" style={{ width: `${question.correctPercentage}%` }} /></div></div><span className="text-xs font-semibold text-danger">{question.correctPercentage}%</span></div>)}{questions.length === 0 && <p className="text-xs text-muted-foreground">No completed submissions yet.</p>}</div></Card>;
@@ -206,7 +195,6 @@ function StudentDetailModal({ deliveryId, student, onClose }: { deliveryId: stri
   );
 }
 function PageHeading({ title, subtitle }: { title: string; subtitle: string }) { return <div><h2 className="text-lg font-semibold">{title}</h2><p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p></div>; }
-function Metric({ value, label, bordered = false }: { value: string; label: string; bordered?: boolean }) { return <div className={bordered ? 'border-x border-ui-border' : ''}><p className="text-base font-semibold text-foreground">{value}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{label}</p></div>; }
 function Legend({ color, label }: { color: string; label: string }) { return <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-xs" style={{ backgroundColor: color }} />{label}</span>; }
 function score(value: number | null | undefined) { return Number.isFinite(value) ? `${value}%` : '—'; }
 function correctScore(value: number | null | undefined, totalQuestions: number) { return Number.isFinite(value) && totalQuestions > 0 ? `${value}/${totalQuestions}` : '—'; }

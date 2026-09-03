@@ -16,6 +16,21 @@ exports.listForClass = async (req, res) => {
   }
 };
 
+exports.listResultsForClass = async (req, res) => {
+  try {
+    const results = await classActivityService.listClassResults({
+      classId: req.params.classId,
+      userId: req.user.userId,
+      userRole: req.user.role,
+    });
+    res.json(results);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('List class results error:', error);
+    res.status(500).json({ error: 'Unable to load class results.' });
+  }
+};
+
 exports.createAssignment = async (req, res) => {
   try {
     const activity = await classActivityService.createAssignmentActivity({

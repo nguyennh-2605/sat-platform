@@ -73,6 +73,120 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
     .sort((left, right) => (right.assignedAt?.getTime() || 0) - (left.assignedAt?.getTime() || 0));
 };
 
+const chooseCountedAttempt = (submissions, scorePolicy) => {
+  const completed = submissions.filter(item => item.status === 'COMPLETED');
+  if (!completed.length) return null;
+  if (scorePolicy === 'BEST') {
+    return [...completed].sort((left, right) => (right.score || 0) - (left.score || 0) || left.attemptNo - right.attemptNo)[0];
+  }
+  if (scorePolicy === 'LATEST') {
+    return [...completed].sort((left, right) => right.attemptNo - left.attemptNo)[0];
+  }
+  return [...completed].sort((left, right) => left.attemptNo - right.attemptNo)[0];
+};
+
+exports.listClassResults = async ({ classId, userId, userRole }) => {
+  const classroom = await prisma.class.findUnique({
+    where: { id: String(classId) },
+    select: { teacherId: true },
+  });
+  if (!classroom) throw new ApiError(404, { error: 'Class not found.' });
+  if (userRole !== 'ADMIN' && classroom.teacherId !== intId(userId)) {
+    throw new ApiError(403, { error: 'Only class staff can view results.' });
+  }
+
+  const activities = await prisma.classActivity.findMany({
+    where: { classId: String(classId), type: { in: ['TEST', 'HOMEWORK'] } },
+    orderBy: [{ createdAt: 'desc' }],
+    select: {
+      id: true,
+      type: true,
+      status: true,
+      title: true,
+      dueAt: true,
+      createdAt: true,
+      lesson: { select: { id: true, title: true, order: true, week: { select: { id: true, title: true, order: true } } } },
+      assignees: { select: { studentId: true, assignedAt: true, excusedAt: true } },
+      test: {
+        select: {
+          testDeliveryId: true,
+          testDelivery: {
+            select: {
+              scorePolicy: true,
+              test: { select: { sections: { select: { _count: { select: { questions: true } } } } } },
+              submissions: { select: { userId: true, status: true, score: true, attemptNo: true } },
+            },
+          },
+        },
+      },
+      homework: {
+        select: {
+          assignmentId: true,
+          assignment: { select: { submissions: { select: { studentId: true } } } },
+        },
+      },
+    },
+  });
+
+  return activities.map(activity => {
+    const activeAssignees = activity.assignees.filter(item => !item.excusedAt);
+    const assignedIds = new Set(activeAssignees.map(item => item.studentId));
+    const assignedAt = activeAssignees.reduce((earliest, assignee) => (
+      !earliest || assignee.assignedAt < earliest ? assignee.assignedAt : earliest
+    ), null);
+    const base = {
+      id: activity.id,
+      type: activity.type,
+      status: activity.status,
+      title: activity.title,
+      assignedAt,
+      dueAt: activity.dueAt,
+      createdAt: activity.createdAt,
+      lesson: activity.lesson,
+    };
+
+    if (activity.type === 'TEST' && activity.test?.testDelivery) {
+      const delivery = activity.test.testDelivery;
+      const questionCount = delivery.test.sections.reduce((sum, section) => sum + section._count.questions, 0);
+      const counted = activeAssignees.map(assignee => chooseCountedAttempt(
+        delivery.submissions.filter(item => item.userId === assignee.studentId),
+        delivery.scorePolicy,
+      )).filter(Boolean);
+      const completedIds = new Set(counted.map(item => item.userId));
+      const inProgressIds = new Set(delivery.submissions
+        .filter(item => item.status === 'DOING' && assignedIds.has(item.userId) && !completedIds.has(item.userId))
+        .map(item => item.userId));
+      const scores = counted
+        .map(item => questionCount && Number.isFinite(Number(item.score)) ? Math.round((Number(item.score) / questionCount) * 100) : null)
+        .filter(Number.isFinite);
+      return {
+        ...base,
+        testResult: {
+          deliveryId: activity.test.testDeliveryId,
+          assigned: activeAssignees.length,
+          completed: completedIds.size,
+          inProgress: inProgressIds.size,
+          missing: activity.dueAt && activity.dueAt < new Date() ? activeAssignees.length - completedIds.size : 0,
+          averageScore: scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length) : null,
+        },
+      };
+    }
+
+    const submittedIds = new Set((activity.homework?.assignment.submissions || [])
+      .filter(item => assignedIds.has(item.studentId))
+      .map(item => item.studentId));
+    return {
+      ...base,
+      assignmentResult: {
+        assignmentId: activity.homework?.assignmentId || null,
+        assigned: activeAssignees.length,
+        submitted: submittedIds.size,
+        missing: activity.dueAt && activity.dueAt < new Date() ? activeAssignees.length - submittedIds.size : 0,
+      },
+    };
+  });
+};
+
 const normalizeDate = (value, fieldName) => {
   if (!value) return null;
   const date = new Date(value);

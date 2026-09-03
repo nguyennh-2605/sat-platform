@@ -260,9 +260,132 @@ const seedTeacher = async (teacher, now) => prisma.$transaction(async tx => {
   });
 
   const weekDefinitions = curriculumWeeks(now);
-  for (const week of weekDefinitions) await tx.week.create({ data: { ...week, classId: foundation.id } });
+  const seededWeeks = [];
+  for (const week of weekDefinitions) {
+    seededWeeks.push(await tx.week.create({
+      data: { ...week, classId: foundation.id },
+      include: { lessons: { orderBy: { order: 'asc' } } },
+    }));
+  }
 
-  return { teacher: teacher.email, classes: 3, students: students.length, submissions: 5, curriculumWeeks: weekDefinitions.length };
+  const foundationStudents = [liam, mia, noah, sophia];
+  const foundationTests = [
+    { suffix: 'main-ideas', title: 'Main Ideas Diagnostic', lesson: seededWeeks[0].lessons[0], createdAt: at(now, -25 * DAY), dueAt: at(now, -20 * DAY), completed: [[liam, 31], [mia, 35], [sophia, 27]], doing: [] },
+    { suffix: 'evidence', title: 'Command of Evidence Checkpoint', lesson: seededWeeks[0].lessons[1], createdAt: at(now, -22 * DAY), dueAt: at(now, -17 * DAY), completed: [[liam, 29], [mia, 33]], doing: [noah] },
+    { suffix: 'words-context', title: 'Words in Context Practice', lesson: seededWeeks[1].lessons[0], createdAt: at(now, -18 * DAY), dueAt: at(now, -13 * DAY), completed: [[liam, 34], [noah, 26], [sophia, 30]], doing: [] },
+    { suffix: 'text-structure', title: 'Text Structure Review', lesson: seededWeeks[1].lessons[1], createdAt: at(now, -12 * DAY), dueAt: at(now, -3 * DAY), completed: [[mia, 36]], doing: [liam] },
+    { suffix: 'boundaries', title: 'Boundaries Mastery Check', lesson: seededWeeks[2].lessons[0], createdAt: at(now, -6 * DAY), dueAt: at(now, 2 * DAY), completed: [[liam, 32], [mia, 37]], doing: [sophia] },
+    { suffix: 'linear-equations', title: 'Linear Equations Practice Test', lesson: seededWeeks[3].lessons[0], createdAt: at(now, -2 * DAY), dueAt: at(now, 5 * DAY), completed: [[noah, 28]], doing: [liam, mia] },
+    { suffix: 'direct-review', title: 'Independent SAT Review', lesson: null, createdAt: at(now, -DAY), dueAt: at(now, 8 * DAY), completed: [], doing: [sophia] },
+  ];
+
+  for (const fixture of foundationTests) {
+    const deliveryId = demoDeliveryId(teacher.id, `foundation-${fixture.suffix}`);
+    await tx.testDelivery.create({
+      data: {
+        id: deliveryId,
+        classId: foundation.id,
+        testId: testRecord.id,
+        lessonId: fixture.lesson?.id || null,
+        title: fixture.title,
+        dueAt: fixture.dueAt,
+        scorePolicy: 'BEST',
+        status: 'PUBLISHED',
+        createdAt: fixture.createdAt,
+        createdById: teacher.id,
+        assignees: { create: foundationStudents.map(student => ({ studentId: student.id, assignedAt: fixture.createdAt })) },
+      },
+    });
+    const completedScores = new Map(fixture.completed.map(([student, score]) => [student.id, score]));
+    const doingIds = new Set(fixture.doing.map(student => student.id));
+    await tx.classActivity.create({
+      data: {
+        id: `teacher-overview-demo-${teacher.id}-foundation-activity-${fixture.suffix}`,
+        type: 'TEST',
+        status: 'PUBLISHED',
+        classId: foundation.id,
+        lessonId: fixture.lesson?.id || null,
+        title: fixture.title,
+        dueAt: fixture.dueAt,
+        scorePolicy: 'BEST',
+        createdById: teacher.id,
+        createdAt: fixture.createdAt,
+        audience: 'ALL_STUDENTS',
+        test: { create: { testDeliveryId: deliveryId } },
+        assignees: { create: foundationStudents.map(student => {
+          const score = completedScores.get(student.id);
+          if (score !== undefined) return { studentId: student.id, status: 'COMPLETED', assignedAt: fixture.createdAt, startedAt: at(fixture.dueAt, -2 * DAY), completedAt: at(fixture.dueAt, -DAY), bestScore: Math.round((score / QUESTION_COUNT) * 100), attemptCount: 1 };
+          if (doingIds.has(student.id)) return { studentId: student.id, status: 'IN_PROGRESS', assignedAt: fixture.createdAt, startedAt: at(now, -4 * HOUR), attemptCount: 1 };
+          return { studentId: student.id, status: fixture.dueAt < now ? 'MISSING' : 'ASSIGNED', assignedAt: fixture.createdAt };
+        }) },
+      },
+    });
+    for (const [student, score] of fixture.completed) {
+      const completedAt = at(fixture.dueAt, -DAY);
+      await tx.submission.create({
+        data: {
+          userId: student.id,
+          testId: testRecord.id,
+          deliveryId,
+          attemptNo: 1,
+          score,
+          status: 'COMPLETED',
+          startedAt: at(completedAt, -28 * 60_000),
+          endTime: completedAt,
+          answers: { create: questions.map((question, index) => ({ questionId: question.id, selectedChoice: index < score ? 'A' : 'B', isCorrect: index < score })) },
+        },
+      });
+    }
+    for (const student of fixture.doing) {
+      await tx.submission.create({
+        data: { userId: student.id, testId: testRecord.id, deliveryId, attemptNo: 1, status: 'DOING', startedAt: at(now, -4 * HOUR) },
+      });
+    }
+  }
+
+  const foundationAssignments = [
+    { suffix: 'context-notes', title: 'Context Clues Reflection', lesson: seededWeeks[1].lessons[0], createdAt: at(now, -15 * DAY), dueAt: at(now, -10 * DAY), submitted: [liam, mia, sophia] },
+    { suffix: 'grammar-revision', title: 'Grammar Revision Worksheet', lesson: seededWeeks[2].lessons[1], createdAt: at(now, -5 * DAY), dueAt: at(now, DAY), submitted: [mia] },
+    { suffix: 'systems-practice', title: 'Systems of Equations Practice', lesson: seededWeeks[3].lessons[1], createdAt: at(now, -DAY), dueAt: at(now, 6 * DAY), submitted: [] },
+    { suffix: 'study-plan', title: 'Personal SAT Study Plan', lesson: null, createdAt: at(now, -3 * HOUR), dueAt: null, submitted: [noah] },
+  ];
+
+  for (const fixture of foundationAssignments) {
+    const assignment = await tx.assignment.create({
+      data: {
+        title: `${DEMO_PREFIX} ${fixture.title}`,
+        type: 'assignment',
+        content: `Complete the ${fixture.title.toLowerCase()} and submit a short response.`,
+        fileUrls: [],
+        links: [],
+        deadline: fixture.dueAt,
+        classId: foundation.id,
+        createdAt: fixture.createdAt,
+        submissions: { create: fixture.submitted.map((student, index) => ({ studentId: student.id, textResponse: `Sample response from ${student.name}.`, submittedAt: at(fixture.createdAt, (index + 1) * 6 * HOUR) })) },
+      },
+    });
+    const submittedIds = new Set(fixture.submitted.map(student => student.id));
+    await tx.classActivity.create({
+      data: {
+        id: `teacher-overview-demo-${teacher.id}-foundation-assignment-${fixture.suffix}`,
+        type: 'HOMEWORK',
+        status: 'PUBLISHED',
+        classId: foundation.id,
+        lessonId: fixture.lesson?.id || null,
+        title: fixture.title,
+        dueAt: fixture.dueAt,
+        createdById: teacher.id,
+        createdAt: fixture.createdAt,
+        audience: 'ALL_STUDENTS',
+        homework: { create: { assignmentId: assignment.id } },
+        assignees: { create: foundationStudents.map(student => submittedIds.has(student.id)
+          ? { studentId: student.id, status: 'COMPLETED', assignedAt: fixture.createdAt, completedAt: at(fixture.createdAt, 6 * HOUR), attemptCount: 1 }
+          : { studentId: student.id, status: fixture.dueAt && fixture.dueAt < now ? 'MISSING' : 'ASSIGNED', assignedAt: fixture.createdAt }) },
+      },
+    });
+  }
+
+  return { teacher: teacher.email, classes: 3, students: students.length, submissions: 5, curriculumWeeks: weekDefinitions.length, foundationActivities: foundationTests.length + foundationAssignments.length };
 });
 
 async function main() {

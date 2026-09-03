@@ -510,7 +510,7 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
         await sendNotificationToUser(
           delivery.class.teacherId,
           `${studentInfo?.name || studentInfo?.email} completed "${test.title}" with ${correctCount}/${totalQuestions} correct.`,
-          `/dashboard/class/${delivery.classId}?tab=performance&deliveryId=${delivery.id}`,
+          `/dashboard/class/${delivery.classId}?tab=results&deliveryId=${delivery.id}`,
         );
       }
     } catch (error) {

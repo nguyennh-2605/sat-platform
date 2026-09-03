@@ -181,7 +181,7 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
       if (canManage) onOpenPerformance(activity.test.testDeliveryId);
       else navigate(`/test/${activity.test.testDelivery.testId}?deliveryId=${activity.test.testDeliveryId}`);
     } else if (activity.homework) {
-      navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}`);
+      navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}${canManage ? '?view=student-work' : ''}`);
     }
   };
 
@@ -359,7 +359,7 @@ function ActivityRow({ activity, canManage, onOpen }: { activity: ClassActivity;
       <DropdownMenu>
         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="ml-auto size-9 shadow-none" aria-label={`Actions for ${activity.title}`}><Ellipsis size={16} /></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem onSelect={onOpen}>{activity.type === 'TEST' ? 'View performance' : 'Open assignment'}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onOpen}>{activity.type === 'TEST' ? 'View results' : canManage ? 'Review submissions' : 'Open assignment'}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </TableCell>}

@@ -5,6 +5,7 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth.middlew
 const router = express.Router();
 
 router.get('/class/:classId', authenticateToken, controller.listForClass);
+router.get('/class/:classId/results', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), controller.listResultsForClass);
 router.post('/assignments', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), controller.createAssignment);
 router.post('/homework', authenticateToken, authorizeRole(['TEACHER', 'ADMIN']), controller.createHomework);
 
