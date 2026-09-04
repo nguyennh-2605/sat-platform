@@ -92,7 +92,7 @@ exports.getWeeks = async ({ classId, userId, userRole }) => {
             orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
             include: { progress: { where: { studentId: currentUserId }, take: 1 } },
           },
-          assignments: { include: { assignment: { select: { id: true, deadline: true, submissions: { where: { studentId: currentUserId }, select: { status: true, submittedAt: true, score: true }, take: 1 } } } } },
+          assignments: { include: { assignment: { select: { id: true, deadline: true, submissions: { where: { studentId: currentUserId, submittedAt: { not: null } }, select: { status: true, submittedAt: true, score: true }, take: 1 } } } } },
           deliveries: {
             where: canManage ? {} : { status: 'PUBLISHED', assignees: { some: { studentId: currentUserId, excusedAt: null } } },
             orderBy: { createdAt: 'desc' },
@@ -102,7 +102,7 @@ exports.getWeeks = async ({ classId, userId, userRole }) => {
             where: canManage ? { type: { in: ['VOCABULARY', 'HOMEWORK', 'RESOURCE'] } } : { type: { in: ['VOCABULARY', 'HOMEWORK', 'RESOURCE'] }, status: 'PUBLISHED', assignees: { some: { studentId: currentUserId, status: { not: 'EXCUSED' } } } },
             include: {
               assignees: canManage ? true : { where: { studentId: currentUserId }, take: 1 },
-              homework: { include: { assignment: { select: { id: true, content: true, fileUrls: true, links: true, submissions: { where: { studentId: currentUserId }, select: { status: true, submittedAt: true }, take: 1 } } } } },
+              homework: { include: { assignment: { select: { id: true, content: true, fileUrls: true, links: true, submissions: { where: { studentId: currentUserId, submittedAt: { not: null } }, select: { status: true, submittedAt: true }, take: 1 } } } } },
             },
           },
           progress: canManage ? true : { where: { studentId: currentUserId }, take: 1 },

@@ -238,8 +238,8 @@ exports.getClassDetail = async ({ id, userId, userRole }) => {
         orderBy: { createdAt: 'desc' }, // Lấy bài tập mới nhất lên đầu
         include: {
           submissions: userRole === 'STUDENT'
-            ? { where: { studentId: currentUserId } }
-            : true
+            ? { where: { studentId: currentUserId, submittedAt: { not: null } } }
+            : { where: { submittedAt: { not: null } } }
         }
       }
     }

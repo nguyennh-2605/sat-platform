@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { _assignmentReviewHelpers } = require('../src/services/assignment.service');
 
-const { reviewState, summarizeStudentWork, validateMaxPoints } = _assignmentReviewHelpers;
+const { reviewState, summarizeStudentWork, validateMaxPoints, normalizeExternalUrl, officialSubmission, serializeSubmission } = _assignmentReviewHelpers;
 const now = new Date('2026-09-04T08:00:00.000Z');
 
 test('assignment work state distinguishes open, missing, submitted, and reviewed work', () => {
@@ -36,4 +36,29 @@ test('student work summary keeps pending work separate from overdue missing work
     { state: 'MISSING', submittedAt: null },
   ]);
   assert.deepEqual(summary, { assigned: 4, submitted: 2, needsReview: 1, reviewed: 1, missing: 1, pending: 1 });
+});
+
+test('a private draft is not treated as an official teacher-visible submission', () => {
+  const draftOnly = { submittedAt: null, contents: [{ slot: 'DRAFT', textResponse: 'Work in progress', items: [] }] };
+  assert.equal(officialSubmission(draftOnly), null);
+});
+
+test('serialization keeps submitted and draft content separate', () => {
+  const submission = {
+    id: 'submission-1', submittedAt: now, reviewedAt: null, score: null, feedback: null,
+    contents: [
+      { id: 'official', slot: 'SUBMITTED', textResponse: 'Official answer', version: 2, updatedAt: now, items: [] },
+      { id: 'draft', slot: 'DRAFT', textResponse: 'Half edited answer', version: 1, updatedAt: now, items: [] },
+    ],
+  };
+  const serialized = serializeSubmission(submission);
+  assert.equal(serialized.textResponse, 'Official answer');
+  assert.equal(serialized.submittedContent.textResponse, 'Official answer');
+  assert.equal(serialized.draftContent.textResponse, 'Half edited answer');
+});
+
+test('submission links accept only bounded http or https URLs', () => {
+  assert.equal(normalizeExternalUrl(' https://docs.example.com/work '), 'https://docs.example.com/work');
+  assert.throws(() => normalizeExternalUrl('javascript:alert(1)'), error => error.statusCode === 400);
+  assert.throws(() => normalizeExternalUrl(`https://example.com/${'a'.repeat(2050)}`), error => error.statusCode === 400);
 });

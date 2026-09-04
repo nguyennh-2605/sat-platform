@@ -125,3 +125,80 @@ exports.upsertSubmission = async (req, res) => {
     return res.status(500).json({ error: 'Unable to submit the assignment.' });
   }
 };
+
+exports.getMySubmission = async (req, res) => {
+  try {
+    const data = await assignmentService.getMySubmission({ assignmentId: req.params.id, studentId: req.user.userId || req.user.id });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Load assignment draft error:', error);
+    return res.status(500).json({ error: 'Unable to load your work.' });
+  }
+};
+
+exports.updateDraft = async (req, res) => {
+  try {
+    const data = await assignmentService.updateDraft({ assignmentId: req.params.id, studentId: req.user.userId || req.user.id, textResponse: req.body.textResponse, expectedVersion: req.body.expectedVersion });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Save assignment draft error:', error);
+    return res.status(500).json({ error: 'Unable to save your draft.' });
+  }
+};
+
+exports.editSubmission = async (req, res) => {
+  try {
+    const data = await assignmentService.editSubmission({ assignmentId: req.params.id, studentId: req.user.userId || req.user.id });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Edit assignment submission error:', error);
+    return res.status(500).json({ error: 'Unable to edit this submission.' });
+  }
+};
+
+exports.discardDraft = async (req, res) => {
+  try {
+    const data = await assignmentService.discardDraft({ assignmentId: req.params.id, studentId: req.user.userId || req.user.id });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Discard assignment draft error:', error);
+    return res.status(500).json({ error: 'Unable to discard this draft.' });
+  }
+};
+
+exports.addDraftItem = async (req, res) => {
+  try {
+    const data = await assignmentService.addDraftItem({ assignmentId: req.params.id, studentId: req.user.userId || req.user.id, ...req.body });
+    return res.status(201).json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Add assignment attachment error:', error);
+    return res.status(500).json({ error: 'Unable to add this attachment.' });
+  }
+};
+
+exports.removeDraftItem = async (req, res) => {
+  try {
+    const data = await assignmentService.removeDraftItem({ assignmentId: req.params.id, itemId: req.params.itemId, studentId: req.user.userId || req.user.id });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Remove assignment attachment error:', error);
+    return res.status(500).json({ error: 'Unable to remove this attachment.' });
+  }
+};
+
+exports.submitDraft = async (req, res) => {
+  try {
+    const data = await assignmentService.submitDraft({ assignmentId: req.params.id, studentId: req.user.userId || req.user.id });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Submit assignment draft error:', error);
+    return res.status(500).json({ error: 'Unable to submit the assignment.' });
+  }
+};

@@ -141,7 +141,12 @@ Express Server (index.js → app.js)
 | `GET` | `/api/assignments/:id` | JWT | Get a role-scoped assignment detail; students receive only their own submission and review |
 | `PUT` | `/api/assignments/:id` | JWT + owning TEACHER | Update assignment content, deadline, resources, and optional maximum points |
 | `DELETE` | `/api/assignments/:id` | JWT | Delete assignment (teacher only) |
-| `PUT` | `/api/assignments/:id/submission` | JWT + STUDENT | Create or replace the student's current submission before the deadline |
+| `PUT` | `/api/assignments/:id/submission` | JWT + STUDENT | Legacy compatibility command that creates a draft and submits it |
+| `GET` | `/api/assignments/:id/my-submission` | JWT + STUDENT | Read the student's submitted snapshot and private working draft |
+| `PATCH/DELETE` | `/api/assignments/:id/my-submission/draft` | JWT + STUDENT | Autosave or discard the private working draft |
+| `POST` | `/api/assignments/:id/my-submission/edit` | JWT + STUDENT | Copy the official snapshot into an editable draft |
+| `POST/DELETE` | `/api/assignments/:id/my-submission/draft/items[/:itemId]` | JWT + STUDENT | Add or remove managed files and external links in a draft |
+| `POST` | `/api/assignments/:id/my-submission/submit` | JWT + STUDENT | Atomically promote a draft and complete the canonical activity |
 | `GET` | `/api/assignments/:id/student-work` | JWT + owning TEACHER/ADMIN | Search, filter, summarize, and cursor-page the assigned student review queue |
 | `GET` | `/api/assignments/:id/student-work/:studentId` | JWT + owning TEACHER/ADMIN | Get one assigned student's latest submission and review state |
 | `PATCH` | `/api/assignments/:id/student-work/:studentId/review` | JWT + owning TEACHER/ADMIN | Save optional points and/or feedback, or mark a submission reviewed |
@@ -260,6 +265,16 @@ Student Overview uses only persisted product data. Coursework and personal plann
 
 Teacher Overview only exposes classes owned by the authenticated teacher. Core workflow data and answer-level learning insights load independently so analytics failures do not hide deadlines or classroom status. Check-in suggestions use explicit overdue, inactivity, or sustained score-decline rules; the page does not invent a manual grading queue for auto-scored activities.
 
+### 5.14 Managed Files
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/files/uploads` | JWT + assigned STUDENT | Create a pending private file asset and a short-lived S3-compatible upload URL |
+| `POST` | `/api/files/:fileAssetId/complete` | JWT + owner | Verify object metadata and mark an upload ready |
+| `GET` | `/api/files/:fileAssetId/access` | JWT + authorized owner/staff | Create a short-lived read URL after checking assignment access |
+
+Managed file records store object keys, never signed URLs. `HomeworkSubmissionContent` separates the student's private `DRAFT` from the official `SUBMITTED` snapshot; teachers only read the latter. External links remain `HomeworkSubmissionItem(kind=LINK)` and do not become managed files.
+
 **Total: 55+ endpoints**
 
 ---
@@ -308,6 +323,8 @@ Folder ──1:N── Test
 ### Key Model Details
 
 **User**: `id`, `email` (unique), `password` (nullable for Google login), `name`, `role` (STUDENT | TEACHER | ADMIN), `avatar`, `createdAt`
+
+**HomeworkSubmission**: one student/assignment aggregate with optional review data and at most one `DRAFT` plus one `SUBMITTED` content slot. Content holds optional text and ordered `HomeworkSubmissionItem` records. `FILE` items reference a private, verified `FileAsset`; `LINK` items store a validated external URL.
 
 **Class**: `id` (UUID), `name`, `teacherId` (FK → User), `createdAt`
 

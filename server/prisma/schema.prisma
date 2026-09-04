@@ -44,6 +44,7 @@ model User {
   lessonProgress        LessonProgress[]
   resourceProgress      ResourceProgress[]
   auditEvents           AuditEvent[]             @relation("AuditEventActor")
+  fileAssets            FileAsset[]              @relation("FileAssetOwner")
 }
 
 model RefreshSession {
@@ -114,21 +115,72 @@ model ClassAnnouncement {
 }
 
 model HomeworkSubmission {
-  id           String     @id @default(uuid())
+  id           String                      @id @default(uuid())
   fileUrl      String?
   textResponse String?
   score        Float?
   feedback     String?
-  submittedAt  DateTime   @default(now())
+  submittedAt  DateTime?
   reviewedAt   DateTime?
-  updatedAt    DateTime   @updatedAt
-  status       String     @default("SUBMITTED")
+  updatedAt    DateTime                    @updatedAt
+  status       String                      @default("SUBMITTED")
   studentId    Int
   assignmentId String
-  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  student      User       @relation(fields: [studentId], references: [id])
+  assignment   Assignment                  @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student      User                        @relation(fields: [studentId], references: [id])
+  contents     HomeworkSubmissionContent[]
 
   @@unique([studentId, assignmentId])
+}
+
+model HomeworkSubmissionContent {
+  id           String                   @id @default(uuid())
+  submissionId String
+  slot         SubmissionContentSlot
+  textResponse String?
+  version      Int                      @default(1)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  submission   HomeworkSubmission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  items        HomeworkSubmissionItem[]
+
+  @@unique([submissionId, slot])
+  @@index([submissionId, updatedAt])
+}
+
+model HomeworkSubmissionItem {
+  id          String                    @id @default(uuid())
+  contentId   String
+  kind        SubmissionItemKind
+  fileAssetId String?
+  externalUrl String?
+  displayName String?
+  order       Int                       @default(0)
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  content     HomeworkSubmissionContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  fileAsset   FileAsset?                @relation(fields: [fileAssetId], references: [id], onDelete: Restrict)
+
+  @@index([contentId, order])
+  @@index([fileAssetId])
+}
+
+model FileAsset {
+  id           String                   @id @default(uuid())
+  ownerId      Int
+  provider     String
+  storageKey   String                   @unique
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  status       FileAssetStatus          @default(PENDING_UPLOAD)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  owner        User                     @relation("FileAssetOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  items        HomeworkSubmissionItem[]
+
+  @@index([ownerId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model Folder {
@@ -383,6 +435,22 @@ enum TestScope {
 enum SubmissionStatus {
   DOING
   COMPLETED
+}
+
+enum SubmissionContentSlot {
+  DRAFT
+  SUBMITTED
+}
+
+enum SubmissionItemKind {
+  FILE
+  LINK
+}
+
+enum FileAssetStatus {
+  PENDING_UPLOAD
+  READY
+  PENDING_DELETE
 }
 
 enum DeliveryStatus {

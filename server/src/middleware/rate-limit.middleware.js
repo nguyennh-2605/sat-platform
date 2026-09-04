@@ -1,4 +1,4 @@
-const createRateLimiter = ({ windowMs, max, message }) => {
+const createRateLimiter = ({ windowMs, max, message, key }) => {
   const requests = new Map();
   let nextCleanupAt = Date.now() + windowMs;
 
@@ -10,11 +10,11 @@ const createRateLimiter = ({ windowMs, max, message }) => {
       }
       nextCleanupAt = now + windowMs;
     }
-    const key = req.ip || req.socket?.remoteAddress || 'unknown';
-    const current = requests.get(key);
+    const requestKey = key?.(req) || req.ip || req.socket?.remoteAddress || 'unknown';
+    const current = requests.get(requestKey);
 
     if (!current || current.resetAt <= now) {
-      requests.set(key, { count: 1, resetAt: now + windowMs });
+      requests.set(requestKey, { count: 1, resetAt: now + windowMs });
       return next();
     }
 
