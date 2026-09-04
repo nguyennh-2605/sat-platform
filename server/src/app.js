@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const corsOptions = require('./config/cors');
+const { corsOptions } = require('./config/cors');
 const apiRoutes = require('./routes');
 const { authenticateToken } = require('./middleware/auth.middleware');
 const { createRateLimiter } = require('./middleware/rate-limit.middleware');

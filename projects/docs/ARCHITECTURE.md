@@ -275,6 +275,8 @@ Teacher Overview only exposes classes owned by the authenticated teacher. Core w
 
 Managed file records store object keys, never signed URLs. `HomeworkSubmissionContent` separates the student's private `DRAFT` from the official `SUBMITTED` snapshot; teachers only read the latter. External links remain `HomeworkSubmissionItem(kind=LINK)` and do not become managed files.
 
+Storage maintenance uses `npm run storage:cleanup`; real bucket verification uses the explicitly gated `npm run storage:smoke`. Environment separation, Render Cron setup, R2 lifecycle guidance, and operational response are documented in `projects/docs/STORAGE_OPERATIONS.md`.
+
 **Total: 55+ endpoints**
 
 ---

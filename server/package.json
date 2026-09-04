@@ -11,6 +11,7 @@
     "db:seed:vocabulary": "node prisma/seed-vocabulary.js",
     "db:seed:teacher-overview": "node scripts/seed-teacher-overview.js",
     "storage:cleanup": "node scripts/cleanup-file-assets.js",
+    "storage:smoke": "node scripts/storage-smoke-test.js",
     "admin:create": "node scripts/admin-cli.js create",
     "admin:promote": "node scripts/admin-cli.js promote",
     "admin:rotate-password": "node scripts/admin-cli.js rotate-password",
