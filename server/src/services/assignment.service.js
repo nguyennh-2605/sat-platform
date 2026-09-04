@@ -54,7 +54,7 @@ const serializeContent = content => content ? ({
 const officialContent = submission => submission?.contents?.find(content => content.slot === 'SUBMITTED') || null;
 const draftContent = submission => submission?.contents?.find(content => content.slot === 'DRAFT') || null;
 const officialSubmission = submission => officialContent(submission) && submission.submittedAt ? submission : null;
-const serializeSubmission = submission => {
+const serializeSubmission = (submission, { includeDraft = true } = {}) => {
   if (!submission) return null;
   const submitted = officialContent(submission);
   const draft = draftContent(submission);
@@ -66,7 +66,7 @@ const serializeSubmission = submission => {
     score: submission.score,
     feedback: submission.feedback,
     submittedContent: serializeContent(submitted),
-    draftContent: serializeContent(draft),
+    draftContent: includeDraft ? serializeContent(draft) : null,
     textResponse: submitted?.textResponse || null,
     fileUrl: legacyLink,
   };
@@ -385,7 +385,12 @@ exports.getStudentWork = async ({ assignmentId, studentId, userId, userRole }) =
   if (!isAssigned) throw new ApiError(404, { error: 'Assigned student not found.' });
   const submission = officialSubmission(assignment.submissions[0]) || null;
   const deadline = assignment.activity?.activity.dueAt || assignment.deadline;
-  return { student, submission: serializeSubmission(submission), state: reviewState(submission, deadline), maxPoints: assignment.maxPoints };
+  return {
+    student,
+    submission: serializeSubmission(submission, { includeDraft: false }),
+    state: reviewState(submission, deadline),
+    maxPoints: assignment.maxPoints,
+  };
 };
 
 exports.reviewStudentWork = async ({ assignmentId, studentId, userId, userRole, score, feedback }) => {

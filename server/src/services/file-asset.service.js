@@ -75,7 +75,15 @@ exports.completeUpload = async ({ fileAssetId, ownerId }) => {
   const storage = getObjectStorage();
   let metadata;
   try { metadata = await storage.headObject({ storageKey: asset.storageKey }); }
-  catch { throw new ApiError(409, { error: 'The uploaded object could not be verified.' }); }
+  catch (error) {
+    console.error('Unable to verify uploaded object.', {
+      fileAssetId: asset.id,
+      errorName: error?.name,
+      errorCode: error?.Code || error?.code,
+      httpStatusCode: error?.$metadata?.httpStatusCode,
+    });
+    throw new ApiError(409, { error: 'The uploaded object could not be verified.' });
+  }
   if (metadata.sizeBytes !== asset.sizeBytes || metadata.sizeBytes > MAX_FILE_BYTES || (metadata.mimeType && metadata.mimeType !== asset.mimeType)) {
     await prisma.fileAsset.update({ where: { id: asset.id }, data: { status: 'PENDING_DELETE' } });
     throw new ApiError(400, { error: 'The uploaded file does not match the expected size or type.' });

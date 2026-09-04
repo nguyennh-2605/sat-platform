@@ -55,6 +55,7 @@ test('serialization keeps submitted and draft content separate', () => {
   assert.equal(serialized.textResponse, 'Official answer');
   assert.equal(serialized.submittedContent.textResponse, 'Official answer');
   assert.equal(serialized.draftContent.textResponse, 'Half edited answer');
+  assert.equal(serializeSubmission(submission, { includeDraft: false }).draftContent, null);
 });
 
 test('submission links accept only bounded http or https URLs', () => {
