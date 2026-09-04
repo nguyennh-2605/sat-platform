@@ -28,6 +28,7 @@ exports.updateAssignment = async (req, res) => {
       links: req.body.links,
       deadline: req.body.deadline,
       testIds: req.body.testIds,
+      maxPoints: req.body.maxPoints,
     });
     return res.status(200).json({
       success: true,
@@ -53,5 +54,74 @@ exports.getAssignmentById = async (req, res) => {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
     console.log("Lỗi khi lấy assignment", error);
     return res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+exports.listStudentWork = async (req, res) => {
+  try {
+    const data = await assignmentService.listStudentWork({
+      assignmentId: req.params.id,
+      userId: req.user.userId || req.user.id,
+      userRole: req.user.role,
+      search: req.query.search,
+      status: req.query.status,
+      cursor: req.query.cursor,
+      limit: req.query.limit,
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('List assignment student work error:', error);
+    return res.status(500).json({ error: 'Unable to load student work.' });
+  }
+};
+
+exports.getStudentWork = async (req, res) => {
+  try {
+    const data = await assignmentService.getStudentWork({
+      assignmentId: req.params.id,
+      studentId: req.params.studentId,
+      userId: req.user.userId || req.user.id,
+      userRole: req.user.role,
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Get assignment student work error:', error);
+    return res.status(500).json({ error: 'Unable to load the submission.' });
+  }
+};
+
+exports.reviewStudentWork = async (req, res) => {
+  try {
+    const data = await assignmentService.reviewStudentWork({
+      assignmentId: req.params.id,
+      studentId: req.params.studentId,
+      userId: req.user.userId || req.user.id,
+      userRole: req.user.role,
+      score: req.body.score,
+      feedback: req.body.feedback,
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Review assignment student work error:', error);
+    return res.status(500).json({ error: 'Unable to save the review.' });
+  }
+};
+
+exports.upsertSubmission = async (req, res) => {
+  try {
+    const data = await assignmentService.upsertSubmission({
+      assignmentId: req.params.id,
+      textResponse: req.body.textResponse,
+      fileUrl: req.body.fileUrl,
+      studentId: req.user.userId || req.user.id,
+    });
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Submit assignment error:', error);
+    return res.status(500).json({ error: 'Unable to submit the assignment.' });
   }
 };

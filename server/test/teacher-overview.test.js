@@ -35,7 +35,7 @@ test('teacher attention aggregates an activity and excludes excused students', (
   assert.equal(result.length, 1);
   assert.equal(result[0].reason, 'OVERDUE');
   assert.deepEqual(result[0].stats, { assigned: 2, completed: 1, inProgress: 0, incomplete: 1, missing: 1 });
-  assert.equal(result[0].href, '/dashboard/class/class-1?tab=results&deliveryId=delivery-1');
+  assert.equal(result[0].href, '/dashboard/class/class-1?tab=activities&deliveryId=delivery-1');
 });
 
 test('teacher attention only includes unresolved overdue or due-soon work', () => {

@@ -4,6 +4,18 @@ const { sendNotificationToUser } = require('./notification.service');
 
 const intId = value => Number.parseInt(value, 10);
 
+const chooseCountedAttempt = (submissions, scorePolicy) => {
+  const completed = submissions.filter(item => item.status === 'COMPLETED');
+  if (!completed.length) return null;
+  if (scorePolicy === 'BEST') {
+    return [...completed].sort((left, right) => (right.score || 0) - (left.score || 0) || left.attemptNo - right.attemptNo)[0];
+  }
+  if (scorePolicy === 'LATEST') {
+    return [...completed].sort((left, right) => right.attemptNo - left.attemptNo)[0];
+  }
+  return [...completed].sort((left, right) => left.attemptNo - right.attemptNo)[0];
+};
+
 exports.listClassActivities = async ({ classId, userId, userRole }) => {
   const classroom = await prisma.class.findUnique({
     where: { id: String(classId) },
@@ -54,6 +66,9 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
             select: {
               testId: true,
               test: { select: { title: true, subject: true, mode: true, duration: true, sections: { select: { _count: { select: { questions: true } } } } } },
+              submissions: canManage
+                ? { select: { userId: true, status: true, score: true, attemptNo: true } }
+                : false,
             },
           },
         },
@@ -64,124 +79,84 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
   });
 
   return activities
-    .map(activity => ({
-      ...activity,
-      assignedAt: activity.assignees.reduce((earliest, assignee) => (
+    .map(activity => {
+      const activeAssignees = activity.assignees.filter(item => !item.excusedAt);
+      const assignedAt = activity.assignees.reduce((earliest, assignee) => (
         !earliest || assignee.assignedAt < earliest ? assignee.assignedAt : earliest
-      ), null),
-    }))
+      ), null);
+      const completed = activeAssignees.filter(item => item.status === 'COMPLETED').length;
+      const inProgress = activeAssignees.filter(item => item.status === 'IN_PROGRESS').length;
+      const overdue = Boolean(activity.dueAt && activity.dueAt < new Date());
+      const missing = overdue ? activeAssignees.filter(item => item.status !== 'COMPLETED').length : 0;
+      let averageScore = null;
+      let sanitizedTest = activity.test;
+
+      if (activity.test?.testDelivery) {
+        const { submissions = [], ...testDelivery } = activity.test.testDelivery;
+        sanitizedTest = { ...activity.test, testDelivery };
+        if (canManage) {
+          const assignedIds = new Set(activeAssignees.map(item => item.studentId));
+          const questionCount = testDelivery.test.sections.reduce((sum, section) => sum + section._count.questions, 0);
+          const counted = activeAssignees
+            .map(assignee => chooseCountedAttempt(submissions.filter(item => item.userId === assignee.studentId), activity.scorePolicy))
+            .filter(Boolean);
+          const scores = counted
+            .filter(item => assignedIds.has(item.userId))
+            .map(item => questionCount && Number.isFinite(Number(item.score)) ? Math.round((Number(item.score) / questionCount) * 100) : null)
+            .filter(Number.isFinite);
+          averageScore = scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length) : null;
+        }
+      }
+
+      return {
+        ...activity,
+        test: sanitizedTest,
+        assignedAt,
+        ...(canManage ? {
+          resultSummary: {
+            assigned: activeAssignees.length,
+            completed,
+            inProgress,
+            missing,
+            averageScore,
+          },
+        } : {}),
+      };
+    })
     .sort((left, right) => (right.assignedAt?.getTime() || 0) - (left.assignedAt?.getTime() || 0));
 };
 
-const chooseCountedAttempt = (submissions, scorePolicy) => {
-  const completed = submissions.filter(item => item.status === 'COMPLETED');
-  if (!completed.length) return null;
-  if (scorePolicy === 'BEST') {
-    return [...completed].sort((left, right) => (right.score || 0) - (left.score || 0) || left.attemptNo - right.attemptNo)[0];
-  }
-  if (scorePolicy === 'LATEST') {
-    return [...completed].sort((left, right) => right.attemptNo - left.attemptNo)[0];
-  }
-  return [...completed].sort((left, right) => left.attemptNo - right.attemptNo)[0];
-};
-
-exports.listClassResults = async ({ classId, userId, userRole }) => {
-  const classroom = await prisma.class.findUnique({
-    where: { id: String(classId) },
-    select: { teacherId: true },
-  });
-  if (!classroom) throw new ApiError(404, { error: 'Class not found.' });
-  if (userRole !== 'ADMIN' && classroom.teacherId !== intId(userId)) {
-    throw new ApiError(403, { error: 'Only class staff can view results.' });
-  }
-
-  const activities = await prisma.classActivity.findMany({
-    where: { classId: String(classId), type: { in: ['TEST', 'HOMEWORK'] } },
-    orderBy: [{ createdAt: 'desc' }],
-    select: {
-      id: true,
-      type: true,
-      status: true,
-      title: true,
-      dueAt: true,
-      createdAt: true,
-      lesson: { select: { id: true, title: true, order: true, week: { select: { id: true, title: true, order: true } } } },
-      assignees: { select: { studentId: true, assignedAt: true, excusedAt: true } },
-      test: {
-        select: {
-          testDeliveryId: true,
-          testDelivery: {
-            select: {
-              scorePolicy: true,
-              test: { select: { sections: { select: { _count: { select: { questions: true } } } } } },
-              submissions: { select: { userId: true, status: true, score: true, attemptNo: true } },
-            },
-          },
-        },
-      },
-      homework: {
-        select: {
-          assignmentId: true,
-          assignment: { select: { submissions: { select: { studentId: true } } } },
-        },
-      },
-    },
-  });
-
+// Compatibility projection for older clients. New Classroom UI reads resultSummary
+// directly from listClassActivities so both workflows share one source of truth.
+exports.listClassResults = async params => {
+  const activities = await exports.listClassActivities(params);
   return activities.map(activity => {
-    const activeAssignees = activity.assignees.filter(item => !item.excusedAt);
-    const assignedIds = new Set(activeAssignees.map(item => item.studentId));
-    const assignedAt = activeAssignees.reduce((earliest, assignee) => (
-      !earliest || assignee.assignedAt < earliest ? assignee.assignedAt : earliest
-    ), null);
     const base = {
       id: activity.id,
       type: activity.type,
       status: activity.status,
       title: activity.title,
-      assignedAt,
+      assignedAt: activity.assignedAt,
       dueAt: activity.dueAt,
       createdAt: activity.createdAt,
       lesson: activity.lesson,
     };
-
-    if (activity.type === 'TEST' && activity.test?.testDelivery) {
-      const delivery = activity.test.testDelivery;
-      const questionCount = delivery.test.sections.reduce((sum, section) => sum + section._count.questions, 0);
-      const counted = activeAssignees.map(assignee => chooseCountedAttempt(
-        delivery.submissions.filter(item => item.userId === assignee.studentId),
-        delivery.scorePolicy,
-      )).filter(Boolean);
-      const completedIds = new Set(counted.map(item => item.userId));
-      const inProgressIds = new Set(delivery.submissions
-        .filter(item => item.status === 'DOING' && assignedIds.has(item.userId) && !completedIds.has(item.userId))
-        .map(item => item.userId));
-      const scores = counted
-        .map(item => questionCount && Number.isFinite(Number(item.score)) ? Math.round((Number(item.score) / questionCount) * 100) : null)
-        .filter(Number.isFinite);
+    if (activity.type === 'TEST') {
       return {
         ...base,
         testResult: {
-          deliveryId: activity.test.testDeliveryId,
-          assigned: activeAssignees.length,
-          completed: completedIds.size,
-          inProgress: inProgressIds.size,
-          missing: activity.dueAt && activity.dueAt < new Date() ? activeAssignees.length - completedIds.size : 0,
-          averageScore: scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length) : null,
+          deliveryId: activity.test?.testDeliveryId || null,
+          ...activity.resultSummary,
         },
       };
     }
-
-    const submittedIds = new Set((activity.homework?.assignment.submissions || [])
-      .filter(item => assignedIds.has(item.studentId))
-      .map(item => item.studentId));
     return {
       ...base,
       assignmentResult: {
         assignmentId: activity.homework?.assignmentId || null,
-        assigned: activeAssignees.length,
-        submitted: submittedIds.size,
-        missing: activity.dueAt && activity.dueAt < new Date() ? activeAssignees.length - submittedIds.size : 0,
+        assigned: activity.resultSummary?.assigned || 0,
+        submitted: activity.resultSummary?.completed || 0,
+        missing: activity.resultSummary?.missing || 0,
       },
     };
   });
@@ -208,7 +183,7 @@ const normalizeUrls = (value, fieldName) => {
   });
 };
 
-exports.createAssignmentActivity = async ({ classId, lessonId, title, instructions, availableAt, dueAt, fileUrls, links, studentIds, userId, userRole }) => {
+exports.createAssignmentActivity = async ({ classId, lessonId, title, instructions, availableAt, dueAt, fileUrls, links, studentIds, maxPoints, userId, userRole }) => {
   const teacherId = intId(userId);
   const normalizedTitle = String(title || '').trim().replace(/\s+/g, ' ');
   if (!classId || !normalizedTitle) throw new ApiError(400, { error: 'Class and assignment title are required.' });
@@ -220,6 +195,10 @@ exports.createAssignmentActivity = async ({ classId, lessonId, title, instructio
   if (startsAt && deadline && deadline <= startsAt) throw new ApiError(400, { error: 'Due date must be after the availability date.' });
   const attachmentUrls = normalizeUrls(fileUrls, 'Attachments');
   const externalLinks = normalizeUrls(links, 'Links');
+  const normalizedMaxPoints = maxPoints === null || maxPoints === undefined || maxPoints === '' ? null : Number(maxPoints);
+  if (normalizedMaxPoints !== null && (!Number.isFinite(normalizedMaxPoints) || normalizedMaxPoints <= 0 || normalizedMaxPoints > 10000)) {
+    throw new ApiError(400, { error: 'Maximum points must be between 0 and 10,000.' });
+  }
 
   const result = await prisma.$transaction(async tx => {
     const classroom = await tx.class.findUnique({
@@ -240,7 +219,7 @@ exports.createAssignmentActivity = async ({ classId, lessonId, title, instructio
 
     const assignment = await tx.assignment.create({ data: {
       classId: classroom.id, title: normalizedTitle, type: 'assignment', content: normalizedInstructions,
-      fileUrls: attachmentUrls, links: externalLinks, deadline,
+      fileUrls: attachmentUrls, links: externalLinks, deadline, maxPoints: normalizedMaxPoints,
     } });
     const activity = await tx.classActivity.create({
       data: {

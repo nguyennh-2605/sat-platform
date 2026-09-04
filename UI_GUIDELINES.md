@@ -270,6 +270,20 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Lessons → Add content chia `Student work` (Assignment, Test) và `Learning material` (File, Link, Video). Composer mở tại chỗ với Session được prefill, không điều hướng giáo viên sang tab khác.
 - Archive test trong Test Library không được làm mất quyền truy cập vào delivery đã Published; archive chỉ ảnh hưởng content library và việc tạo assignment mới.
 
+### Assignment Detail
+
+- Teacher và Student dùng chung page shell, metadata, instructions và resources; phần hành động thay đổi theo role thay vì duy trì hai màn hình không đồng nhất.
+- Student dùng work rail `340px` sticky từ desktop và stack dưới nội dung trên mobile. Rail phải giữ submission hiện tại sau refresh, cho phép edit/resubmit tới deadline, và hiển thị review gần nhất mà không làm mất dấu review cũ khi có resubmission mới.
+- V1 chỉ nhận written response hoặc một URL `http(s)`; không mô phỏng file upload khi chưa có storage flow thật.
+- Teacher dùng Student Work master-detail: list searchable/filterable bên trái và submission review bên phải. Không render toàn bộ submission thành nhiều card dài trong một trang.
+- Teacher Assignment Detail tách `Overview` khỏi `Student work`. Link từ completion/review queue mở thẳng `Student work`; không đặt instructions phía trên grading workspace.
+- Trên desktop rộng, Student Work dùng ba pane: student navigation khoảng `280px`, submission viewer co giãn, review rail khoảng `340px`. Review rail sticky; ở laptop và mobile phải collapse/stack mà không làm viewer tràn viewport.
+- Submission viewer render written response trực tiếp; PDF và image có inline preview cùng secondary action mở tab mới. External link, DOCX/PPTX/XLSX và định dạng browser không hỗ trợ dùng fallback rõ ràng, không iframe website tùy ý.
+- Student list không lặp `No submission` và `Not submitted`. Summary phân biệt `pending` trước deadline với `missing` sau deadline. Sau khi review một item trong queue, ưu tiên chuyển sang submission `Needs review` tiếp theo.
+- Grading là optional theo từng Assignment. `maxPoints = null` nghĩa là feedback-only; khi có `maxPoints`, score phải nằm trong `0..maxPoints`. Feedback vẫn optional và teacher có thể chỉ `Mark as reviewed`.
+- Review state được suy ra từ timestamps: chưa nộp, missing sau deadline, needs review, hoặc reviewed. Resubmission sau `reviewedAt` phải quay lại review queue.
+- Instructions, resources và submission là content surfaces dùng shared border/radius/token; không dùng KPI card, decorative icon box hoặc local modal/control variants.
+
 ## 9. Analytics
 
 - Bám sát `dashboard/analytics` và `dashboard/default`: KPI strip, Score Progress, Activity Heatmap, Section Performance và Recent Activity.

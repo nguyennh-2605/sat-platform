@@ -448,84 +448,8 @@ exports.createAssignment = async ({ title, content, type, deadline, classId, dri
 };
 
 exports.createSubmission = async ({ assignmentId, textResponse, fileUrl, studentId }) => {
-  if (!assignmentId) {
-    throw new ApiError(400, { error: "Thiếu thông tin bài tập (assignmentId)" });
-  }
-
-  const currentStudentId = parseUserId(studentId);
-
-  if (!currentStudentId) {
-    throw new ApiError(401, { error: "Không tìm thấy thông tin học sinh." });
-  }
-
-    const assignmentInfo = await prisma.assignment.findUnique({
-      where: { id: assignmentId },
-      include: {
-        activity: { include: { activity: { include: { assignees: { where: { studentId: currentStudentId, excusedAt: null }, select: { studentId: true }, take: 1 } } } } },
-        class: {
-        include: {
-          students: { select: { id: true } }
-        }
-      }
-    }
-  });
-
-  if (!assignmentInfo) {
-    throw new ApiError(404, { error: "Không tìm thấy bài tập" });
-  }
-
-    const isEnrolledStudent = assignmentInfo.class.students.some(student => student.id === currentStudentId);
-    const activityAvailable = !assignmentInfo.activity || (assignmentInfo.activity.activity.status === 'PUBLISHED'
-      && (!assignmentInfo.activity.activity.availableAt || assignmentInfo.activity.activity.availableAt <= new Date())
-      && assignmentInfo.activity.activity.assignees.length > 0);
-
-    if (!isEnrolledStudent || !activityAvailable) {
-      throw new ApiError(403, { error: "Bạn không có quyền nộp bài tập này." });
-    }
-
-  // Kiểm tra xem đã nộp chưa (dùng upsert để hỗ trợ nộp lại)
-  const submission = await prisma.homeworkSubmission.upsert({
-    where: {
-      studentId_assignmentId: {
-        studentId: currentStudentId,
-        assignmentId: assignmentId
-      }
-    },
-    update: {
-      textResponse: textResponse || null,
-      fileUrl: fileUrl || null,
-      submittedAt: new Date(),
-      status: 'SUBMITTED'
-    },
-    create: {
-      studentId: currentStudentId,
-      assignmentId: assignmentId,
-      textResponse: textResponse || null,
-      fileUrl: fileUrl || null,
-    }
-  });
-
-  const [homeworkActivity] = await prisma.$queryRaw`SELECT "activityId" FROM "HomeworkActivity" WHERE "assignmentId" = ${assignmentId} LIMIT 1`;
-  if (homeworkActivity) {
-    await prisma.activityAssignee.updateMany({
-      where: { activityId: homeworkActivity.activityId, studentId: currentStudentId },
-      data: { status: 'COMPLETED', startedAt: submission.submittedAt, completedAt: submission.submittedAt, attemptCount: 1 },
-    });
-  }
-
-  const studentInfo = await prisma.user.findUnique({
-    where: { id: currentStudentId }
-  });
-
-  if (assignmentInfo && studentInfo) {
-    await sendNotificationToUser(
-      assignmentInfo.class.teacherId,
-      `Học sinh ${studentInfo.name || studentInfo.email} vừa nộp bài tập "${assignmentInfo.title}" của lớp ${assignmentInfo.class.name}.`,
-      `/dashboard/class/${assignmentInfo.classId}/assignment/${assignmentId}`
-    );
-  }
-
-  return submission;
+  const assignmentService = require('./assignment.service');
+  return assignmentService.upsertSubmission({ assignmentId, textResponse, fileUrl, studentId });
 };
 
 exports.getExamTests = async ({ classId, userId, userRole }) => {

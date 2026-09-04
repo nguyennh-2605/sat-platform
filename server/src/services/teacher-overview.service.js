@@ -18,10 +18,10 @@ const assessedActivity = activity => activity.type === 'TEST' || activity.type =
 
 const activityHref = activity => {
   if (activity.type === 'TEST' && activity.test?.testDeliveryId) {
-    return `/dashboard/class/${activity.classId}?tab=results&deliveryId=${activity.test.testDeliveryId}`;
+    return `/dashboard/class/${activity.classId}?tab=activities&deliveryId=${activity.test.testDeliveryId}`;
   }
   if (activity.type === 'HOMEWORK' && activity.homework?.assignmentId) {
-    return `/dashboard/class/${activity.classId}/assignment/${activity.homework.assignmentId}`;
+    return `/dashboard/class/${activity.classId}/assignment/${activity.homework.assignmentId}?view=student-work`;
   }
   return `/dashboard/class/${activity.classId}?tab=activities`;
 };
@@ -244,7 +244,7 @@ const buildCheckIns = ({ classes, activities, submissions, now = new Date() }) =
             reasonLabel: `Score dropped ${decline} points across the last 3 tests`,
             priority: 2,
             magnitude: decline,
-            href: `/dashboard/class/${classroom.id}?tab=results&deliveryId=${latest.deliveryId}`,
+            href: `/dashboard/class/${classroom.id}?tab=activities&deliveryId=${latest.deliveryId}`,
           });
         }
       }

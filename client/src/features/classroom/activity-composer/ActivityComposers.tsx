@@ -31,9 +31,19 @@ interface BaseComposerProps {
   students: ActivityStudent[];
   initialLessonId?: string;
   onCreated: () => Promise<void> | void;
+  assignment?: {
+    id: string;
+    title: string;
+    content: string | null;
+    fileUrls: string[];
+    links: string[];
+    deadline: string | null;
+    maxPoints: number | null;
+    activity?: { availableAt: string | null; lesson: { id: string } | null } | null;
+  };
 }
 
-export function AssignmentComposer({ open, onClose, classId, students, initialLessonId, onCreated }: BaseComposerProps) {
+export function AssignmentComposer({ open, onClose, classId, students, initialLessonId, onCreated, assignment }: BaseComposerProps) {
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [availableAt, setAvailableAt] = useState('');
@@ -44,13 +54,24 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
   const [outline, setOutline] = useState<OutlineWeek[]>([]);
   const [allStudents, setAllStudents] = useState(true);
   const [studentIds, setStudentIds] = useState<number[]>([]);
+  const [gradingMode, setGradingMode] = useState<'FEEDBACK' | 'POINTS'>('FEEDBACK');
+  const [maxPoints, setMaxPoints] = useState(10);
   const [saving, setSaving] = useState(false);
+  const editing = Boolean(assignment);
 
   useEffect(() => {
     if (!open) return;
-    setLessonId(initialLessonId || '');
+    setTitle(assignment?.title || '');
+    setInstructions(assignment?.content || '');
+    setAvailableAt(toLocalDateTime(assignment?.activity?.availableAt));
+    setDueAt(toLocalDateTime(assignment?.deadline));
+    setFileUrls((assignment?.fileUrls || []).join('\n'));
+    setLinks((assignment?.links || []).join('\n'));
+    setLessonId(assignment?.activity?.lesson?.id || initialLessonId || '');
+    setGradingMode(assignment?.maxPoints ? 'POINTS' : 'FEEDBACK');
+    setMaxPoints(assignment?.maxPoints || 10);
     void loadOutline(classId, setOutline);
-  }, [classId, initialLessonId, open]);
+  }, [assignment, classId, initialLessonId, open]);
 
   useEffect(() => {
     if (open) return;
@@ -60,6 +81,8 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
     setDueAt('');
     setFileUrls('');
     setLinks('');
+    setGradingMode('FEEDBACK');
+    setMaxPoints(10);
     setAllStudents(true);
     setStudentIds([]);
     setOutline([]);
@@ -67,12 +90,13 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
 
   const submit = async () => {
     if (!title.trim()) return toast.error('Enter an assignment title');
-    if (!students.length) return toast.error('Add at least one student before publishing an assignment');
-    if (!allStudents && !studentIds.length) return toast.error('Select at least one student');
+    if (!editing && !students.length) return toast.error('Add at least one student before publishing an assignment');
+    if (!editing && !allStudents && !studentIds.length) return toast.error('Select at least one student');
     if (!validDates(availableAt, dueAt)) return toast.error('Due date must be after availability');
+    if (gradingMode === 'POINTS' && (!Number.isFinite(maxPoints) || maxPoints <= 0 || maxPoints > 10000)) return toast.error('Maximum points must be between 0 and 10,000');
     setSaving(true);
     try {
-      await axiosClient.post('/api/class-activities/assignments', {
+      const payload = {
         classId,
         lessonId: lessonId || null,
         title: title.trim(),
@@ -81,9 +105,12 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
         dueAt: isoOrNull(dueAt),
         fileUrls: urlLines(fileUrls),
         links: urlLines(links),
+        maxPoints: gradingMode === 'POINTS' ? maxPoints : null,
         ...(!allStudents ? { studentIds } : {}),
-      });
-      toast.success('Assignment published');
+      };
+      if (assignment) await axiosClient.put(`/api/assignments/${assignment.id}`, { title: payload.title, content: payload.instructions, deadline: payload.dueAt, fileUrls: payload.fileUrls, links: payload.links, maxPoints: payload.maxPoints });
+      else await axiosClient.post('/api/class-activities/assignments', payload);
+      toast.success(assignment ? 'Assignment updated' : 'Assignment published');
       await onCreated();
       onClose();
     } catch (error) {
@@ -98,13 +125,13 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
     onClose={() => !saving && onClose()}
     closeOnBackdrop={!saving}
     presentation="content-dialog"
-    title="Add assignment"
-    subtitle={initialLessonId ? 'Create student work for this session.' : 'Create student work with instructions and submissions.'}
+    title={editing ? 'Edit assignment' : 'Add assignment'}
+    subtitle={editing ? 'Update the assignment details and grading.' : initialLessonId ? 'Create student work for this session.' : 'Create student work with instructions and submissions.'}
     className="max-w-3xl!"
     footer={<>
       <Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button>
-      <Button disabled={saving || !title.trim() || !students.length || (!allStudents && !studentIds.length)} onClick={() => void submit()}>
-        {saving ? <><LoaderCircle className="animate-spin" />Publishing…</> : 'Publish assignment'}
+      <Button disabled={saving || !title.trim() || (!editing && (!students.length || (!allStudents && !studentIds.length)))} onClick={() => void submit()}>
+        {saving ? <><LoaderCircle className="animate-spin" />Saving…</> : editing ? 'Save changes' : 'Publish assignment'}
       </Button>
     </>}
   >
@@ -124,7 +151,10 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
           <Textarea id="assignment-reference-links" value={links} onChange={event => setLinks(event.target.value)} rows={3} placeholder="One URL per line" />
         </Field>
       </div>
-      <DeliveryFields
+      <Field label="Grading">
+        <div className="space-y-3"><Tabs className="grid w-full grid-cols-2 sm:w-80" items={[{ value: 'FEEDBACK' as const, label: 'Feedback only' }, { value: 'POINTS' as const, label: 'Points' }]} value={gradingMode} onValueChange={setGradingMode} ariaLabel="Assignment grading" tabClassName="w-full" />{gradingMode === 'POINTS' && <div className="flex max-w-xs items-center gap-2"><Input type="number" min={1} max={10000} step="any" value={maxPoints} onChange={event => setMaxPoints(Number(event.target.value))} aria-label="Maximum points" /><span className="shrink-0 text-caption text-muted-foreground">maximum points</span></div>}</div>
+      </Field>
+      {editing ? <Field label="Due date"><DateTimePicker value={dueAt} onChange={setDueAt} placeholder="No deadline" ariaLabel="Due date" /></Field> : <DeliveryFields
         idPrefix="assignment"
         availableAt={availableAt}
         onAvailableAt={setAvailableAt}
@@ -138,7 +168,7 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
         onAllStudents={setAllStudents}
         studentIds={studentIds}
         onStudentIds={setStudentIds}
-      />
+      />}
     </div>
   </Modal>;
 }
@@ -446,6 +476,12 @@ const isoOrNull = (value: string) => value ? new Date(value).toISOString() : nul
 const validDates = (availableAt: string, dueAt: string) => !availableAt || !dueAt || new Date(availableAt) < new Date(dueAt);
 const urlLines = (value: string) => value.split(/\r?\n/).map(item => item.trim()).filter(Boolean);
 const errorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
+const toLocalDateTime = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+};
 
 async function loadOutline(classId: string, setOutline: (value: OutlineWeek[]) => void) {
   try {

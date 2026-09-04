@@ -60,18 +60,18 @@ model RefreshSession {
 }
 
 model Class {
-  id          String          @id @default(uuid())
-  name        String
-  color       String          @default("#1B7A5A")
-  createdAt   DateTime        @default(now())
-  teacherId   Int
-  assignments Assignment[]
-  teacher     User            @relation("TeacherClasses", fields: [teacherId], references: [id])
-  classTests  ClassTest[]
-  students    User[]          @relation("StudentClasses")
-  weeks       Week[]
-  deliveries  TestDelivery[]
-  activities  ClassActivity[]
+  id            String              @id @default(uuid())
+  name          String
+  color         String              @default("#1B7A5A")
+  createdAt     DateTime            @default(now())
+  teacherId     Int
+  assignments   Assignment[]
+  teacher       User                @relation("TeacherClasses", fields: [teacherId], references: [id])
+  classTests    ClassTest[]
+  students      User[]              @relation("StudentClasses")
+  weeks         Week[]
+  deliveries    TestDelivery[]
+  activities    ClassActivity[]
   announcements ClassAnnouncement[]
 
   @@index([teacherId, createdAt])
@@ -86,6 +86,7 @@ model Assignment {
   links            String[]
   testIds          Int[]                @default([])
   deadline         DateTime?
+  maxPoints        Float?
   createdAt        DateTime             @default(now())
   classId          String
   class            Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
@@ -119,6 +120,8 @@ model HomeworkSubmission {
   score        Float?
   feedback     String?
   submittedAt  DateTime   @default(now())
+  reviewedAt   DateTime?
+  updatedAt    DateTime   @updatedAt
   status       String     @default("SUBMITTED")
   studentId    Int
   assignmentId String

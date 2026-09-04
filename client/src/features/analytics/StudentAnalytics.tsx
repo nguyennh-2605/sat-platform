@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useDashboardBack } from '../navigation/DashboardBackContext';
 import { capitalizeFirstLetter } from '../../utils/text';
-import ClassroomResultsOverview from './ClassroomResultsOverview';
 
 interface DeliveryListItem {
   id: string; title: string; createdAt: string; dueAt: string | null; maxAttempts: number; scorePolicy: 'FIRST' | 'BEST' | 'LATEST';
@@ -37,39 +36,26 @@ const formatDuration = (milliseconds: number | null | undefined) => {
 };
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase();
 
-export default function StudentAnalytics({ classId, initialDeliveryId }: { classId?: string; initialDeliveryId?: string | null }) {
+export default function StudentAnalytics({ initialDeliveryId }: { initialDeliveryId: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(initialDeliveryId || null);
   const [report, setReport] = useState<PerformanceReport | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!selectedDeliveryId) return;
-    axiosClient.get(`/api/test-deliveries/${selectedDeliveryId}/performance`)
+    axiosClient.get(`/api/test-deliveries/${initialDeliveryId}/performance`)
       .then(data => setReport(data))
       .catch(error => console.error('Unable to load test performance:', error))
       .finally(() => setLoading(false));
-  }, [selectedDeliveryId]);
+  }, [initialDeliveryId]);
 
-  const openReport = (deliveryId: string) => {
-    setReport(null);
-    setLoading(true);
-    setSelectedDeliveryId(deliveryId);
-    const next = new URLSearchParams(searchParams);
-    next.set('tab', 'results');
-    next.set('deliveryId', deliveryId);
-    setSearchParams(next, { replace: true });
-  };
   const closeReport = () => {
-    setSelectedDeliveryId(null);
     setReport(null);
     const next = new URLSearchParams(searchParams);
     next.delete('deliveryId');
     setSearchParams(next, { replace: true });
   };
-  useDashboardBack(closeReport, Boolean(selectedDeliveryId), 10);
-  if (selectedDeliveryId) return <PerformanceDashboard report={report} loading={loading} />;
-  return classId ? <ClassroomResultsOverview classId={classId} onOpenTest={openReport} /> : <EmptyState title="Class results unavailable" />;
+  useDashboardBack(closeReport, true, 10);
+  return <PerformanceDashboard report={report} loading={loading} />;
 }
 
 function PerformanceDashboard({ report, loading }: { report: PerformanceReport | null; loading: boolean }) {

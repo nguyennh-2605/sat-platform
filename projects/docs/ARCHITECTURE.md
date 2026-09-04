@@ -132,15 +132,19 @@ Express Server (index.js → app.js)
 | `GET/POST` | `/api/classes/:classId/announcements` | JWT / JWT + TEACHER/ADMIN | List or publish class announcements from the dedicated announcement source |
 | `PATCH/DELETE` | `/api/classes/:classId/announcements/:announcementId` | JWT + TEACHER/ADMIN | Edit or delete an announcement |
 | `POST` | `/api/classes/posts` | JWT + TEACHER/ADMIN | Legacy compatibility endpoint; announcements are routed to the dedicated source |
-| `POST` | `/api/classes/submissions` | JWT | Submit homework for an assignment |
+| `POST` | `/api/classes/submissions` | JWT + STUDENT | Compatibility submission endpoint; delegates to the canonical Assignment submission flow |
 
 ### 5.3 Assignments
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/assignments/:id` | JWT | Get assignment detail with selected tests |
-| `PUT` | `/api/assignments/:id` | JWT | Update assignment (teacher only, verified in service) |
+| `GET` | `/api/assignments/:id` | JWT | Get a role-scoped assignment detail; students receive only their own submission and review |
+| `PUT` | `/api/assignments/:id` | JWT + owning TEACHER | Update assignment content, deadline, resources, and optional maximum points |
 | `DELETE` | `/api/assignments/:id` | JWT | Delete assignment (teacher only) |
+| `PUT` | `/api/assignments/:id/submission` | JWT + STUDENT | Create or replace the student's current submission before the deadline |
+| `GET` | `/api/assignments/:id/student-work` | JWT + owning TEACHER/ADMIN | Search, filter, summarize, and cursor-page the assigned student review queue |
+| `GET` | `/api/assignments/:id/student-work/:studentId` | JWT + owning TEACHER/ADMIN | Get one assigned student's latest submission and review state |
+| `PATCH` | `/api/assignments/:id/student-work/:studentId/review` | JWT + owning TEACHER/ADMIN | Save optional points and/or feedback, or mark a submission reviewed |
 
 ### 5.4 Practice Tests & Exam Room
 
@@ -153,8 +157,8 @@ Express Server (index.js → app.js)
 | `POST` | `/api/tests/:id/duplicate` | JWT + TEACHER/ADMIN | Duplicate an accessible test into an owned Draft |
 | `POST` | `/api/tests/:id/copy-to-system` | JWT + ADMIN | Copy a Teacher-owned Personal test into a platform-owned System Draft |
 | `PATCH` | `/api/tests/:id/status` | JWT + TEACHER/ADMIN | Publish, archive, or restore an owned test |
-| `GET` | `/api/class-activities/class/:classId` | JWT | List Assignment and Test activities visible to staff or an enrolled student |
-| `GET` | `/api/class-activities/class/:classId/results` | JWT + TEACHER/ADMIN | List the unified Assignment and Test results projection used by the action-oriented Results view |
+| `GET` | `/api/class-activities/class/:classId` | JWT | List canonical Assignment and Test activities; staff also receive participation and outcome summaries while students receive only their own assignee state |
+| `GET` | `/api/class-activities/class/:classId/results` | JWT + TEACHER/ADMIN | Compatibility projection for older clients; derived from the canonical Activities summary without a separate query path |
 | `POST` | `/api/class-activities/assignments` | JWT + TEACHER/ADMIN | Publish an Assignment to all or selected students, optionally linked to a lesson |
 | `POST` | `/api/class-activities/homework` | JWT + TEACHER/ADMIN | Compatibility alias for Assignment creation; new clients must use `/assignments` |
 | `POST` | `/api/test-deliveries` | JWT + TEACHER/ADMIN | Bulk-publish one or more tests; one request creates one independent TestDelivery and ClassActivity per selected test |
@@ -332,7 +336,7 @@ Folder ──1:N── Test
 | `/dashboard/practice-test` | PracticeTest | Test listing & filters |
 | `/dashboard/practice-test/my-bank/:folderId?` | TestBank | Folder-based test organization |
 | `/dashboard/practice-test/create` | CreateTestWizard | Multi-step test creation |
-| `/dashboard/class/:classId` | Classroom | Lessons, canonical activities, results (teacher), members, and announcements |
+| `/dashboard/class/:classId` | Classroom | Lessons, canonical activities with teacher result summaries, members, and announcements |
 | `/dashboard/class/:classId/assignment/:assignmentId` | AssignmentDetail | View/submit homework |
 | `/dashboard/error-log` | ErrorLog | Wrong answer tracking |
 | `/dashboard/results-analytics` | ResultAnalytics | Performance charts & history |
@@ -431,7 +435,7 @@ Folder ──1:N── Test
 ```text
 1. DashboardHome dispatches TEACHER to the dedicated TeacherOverview rather than the legacy shared workspace home.
 2. GET /api/teacher/overview validates teacher ownership and aggregates published activities, scheduled lessons, class completion, and deterministic check-in signals.
-3. The class scope is URL-backed; all workflow links restore the relevant Classroom Activities, Performance, Progress, or assignment destination.
+3. The class scope is URL-backed; workflow links restore Classroom Activities, its embedded Test analysis, Lessons, or Assignment student work.
 4. Needs Attention includes only unresolved published work due within 48 hours or overdue; auto-scored tests and homework are not presented as a fictional review queue.
 5. Class Pulse uses the last 30 days of persisted activities and ActivityAssignee completion/best-score data.
 6. GET /api/teacher/overview/insights loads independently and applies each delivery's FIRST, BEST, or LATEST score policy before aggregating classified answers.

@@ -15,7 +15,7 @@ import ClassroomActivities from '../../features/classroom/ClassroomActivities';
 import { capitalizeFirstLetter } from '../../utils/text';
 
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-type ClassroomTab = 'LESSONS' | 'ACTIVITIES' | 'RESULTS' | 'MEMBERS' | 'ANNOUNCEMENTS';
+type ClassroomTab = 'LESSONS' | 'ACTIVITIES' | 'MEMBERS' | 'ANNOUNCEMENTS';
 
 interface CurrentUser { id: string; name: string; role: UserRole }
 interface ClassMember { id: number; name: string | null; email: string; createdAt: string }
@@ -74,7 +74,7 @@ export default function Classroom() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')?.toUpperCase();
-    const aliases: Record<string, ClassroomTab> = { PROGRESS: 'LESSONS', PERFORMANCE: 'RESULTS', NOTIFICATIONS: 'ANNOUNCEMENTS' };
+    const aliases: Record<string, ClassroomTab> = { PROGRESS: 'LESSONS', PERFORMANCE: 'ACTIVITIES', RESULTS: 'ACTIVITIES', NOTIFICATIONS: 'ANNOUNCEMENTS' };
     const resolved = aliases[requestedTab || ''] || requestedTab;
     if (requestedTab && aliases[requestedTab]) {
       const next = new URLSearchParams(searchParams);
@@ -82,21 +82,20 @@ export default function Classroom() {
       setSearchParams(next, { replace: true });
     }
     if (resolved === 'LESSONS' || resolved === 'ACTIVITIES' || resolved === 'MEMBERS' || resolved === 'ANNOUNCEMENTS') setActiveTab(resolved);
-    if (canManage && resolved === 'RESULTS') setActiveTab(resolved);
-  }, [canManage, searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams]);
 
   const selectTab = (tab: ClassroomTab) => {
     setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
     next.set('tab', tab.toLowerCase());
-    if (tab !== 'RESULTS') next.delete('deliveryId');
+    if (tab !== 'ACTIVITIES') next.delete('deliveryId');
     setSearchParams(next, { replace: true });
   };
 
   const openTestPerformance = (deliveryId: string) => {
-    setActiveTab('RESULTS');
+    setActiveTab('ACTIVITIES');
     const next = new URLSearchParams(searchParams);
-    next.set('tab', 'results');
+    next.set('tab', 'activities');
     next.set('deliveryId', deliveryId);
     setSearchParams(next, { replace: true });
   };
@@ -120,7 +119,6 @@ export default function Classroom() {
   const tabs: Array<TabItem<ClassroomTab>> = [
     { value: 'LESSONS', label: 'Lessons', panelId: 'classroom-lessons-panel' },
     { value: 'ACTIVITIES', label: 'Activities', panelId: 'classroom-activities-panel' },
-    ...(canManage ? [{ value: 'RESULTS' as ClassroomTab, label: 'Results', panelId: 'classroom-results-panel' }] : []),
     { value: 'MEMBERS', label: 'Members', panelId: 'classroom-members-panel' },
     { value: 'ANNOUNCEMENTS', label: 'Announcements', panelId: 'classroom-announcements-panel' },
   ];
@@ -136,8 +134,10 @@ export default function Classroom() {
 
       <div>
       {activeTab === 'LESSONS' && <div id="classroom-lessons-panel" role="tabpanel" className="py-2"><WeeklyProgress canManage={canManage} students={classDetail.students} /></div>}
-      {activeTab === 'ACTIVITIES' && <div id="classroom-activities-panel" role="tabpanel"><ClassroomActivities classId={classId || ''} students={classDetail.students} canManage={canManage} onOpenPerformance={openTestPerformance} /></div>}
-      {activeTab === 'RESULTS' && canManage && <div id="classroom-results-panel" role="tabpanel" className="py-2"><StudentAnalytics classId={classId} initialDeliveryId={searchParams.get('deliveryId')} /></div>}
+      {activeTab === 'ACTIVITIES' && <div id="classroom-activities-panel" role="tabpanel">{canManage && searchParams.get('deliveryId')
+        ? <StudentAnalytics key={searchParams.get('deliveryId')} initialDeliveryId={searchParams.get('deliveryId') as string} />
+        : <ClassroomActivities classId={classId || ''} students={classDetail.students} canManage={canManage} onOpenPerformance={openTestPerformance} />}
+      </div>}
       {activeTab === 'MEMBERS' && <div id="classroom-members-panel" role="tabpanel"><MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} /></div>}
       {activeTab === 'ANNOUNCEMENTS' && <div id="classroom-announcements-panel" role="tabpanel"><AnnouncementsTab classId={classDetail.id} selectedAnnouncementId={searchParams.get('announcementId')} refreshKey={announcementVersion} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} /></div>}
       </div>

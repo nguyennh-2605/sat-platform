@@ -37,7 +37,7 @@ import { AssignmentComposer, AssignTestsComposer, type ActivityStudent } from '.
 
 type ActivityType = 'TEST' | 'HOMEWORK';
 type ActivityTypeFilter = 'ALL' | ActivityType;
-type ActivityStatusFilter = 'ALL' | 'PUBLISHED' | 'DRAFT' | 'CLOSED' | 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE';
+type ActivityStatusFilter = 'ALL' | 'PUBLISHED' | 'DRAFT' | 'CLOSED' | 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE' | 'NEEDS_ATTENTION';
 type ActivityDateFilter = 'ALL' | 'THIS_WEEK' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'CUSTOM';
 type ActivitySort = 'ASSIGNED_DESC' | 'ASSIGNED_ASC' | 'DUE_ASC' | 'DUE_DESC';
 type StudentActivityStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE' | 'EXCUSED';
@@ -67,6 +67,13 @@ interface ClassActivity {
   lesson?: { id: string; title: string; order: number; week: { id: string; title: string; order: number } } | null;
   test?: { testDeliveryId: string; testDelivery: { testId: number; test: { title: string; subject: 'RW' | 'MATH'; mode: 'PRACTICE' | 'EXAM'; duration: number; sections: Array<{ _count: { questions: number } }> } } } | null;
   homework?: { assignmentId: string } | null;
+  resultSummary?: {
+    assigned: number;
+    completed: number;
+    inProgress: number;
+    missing: number;
+    averageScore: number | null;
+  };
 }
 
 interface Choice<T extends string> {
@@ -135,8 +142,11 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
       if (typeFilter !== 'ALL' && activity.type !== typeFilter) return false;
       if (query && !activity.title.toLocaleLowerCase().includes(query)) return false;
       if (statusFilter !== 'ALL') {
-        const effectiveStatus = canManage ? activity.status : studentStatus(activity);
-        if (effectiveStatus !== statusFilter) return false;
+        if (canManage) {
+          if (statusFilter === 'NEEDS_ATTENTION' && !needsAttention(activity)) return false;
+          else if (statusFilter === 'COMPLETED' && !isActivityComplete(activity)) return false;
+          else if (statusFilter !== 'NEEDS_ATTENTION' && statusFilter !== 'COMPLETED' && activity.status !== statusFilter) return false;
+        } else if (studentStatus(activity) !== statusFilter) return false;
       }
       if (dateFilter !== 'ALL') {
         const assignedTime = activity.assignedAt ? new Date(activity.assignedAt).getTime() : 0;
@@ -176,12 +186,12 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
     setCustomDateOpen(false);
   };
 
-  const openActivity = (activity: ClassActivity) => {
+  const openActivity = (activity: ClassActivity, review = false) => {
     if (activity.type === 'TEST' && activity.test) {
       if (canManage) onOpenPerformance(activity.test.testDeliveryId);
       else navigate(`/test/${activity.test.testDelivery.testId}?deliveryId=${activity.test.testDeliveryId}`);
     } else if (activity.homework) {
-      navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}${canManage ? '?view=student-work' : ''}`);
+      navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}${canManage && review ? '?view=student-work' : ''}`);
     }
   };
 
@@ -189,6 +199,8 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
   const statusChoices: Array<Choice<ActivityStatusFilter>> = canManage
     ? [
       { value: 'ALL', label: 'All status' },
+      { value: 'NEEDS_ATTENTION', label: 'Needs attention' },
+      { value: 'COMPLETED', label: 'Complete' },
       { value: 'PUBLISHED', label: 'Active' },
       { value: 'DRAFT', label: 'Draft' },
       { value: 'CLOSED', label: 'Closed' },
@@ -242,7 +254,7 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
                 ? <Button variant="outline" onClick={clearFilters}><X size={16} />Clear filters</Button>
                 : canManage ? <Button onClick={() => setComposer('ASSIGNMENT')}><Plus size={16} />Add activity</Button> : undefined}
             />
-            : <ActivityTable activities={filtered} canManage={canManage} onOpen={openActivity} />}
+            : <ActivityTable activities={filtered} canManage={canManage} onOpen={activity => openActivity(activity)} onReview={activity => openActivity(activity, true)} />}
     </DataSurface>
 
     <AssignmentComposer open={composer === 'ASSIGNMENT'} onClose={() => setComposer(null)} classId={classId} students={students} onCreated={loadActivities} />
@@ -304,13 +316,14 @@ function AddActivityMenu({ onSelect }: { onSelect: (value: 'ASSIGNMENT' | 'TEST'
   </DropdownMenu>;
 }
 
-function ActivityTable({ activities, canManage, onOpen }: { activities: ClassActivity[]; canManage: boolean; onOpen: (activity: ClassActivity) => void }) {
-  return <Table className={canManage ? 'min-w-[900px] table-fixed' : 'min-w-[760px] table-fixed'}>
+function ActivityTable({ activities, canManage, onOpen, onReview }: { activities: ClassActivity[]; canManage: boolean; onOpen: (activity: ClassActivity) => void; onReview: (activity: ClassActivity) => void }) {
+  return <Table className={canManage ? 'min-w-[1040px] table-fixed' : 'min-w-[760px] table-fixed'}>
         <colgroup>
-          <col className={canManage ? 'w-[56%]' : 'w-[58%]'} />
-          <col className={canManage ? 'w-[12%]' : 'w-[13%]'} />
-          <col className={canManage ? 'w-[15%]' : 'w-[16%]'} />
-          <col className={canManage ? 'w-[12%]' : 'w-[13%]'} />
+          <col className={canManage ? 'w-[42%]' : 'w-[58%]'} />
+          <col className={canManage ? 'w-[10%]' : 'w-[13%]'} />
+          <col className={canManage ? 'w-[14%]' : 'w-[16%]'} />
+          <col className={canManage ? 'w-[17%]' : 'w-[13%]'} />
+          {canManage && <col className="w-[12%]" />}
           {canManage && <col className="w-[5%]" />}
         </colgroup>
         <TableHeader>
@@ -318,21 +331,29 @@ function ActivityTable({ activities, canManage, onOpen }: { activities: ClassAct
             <TableHead>Activity</TableHead>
             <TableHead>Assigned</TableHead>
             <TableHead>Due</TableHead>
-            <TableHead>{canManage ? 'Completion' : 'Status'}</TableHead>
+            <TableHead>{canManage ? 'Participation' : 'Status'}</TableHead>
+            {canManage && <TableHead>Outcome</TableHead>}
             {canManage && <TableHead><span className="sr-only">Actions</span></TableHead>}
           </TableRow>
         </TableHeader>
-        <TableBody>{activities.map(activity => <ActivityRow key={activity.id} activity={activity} canManage={canManage} onOpen={() => onOpen(activity)} />)}</TableBody>
+        <TableBody>{activities.map(activity => <ActivityRow key={activity.id} activity={activity} canManage={canManage} onOpen={() => onOpen(activity)} onReview={() => onReview(activity)} />)}</TableBody>
   </Table>;
 }
 
-function ActivityRow({ activity, canManage, onOpen }: { activity: ClassActivity; canManage: boolean; onOpen: () => void }) {
+function ActivityRow({ activity, canManage, onOpen, onReview }: { activity: ClassActivity; canManage: boolean; onOpen: () => void; onReview: () => void }) {
   const activeAssignees = activity.assignees.filter(item => !item.excusedAt);
-  const completed = activeAssignees.filter(item => item.status === 'COMPLETED').length;
+  const summary = activity.resultSummary || {
+    assigned: activeAssignees.length,
+    completed: activeAssignees.filter(item => item.status === 'COMPLETED').length,
+    inProgress: activeAssignees.filter(item => item.status === 'IN_PROGRESS').length,
+    missing: 0,
+    averageScore: null,
+  };
   const notAvailable = Boolean(!canManage && activity.availableAt && new Date(activity.availableAt) > new Date());
   const personalStatus = studentStatus(activity);
-  const secondaryCompletion = completionDetail(activity, activeAssignees);
-  const overdue = Boolean(activity.dueAt && isPast(new Date(activity.dueAt)) && (canManage ? completed < activeAssignees.length : personalStatus === 'OVERDUE'));
+  const secondaryCompletion = participationDetail(summary);
+  const overdue = Boolean(activity.dueAt && isPast(new Date(activity.dueAt)) && (canManage ? summary.completed < summary.assigned : personalStatus === 'OVERDUE'));
+  const dueSoon = Boolean(canManage && !overdue && activity.dueAt && needsAttention(activity));
   const handleOpen = () => { if (!notAvailable) onOpen(); };
 
   return <TableRow className={notAvailable ? '' : 'group cursor-pointer hover:bg-muted/30'} onClick={handleOpen}>
@@ -349,17 +370,25 @@ function ActivityRow({ activity, canManage, onOpen }: { activity: ClassActivity;
       </button>
     </TableCell>
     <TableCell className="whitespace-nowrap text-subtle"><time dateTime={activity.assignedAt || undefined}>{formatAssignedDate(activity.assignedAt)}</time></TableCell>
-    <TableCell className="whitespace-nowrap">{activity.dueAt ? <div><time dateTime={activity.dueAt} className={overdue ? 'text-danger' : 'text-subtle'}>{formatDateTime(activity.dueAt)}</time>{overdue && <p className="mt-1 text-caption font-medium text-danger">Overdue</p>}</div> : <span className="text-muted-foreground">No deadline</span>}</TableCell>
-    <TableCell>
+    <TableCell className="whitespace-nowrap">{activity.dueAt ? <div><time dateTime={activity.dueAt} className={overdue ? 'text-danger' : 'text-subtle'}>{formatDateTime(activity.dueAt)}</time>{overdue && <p className="mt-1 text-caption font-medium text-danger">Overdue</p>}{dueSoon && <p className="mt-1 text-caption font-medium text-warning">Due soon</p>}</div> : <span className="text-muted-foreground">No deadline</span>}</TableCell>
+    <TableCell onClick={event => { if (canManage && activity.type === 'HOMEWORK') event.stopPropagation(); }}>
       {canManage
-        ? <div><p className="font-medium tabular-nums text-foreground">{completed} / {activeAssignees.length}</p>{secondaryCompletion && <p className="mt-1 text-caption text-muted-foreground">{secondaryCompletion}</p>}</div>
+        ? activity.type === 'HOMEWORK'
+          ? <button type="button" onClick={onReview} className="text-left outline-none hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-primary/40"><span className="block font-medium tabular-nums text-foreground">{summary.completed} / {summary.assigned} submitted</span>{secondaryCompletion && <span className="mt-1 block text-caption text-muted-foreground">{secondaryCompletion}</span>}</button>
+          : <div><p className="font-medium tabular-nums text-foreground">{summary.completed} / {summary.assigned} completed</p>{secondaryCompletion && <p className="mt-1 text-caption text-muted-foreground">{secondaryCompletion}</p>}</div>
         : <StudentStatusBadge status={personalStatus} />}
     </TableCell>
+    {canManage && <TableCell>{activity.type === 'TEST'
+      ? summary.averageScore == null
+        ? <span className="text-muted-foreground">No scores yet</span>
+        : <div><p className="font-medium tabular-nums text-foreground">{summary.averageScore}%</p><p className="mt-1 text-caption text-muted-foreground">Average score</p></div>
+      : <div><p className="font-medium text-foreground">Not scored</p><p className="mt-1 text-caption text-muted-foreground">Submission tracked</p></div>}
+    </TableCell>}
     {canManage && <TableCell onClick={event => event.stopPropagation()} className="text-right">
       <DropdownMenu>
         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="ml-auto size-9 shadow-none" aria-label={`Actions for ${activity.title}`}><Ellipsis size={16} /></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem onSelect={onOpen}>{activity.type === 'TEST' ? 'View results' : canManage ? 'Review submissions' : 'Open assignment'}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={activity.type === 'HOMEWORK' && canManage ? onReview : onOpen}>{activity.type === 'TEST' ? 'View results' : canManage ? 'Review submissions' : 'Open assignment'}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </TableCell>}
@@ -386,12 +415,24 @@ function studentStatus(activity: ClassActivity): StudentActivityStatus {
   return 'NOT_STARTED';
 }
 
-function completionDetail(activity: ClassActivity, assignees: ActivityAssignee[]) {
-  const inProgress = assignees.filter(item => item.status === 'IN_PROGRESS').length;
-  const overdue = assignees.filter(item => item.status === 'MISSING' || (activity.dueAt && isPast(new Date(activity.dueAt)) && item.status !== 'COMPLETED')).length;
-  if (overdue) return `${overdue} overdue`;
-  if (inProgress) return `${inProgress} in progress`;
+function participationDetail(summary: NonNullable<ClassActivity['resultSummary']>) {
+  if (summary.missing) return `${summary.missing} missing${summary.inProgress ? ` · ${summary.inProgress} in progress` : ''}`;
+  if (summary.inProgress) return `${summary.inProgress} in progress`;
+  const notStarted = Math.max(0, summary.assigned - summary.completed);
+  if (notStarted) return `${notStarted} not started`;
   return '';
+}
+
+function isActivityComplete(activity: ClassActivity) {
+  const summary = activity.resultSummary;
+  return Boolean(summary && summary.assigned > 0 && summary.completed >= summary.assigned);
+}
+
+function needsAttention(activity: ClassActivity) {
+  const summary = activity.resultSummary;
+  if (!summary || summary.assigned <= summary.completed || !activity.dueAt) return false;
+  const dueAt = new Date(activity.dueAt).getTime();
+  return dueAt - Date.now() <= 3 * 24 * 60 * 60 * 1000;
 }
 
 function activityMetadata(activity: ClassActivity) {
@@ -447,6 +488,7 @@ function ActivitySkeleton({ canManage }: { canManage: boolean }) {
         <div className="h-4 w-20 rounded-sm bg-muted" />
         <div className="h-4 w-28 rounded-sm bg-muted" />
         <div className="h-5 w-20 rounded-full bg-muted" />
+        {canManage && <div className="h-4 w-20 rounded-sm bg-muted" />}
         {canManage && <div className="size-8 rounded-control bg-muted" />}
       </div>)}
   </div>;

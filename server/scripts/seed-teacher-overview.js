@@ -344,10 +344,17 @@ const seedTeacher = async (teacher, now) => prisma.$transaction(async tx => {
   }
 
   const foundationAssignments = [
-    { suffix: 'context-notes', title: 'Context Clues Reflection', lesson: seededWeeks[1].lessons[0], createdAt: at(now, -15 * DAY), dueAt: at(now, -10 * DAY), submitted: [liam, mia, sophia] },
-    { suffix: 'grammar-revision', title: 'Grammar Revision Worksheet', lesson: seededWeeks[2].lessons[1], createdAt: at(now, -5 * DAY), dueAt: at(now, DAY), submitted: [mia] },
+    {
+      suffix: 'context-notes', title: 'Context Clues Reflection', lesson: seededWeeks[1].lessons[0], createdAt: at(now, -15 * DAY), dueAt: at(now, -10 * DAY), maxPoints: 10,
+      submitted: [
+        { student: liam, textResponse: 'I first identified the surrounding contrast words, then replaced the unfamiliar word with my own prediction before checking each answer choice.', score: 9, feedback: 'Clear strategy and a strong explanation of how you verified the answer.', reviewed: true },
+        { student: mia, fileUrl: 'https://example.com/submissions/mia-context-clues-reflection.pdf' },
+        { student: sophia, fileUrl: 'https://www.desmos.com/calculator', score: 8, feedback: 'Good supporting example. Add one sentence explaining why the other choices do not fit.', reviewed: true },
+      ],
+    },
+    { suffix: 'grammar-revision', title: 'Grammar Revision Worksheet', lesson: seededWeeks[2].lessons[1], createdAt: at(now, -5 * DAY), dueAt: at(now, DAY), maxPoints: null, submitted: [{ student: mia, textResponse: 'I revised the paragraph by fixing sentence boundaries and matching each verb with its subject.' }] },
     { suffix: 'systems-practice', title: 'Systems of Equations Practice', lesson: seededWeeks[3].lessons[1], createdAt: at(now, -DAY), dueAt: at(now, 6 * DAY), submitted: [] },
-    { suffix: 'study-plan', title: 'Personal SAT Study Plan', lesson: null, createdAt: at(now, -3 * HOUR), dueAt: null, submitted: [noah] },
+    { suffix: 'study-plan', title: 'Personal SAT Study Plan', lesson: null, createdAt: at(now, -3 * HOUR), dueAt: null, submitted: [{ student: noah, fileUrl: 'https://example.com/submissions/noah-sat-study-plan.docx' }] },
   ];
 
   for (const fixture of foundationAssignments) {
@@ -359,12 +366,25 @@ const seedTeacher = async (teacher, now) => prisma.$transaction(async tx => {
         fileUrls: [],
         links: [],
         deadline: fixture.dueAt,
+        maxPoints: fixture.maxPoints ?? null,
         classId: foundation.id,
         createdAt: fixture.createdAt,
-        submissions: { create: fixture.submitted.map((student, index) => ({ studentId: student.id, textResponse: `Sample response from ${student.name}.`, submittedAt: at(fixture.createdAt, (index + 1) * 6 * HOUR) })) },
+        submissions: { create: fixture.submitted.map((submission, index) => {
+          const submittedAt = at(fixture.createdAt, (index + 1) * 6 * HOUR);
+          return {
+            studentId: submission.student.id,
+            textResponse: submission.textResponse || null,
+            fileUrl: submission.fileUrl || null,
+            score: submission.score ?? null,
+            feedback: submission.feedback || null,
+            submittedAt,
+            reviewedAt: submission.reviewed ? at(submittedAt, 2 * HOUR) : null,
+            status: submission.reviewed ? 'REVIEWED' : 'SUBMITTED',
+          };
+        }) },
       },
     });
-    const submittedIds = new Set(fixture.submitted.map(student => student.id));
+    const submissionByStudent = new Map(fixture.submitted.map((submission, index) => [submission.student.id, { ...submission, submittedAt: at(fixture.createdAt, (index + 1) * 6 * HOUR) }]));
     await tx.classActivity.create({
       data: {
         id: `teacher-overview-demo-${teacher.id}-foundation-assignment-${fixture.suffix}`,
@@ -378,9 +398,12 @@ const seedTeacher = async (teacher, now) => prisma.$transaction(async tx => {
         createdAt: fixture.createdAt,
         audience: 'ALL_STUDENTS',
         homework: { create: { assignmentId: assignment.id } },
-        assignees: { create: foundationStudents.map(student => submittedIds.has(student.id)
-          ? { studentId: student.id, status: 'COMPLETED', assignedAt: fixture.createdAt, completedAt: at(fixture.createdAt, 6 * HOUR), attemptCount: 1 }
-          : { studentId: student.id, status: fixture.dueAt && fixture.dueAt < now ? 'MISSING' : 'ASSIGNED', assignedAt: fixture.createdAt }) },
+        assignees: { create: foundationStudents.map(student => {
+          const submission = submissionByStudent.get(student.id);
+          return submission
+            ? { studentId: student.id, status: 'COMPLETED', assignedAt: fixture.createdAt, startedAt: submission.submittedAt, completedAt: submission.submittedAt, attemptCount: 1 }
+            : { studentId: student.id, status: fixture.dueAt && fixture.dueAt < now ? 'MISSING' : 'ASSIGNED', assignedAt: fixture.createdAt };
+        }) },
       },
     });
   }
