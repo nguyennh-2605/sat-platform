@@ -41,7 +41,7 @@ Schedule: once per day
 
 The Cron Job requires production `DATABASE_URL` and every `OBJECT_STORAGE_*` variable. It does not need frontend variables. Use the production bucket token, never the development token.
 
-Cleanup processes at most 200 candidates per run:
+Cleanup processes at most 200 candidates per run using five concurrent workers. The bounded worker pool avoids both slow sequential R2 round trips and an unbounded burst against R2 or PostgreSQL:
 
 - `PENDING_UPLOAD` older than 24 hours;
 - unattached `READY` assets older than 24 hours;
@@ -79,4 +79,3 @@ The smoke test writes a small text object, verifies metadata, downloads and comp
 - Metadata verification failures: confirm Object Read permission and outbound network access.
 - Cleanup delete failures: inspect the safe error code in the structured log; the asset remains queued for retry.
 - Browser upload failures: verify both the exact R2 bucket CORS origin and the API `CORS_ORIGINS` value.
-

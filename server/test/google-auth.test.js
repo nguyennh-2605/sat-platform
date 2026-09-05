@@ -106,3 +106,43 @@ test('Google login limiter returns 429 after the configured request budget', () 
   assert.equal(response.statusCode, 429);
   assert.equal(response.body.code, 'RATE_LIMITED');
 });
+
+test('rate limiter emits client hints and resets the budget after its window', () => {
+  let now = 1_000;
+  const limiter = createRateLimiter({ windowMs: 10_000, max: 2, message: 'Slow down.', clock: () => now });
+  const request = { ip: '127.0.0.1' };
+  const response = {
+    headers: {},
+    set(name, value) { this.headers[name] = value; },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+  let nextCalls = 0;
+
+  limiter(request, response, () => { nextCalls += 1; });
+  assert.equal(response.headers['RateLimit-Limit'], '2');
+  assert.equal(response.headers['RateLimit-Remaining'], '1');
+  limiter(request, response, () => { nextCalls += 1; });
+  limiter(request, response, () => { nextCalls += 1; });
+  assert.equal(response.statusCode, 429);
+  assert.equal(response.headers['RateLimit-Remaining'], '0');
+
+  now += 10_001;
+  limiter(request, response, () => { nextCalls += 1; });
+  assert.equal(nextCalls, 3);
+  assert.equal(response.headers['RateLimit-Remaining'], '1');
+});
+
+test('rate limiter bounds stored client keys', () => {
+  const limiter = createRateLimiter({ windowMs: 60_000, max: 1, maxKeys: 2, message: 'Slow down.' });
+  const response = {
+    set() {},
+    status() { return this; },
+    json() { return this; },
+  };
+  let nextCalls = 0;
+  for (const ip of ['client-a', 'client-b', 'client-c', 'client-a']) {
+    limiter({ ip }, response, () => { nextCalls += 1; });
+  }
+  assert.equal(nextCalls, 4);
+});

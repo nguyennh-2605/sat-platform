@@ -95,6 +95,8 @@ model Assignment {
   testSubmissions  Submission[]
   activity         HomeworkActivity?
   lessonAssignment LessonAssignment?
+
+  @@index([classId, createdAt])
 }
 
 model ClassAnnouncement {
@@ -131,6 +133,7 @@ model HomeworkSubmission {
   contents     HomeworkSubmissionContent[]
 
   @@unique([studentId, assignmentId])
+  @@index([assignmentId, status, submittedAt])
 }
 
 model HomeworkSubmissionContent {
@@ -827,6 +830,7 @@ model ClassActivity {
   vocabularySessions VocabularyStudySession[]
 
   @@index([classId, status, dueAt])
+  @@index([classId, createdAt])
   @@index([lessonId])
 }
 

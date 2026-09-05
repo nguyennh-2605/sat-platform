@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseCorsOrigins } = require('../src/config/cors');
+const { corsOptions, parseCorsOrigins } = require('../src/config/cors');
 
 test('CORS origins are trimmed, empty values removed, and duplicates collapsed', () => {
   assert.deepEqual(
@@ -20,4 +20,8 @@ test('production refuses to start without explicit CORS origins', () => {
 test('CORS configuration rejects paths and production loopback origins', () => {
   assert.throws(() => parseCorsOrigins('https://app.example.com/path', 'production'), /exact http\(s\) origins/);
   assert.throws(() => parseCorsOrigins('http://localhost:5173', 'production'), /loopback origin/);
+});
+
+test('CORS preflight responses can be reused for ten minutes', () => {
+  assert.equal(corsOptions.maxAge, 600);
 });

@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma');
+const { Prisma } = require('@prisma/client');
 const ApiError = require('../utils/ApiError');
 const testDeliveryService = require('./test-delivery.service');
 const { sendNotificationToUser } = require('./notification.service');
@@ -313,59 +314,154 @@ exports.getAssignmentById = async ({ id, userId, userRole }) => {
   };
 };
 
-exports.listStudentWork = async ({ assignmentId, userId, userRole, search, status, cursor, limit }) => {
+const studentWorkCte = ({ assignmentId, classId, activityId, overdue }) => {
+  const assignedStudents = activityId
+    ? Prisma.sql`
+        SELECT student."id", student."name", student."email"
+        FROM "_StudentClasses" enrollment
+        JOIN "User" student ON student."id" = enrollment."B"
+        JOIN "ActivityAssignee" assignee
+          ON assignee."studentId" = student."id"
+         AND assignee."activityId" = ${activityId}
+         AND assignee."excusedAt" IS NULL
+        WHERE enrollment."A" = ${classId}
+      `
+    : Prisma.sql`
+        SELECT student."id", student."name", student."email"
+        FROM "_StudentClasses" enrollment
+        JOIN "User" student ON student."id" = enrollment."B"
+        WHERE enrollment."A" = ${classId}
+      `;
+
+  return Prisma.sql`
+    WITH assigned_students AS (${assignedStudents}),
+    work_items AS (
+      SELECT
+        student."id" AS "studentId",
+        student."name",
+        student."email",
+        submission."submittedAt",
+        submission."reviewedAt",
+        submission."score",
+        CASE
+          WHEN submitted_content."id" IS NOT NULL AND submission."submittedAt" IS NOT NULL THEN
+            CASE
+              WHEN submission."reviewedAt" IS NOT NULL
+               AND submission."reviewedAt" >= submission."submittedAt" THEN 'REVIEWED'
+              ELSE 'NEEDS_REVIEW'
+            END
+          WHEN ${overdue} THEN 'MISSING'
+          ELSE 'NOT_SUBMITTED'
+        END AS "state"
+      FROM assigned_students student
+      LEFT JOIN "HomeworkSubmission" submission
+        ON submission."studentId" = student."id"
+       AND submission."assignmentId" = ${assignmentId}
+      LEFT JOIN "HomeworkSubmissionContent" submitted_content
+        ON submitted_content."submissionId" = submission."id"
+       AND submitted_content."slot" = 'SUBMITTED'
+    )
+  `;
+};
+
+const listStudentWorkWithDb = async ({ assignmentId, userId, userRole, search, status, cursor, limit }, db) => {
   const currentUserId = userIdNumber(userId);
-  const assignment = await prisma.assignment.findUnique({
+  const normalizedStatus = String(status || 'ALL').toUpperCase();
+  const allowedStatuses = new Set(['ALL', 'NEEDS_REVIEW', 'REVIEWED', 'MISSING', 'NOT_SUBMITTED']);
+  if (!allowedStatuses.has(normalizedStatus)) throw new ApiError(400, { error: 'Invalid student work status.' });
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 50));
+  const cursorId = Number(cursor);
+  const normalizedCursor = Number.isInteger(cursorId) && cursorId > 0 ? cursorId : null;
+  const normalizedSearch = String(search || '').trim().toLowerCase();
+
+  const assignment = await db.assignment.findUnique({
     where: { id: assignmentId },
-    include: {
-      class: { select: { teacherId: true, students: { select: { id: true, name: true, email: true } } } },
-      submissions: { include: submissionInclude },
-      activity: { include: { activity: { select: { dueAt: true, assignees: { where: { excusedAt: null }, select: { studentId: true } } } } } },
+    select: {
+      id: true,
+      classId: true,
+      deadline: true,
+      class: { select: { teacherId: true } },
+      activity: { select: { activity: { select: { id: true, dueAt: true } } } },
     },
   });
   if (!assignment) throw new ApiError(404, { error: 'Assignment not found.' });
   if (!canManageAssignment(assignment, currentUserId, userRole)) throw new ApiError(403, { error: 'Only class staff can review student work.' });
 
-  const assignedIds = assignment.activity
-    ? new Set(assignment.activity.activity.assignees.map(item => item.studentId))
-    : new Set(assignment.class.students.map(item => item.id));
-  const submissionByStudent = new Map(assignment.submissions.map(item => [item.studentId, officialSubmission(item)]));
   const deadline = assignment.activity?.activity.dueAt || assignment.deadline;
-  const allItems = assignment.class.students.filter(student => assignedIds.has(student.id)).map(student => {
-    const submission = submissionByStudent.get(student.id) || null;
+  const cte = studentWorkCte({
+    assignmentId: assignment.id,
+    classId: assignment.classId,
+    activityId: assignment.activity?.activity.id || null,
+    overdue: Boolean(deadline && deadline < new Date()),
+  });
+  const [summaryRows, pageRows] = await Promise.all([
+    db.$queryRaw(Prisma.sql`
+      ${cte}
+      SELECT
+        COUNT(*)::int AS "assigned",
+        (COUNT(*) FILTER (WHERE "state" IN ('NEEDS_REVIEW', 'REVIEWED')))::int AS "submitted",
+        (COUNT(*) FILTER (WHERE "state" = 'NEEDS_REVIEW'))::int AS "needsReview",
+        (COUNT(*) FILTER (WHERE "state" = 'REVIEWED'))::int AS "reviewed",
+        (COUNT(*) FILTER (WHERE "state" = 'MISSING'))::int AS "missing",
+        (COUNT(*) FILTER (WHERE "state" = 'NOT_SUBMITTED'))::int AS "pending"
+      FROM work_items
+    `),
+    db.$queryRaw(Prisma.sql`
+      ${cte},
+      filtered AS (
+        SELECT *
+        FROM work_items
+        WHERE (${normalizedStatus} = 'ALL' OR "state" = ${normalizedStatus})
+          AND (${normalizedSearch} = '' OR POSITION(
+            ${normalizedSearch} IN LOWER(CONCAT_WS(' ', COALESCE("name", ''), "email"))
+          ) > 0)
+      ),
+      ranked AS (
+        SELECT *, ROW_NUMBER() OVER (
+          ORDER BY
+            CASE "state"
+              WHEN 'NEEDS_REVIEW' THEN 0
+              WHEN 'MISSING' THEN 1
+              WHEN 'REVIEWED' THEN 2
+              ELSE 3
+            END,
+            "submittedAt" DESC NULLS LAST,
+            "studentId" ASC
+        ) AS "rowNumber"
+        FROM filtered
+      )
+      SELECT "studentId", "name", "email", "state", "submittedAt", "reviewedAt", "score"
+      FROM ranked
+      WHERE "rowNumber" > COALESCE(
+        (SELECT "rowNumber" FROM ranked WHERE "studentId" = ${normalizedCursor}),
+        0
+      )
+      ORDER BY "rowNumber"
+      LIMIT ${pageSize + 1}
+    `),
+  ]);
+
+  const summary = summaryRows[0] || { assigned: 0, submitted: 0, needsReview: 0, reviewed: 0, missing: 0, pending: 0 };
+  const hasNextPage = pageRows.length > pageSize;
+  const items = pageRows.slice(0, pageSize).map(row => {
+    const hasOfficialSubmission = row.state === 'NEEDS_REVIEW' || row.state === 'REVIEWED';
     return {
-      student,
-      state: reviewState(submission, deadline),
-      submittedAt: submission?.submittedAt || null,
-      reviewedAt: submission?.reviewedAt || null,
-      score: submission?.score ?? null,
+      student: { id: row.studentId, name: row.name, email: row.email },
+      state: row.state,
+      submittedAt: hasOfficialSubmission ? row.submittedAt : null,
+      reviewedAt: hasOfficialSubmission ? row.reviewedAt : null,
+      score: hasOfficialSubmission ? row.score ?? null : null,
     };
   });
-  const summary = summarizeStudentWork(allItems);
-
-  const normalizedSearch = String(search || '').trim().toLowerCase();
-  const normalizedStatus = String(status || 'ALL').toUpperCase();
-  const allowedStatuses = new Set(['ALL', 'NEEDS_REVIEW', 'REVIEWED', 'MISSING', 'NOT_SUBMITTED']);
-  if (!allowedStatuses.has(normalizedStatus)) throw new ApiError(400, { error: 'Invalid student work status.' });
-  const priorities = { NEEDS_REVIEW: 0, MISSING: 1, REVIEWED: 2, NOT_SUBMITTED: 3 };
-  const filtered = allItems.filter(item => {
-    if (normalizedStatus !== 'ALL' && item.state !== normalizedStatus) return false;
-    if (!normalizedSearch) return true;
-    return `${item.student.name || ''} ${item.student.email}`.toLowerCase().includes(normalizedSearch);
-  }).sort((left, right) => priorities[left.state] - priorities[right.state]
-    || new Date(right.submittedAt || 0).getTime() - new Date(left.submittedAt || 0).getTime()
-    || left.student.id - right.student.id);
-
-  const pageSize = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 50));
-  const cursorIndex = cursor ? filtered.findIndex(item => String(item.student.id) === String(cursor)) : -1;
-  const start = cursorIndex >= 0 ? cursorIndex + 1 : 0;
-  const items = filtered.slice(start, start + pageSize);
   return {
     summary,
     items,
-    nextCursor: start + pageSize < filtered.length ? String(items.at(-1).student.id) : null,
+    nextCursor: hasNextPage ? String(items.at(-1).student.id) : null,
   };
 };
+
+exports.listStudentWorkWithDb = listStudentWorkWithDb;
+exports.listStudentWork = params => listStudentWorkWithDb(params, prisma);
 
 exports.getStudentWork = async ({ assignmentId, studentId, userId, userRole }) => {
   const currentUserId = userIdNumber(userId);

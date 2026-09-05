@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { _assignmentReviewHelpers } = require('../src/services/assignment.service');
+const assignmentService = require('../src/services/assignment.service');
+const { _assignmentReviewHelpers } = assignmentService;
 
 const { reviewState, summarizeStudentWork, validateMaxPoints, normalizeExternalUrl, officialSubmission, serializeSubmission } = _assignmentReviewHelpers;
 const now = new Date('2026-09-04T08:00:00.000Z');
@@ -62,4 +63,46 @@ test('submission links accept only bounded http or https URLs', () => {
   assert.equal(normalizeExternalUrl(' https://docs.example.com/work '), 'https://docs.example.com/work');
   assert.throws(() => normalizeExternalUrl('javascript:alert(1)'), error => error.statusCode === 400);
   assert.throws(() => normalizeExternalUrl(`https://example.com/${'a'.repeat(2050)}`), error => error.statusCode === 400);
+});
+
+test('student work list paginates summary rows without loading submission content', async () => {
+  let assignmentQuery;
+  let rawQueryCalls = 0;
+  const db = {
+    assignment: {
+      findUnique: async query => {
+        assignmentQuery = query;
+        return {
+          id: 'assignment-1',
+          classId: 'class-1',
+          deadline: null,
+          class: { teacherId: 4 },
+          activity: null,
+        };
+      },
+    },
+    $queryRaw: async () => {
+      rawQueryCalls += 1;
+      if (rawQueryCalls === 1) {
+        return [{ assigned: 3, submitted: 2, needsReview: 1, reviewed: 1, missing: 0, pending: 1 }];
+      }
+      return [
+        { studentId: 10, name: 'Ada', email: 'ada@example.com', state: 'NEEDS_REVIEW', submittedAt: now, reviewedAt: null, score: null },
+        { studentId: 11, name: 'Ben', email: 'ben@example.com', state: 'REVIEWED', submittedAt: now, reviewedAt: now, score: 9 },
+        { studentId: 12, name: 'Cy', email: 'cy@example.com', state: 'NOT_SUBMITTED', submittedAt: null, reviewedAt: null, score: null },
+      ];
+    },
+  };
+
+  const result = await assignmentService.listStudentWorkWithDb({
+    assignmentId: 'assignment-1', userId: 4, userRole: 'TEACHER', limit: 2,
+  }, db);
+
+  assert.equal(assignmentQuery.include, undefined);
+  assert.equal(assignmentQuery.select.submissions, undefined);
+  assert.equal(rawQueryCalls, 2);
+  assert.equal(result.items.length, 2);
+  assert.equal(result.items[0].student.id, 10);
+  assert.equal(result.nextCursor, '11');
+  assert.deepEqual(result.summary, { assigned: 3, submitted: 2, needsReview: 1, reviewed: 1, missing: 0, pending: 1 });
 });

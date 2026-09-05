@@ -29,6 +29,7 @@ const corsOptions = {
   origin: parseCorsOrigins(process.env.CORS_ORIGINS),
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Intent'],
   credentials: true,
+  maxAge: 600,
 };
 
 module.exports = { corsOptions, parseCorsOrigins };

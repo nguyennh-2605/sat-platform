@@ -134,3 +134,30 @@ test('cleanup deletes orphan assets and keeps failures pending for a retry', asy
   assert.deepEqual(deleted, ['asset-ok']);
   assert.deepEqual(pending, [{ id: 'asset-failed', status: 'PENDING_DELETE' }]);
 });
+
+test('cleanup uses bounded concurrency instead of deleting the whole batch at once', async () => {
+  const db = createDb();
+  db.fileAsset.findMany = async () => Array.from({ length: 8 }, (_, index) => ({
+    id: `asset-${index}`,
+    storageKey: `orphan-${index}`,
+  }));
+  db.fileAsset.delete = async () => undefined;
+  let active = 0;
+  let maximumActive = 0;
+
+  const result = await fileAssetService.cleanupAssets({
+    db,
+    concurrency: 3,
+    storageFactory: () => ({ deleteObject: async () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      active -= 1;
+    } }),
+    logger: silentLogger,
+    clock: () => 1000,
+  });
+
+  assert.equal(maximumActive, 3);
+  assert.deepEqual(result, { candidates: 8, processed: 8, failed: 0, durationMs: 0 });
+});

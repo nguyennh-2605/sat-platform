@@ -104,6 +104,8 @@ Express Server (index.js → app.js)
 - **3-layer**: Routes → Controllers → Services → Database. Services never touch `req`/`res`.
 - **Error handling**: Services throw `ApiError(statusCode, { message })`. Controllers catch and return `{ success: false, error }`.
 - **Authorization**: Every protected service function verifies the requesting user owns the resource or has the correct role.
+- **Abuse protection**: Credential, registration, Google OAuth, refresh, account-upgrade, and managed-upload endpoints use bounded in-memory rate limiters. Production trusts one reverse-proxy hop by default so limits use the client IP on Render.
+- **Process lifecycle**: `SIGTERM` and `SIGINT` stop accepting new requests, drain active HTTP work for up to 10 seconds, and disconnect Prisma before exit.
 - **SSE Notifications**: In-memory `Map<userId, Set<Response>>` maintains active connections; events are pushed in real-time and persisted to DB.
 
 ---
@@ -147,7 +149,7 @@ Express Server (index.js → app.js)
 | `POST` | `/api/assignments/:id/my-submission/edit` | JWT + STUDENT | Copy the official snapshot into an editable draft |
 | `POST/DELETE` | `/api/assignments/:id/my-submission/draft/items[/:itemId]` | JWT + STUDENT | Add or remove managed files and external links in a draft |
 | `POST` | `/api/assignments/:id/my-submission/submit` | JWT + STUDENT | Atomically promote a draft and complete the canonical activity |
-| `GET` | `/api/assignments/:id/student-work` | JWT + owning TEACHER/ADMIN | Search, filter, summarize, and cursor-page the assigned student review queue |
+| `GET` | `/api/assignments/:id/student-work` | JWT + owning TEACHER/ADMIN | Search, filter, summarize, and database cursor-page lightweight review rows; submission content is loaded only by the student detail endpoint |
 | `GET` | `/api/assignments/:id/student-work/:studentId` | JWT + owning TEACHER/ADMIN | Get one assigned student's latest submission and review state |
 | `PATCH` | `/api/assignments/:id/student-work/:studentId/review` | JWT + owning TEACHER/ADMIN | Save optional points and/or feedback, or mark a submission reviewed |
 

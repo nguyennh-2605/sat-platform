@@ -5,6 +5,8 @@ const ApiError = require('../utils/ApiError');
 const { getObjectStorage } = require('../storage/object-storage');
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const DEFAULT_CLEANUP_CONCURRENCY = 5;
+const MAX_CLEANUP_CONCURRENCY = 10;
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
   'application/msword',
@@ -123,6 +125,7 @@ exports.getAccessUrl = async ({ fileAssetId, userId, userRole }, dependencies = 
 exports.cleanupAssets = async ({
   olderThan = new Date(Date.now() - 24 * 60 * 60 * 1000),
   batchSize = 200,
+  concurrency = DEFAULT_CLEANUP_CONCURRENCY,
   db = prisma,
   storageFactory = getObjectStorage,
   logger = console,
@@ -139,9 +142,16 @@ exports.cleanupAssets = async ({
   });
   if (!assets.length) return { candidates: 0, processed: 0, failed: 0, durationMs: clock() - startedAt };
   const storage = storageFactory();
+  const requestedConcurrency = Number.parseInt(concurrency, 10);
+  const workerCount = Math.min(
+    assets.length,
+    Math.max(1, Math.min(Number.isInteger(requestedConcurrency) ? requestedConcurrency : DEFAULT_CLEANUP_CONCURRENCY, MAX_CLEANUP_CONCURRENCY)),
+  );
   let processed = 0;
   let failed = 0;
-  for (const asset of assets) {
+  let nextIndex = 0;
+
+  const cleanAsset = async asset => {
     try {
       await storage.deleteObject({ storageKey: asset.storageKey });
       await db.fileAsset.delete({ where: { id: asset.id } });
@@ -151,7 +161,17 @@ exports.cleanupAssets = async ({
       logger.error('Unable to delete a stale object.', { fileAssetId: asset.id, ...storageErrorDetails(error) });
       await db.fileAsset.update({ where: { id: asset.id }, data: { status: 'PENDING_DELETE' } }).catch(() => undefined);
     }
-  }
+  };
+
+  const runWorker = async () => {
+    while (nextIndex < assets.length) {
+      const asset = assets[nextIndex];
+      nextIndex += 1;
+      await cleanAsset(asset);
+    }
+  };
+
+  await Promise.all(Array.from({ length: workerCount }, runWorker));
   return { candidates: assets.length, processed, failed, durationMs: clock() - startedAt };
 };
 
@@ -159,4 +179,12 @@ function serializeAsset(asset) {
   return { id: asset.id, name: asset.originalName, mimeType: asset.mimeType, sizeBytes: asset.sizeBytes, status: asset.status };
 }
 
-exports._fileAssetHelpers = { ALLOWED_MIME_TYPES, MAX_FILE_BYTES, normalizeName, assertStudentAssignmentAccess, storageErrorDetails };
+exports._fileAssetHelpers = {
+  ALLOWED_MIME_TYPES,
+  MAX_FILE_BYTES,
+  DEFAULT_CLEANUP_CONCURRENCY,
+  MAX_CLEANUP_CONCURRENCY,
+  normalizeName,
+  assertStudentAssignmentAccess,
+  storageErrorDetails,
+};
