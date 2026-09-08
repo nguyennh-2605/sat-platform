@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Check, Copy, ExternalLink, Megaphone, Plus, Trash2 } from 'lucide-react';
+import { Check, Copy, ExternalLink, Megaphone, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
-import { Button, Card, Input, Modal, PageHeader, Tabs, type TabItem } from '../../components/ui/AppUI';
-import { DataSurface } from '@/components/ui/data-surface';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button, Card, Modal, PageHeader, Tabs, type TabItem } from '../../components/ui/AppUI';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button as PrimitiveButton } from '@/components/ui/button';
+import { DataStateRow, DataSurface, DataToolbar, DataToolbarSearch } from '@/components/ui/data-surface';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDashboardBack } from '../../features/navigation/DashboardBackContext';
 import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import AnnouncementDialog from '../../features/classroom/AnnouncementDialog';
@@ -29,7 +34,7 @@ interface ClassDetail {
 }
 interface ClassAnnouncement { id: string; title: string; content?: string | null; fileUrls: string[]; links: string[]; createdAt: string; author: { id: number; name: string | null } }
 
-const AVATAR_COLORS = ['#1B7A5A', '#0F4D38', '#2563EB', '#A16207', '#8B3A62', '#475569'];
+const MEMBER_SEARCH_THRESHOLD = 20;
 const requestErrorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
 
 export default function Classroom() {
@@ -186,17 +191,30 @@ function InviteCodeWidget({ classId }: { classId: string }) {
 }
 
 function MembersTab({ classroom, canManage, onInvite, onRemove }: { classroom: ClassDetail; canManage: boolean; onInvite: () => void; onRemove: (student: ClassMember) => void }) {
+  const [studentSearch, setStudentSearch] = useState('');
+  const showStudentSearch = classroom.students.length >= MEMBER_SEARCH_THRESHOLD;
+  const normalizedSearch = studentSearch.trim().toLowerCase();
+  const visibleStudents = showStudentSearch && normalizedSearch
+    ? classroom.students.filter(student => `${student.name || ''} ${student.email}`.toLowerCase().includes(normalizedSearch))
+    : classroom.students;
+
   return <div className="flex flex-col gap-8 py-2">
     <MemberSection title="Teachers" count={1}>
-      <MemberTable label="Teacher" members={[classroom.teacher]} canManage={false} />
+      <MemberTable label="Teacher" members={[classroom.teacher]} />
     </MemberSection>
 
     <MemberSection
       title="Students"
       count={classroom.students.length}
-      action={canManage ? <Button size="sm" onClick={onInvite}><Plus size={14} />Invite student</Button> : undefined}
+      action={canManage ? <PrimitiveButton size="sm" onClick={onInvite}><Plus aria-hidden="true" />Invite student</PrimitiveButton> : undefined}
     >
-      <MemberTable label="Student" members={classroom.students} canManage={canManage} onRemove={onRemove} />
+      <MemberTable
+        label="Student"
+        members={visibleStudents}
+        canManage={canManage}
+        onRemove={onRemove}
+        search={showStudentSearch ? { value: studentSearch, onChange: setStudentSearch } : undefined}
+      />
     </MemberSection>
   </div>;
 }
@@ -204,21 +222,40 @@ function MembersTab({ classroom, canManage, onInvite, onRemove }: { classroom: C
 function MemberSection({ title, count, action, children }: { title: string; count: number; action?: ReactNode; children: ReactNode }) {
   return <section>
     <div className="mb-4 flex items-center justify-between gap-4">
-      <div className="flex items-baseline gap-2"><h2 className="text-base font-semibold text-foreground">{title}</h2><span className="text-xs text-muted-foreground">{count}</span></div>
+      <div className="flex items-baseline gap-2"><h2 className="text-base font-semibold text-foreground">{title}</h2><span className="text-sm font-normal tabular-nums text-muted-foreground">{count}</span></div>
       {action}
     </div>
     {children}
   </section>;
 }
 
-function MemberTable({ label, members, canManage, onRemove }: { label: 'Teacher' | 'Student'; members: ClassMember[]; canManage: boolean; onRemove?: (student: ClassMember) => void }) {
-  return <DataSurface><Table className="min-w-[680px] table-fixed">
-    <TableHeader><TableRow><TableHead className="w-[30%]">{label}</TableHead><TableHead className="w-[34%]">Email</TableHead><TableHead className="w-[24%]">Joined</TableHead><TableHead className="w-[12%] text-right">Actions</TableHead></TableRow></TableHeader>
-    <TableBody>{members.length === 0 ? <TableRow className="hover:bg-transparent"><TableCell colSpan={4} className="h-40 text-center text-muted-foreground">No students have joined this class yet.</TableCell></TableRow> : members.map((member, index) => <TableRow key={member.id}>
-      <TableCell><div className="flex min-w-0 items-center gap-2.5"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white" style={{ backgroundColor: AVATAR_COLORS[index % AVATAR_COLORS.length] }}>{initials(member.name)}</span><span className="truncate font-medium text-foreground">{member.name || `Unknown ${label.toLowerCase()}`}</span></div></TableCell>
+interface MemberSearchControl {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function MemberTable({ label, members, canManage = false, onRemove, search }: { label: 'Teacher' | 'Student'; members: ClassMember[]; canManage?: boolean; onRemove?: (student: ClassMember) => void; search?: MemberSearchControl }) {
+  const hasActions = label === 'Student' && canManage && Boolean(onRemove);
+  const columnCount = hasActions ? 4 : 3;
+  const isFiltered = Boolean(search?.value.trim());
+
+  return <DataSurface>
+    {search && <DataToolbar>
+      <DataToolbarSearch
+        label="Search students"
+        placeholder="Search students..."
+        value={search.value}
+        onChange={event => search.onChange(event.target.value)}
+      />
+    </DataToolbar>}
+    <Table className={hasActions ? 'min-w-[680px] table-fixed' : 'min-w-[620px] table-fixed'}>
+    <TableCaption className="sr-only">{label}s in this class</TableCaption>
+    <TableHeader><TableRow><TableHead className="w-[32%]">{label}</TableHead><TableHead className="w-[40%]">Email</TableHead><TableHead>Joined</TableHead>{hasActions && <TableHead className="w-12 text-right"><span className="sr-only">Actions</span></TableHead>}</TableRow></TableHeader>
+    <TableBody>{members.length === 0 ? <DataStateRow colSpan={columnCount}><div className="mx-auto max-w-sm"><p className="text-sm font-medium text-foreground">{isFiltered ? 'No students found' : label === 'Student' ? 'No students yet' : 'No teachers yet'}</p><p className="mt-1 text-xs text-muted-foreground">{isFiltered ? 'Try a different name or email address.' : label === 'Student' ? 'Students who join this class will appear here.' : 'Teachers assigned to this class will appear here.'}</p>{isFiltered && search && <PrimitiveButton variant="ghost" size="sm" className="mt-3" onClick={() => search.onChange('')}>Clear search</PrimitiveButton>}</div></DataStateRow> : members.map(member => <TableRow key={member.id}>
+      <TableCell><div className="flex min-w-0 items-center gap-2.5"><Avatar><AvatarFallback className="text-xs font-semibold">{initials(member.name)}</AvatarFallback></Avatar><span className="truncate font-medium text-foreground">{member.name || `Unknown ${label.toLowerCase()}`}</span></div></TableCell>
       <TableCell className="truncate text-muted-foreground" title={member.email}>{member.email}</TableCell>
       <TableCell className="text-muted-foreground">{formatMemberSince(member.createdAt)}</TableCell>
-      <TableCell className="text-right">{canManage && onRemove ? <button type="button" onClick={() => onRemove(member)} className="app-icon-button ml-auto h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Remove ${member.name || 'student'}`} title="Remove student"><Trash2 size={15} /></button> : <span className="text-muted-foreground">—</span>}</TableCell>
+      {hasActions && onRemove && <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><PrimitiveButton variant="ghost" size="icon-sm" className="ml-auto text-muted-foreground" aria-label={`Actions for ${member.name || 'student'}`}><MoreHorizontal aria-hidden="true" /></PrimitiveButton></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem variant="destructive" onSelect={() => onRemove(member)}><Trash2 aria-hidden="true" />Remove from class</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>}
     </TableRow>)}</TableBody>
   </Table></DataSurface>;
 }
@@ -227,13 +264,28 @@ function AddStudentModal({ open, onClose, onAdd }: { open: boolean; onClose: () 
   const [email, setEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const submit = async (event: React.FormEvent) => { event.preventDefault(); if (!email.trim()) return; setSaving(true); try { await onAdd(email.trim()); toast.success('Student added'); setEmail(''); onClose(); } catch (error) { toast.error(requestErrorMessage(error, 'This student could not be added.')); } finally { setSaving(false); } };
-  return <Modal open={open} onClose={onClose} closeOnBackdrop title="Invite a student" subtitle="Add a student to this class using their account email." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !email.trim()} onClick={submit}>{saving ? 'Adding…' : 'Add student'}</Button></>}><form onSubmit={submit}><label className="block"><span className="mb-2 block text-sm font-medium text-foreground">Student email</span><Input autoFocus type="email" className="w-full" value={email} onChange={event => setEmail(event.target.value)} placeholder="student@example.com" /></label></form></Modal>;
+  return <Modal
+    open={open}
+    onClose={onClose}
+    closeOnBackdrop
+    presentation="content-dialog"
+    title="Invite a student"
+    subtitle="Add a student to this class using their account email."
+    footer={<><PrimitiveButton variant="outline" disabled={saving} onClick={onClose}>Cancel</PrimitiveButton><PrimitiveButton type="submit" form="invite-student-form" disabled={saving || !email.trim()}>{saving ? 'Adding…' : 'Add student'}</PrimitiveButton></>}
+  >
+    <form id="invite-student-form" onSubmit={submit}>
+      <Field>
+        <FieldLabel htmlFor="student-email">Student email</FieldLabel>
+        <Input id="student-email" autoFocus type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="student@example.com" autoComplete="email" />
+      </Field>
+    </form>
+  </Modal>;
 }
 
 function RemoveStudentModal({ student, onClose, onRemove }: { student: ClassMember | null; onClose: () => void; onRemove: () => Promise<void> }) {
   const [removing, setRemoving] = useState(false);
   const submit = async () => { setRemoving(true); try { await onRemove(); toast.success('Student removed'); } catch (error) { toast.error(requestErrorMessage(error, 'Unable to remove this student.')); } finally { setRemoving(false); } };
-  return <Modal open={Boolean(student)} onClose={onClose} closeOnBackdrop title="Remove student" subtitle="This student will lose access to the class and its assigned tests." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="destructive" disabled={removing} onClick={() => void submit()}>{removing ? 'Removing…' : 'Remove student'}</Button></>}><p className="text-sm leading-6 text-muted-foreground">Remove <span className="font-semibold text-foreground">{student?.name || student?.email}</span> from this class?</p></Modal>;
+  return <Modal open={Boolean(student)} onClose={onClose} closeOnBackdrop presentation="content-dialog" title="Remove student" subtitle="This student will lose access to the class and its assigned tests." footer={<><PrimitiveButton variant="outline" disabled={removing} onClick={onClose}>Cancel</PrimitiveButton><PrimitiveButton variant="destructive" disabled={removing} onClick={() => void submit()}>{removing ? 'Removing…' : 'Remove student'}</PrimitiveButton></>}><p className="text-sm leading-6 text-muted-foreground">Remove <span className="font-semibold text-foreground">{student?.name || student?.email}</span> from this class?</p></Modal>;
 }
 
 function ClassroomLoading() {

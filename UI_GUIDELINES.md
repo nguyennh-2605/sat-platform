@@ -270,6 +270,13 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Lessons → Add content chia `Student work` (Assignment, Test) và `Learning material` (File, Link, Video). Composer mở tại chỗ với Session được prefill, không điều hướng giáo viên sang tab khác.
 - Archive test trong Test Library không được làm mất quyền truy cập vào delivery đã Published; archive chỉ ảnh hưởng content library và việc tạo assignment mới.
 
+### Classroom Members
+
+- `Members` là management/list view. Giữ Teachers và Students thành hai management table riêng trong `DataSurface`; không đổi roster thành member cards và không đưa analytics columns vào màn này.
+- Chỉ render cột action khi người xem có ít nhất một action hợp lệ cho nhóm đó. Row action dùng shared ghost icon Button và `DropdownMenu`; không render dấu `—` trong một cột action không có chức năng.
+- Member count cạnh section heading là metadata muted, không cạnh tranh hierarchy với heading. Avatar dùng shared neutral `Avatar`/`AvatarFallback`, trừ khi toàn app có một hệ thống màu avatar nhất quán.
+- Student search chỉ xuất hiện khi roster đủ lớn và phải nằm trong `DataToolbar` của cùng `DataSurface`. Không thêm filter cho field chưa tồn tại trong dữ liệu thật; filtered-empty và roster-empty là hai state khác nhau.
+
 ### Assignment Detail
 
 - Teacher và Student dùng chung page shell, metadata, instructions và resources; phần hành động thay đổi theo role thay vì duy trì hai màn hình không đồng nhất.
