@@ -115,6 +115,7 @@ Các component chuẩn:
 - `Card`
 - `Badge`
 - `Input`
+- `RichTextEditor`, `RichTextContent`
 - `Select`
 - `DateTimePicker`
 - `Modal`
@@ -131,6 +132,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 - `Button`: dùng canonical primitive `components/ui/button.tsx` với variant `default`, `outline`, `secondary`, `ghost`, `destructive`, `link`; size `xs`, `sm`, `default`, `lg`, `icon`, `icon-xs`, `icon-sm`, `icon-lg`. `AppUI.Button` chỉ là compatibility facade cho màn hình legacy và không dùng cho màn hình đã migrate.
 - `Input` và `Select`: cao `36px`, focus ring primary; label/helper/error nằm ngoài control và dùng typography chuẩn.
+- `RichTextEditor`: dùng shared Quill wrapper với toolbar tối thiểu theo domain; Announcement MVP chỉ gồm paragraph, bold, italic, ordered/bullet list, link và clear formatting. `RichTextContent` sở hữu sanitizer và style render tường minh cho cùng format; backend vẫn áp dụng content-length limit.
 - `Modal`: dùng `presentation="content-dialog"` trong dashboard; có title, nút đóng, Escape, focus trap và restore focus. Không tự dựng overlay.
 - `Tabs`: bắt buộc cho chuyển đổi panel cùng trang; có `tablist/tab/tabpanel`, Arrow keys, Home/End. Link điều hướng sang route khác không phải Tabs.
 - `Collapsible`: dùng cho outline có nhiều section được mở đồng thời; trigger phải có accessible name và controlled state khi page có Expand/Collapse All.
@@ -269,6 +271,15 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Activity list hiển thị type, Week/Session placement, deadline, audience/completion summary và mở đúng destination: Test Performance hoặc Assignment Detail.
 - Lessons → Add content chia `Student work` (Assignment, Test) và `Learning material` (File, Link, Video). Composer mở tại chỗ với Session được prefill, không điều hướng giáo viên sang tab khác.
 - Archive test trong Test Library không được làm mất quyền truy cập vào delivery đã Published; archive chỉ ảnh hưởng content library và việc tạo assignment mới.
+
+### Classroom Announcements
+
+- `Announcements` là class landing feed dùng chung cho Teacher và Student, đứng đầu tab order và là tab mặc định khi URL không chỉ định `?tab=`. Thứ tự Classroom là `Announcements → Lessons → Activities → Members`.
+- Feed giới hạn khoảng `900–1000px`, left-aligned theo content container và dùng typography, spacing, separator thay cho một Card riêng cho từng post hoặc một giant outer Card. Header chỉ gồm title, description ngắn và CTA `New announcement` cho người có quyền.
+- Mỗi row hiển thị neutral author avatar, author name, published timestamp, title, content và resources có thật. Không lặp megaphone icon trên từng row; icon này chỉ phù hợp cho empty state.
+- Announcement rich text phải được sanitize trước khi render, link chỉ cho protocol an toàn và prose dài phải wrap được. Attachment và reference link dùng shared attachment anatomy cùng provider/file icon phù hợp.
+- Teacher/Admin actions là Edit, Pin/Unpin và Delete qua menu dấu ba chấm. Pinned state phải persist ở `ClassAnnouncement`, tối đa năm item mỗi class; feed nhóm Pinned trước Recent và giữ newest-first trong từng nhóm.
+- Class invite code thuộc Students section trong `Members`, không xuất hiện trong announcement feed. Loading, empty, error và selected/deep-link state phải giữ cùng feed width.
 
 ### Classroom Members
 

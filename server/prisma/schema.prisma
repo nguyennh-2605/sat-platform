@@ -107,12 +107,14 @@ model ClassAnnouncement {
   content   String?
   fileUrls  String[]
   links     String[]
+  isPinned  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   author    User     @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([classId, createdAt])
+  @@index([classId, isPinned, createdAt])
   @@index([authorId, createdAt])
 }
 

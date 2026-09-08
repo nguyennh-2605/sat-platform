@@ -131,8 +131,8 @@ Express Server (index.js → app.js)
 | `GET` | `/api/classes/:testId/report` | JWT + TEACHER/ADMIN | Test analytics (leaderboard, question stats) |
 | `POST` | `/api/classes` | JWT + TEACHER/ADMIN | Create a new class |
 | `POST` | `/api/classes/:classId/students` | JWT + TEACHER/ADMIN | Add student by email |
-| `GET/POST` | `/api/classes/:classId/announcements` | JWT / JWT + TEACHER/ADMIN | List or publish class announcements from the dedicated announcement source |
-| `PATCH/DELETE` | `/api/classes/:classId/announcements/:announcementId` | JWT + TEACHER/ADMIN | Edit or delete an announcement |
+| `GET/POST` | `/api/classes/:classId/announcements` | JWT / JWT + TEACHER/ADMIN | List or publish class announcements with rich-text-compatible content and up to five persisted pinned items per class |
+| `PATCH/DELETE` | `/api/classes/:classId/announcements/:announcementId` | JWT + TEACHER/ADMIN | Edit, pin/unpin, or delete an announcement |
 | `POST` | `/api/classes/posts` | JWT + TEACHER/ADMIN | Legacy compatibility endpoint; announcements are routed to the dedicated source |
 | `POST` | `/api/classes/submissions` | JWT + STUDENT | Compatibility submission endpoint; delegates to the canonical Assignment submission flow |
 
