@@ -28,13 +28,14 @@ interface PageHeaderProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> 
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  size?: 'default' | 'compact';
 }
 
-export function PageHeader({ title, description, actions, className, ...props }: PageHeaderProps) {
+export function PageHeader({ title, description, actions, size = 'default', className, ...props }: PageHeaderProps) {
   return (
     <div className={cx('flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between', className)} {...props}>
       <div className="min-w-0 space-y-1">
-        <h1 className="text-3xl tracking-tight text-foreground">{title}</h1>
+        <h1 className={cx('tracking-tight text-foreground', size === 'compact' ? 'text-2xl font-semibold' : 'text-3xl')}>{title}</h1>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2 lg:w-fit">{actions}</div>}

@@ -129,7 +129,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ### Contract của từng component
 
-- `Button`: chỉ dùng variant `primary`, `outline`, `accent`, `ghost`, `destructive`; size `sm`, `md`, `lg`, `icon`.
+- `Button`: dùng canonical primitive `components/ui/button.tsx` với variant `default`, `outline`, `secondary`, `ghost`, `destructive`, `link`; size `xs`, `sm`, `default`, `lg`, `icon`, `icon-xs`, `icon-sm`, `icon-lg`. `AppUI.Button` chỉ là compatibility facade cho màn hình legacy và không dùng cho màn hình đã migrate.
 - `Input` và `Select`: cao `36px`, focus ring primary; label/helper/error nằm ngoài control và dùng typography chuẩn.
 - `Modal`: dùng `presentation="content-dialog"` trong dashboard; có title, nút đóng, Escape, focus trap và restore focus. Không tự dựng overlay.
 - `Tabs`: bắt buộc cho chuyển đổi panel cùng trang; có `tablist/tab/tabpanel`, Arrow keys, Home/End. Link điều hướng sang route khác không phải Tabs.
@@ -168,10 +168,10 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ## 6. Button và control
 
-- Chiều cao button mặc định: `36px`; button lớn tối đa khoảng `40px`.
+- Chiều cao button mặc định: `32px`; action lớn dùng `36px`. Không override height cục bộ nếu canonical size đã đáp ứng.
 - Primary button dùng semantic primary neutral; không hardcode màu.
 - Secondary button dùng surface, border và foreground semantic.
-- Accent button chỉ dùng cho hành động có chủ ý rõ ràng; không dùng màu thương hiệu tùy tiện trong neutral pass.
+- `secondary` chỉ dùng khi cần phân biệt một action phụ có surface rõ; không dùng màu thương hiệu tùy tiện trong neutral pass.
 - Icon-only button phải có `aria-label` hoặc `title`.
 - Không dùng button `rounded-full` cho action thông thường.
 - Input/select cao khoảng `32–36px`, `rounded-lg`, focus ring semantic.
@@ -273,12 +273,17 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 ### Assignment Detail
 
 - Teacher và Student dùng chung page shell, metadata, instructions và resources; phần hành động thay đổi theo role thay vì duy trì hai màn hình không đồng nhất.
-- Student dùng work rail `340px` sticky từ desktop và stack dưới nội dung trên mobile. Rail phải giữ submission hiện tại sau refresh, cho phép edit/resubmit tới deadline, và hiển thị review gần nhất mà không làm mất dấu review cũ khi có resubmission mới.
-- V1 chỉ nhận written response hoặc một URL `http(s)`; không mô phỏng file upload khi chưa có storage flow thật.
+- Student dùng work rail `380–400px` sticky từ viewport `xl`; ở laptop, tablet và mobile rail chuyển thành full-width ngay dưới page header, trước instructions, để submission state/action không bị chìm. Rail phải giữ submission hiện tại sau refresh, cho phép edit/resubmit tới deadline, và hiển thị review gần nhất mà không làm mất dấu review cũ khi có resubmission mới.
+- Student submission nhận written response, URL `http(s)` và managed file upload qua storage flow thật. UI phải giữ progress, retry/error, giới hạn attachment và phân biệt private draft với official submitted snapshot; không mô phỏng upload ở client.
+- Submitted/reviewed mặc định là read-only. Nếu có private draft, hiển thị `Unsubmitted changes` với `Resume editing`/`Discard draft` thay vì tự mở editor. Chỉ có một submission status badge; teacher feedback không lặp badge `Reviewed`.
 - Teacher dùng Student Work master-detail: list searchable/filterable bên trái và submission review bên phải. Không render toàn bộ submission thành nhiều card dài trong một trang.
 - Teacher Assignment Detail tách `Overview` khỏi `Student work`. Link từ completion/review queue mở thẳng `Student work`; không đặt instructions phía trên grading workspace.
-- Trên desktop rộng, Student Work dùng ba pane: student navigation khoảng `280px`, submission viewer co giãn, review rail khoảng `340px`. Review rail sticky; ở laptop và mobile phải collapse/stack mà không làm viewer tràn viewport.
+- `Overview | Student work` phải dùng shared page-level Tabs. Các modality động trong submission không dùng page Tabs; dùng compact source selector tích hợp trong viewer toolbar để chuyển giữa written response và file, còn external link mở ở tab mới.
+- Teacher Student Work là reading workspace hai pane: student navigation khoảng `260–280px` và submission viewer chiếm toàn bộ phần còn lại. Review là contextual right-side Sheet `380–400px`, chỉ mở từ submission header và không trở thành fixed workspace column.
 - Submission viewer render written response trực tiếp; PDF và image có inline preview cùng secondary action mở tab mới. External link, DOCX/PPTX/XLSX và định dạng browser không hỗ trợ dùng fallback rõ ràng, không iframe website tùy ý.
+- Khi chọn student, viewer tự ưu tiên file đầu tiên, sau đó fallback về written response rồi links. Source selector chính là attachment navigation; không render thêm attachment list hoặc nhãn `Previewing` làm cùng một file xuất hiện hai lần.
+- Submission status chỉ xuất hiện một lần ở viewer header. Review drawer dùng review timestamp/state metadata thay cho badge lặp lại, và không lặp stale-review warning đã có ở viewer.
+- Review Sheet giữ mở khi auto-advance sang submission tiếp theo. Khi đóng Sheet có review chưa lưu, phải yêu cầu xác nhận trước khi bỏ thay đổi.
 - Student list không lặp `No submission` và `Not submitted`. Summary phân biệt `pending` trước deadline với `missing` sau deadline. Sau khi review một item trong queue, ưu tiên chuyển sang submission `Needs review` tiếp theo.
 - Grading là optional theo từng Assignment. `maxPoints = null` nghĩa là feedback-only; khi có `maxPoints`, score phải nằm trong `0..maxPoints`. Feedback vẫn optional và teacher có thể chỉ `Mark as reviewed`.
 - Review state được suy ra từ timestamps: chưa nộp, missing sau deadline, needs review, hoặc reviewed. Resubmission sau `reviewedAt` phải quay lại review queue.
