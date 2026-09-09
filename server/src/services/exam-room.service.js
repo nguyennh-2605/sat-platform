@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
 const { gradeQuestions } = require('../utils/grading');
 const testDeliveryService = require('./test-delivery.service');
+const errorLogService = require('./error-log.service');
 const { normalizeQuestionTimingSnapshot, timingRowsFromSnapshot } = require('../utils/question-timing');
 
 exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, classId, deliveryId }) => {
@@ -475,6 +476,14 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
           selectedChoice: item.selectedChoice,
           isCorrect: item.isCorrect
         }))
+      });
+
+      await errorLogService.syncSubmissionErrorLogs({
+        db: tx,
+        userId,
+        submissionId: submission.id,
+        test,
+        answerRows: answersToSave,
       });
     }
 

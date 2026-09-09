@@ -6,6 +6,7 @@ import { Badge, Card, EmptyState, LoadingBar, Modal, PageHeader, Select, Tabs, t
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
 import { appToast } from '../../components/ui/toast';
@@ -21,7 +22,7 @@ type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
 type ProgressFilter = 'ALL' | 'MASTERED' | 'LEARNING' | 'NOT_STUDIED';
 type QuizMasteryFilter = ProgressFilter;
 interface QuizConfig { startIndex: number; endIndex: number; masteries: Array<Exclude<QuizMasteryFilter, 'ALL'>>; restart?: boolean }
-interface StudyConfig extends QuizConfig { questionCount?: number; shuffle: boolean; restart?: boolean }
+interface StudyConfig extends QuizConfig { questionCount?: number; shuffle: boolean; sourceTermIds?: string[]; restart?: boolean }
 interface ActiveStudySession { id: string; mode: 'FLASHCARD' | 'QUIZ'; answeredCount: number; totalItems: number; rangeStart?: number | null; rangeEnd?: number | null; nextSourceOrder?: number | null; shuffle: boolean; startedAt: string; lastActivityAt: string }
 
 interface SetSummary {
@@ -29,7 +30,7 @@ interface SetSummary {
 }
 interface Term { id?: string; sourceTermId?: string | null; word: string; meaning: string; translation: string; exampleSentence?: string | null; progress?: { mastery: string; seenCount?: number; lastReviewedAt?: string | null } | null }
 interface SetDetail extends SetSummary { canEdit: boolean; version: number; terms: Term[] }
-interface StudyQuestion { id: string; prompt: string; order: number; sourceOrder?: number | null; options: string[]; selectedMeaning?: string | null; isCorrect?: boolean | null; meaning?: string; translation?: string; exampleSentence?: string | null }
+interface StudyQuestion { id: string; sourceTermId?: string | null; prompt: string; order: number; sourceOrder?: number | null; options: string[]; selectedMeaning?: string | null; isCorrect?: boolean | null; meaning?: string; translation?: string; exampleSentence?: string | null }
 interface StudySession { id: string; setId: string; activityId?: string | null; mode: 'FLASHCARD' | 'QUIZ'; status: 'IN_PROGRESS' | 'COMPLETED'; totalItems: number; answeredCount: number; correctCount: number; score: number; rangeStart?: number | null; rangeEnd?: number | null; shuffle: boolean; startedAt: string; lastActivityAt: string; questions: StudyQuestion[] }
 interface InlineTermDraft { word: string; meaning: string; translation: string; exampleSentence: string }
 interface ClassInfo { id: string; name: string }
@@ -194,14 +195,32 @@ export default function Vocabulary() {
     setActivity(currentActivity);
     setDetailTab(tab);
   }, [currentActivity, currentSet]);
+  const startFlashcards = useCallback((config: StudyConfig | null) => {
+    setStudyConfig(config);
+    openMode('FLASHCARDS');
+  }, [openMode]);
   const openFlashcards = useCallback(() => {
-    if (currentSet?.activeFlashcardSession) {
-      setStudyConfig(null);
-      openMode('FLASHCARDS');
+    if (!currentSet) return;
+    if (currentSet.activeFlashcardSession) {
+      startFlashcards(null);
       return;
     }
-    setStudySetupOpen(true);
-  }, [currentSet?.activeFlashcardSession, openMode]);
+    const allMasteries: StudyConfig['masteries'] = ['NOT_STUDIED', 'LEARNING', 'MASTERED'];
+    if (currentActivity) {
+      startFlashcards({ startIndex: 1, endIndex: currentSet.termCount, masteries: allMasteries, questionCount: currentSet.termCount, shuffle: false });
+      return;
+    }
+    const notStudiedCount = Math.max(0, currentSet.termCount - currentSet.studiedCount);
+    if (notStudiedCount > 0) {
+      startFlashcards({ startIndex: 1, endIndex: currentSet.termCount, masteries: ['NOT_STUDIED'], questionCount: Math.min(10, notStudiedCount), shuffle: false });
+      return;
+    }
+    if (currentSet.learningCount > 0) {
+      startFlashcards({ startIndex: 1, endIndex: currentSet.termCount, masteries: ['LEARNING'], questionCount: currentSet.learningCount, shuffle: false });
+      return;
+    }
+    startFlashcards({ startIndex: 1, endIndex: currentSet.termCount, masteries: allMasteries, questionCount: currentSet.termCount, shuffle: false });
+  }, [currentActivity, currentSet, startFlashcards]);
   const openQuiz = useCallback(() => {
     if (currentSet?.activeQuizSession) {
       setQuizConfig(null);
@@ -298,7 +317,7 @@ export default function Vocabulary() {
     <DeleteCollectionDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={async deletedId => { if (currentSet?.id === deletedId) currentCollectionKeyRef.current = ''; setDeleteTarget(null); invalidateQueryCache('/api/vocabulary'); await loadSets(true); }} />
     <WordDetailSheet term={selectedWord} onOpenChange={open => { if (!open) setSelectedWord(null); }} />
     {currentSet && <AssignDialog open={assignOpen} set={currentSet} initialClassId={assignToClassId} onClose={closeAssignDialog} />}
-    {currentSet && studySetupOpen && <StudySetupModal open set={currentSet} onClose={() => setStudySetupOpen(false)} onStart={config => { setStudyConfig(config); setStudySetupOpen(false); setSelected(currentSet); setActivity(currentActivity); setDetailTab('FLASHCARDS'); }} />}
+    {currentSet && studySetupOpen && <StudySetupModal open set={currentSet} onClose={() => setStudySetupOpen(false)} onStart={config => { setStudySetupOpen(false); startFlashcards(config); }} />}
     {currentSet && quizSetupOpen && <QuizSetupModal open set={currentSet} onClose={() => setQuizSetupOpen(false)} onStart={config => { setQuizConfig(config); setQuizSetupOpen(false); setSelected(currentSet); setActivity(currentActivity); setDetailTab('QUIZ'); }} />}
   </div>;
 }
@@ -309,14 +328,18 @@ const CollectionGrid = memo(function CollectionGrid({ sets, currentKey, onSelect
 
 function CollectionCard({ set, active, onClick }: { set: SetSummary; active: boolean; onClick: () => void }) {
   const studiedCount = set.studiedCount || 0;
+  const coverage = set.termCount ? Math.round((studiedCount / set.termCount) * 100) : 0;
   const lastStudied = formatStudyDate(set.lastStudiedAt);
-  return <Button variant="outline" onClick={onClick} aria-pressed={active} className={`h-auto min-h-28 w-full items-stretch justify-start rounded-card p-4 text-left shadow-none ${active ? 'border-ui-border-strong bg-muted ring-1 ring-border' : 'border-ui-border bg-surface hover:bg-muted/40'}`}>
-    <span className="flex min-w-0 flex-1 flex-col">
+  return <Card className={`group relative min-h-28 overflow-hidden p-0 shadow-none transition-colors hover:bg-muted/40 ${active ? 'border-ui-border-strong bg-muted ring-1 ring-border' : 'border-ui-border bg-surface'}`}>
+    <Button variant="ghost" onClick={onClick} aria-pressed={active} className="absolute inset-0 z-10 h-auto w-full rounded-card bg-transparent p-0 shadow-none hover:bg-transparent" aria-label={`Select ${set.title}`}><span className="sr-only">Select {set.title}</span></Button>
+    <div className="pointer-events-none flex min-h-28 min-w-0 flex-col p-4 text-left">
       <span className="flex min-w-0 items-start justify-between gap-3"><span className="line-clamp-2 text-title font-semibold leading-5">{set.title}</span>{set.scope === 'SYSTEM' && !set.assignedActivityId && <Badge tone="neutral">System</Badge>}{set.assignedActivityId && <Badge tone="gold">Assigned</Badge>}</span>
       {set.description && <span className="mt-1.5 line-clamp-2 whitespace-normal text-caption font-normal leading-4 text-muted-foreground">{set.description}</span>}
-      <span className="mt-auto pt-4 text-caption font-normal text-muted-foreground">{studiedCount.toLocaleString()} / {set.termCount.toLocaleString()} studied{lastStudied ? ` · Last studied ${lastStudied}` : ''}</span>
-    </span>
-  </Button>;
+      <span className="mt-auto flex items-center justify-between gap-3 pt-4 text-caption font-normal text-muted-foreground"><span>{studiedCount.toLocaleString()} / {set.termCount.toLocaleString()} studied</span><span>{coverage}%</span></span>
+      <Progress value={coverage} aria-label={`${coverage}% of words studied`} className="mt-2" />
+      <span className="mt-2 text-caption font-normal text-muted-foreground">{set.masteredCount.toLocaleString()} mastered{lastStudied ? ` · Last studied ${lastStudied}` : ''}</span>
+    </div>
+  </Card>;
 }
 
 function SelectedSetSummary({ set, activity, role, canQuiz, onReview, onStudyOptions, onQuiz, onQuizOptions, onAssign, onEdit, onDelete }: { set: SetDetail; activity: VocabularyActivity | null; role: UserRole; canQuiz: boolean; onReview: () => void; onStudyOptions: () => void; onQuiz: () => void; onQuizOptions: () => void; onAssign: () => void; onEdit: () => void; onDelete: () => void }) {
@@ -327,15 +350,28 @@ function SelectedSetSummary({ set, activity, role, canQuiz, onReview, onStudyOpt
   const studiedCount = set.studiedCount ?? set.terms.filter(term => term.progress && term.progress.mastery !== 'NOT_STUDIED').length;
   const learningCount = set.learningCount ?? set.terms.filter(term => term.progress?.mastery === 'LEARNING').length;
   const activeStudy = set.activeFlashcardSession;
-  const studyLabel = activeStudy ? 'Continue studying' : studiedCount === set.termCount && set.termCount > 0 ? 'Review words' : 'Start studying';
-  const StudyIcon = activeStudy || studiedCount === set.termCount ? RotateCcw : Play;
+  const notStudiedCount = Math.max(0, set.termCount - studiedCount);
+  const studyLabel = activeStudy
+    ? 'Continue studying'
+    : activity
+      ? 'Start studying'
+      : notStudiedCount > 0
+        ? `Learn ${Math.min(10, notStudiedCount)} new`
+        : learningCount > 0
+          ? `Review ${learningCount} learning`
+          : 'Review words';
+  const StudyIcon = activeStudy || notStudiedCount === 0 ? RotateCcw : Play;
   const lastStudied = formatStudyDate(set.lastStudiedAt);
   const rangeLabel = activeStudy?.rangeStart && activeStudy.rangeEnd ? `Words ${activeStudy.rangeStart}–${activeStudy.rangeEnd}` : null;
   return <Card className="mt-6 p-5 shadow-none sm:p-6">
     <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0 max-w-3xl">
         <div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-semibold tracking-tight text-foreground">{set.title}</h2>{activity ? <Badge tone="gold">Assigned</Badge> : set.scope === 'SYSTEM' ? <Badge tone="neutral">System</Badge> : null}{set.status !== 'PUBLISHED' && <Badge tone="warning">{set.status === 'DRAFT' ? 'Draft' : 'Archived'}</Badge>}</div>
-        <p className="mt-2 text-caption font-medium text-muted-foreground">{set.termCount.toLocaleString()} words · {studiedCount.toLocaleString()} studied{learningCount > 0 ? ` · ${learningCount.toLocaleString()} learning` : ''}{set.masteredCount > 0 ? ` · ${set.masteredCount.toLocaleString()} mastered` : ''}{lastStudied ? ` · Last studied ${lastStudied}` : ''}{activity ? ` · ${activity.class.name}` : ''}</p>
+        <p className="mt-2 text-caption font-medium text-muted-foreground">{set.termCount.toLocaleString()} words{lastStudied ? ` · Last studied ${lastStudied}` : ''}{activity ? ` · ${activity.class.name}` : ''}</p>
+        <div className="mt-4 max-w-xl" aria-label={`${set.masteredCount} mastered, ${learningCount} learning, ${notStudiedCount} not studied`} role="img">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-caption"><span className="font-medium text-foreground">Learning progress</span><span className="text-muted-foreground">{set.masteredCount} mastered · {learningCount} learning · {studiedCount}/{set.termCount} studied</span></div>
+          <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted"><span className="bg-primary" style={{ width: `${set.termCount ? (set.masteredCount / set.termCount) * 100 : 0}%` }} /><span className="bg-muted-foreground/60" style={{ width: `${set.termCount ? (learningCount / set.termCount) * 100 : 0}%` }} /></div>
+        </div>
         {activeStudy && <p className="mt-2 text-caption text-foreground">Continue: {activeStudy.answeredCount} of {activeStudy.totalItems} cards studied{!activeStudy.shuffle && activeStudy.nextSourceOrder ? ` · Resume at word ${activeStudy.nextSourceOrder}` : ''}{rangeLabel ? ` · ${rangeLabel}` : ''}</p>}
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -445,7 +481,7 @@ function VocabularyHomeSkeleton() {
 }
 
 function SetWorkspace({ set, activity, tab, onTab, role, studyConfig, quizConfig, onBack, onEdit, onTermSaved, onAssign, onRefresh, assigner }: { set: SetDetail; activity: VocabularyActivity | null; tab: DetailTab; onTab: (tab: DetailTab) => void; role: UserRole; studyConfig: StudyConfig | null; quizConfig: QuizConfig | null; onBack: () => void; onEdit: () => void; onTermSaved: (set: SetDetail) => void; onAssign: () => void; onRefresh: () => Promise<void>; assigner: React.ReactNode }) {
-  if (tab === 'FLASHCARDS') return <FlashcardWorkspace set={set} activityId={activity?.id} config={studyConfig} canEdit={set.canEdit && !activity} onTermSaved={onTermSaved} />;
+  if (tab === 'FLASHCARDS') return <FlashcardWorkspace set={set} activityId={activity?.id} config={studyConfig} canEdit={set.canEdit && !activity} onBack={onBack} onTermSaved={onTermSaved} />;
   if (tab === 'QUIZ') return <QuizWorkspace set={set} activityId={activity?.id} config={quizConfig} />;
   const tabs: Array<TabItem<DetailTab>> = [{ value: 'TERMS', label: 'Terms', icon: BookOpen }, { value: 'FLASHCARDS', label: 'Flashcards', icon: RotateCcw }, { value: 'QUIZ', label: 'Test', icon: ClipboardCheck, disabled: set.terms.length < 4 }];
   const publish = async () => { try { await axiosClient.post(`/api/vocabulary/sets/${set.id}/publish`); invalidateQueryCache('/api/vocabulary'); appToast.success('Vocabulary set published.'); await onRefresh(); } catch (error) { appToast.error(errorMessage(error, 'Unable to publish the set.')); } };
@@ -460,7 +496,8 @@ function SetWorkspace({ set, activity, tab, onTab, role, studyConfig, quizConfig
   </div>;
 }
 
-function FlashcardWorkspace({ set, activityId, config, canEdit, onTermSaved }: { set: SetDetail; activityId?: string; config: StudyConfig | null; canEdit: boolean; onTermSaved: (set: SetDetail) => void }) {
+function FlashcardWorkspace({ set, activityId, config, canEdit, onBack, onTermSaved }: { set: SetDetail; activityId?: string; config: StudyConfig | null; canEdit: boolean; onBack: () => void; onTermSaved: (set: SetDetail) => void }) {
+  const didStartRef = useRef(false);
   const [session, setSession] = useState<StudySession | null>(null);
   const [questionOrder, setQuestionOrder] = useState<string[]>([]);
   const [originalQuestionOrder, setOriginalQuestionOrder] = useState<string[]>([]);
@@ -474,11 +511,13 @@ function FlashcardWorkspace({ set, activityId, config, canEdit, onTermSaved }: {
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [termDraft, setTermDraft] = useState<InlineTermDraft | null>(null);
   const [savingTerm, setSavingTerm] = useState(false);
-  const start = useCallback(async () => {
+  const [showCompletion, setShowCompletion] = useState(false);
+  const start = useCallback(async (overrideConfig?: StudyConfig) => {
     setLoading(true);
     try {
-      const result = await axiosClient.post<StudySession, StudySession>(`/api/vocabulary/sets/${set.id}/sessions`, { mode: 'FLASHCARD', activityId, ...(config || {}) });
+      const result = await axiosClient.post<StudySession, StudySession>(`/api/vocabulary/sets/${set.id}/sessions`, { mode: 'FLASHCARD', activityId, ...(overrideConfig || config || {}) });
       setSession(result);
+      setShowCompletion(false);
       const sessionOrder = result.questions.map(question => question.id);
       const sourceOrder = [...result.questions].sort((left, right) => (left.sourceOrder ?? left.order) - (right.sourceOrder ?? right.order)).map(question => question.id);
       setQuestionOrder(result.shuffle ? sessionOrder : sourceOrder);
@@ -491,7 +530,11 @@ function FlashcardWorkspace({ set, activityId, config, canEdit, onTermSaved }: {
     } catch (error) { appToast.error(errorMessage(error, 'Unable to start flashcards.')); }
     finally { setLoading(false); }
   }, [activityId, config, set.id]);
-  useEffect(() => { void start(); }, [start]);
+  useEffect(() => {
+    if (didStartRef.current) return;
+    didStartRef.current = true;
+    void start();
+  }, [start]);
 
   const orderedQuestions = useMemo(() => {
     if (!session) return [];
@@ -542,21 +585,59 @@ function FlashcardWorkspace({ set, activityId, config, canEdit, onTermSaved }: {
   }, [autoplay, current, flipped, orderedQuestions.length]);
   useEffect(() => () => window.speechSynthesis?.cancel(), []);
 
-  const speak = () => {
+  const speak = useCallback(() => {
     if (!current || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(current.prompt);
     utterance.lang = 'en-US';
     utterance.rate = 0.9;
     window.speechSynthesis.speak(utterance);
-  };
-  const answer = async (mastery: 'LEARNING' | 'KNOW') => {
+  }, [current]);
+  const answer = useCallback(async (mastery: 'LEARNING' | 'KNOW') => {
     if (!session || !current || saving || current.selectedMeaning) return;
     setSaving(true);
-    try { setSession(await axiosClient.post<StudySession, StudySession>(`/api/vocabulary/sessions/${session.id}/questions/${current.id}/answer`, { mastery })); invalidateQueryCache('/api/vocabulary'); }
+    try {
+      const result = await axiosClient.post<StudySession, StudySession>(`/api/vocabulary/sessions/${session.id}/questions/${current.id}/answer`, { mastery });
+      setSession(result);
+      if (result.status === 'COMPLETED') {
+        setAutoplay(false);
+        setShowCompletion(true);
+      }
+      invalidateQueryCache('/api/vocabulary');
+    }
     catch (error) { appToast.error(errorMessage(error, 'Unable to save your progress.')); }
     finally { setSaving(false); }
-  };
+  }, [current, saving, session]);
+  useEffect(() => {
+    if (!current || loading || saving || reordering || editingQuestionId || showCompletion) return undefined;
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const key = event.key.toLocaleLowerCase('en-US');
+      if (event.key === ' ' && !target?.closest('button')) {
+        event.preventDefault();
+        setFlipped(value => !value);
+      } else if (event.key === 'ArrowLeft' && index > 0) {
+        event.preventDefault();
+        goTo(index - 1);
+      } else if (event.key === 'ArrowRight' && index < orderedQuestions.length - 1) {
+        event.preventDefault();
+        goTo(index + 1);
+      } else if (key === 'p') {
+        event.preventDefault();
+        speak();
+      } else if (flipped && !current.selectedMeaning && key === '1') {
+        event.preventDefault();
+        void answer('LEARNING');
+      } else if (flipped && !current.selectedMeaning && key === '2') {
+        event.preventDefault();
+        void answer('KNOW');
+      }
+    };
+    document.addEventListener('keydown', handleShortcut);
+    return () => document.removeEventListener('keydown', handleShortcut);
+  }, [answer, current, editingQuestionId, flipped, goTo, index, loading, orderedQuestions.length, reordering, saving, showCompletion, speak]);
   const beginTermEdit = (question: StudyQuestion) => {
     setAutoplay(false);
     setEditingQuestionId(question.id);
@@ -577,6 +658,28 @@ function FlashcardWorkspace({ set, activityId, config, canEdit, onTermSaved }: {
     } catch (error) { appToast.error(errorMessage(error, 'Unable to update this vocabulary term.')); }
     finally { setSavingTerm(false); }
   };
+
+  if (showCompletion && session?.status === 'COMPLETED') {
+    const stillLearningIds = session.questions
+      .filter(question => question.selectedMeaning === 'LEARNING' && question.sourceTermId)
+      .map(question => question.sourceTermId as string);
+    const restart = (sourceTermIds?: string[]) => void start({
+      startIndex: 1,
+      endIndex: set.termCount,
+      masteries: ['NOT_STUDIED', 'LEARNING', 'MASTERED'],
+      questionCount: sourceTermIds?.length || set.termCount,
+      shuffle: false,
+      ...(sourceTermIds?.length ? { sourceTermIds } : {}),
+    });
+    return <FlashcardCompleteScreen
+      session={session}
+      loading={loading}
+      canReviewStillLearning={!activityId && stillLearningIds.length > 0}
+      onReviewStillLearning={() => restart(stillLearningIds)}
+      onStudyAgain={() => restart()}
+      onBack={onBack}
+    />;
+  }
 
   return <div className={ui.page}>
     <main className="relative min-h-0 flex-1 overflow-y-auto"><LoadingBar active={loading || saving} />
@@ -604,13 +707,24 @@ function FlashcardWorkspace({ set, activityId, config, canEdit, onTermSaved }: {
             <Button variant="ghost" size="icon" className="hidden h-12 w-12 sm:inline-flex" disabled={index === orderedQuestions.length - 1} onClick={() => goTo(index + 1)} aria-label="Next flashcard"><ChevronRight size={25} /></Button>
           </div>
 
-          <div className="mx-auto mt-5 flex max-w-[820px] flex-wrap items-center justify-between gap-3"><div className="flex gap-2 sm:hidden"><Button variant="outline" size="icon" disabled={index === 0} onClick={() => goTo(index - 1)} aria-label="Previous flashcard"><ChevronLeft size={20} /></Button><Button variant="outline" size="icon" disabled={index === orderedQuestions.length - 1} onClick={() => goTo(index + 1)} aria-label="Next flashcard"><ChevronRight size={20} /></Button></div><div className="flex gap-2"><Button variant={shuffled ? 'secondary' : 'outline'} aria-pressed={shuffled} disabled={reordering} onClick={() => void toggleShuffle()} title={shuffled ? 'Restore the original set order' : 'Shuffle cards randomly'}><Shuffle size={16} />{reordering ? 'Updating…' : 'Shuffle'}</Button><Button variant={autoplay ? 'default' : 'outline'} onClick={() => setAutoplay(value => !value)}>{autoplay ? <Pause size={16} /> : <Play size={16} />}{autoplay ? 'Pause' : 'Autoplay'}</Button></div>{flipped ? current.selectedMeaning ? <Badge tone={current.selectedMeaning === 'KNOW' ? 'success' : 'warning'}>{current.selectedMeaning === 'KNOW' ? 'Known' : 'Still learning'}</Badge> : <div className="flex gap-2"><Button variant="outline" disabled={saving} onClick={() => void answer('LEARNING')}>Still learning</Button><Button disabled={saving} onClick={() => void answer('KNOW')}><Check size={16} />Know it</Button></div> : <p className="hidden text-caption text-muted-foreground md:block">Flip the card to rate your recall</p>}</div>
+          <div className="mx-auto mt-5 flex max-w-[820px] flex-wrap items-center justify-between gap-3"><div className="flex gap-2 sm:hidden"><Button variant="outline" size="icon" disabled={index === 0} onClick={() => goTo(index - 1)} aria-label="Previous flashcard"><ChevronLeft size={20} /></Button><Button variant="outline" size="icon" disabled={index === orderedQuestions.length - 1} onClick={() => goTo(index + 1)} aria-label="Next flashcard"><ChevronRight size={20} /></Button></div><div className="flex gap-2"><Button variant={shuffled ? 'secondary' : 'outline'} aria-pressed={shuffled} disabled={reordering} onClick={() => void toggleShuffle()} title={shuffled ? 'Restore the original set order' : 'Shuffle cards randomly'}><Shuffle size={16} />{reordering ? 'Updating…' : 'Shuffle'}</Button><Button variant={autoplay ? 'default' : 'outline'} onClick={() => setAutoplay(value => !value)}>{autoplay ? <Pause size={16} /> : <Play size={16} />}{autoplay ? 'Pause' : 'Autoplay'}</Button></div>{flipped ? current.selectedMeaning ? <Badge tone={current.selectedMeaning === 'KNOW' ? 'success' : 'warning'}>{current.selectedMeaning === 'KNOW' ? 'Got it' : 'Still learning'}</Badge> : <div className="flex gap-2"><Button variant="outline" disabled={saving} onClick={() => void answer('LEARNING')}>Still learning</Button><Button disabled={saving} onClick={() => void answer('KNOW')}><Check size={16} />Got it</Button></div> : <p className="hidden text-caption text-muted-foreground md:block">Flip the card to rate your recall</p>}</div>
+          <p className="mx-auto mt-3 hidden max-w-[820px] text-center text-caption text-muted-foreground md:block"><kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">Space</kbd> flip · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">←</kbd> <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">→</kbd> move · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">1</kbd> still learning · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">2</kbd> got it · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">P</kbd> pronounce</p>
         </section>
 
         <section aria-labelledby="terms-in-set-heading" className="mt-16"><div className="flex items-end justify-between gap-4"><div><h2 id="terms-in-set-heading" className="text-display font-semibold text-foreground">Terms in this set</h2><p className="mt-1 text-body text-muted-foreground">Review every term and its complete definition.</p></div><div className="flex items-center gap-2">{!canEdit && <Badge tone="neutral">Read only</Badge>}<Badge tone="neutral">{orderedQuestions.length} terms</Badge>{session?.status === 'COMPLETED' && <Badge tone="success">Session complete · {session.score}%</Badge>}</div></div><div className="mt-5 space-y-4">{orderedQuestions.map(question => <InlineEditableTermCard key={question.id} question={question} canEdit={canEdit} editing={editingQuestionId === question.id} draft={editingQuestionId === question.id ? termDraft : null} saving={savingTerm} onEdit={() => beginTermEdit(question)} onCancel={cancelTermEdit} onChange={updateTermDraft} onSave={() => void saveTermEdit()} />)}</div></section>
       </>}
     </div></main>
   </div>;
+}
+
+function FlashcardCompleteScreen({ session, loading, canReviewStillLearning, onReviewStillLearning, onStudyAgain, onBack }: { session: StudySession; loading: boolean; canReviewStillLearning: boolean; onReviewStillLearning: () => void; onStudyAgain: () => void; onBack: () => void }) {
+  const gotItCount = session.questions.filter(question => question.selectedMeaning === 'KNOW').length;
+  const stillLearningCount = session.questions.filter(question => question.selectedMeaning === 'LEARNING').length;
+  return <div className={ui.page}><main className="relative min-h-0 flex-1 overflow-y-auto"><LoadingBar active={loading} /><div className={`${ui.content} !max-w-3xl py-10`}>
+    <section className="text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success-soft text-success"><Check size={28} /></span><h1 className="mt-5 text-display font-semibold text-foreground">Review complete</h1><p className="mt-2 text-body text-muted-foreground">You studied all {session.totalItems} cards in this session.</p></section>
+    <Card className="mt-8 overflow-hidden shadow-none"><div className="grid divide-y divide-ui-border sm:grid-cols-3 sm:divide-x sm:divide-y-0"><div className="p-5 text-center"><p className="text-display font-semibold tabular-nums text-foreground">{session.totalItems}</p><p className="mt-1 text-caption text-muted-foreground">Cards studied</p></div><div className="p-5 text-center"><p className="text-display font-semibold tabular-nums text-success">{gotItCount}</p><p className="mt-1 text-caption text-muted-foreground">Got it</p></div><div className="p-5 text-center"><p className="text-display font-semibold tabular-nums text-warning">{stillLearningCount}</p><p className="mt-1 text-caption text-muted-foreground">Still learning</p></div></div><div className="border-t border-ui-border bg-muted/30 px-5 py-3 text-center text-caption text-muted-foreground">“Got it” is your self-rating. A word becomes Mastered after successful quiz recall.</div></Card>
+    <div className="mt-6 flex flex-wrap justify-end gap-2"><Button variant="outline" disabled={loading} onClick={onBack}>Back to set</Button>{canReviewStillLearning ? <Button disabled={loading} onClick={onReviewStillLearning}><RotateCcw />{loading ? 'Starting…' : `Review ${stillLearningCount} still learning`}</Button> : <Button disabled={loading} onClick={onStudyAgain}><RotateCcw />{loading ? 'Starting…' : 'Study again'}</Button>}</div>
+  </div></main></div>;
 }
 
 const InlineEditableTermCard = memo(function InlineEditableTermCard({ question, canEdit, editing, draft, saving, onEdit, onCancel, onChange, onSave }: { question: StudyQuestion; canEdit: boolean; editing: boolean; draft: InlineTermDraft | null; saving: boolean; onEdit: () => void; onCancel: () => void; onChange: (field: keyof InlineTermDraft, value: string) => void; onSave: () => void }) {
@@ -638,11 +752,12 @@ const InlineEditableTermCard = memo(function InlineEditableTermCard({ question, 
   </Card>;
 });
 
-type StudySelection = 'ALL' | 'NEXT_UNSTUDIED' | 'RANGE';
+type StudySelection = 'ALL' | 'NEXT_UNSTUDIED' | 'LEARNING' | 'RANGE';
 
 function StudySetupModal({ open, set, onClose, onStart }: { open: boolean; set: SetDetail; onClose: () => void; onStart: (config: StudyConfig) => void }) {
   const notStudiedCount = set.terms.filter(term => (term.progress?.mastery || 'NOT_STUDIED') === 'NOT_STUDIED').length;
-  const [selection, setSelection] = useState<StudySelection>(set.terms.length > 20 && notStudiedCount > 0 ? 'NEXT_UNSTUDIED' : 'ALL');
+  const learningCount = set.terms.filter(term => term.progress?.mastery === 'LEARNING').length;
+  const [selection, setSelection] = useState<StudySelection>(notStudiedCount > 0 ? 'NEXT_UNSTUDIED' : learningCount > 0 ? 'LEARNING' : 'ALL');
   const [startIndex, setStartIndex] = useState(1);
   const [endIndex, setEndIndex] = useState(Math.min(20, set.terms.length));
   const [shuffleCards, setShuffleCards] = useState(false);
@@ -651,6 +766,8 @@ function StudySetupModal({ open, set, onClose, onStart }: { open: boolean; set: 
     ? set.terms.length
     : selection === 'NEXT_UNSTUDIED'
       ? Math.min(10, notStudiedCount)
+      : selection === 'LEARNING'
+        ? learningCount
       : validRange ? endIndex - startIndex + 1 : 0;
   const canStart = selectedCount > 0 && (selection !== 'RANGE' || validRange);
   const start = () => {
@@ -658,8 +775,8 @@ function StudySetupModal({ open, set, onClose, onStart }: { open: boolean; set: 
     onStart({
       startIndex: selection === 'RANGE' ? startIndex : 1,
       endIndex: selection === 'RANGE' ? endIndex : set.terms.length,
-      masteries: selection === 'NEXT_UNSTUDIED' ? ['NOT_STUDIED'] : ['NOT_STUDIED', 'LEARNING', 'MASTERED'],
-      questionCount: selection === 'NEXT_UNSTUDIED' ? 10 : selectedCount,
+      masteries: selection === 'NEXT_UNSTUDIED' ? ['NOT_STUDIED'] : selection === 'LEARNING' ? ['LEARNING'] : ['NOT_STUDIED', 'LEARNING', 'MASTERED'],
+      questionCount: selection === 'NEXT_UNSTUDIED' ? Math.min(10, notStudiedCount) : selectedCount,
       shuffle: shuffleCards,
       restart: Boolean(set.activeFlashcardSession),
     });
@@ -667,6 +784,7 @@ function StudySetupModal({ open, set, onClose, onStart }: { open: boolean; set: 
   const choices: Array<{ value: StudySelection; title: string; description: string; disabled?: boolean }> = [
     { value: 'ALL', title: 'All words', description: `Study all ${set.terms.length} words in this set.` },
     { value: 'NEXT_UNSTUDIED', title: 'Next 10 unstudied', description: `${notStudiedCount} words have not been studied yet.`, disabled: notStudiedCount === 0 },
+    { value: 'LEARNING', title: 'Review learning', description: `${learningCount} words still need retrieval practice.`, disabled: learningCount === 0 },
     { value: 'RANGE', title: 'Custom range', description: 'Choose a consecutive group by its position in the set.' },
   ];
   return <Modal open={open} onClose={onClose} presentation="content-dialog" title="Study setup" subtitle={`Choose what to study from ${set.title}.`} className="!max-w-2xl" footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button size="lg" disabled={!canStart} onClick={start}>Start studying<ChevronRight /></Button></>}>
@@ -674,7 +792,7 @@ function StudySetupModal({ open, set, onClose, onStart }: { open: boolean; set: 
       {set.activeFlashcardSession && <div className="rounded-control border border-warning/25 bg-warning-soft p-3 text-sm text-foreground"><p className="font-medium">You have an unfinished study session.</p><p className="mt-1 text-caption text-muted-foreground">Starting another selection will replace that session. Use Continue studying if you want to keep it.</p></div>}
       <section aria-labelledby="study-selection-heading">
         <h3 id="study-selection-heading" className="text-title font-semibold text-foreground">Words to study</h3>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">{choices.map(choice => <Button key={choice.value} type="button" variant="outline" disabled={choice.disabled} aria-pressed={selection === choice.value} onClick={() => setSelection(choice.value)} className={`h-auto min-h-24 items-start justify-start whitespace-normal p-3 text-left shadow-none ${selection === choice.value ? 'border-ring bg-muted ring-2 ring-ring/20' : ''}`}><span><span className="flex items-center gap-2 font-medium text-foreground">{choice.title}{selection === choice.value && <Check />}</span><span className="mt-1 block text-xs font-normal leading-4 text-muted-foreground">{choice.description}</span></span></Button>)}</div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">{choices.map(choice => <Button key={choice.value} type="button" variant="outline" disabled={choice.disabled} aria-pressed={selection === choice.value} onClick={() => setSelection(choice.value)} className={`h-auto min-h-20 items-start justify-start whitespace-normal p-3 text-left shadow-none ${selection === choice.value ? 'border-ring bg-muted ring-2 ring-ring/20' : ''}`}><span><span className="flex items-center gap-2 font-medium text-foreground">{choice.title}{selection === choice.value && <Check />}</span><span className="mt-1 block text-xs font-normal leading-4 text-muted-foreground">{choice.description}</span></span></Button>)}</div>
       </section>
       {selection === 'RANGE' && <section aria-labelledby="study-range-heading"><h3 id="study-range-heading" className="text-title font-semibold text-foreground">Range</h3><div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-end gap-3"><label className="text-caption font-medium text-foreground">From<Input type="number" min={1} max={set.terms.length} className="mt-2" value={startIndex} onChange={event => setStartIndex(Number(event.target.value))} /></label><span className="pb-2 text-muted-foreground">to</span><label className="text-caption font-medium text-foreground">To<Input type="number" min={1} max={set.terms.length} className="mt-2" value={endIndex} onChange={event => setEndIndex(Number(event.target.value))} /></label></div>{!validRange && <p className="mt-2 text-caption text-danger">Choose a valid range within this set.</p>}</section>}
       <label className="flex cursor-pointer items-start gap-3 rounded-control border border-ui-border p-3"><Checkbox checked={shuffleCards} onCheckedChange={checked => setShuffleCards(checked === true)} aria-label="Shuffle cards" /><span><span className="block text-sm font-medium text-foreground">Shuffle cards</span><span className="mt-0.5 block text-xs text-muted-foreground">Study in a random order. You can turn shuffle off during the session to restore the original set order.</span></span></label>
@@ -706,6 +824,7 @@ function QuizSetupModal({ open, set, onClose, onStart }: { open: boolean; set: S
 }
 
 function QuizWorkspace({ set, activityId, config }: { set: SetDetail; activityId?: string; config: QuizConfig | null }) {
+  const didStartRef = useRef(false);
   const [session, setSession] = useState<StudySession | null>(null);
   const [index, setIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState('');
@@ -723,7 +842,11 @@ function QuizWorkspace({ set, activityId, config }: { set: SetDetail; activityId
     } catch (error) { appToast.error(errorMessage(error, 'Unable to start the quiz.')); }
     finally { setLoading(false); }
   }, [activityId, effectiveConfig, set.id]);
-  useEffect(() => { void start(); }, [start]);
+  useEffect(() => {
+    if (didStartRef.current) return;
+    didStartRef.current = true;
+    void start();
+  }, [start]);
   const current = session?.questions[index];
   const answered = Boolean(current?.selectedMeaning);
   const submit = async () => {

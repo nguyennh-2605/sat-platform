@@ -24,6 +24,15 @@ const rangeSourceItems = (items, startIndex, endIndex) => {
   };
 };
 
+const selectSourceItemsById = (items, sourceTermIds) => {
+  if (!Array.isArray(sourceTermIds)) return items;
+  const requestedIds = new Set(sourceTermIds.map(value => clean(value, 80)).filter(Boolean));
+  if (!requestedIds.size) return items;
+  const selected = items.filter(item => requestedIds.has(item.sourceTermId || item.id));
+  if (selected.length !== requestedIds.size) throw new ApiError(400, { error: 'One or more selected study words are invalid.' });
+  return selected;
+};
+
 const validateTerms = rawTerms => {
   if (!Array.isArray(rawTerms)) throw new ApiError(400, { error: 'Terms must be an array.' });
   const seen = new Set();
@@ -338,6 +347,7 @@ const sessionResponse = session => ({
   completedAt: session.completedAt,
   questions: session.questions.map(question => ({
     id: question.id,
+    sourceTermId: question.sourceTermId,
     prompt: question.prompt,
     order: question.order,
     sourceOrder: question.sourceOrder,
@@ -352,7 +362,7 @@ const sessionResponse = session => ({
   })),
 });
 
-exports.createSession = async ({ setId, activityId, mode, questionCount, startIndex, endIndex, masteries, restart, shuffle: shuffleRequested, userId, userRole }) => {
+exports.createSession = async ({ setId, activityId, mode, questionCount, startIndex, endIndex, masteries, sourceTermIds, restart, shuffle: shuffleRequested, userId, userRole }) => {
   const set = await getAccessibleSet({ setId, userId, userRole, activityId });
   const normalizedMode = String(mode || 'FLASHCARD').toUpperCase();
   if (!['FLASHCARD', 'QUIZ'].includes(normalizedMode)) throw new ApiError(400, { error: 'Study mode is invalid.' });
@@ -369,6 +379,7 @@ exports.createSession = async ({ setId, activityId, mode, questionCount, startIn
   const assignedSession = Boolean(activityId);
   const ranged = rangeSourceItems(sourceItems, assignedSession ? 1 : startIndex, assignedSession ? sourceItems.length : endIndex);
   sourceItems = ranged.items;
+  if (!assignedSession) sourceItems = selectSourceItemsById(sourceItems, sourceTermIds);
   const requestedMasteries = assignedSession || !Array.isArray(masteries)
     ? []
     : [...new Set(masteries.map(value => String(value).toUpperCase()))];
@@ -683,4 +694,4 @@ exports.getActivityPerformance = async ({ activityId, userId, userRole }) => {
   };
 };
 
-exports._private = { validateTerms, normalizeWord, shuffle, rangeSourceItems, nextTermMastery };
+exports._private = { validateTerms, normalizeWord, shuffle, rangeSourceItems, selectSourceItemsById, nextTermMastery };

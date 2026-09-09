@@ -77,6 +77,19 @@ test('study ranges clamp the end and reject a start after the final word', () =>
   );
 });
 
+test('an explicit review queue keeps source order and rejects foreign terms', () => {
+  const items = [
+    { id: 'term-1', word: 'one' },
+    { id: 'term-2', word: 'two' },
+    { id: 'term-3', word: 'three' },
+  ];
+  assert.deepEqual(_private.selectSourceItemsById(items, ['term-3', 'term-1']), [items[0], items[2]]);
+  assert.throws(
+    () => _private.selectSourceItemsById(items, ['term-1', 'foreign-term']),
+    error => error.statusCode === 400 && /selected study words are invalid/.test(error.body.error),
+  );
+});
+
 test('a wrong quiz answer immediately returns a mastered word to learning', () => {
   assert.deepEqual(_private.nextTermMastery({
     existing: { mastery: 'MASTERED', correctStreak: 8 },

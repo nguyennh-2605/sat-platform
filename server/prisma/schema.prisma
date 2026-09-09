@@ -274,6 +274,7 @@ model Question {
   domain        QuestionDomain?  @relation("QuestionDomainQuestions", fields: [domainCode], references: [code], onDelete: SetNull)
   skill         QuestionSkill?   @relation("QuestionSkillQuestions", fields: [skillCode], references: [code], onDelete: SetNull)
   timings       QuestionTiming[]
+  errorLogs     ErrorLog[]
 
   @@index([domainCode])
   @@index([skillCode])
@@ -326,6 +327,7 @@ model Submission {
   test                   Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
   user                   User             @relation(fields: [userId], references: [id])
   questionTimings        QuestionTiming[]
+  errorLogs              ErrorLog[]
 
   @@unique([deliveryId, userId, attemptNo])
   @@index([deliveryId, status])
@@ -346,19 +348,29 @@ model Answer {
 }
 
 model ErrorLog {
-  id            String   @id @default(uuid())
+  id            String             @id @default(uuid())
   source        String?
   category      String?
   userAnswer    String?
   correctAnswer String?
+  whyChosen     String?
   whyWrong      String?
   whyRight      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  takeaway      String?
+  rootCause     ErrorLogRootCause?
+  reviewedAt    DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
   userId        Int
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissionId  Int?
+  questionId    Int?
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submission    Submission?        @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  question      Question?          @relation(fields: [questionId], references: [id], onDelete: SetNull)
 
+  @@unique([userId, submissionId, questionId])
   @@index([userId, createdAt])
+  @@index([userId, reviewedAt, createdAt])
 }
 
 model Notification {
@@ -473,6 +485,17 @@ enum ScorePolicy {
 enum QuestionType {
   MCQ // Trắc nghiệm
   SPR // Tự luận điền số (Grid-in)
+}
+
+enum ErrorLogRootCause {
+  KNOWLEDGE_GAP
+  MISREAD_QUESTION
+  MISREAD_PASSAGE
+  WRONG_REASONING
+  CARELESS_MISTAKE
+  TIME_PRESSURE
+  CALCULATION_ERROR
+  GUESSED
 }
 
 enum VocabularySetScope {

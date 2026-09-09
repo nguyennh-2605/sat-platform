@@ -245,16 +245,26 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Hiển thị question count, progress percentage, last attempt và score khi có dữ liệu thật.
 - Các trạng thái dùng English: `Not started`, `In progress`, `Completed`.
 
+### Error Log
+
+- Error Log dùng mental model `index → reflection workspace`: bảng chính chỉ giữ `Skill`, `Source`, `Yours`, `Correct`, `Review`; không render reasoning dài thành row cao.
+- Câu sai được backend tự động thêm ở trạng thái `Needs review` khi submission hoàn tất. Việc retry submit không được tạo entry trùng; manual entry chỉ phục vụ bài làm ngoài platform hoặc dữ liệu legacy.
+- Click row mở dashboard content-dialog có question context và answer choices ở bên trái, reflection editor ở bên phải; mobile xếp dọc. Math và passage tiếp tục dùng renderer/typography của nội dung đề.
+- Hệ thống chỉ tự điền dữ liệu khách quan. `Why did you choose your answer?`, `What was wrong with that reasoning?`, `Why is the correct answer right?`, `Takeaway` và `Root cause` luôn do học sinh tự nhập, không AI-prefill.
+- `Mark reviewed` chỉ bật khi đủ bốn reflection và root cause; partial work dùng `Save draft`. Search phải tìm được source, skill và takeaway; status/root-cause filters nằm trong cùng DataToolbar.
+
 ### Vocabulary
 
 - Vocabulary dùng mental model `set-first, study-second`: chọn material trước, sau đó mới chọn Review hoặc Quiz. Không trình bày study mode như các feature card độc lập phía trên library.
 - Page header chỉ có title và description. `Vocabulary sets` là section đầu tiên; `New set` là outline action của section, không phải CTA cạnh tranh trong header.
 - Set card phải compact. Selected state dùng neutral `bg-muted`, border/ring nhẹ và `aria-pressed`; không invert thành solid primary/dark card. Chỉ hiển thị badge khi source/state cần phân biệt như `System`, `Assigned`, `Draft`.
-- Set selector và selected summary không lặp description. Set đang chọn có một compact summary surface ngay dưới collection: title, word/mastery metadata và action hierarchy dynamic `Start studying` / `Continue studying` / `Review words` primary, `Take quiz` outline. Assign/Edit/Delete là contextual actions trong overflow menu theo capability thật.
+- Set selector và selected summary không lặp description. Set đang chọn có một compact summary surface ngay dưới collection: title, learning-progress breakdown và action hierarchy dynamic `Continue studying` → `Learn N new` → `Review N learning` → `Review words` primary, `Take quiz` outline. Assign/Edit/Delete là contextual actions trong overflow menu theo capability thật.
 - Mọi standard action trong Vocabulary dùng canonical shadcn `components/ui/button.tsx`; không dùng `AppUI.Button`, không tự override height/shadow cho primary/outline utility action. Study interaction đặc thù có thể tăng touch target nhưng vẫn phải render qua canonical Button.
-- Set card hiển thị study continuity từ dữ liệu thật: số từ đã học và ngày học gần nhất. Chỉ dùng `Continue studying`/`Continue quiz` khi có session `IN_PROGRESS`; mở một phạm vi mới phải cảnh báo rõ rằng session cũ sẽ được thay thế.
-- Flashcard setup hỗ trợ `All words`, `Next 10 unstudied` và `Custom range`; Quiz setup hỗ trợ range và mastery filter. Assigned activity luôn dùng snapshot/scope do giáo viên giao, không cho client âm thầm override bằng default cá nhân.
+- Set card hiển thị study continuity từ dữ liệu thật: exact studied count, progress bar mảnh cho coverage, mastered count và ngày học gần nhất. Không dùng coverage 100% để ngụ ý toàn bộ từ đã mastered. Selected summary dùng segmented bar trung tính để phân biệt Mastered, Learning và Not studied.
+- Chỉ dùng `Continue studying`/`Continue quiz` khi có session `IN_PROGRESS`; mở một phạm vi mới phải cảnh báo rõ rằng session cũ sẽ được thay thế.
+- Flashcard setup hỗ trợ `All words`, `Next 10 unstudied`, `Review learning` và `Custom range`; Quiz setup hỗ trợ range và mastery filter. Assigned activity luôn dùng snapshot/scope do giáo viên giao, không cho client âm thầm override bằng default cá nhân.
 - Shuffle là toggle có state rõ bằng `aria-pressed`: bật sẽ tạo thứ tự ngẫu nhiên, tắt phải khôi phục chính xác thứ tự gốc của set. Thứ tự hiện tại được persist cùng session để reload/continue không làm thay đổi ngoài ý muốn; khi toggle phải giữ người học ở đúng card hiện tại.
+- Flashcard hoàn tất phải có compact completion summary cho `Got it` và `Still learning`, giải thích `Got it` chỉ là self-rating, đồng thời tạo review loop cho đúng các từ vừa đánh dấu `Still learning`. Desktop hỗ trợ và hiển thị shortcut `Space`, Arrow keys, `1`, `2`, `P`; shortcut không được chiếm phím khi user đang nhập liệu.
 - Words là `rich list` trong một `DataSurface`, không phải grid card. Desktop có header nhẹ `Word | Definition | Progress`; mỗi row phục vụ scan nhanh theo thứ tự word, Vietnamese translation, short definition, progress và optional last-reviewed metadata. Mobile ẩn header nhưng giữ cùng thứ tự nội dung.
 - Search và progress filter nằm trong `DataToolbar`. Filter dùng shared Dropdown Menu; filtered-empty có `Clear filters`, pagination nằm trong footer của cùng surface.
 - Click word mở shared right-side Sheet để progressive-disclose full definition, example, progress và last-reviewed date. Không render nút `View` lặp lại trên từng row.

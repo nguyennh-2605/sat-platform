@@ -214,10 +214,10 @@ Express Server (index.js → app.js)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/error-logs` | JWT | Get user's error logs (wrong answers) |
-| `POST` | `/api/error-logs` | JWT | Create new error log entry |
-| `PUT` | `/api/error-logs/:id` | JWT | Update error log (owner-checked) |
-| `DELETE` | `/api/error-logs/:id` | JWT | Delete error log (owner-checked) |
+| `GET` | `/api/error-logs` | JWT + STUDENT | Get the student's paginated error logs with linked question context and review/root-cause filters |
+| `POST` | `/api/error-logs` | JWT + STUDENT | Create a manual error log entry for work completed outside the platform |
+| `PUT` | `/api/error-logs/:id` | JWT + STUDENT | Save student-authored reasoning or mark a complete reflection reviewed (owner-checked) |
+| `DELETE` | `/api/error-logs/:id` | JWT + STUDENT | Delete error log (owner-checked) |
 
 ### 5.9 AI Features
 
@@ -341,6 +341,8 @@ Folder ──1:N── Test
 **Question**: `id`, `sectionId`, `type` (MCQ | SPR), `blocks` (JSON content), `questionText`, `choices` (JSON), `correctAnswer`, `explanation`, `order`
 
 **Answer**: `id`, `submissionId`, `questionId`, `selectedChoice`, `isCorrect`
+
+**ErrorLog**: student-owned mistake review with objective source/answer snapshots, optional `Submission` and `Question` links, student-authored `whyChosen`, `whyWrong`, `whyRight`, `takeaway`, quick `rootCause`, and `reviewedAt`. New wrong answers are logged automatically and idempotently when a test submission is committed; manual and legacy entries remain supported.
 
 **AuditEvent**: durable product-domain mutation history with `action`, `category`, optional actor reference plus actor snapshot, entity identity/label snapshot, allowlisted metadata, and `createdAt`. `AdminAuditLog` remains separate for privileged Admin CLI security operations. Submission analytics and raw operational errors are not duplicated into AuditEvent.
 
@@ -495,6 +497,26 @@ Folder ──1:N── Test
    → Persists to Notification table
    → Pushes SSE event to all connected clients of that user
 3. Client receives event → updates notification bell count in real-time
+```
+
+### 8.11 Vocabulary Study Flow
+
+```text
+1. Vocabulary set summaries derive coverage, mastery counts, and last-studied time from VocabularyTermProgress.
+2. POST /api/vocabulary/sets/:setId/sessions resumes the latest matching in-progress session unless restart is explicit.
+3. Personal/System study sessions may select a one-based range, mastery group, or validated sourceTermIds review queue; assigned activities always use the teacher-owned activity snapshot and question scope.
+4. Flashcard display order and Shuffle state are persisted on the session. Disabling Shuffle restores sourceOrder; reloading does not silently change the order.
+5. Flashcard self-ratings update progress but do not equate Got it with Mastered. Quiz recall remains the canonical path to Mastered.
+```
+
+### 8.12 Error Log Review Flow
+
+```text
+1. A completed test transaction creates one ErrorLog for each wrong Answer, uniquely keyed by student, submission, and question.
+2. The system snapshots source, skill, selected answer, and correct answer while linking the original Question for full review context.
+3. Every new entry starts in Needs review; the system does not generate or prefill the student's reflection.
+4. The student writes why they chose the answer, diagnoses the reasoning error, explains the correct reasoning, selects a root cause, and records a reusable takeaway.
+5. Mark reviewed succeeds only when every reflection field and the root-cause classification are complete.
 ```
 
 ---

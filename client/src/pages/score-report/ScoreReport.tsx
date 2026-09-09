@@ -90,10 +90,13 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
   const [loading, setLoading] = useState(!resolvedInitialData);
   const [loadError, setLoadError] = useState(false);
   const [reviewingQuestion, setReviewingQuestion] = useState<QuestionResult | null>(null);
-  const [loggedQuestions, setLoggedQuestions] = useState<Set<number | string>>(new Set());
   const [filter, setFilter] = useState<ReviewFilter>('ALL');
   const [page, setPage] = useState(1);
   const resultId = location.state?.resultId;
+
+  useEffect(() => {
+    invalidateQueryCache('/api/error-logs');
+  }, [resultId]);
 
   useEffect(() => {
     if (resolvedInitialData) return;
@@ -127,27 +130,6 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
     else navigate('/dashboard/results-analytics');
   };
   useDashboardBack(handleBack);
-
-  const handleAddToErrorLog = async (question: QuestionResult) => {
-    if (!data || loggedQuestions.has(question.id)) return;
-
-    try {
-      await axiosClient.post('/api/error-logs', {
-        source: data.examTitle,
-        userAnswer: question.userAnswer || 'Omitted',
-        category: 'General',
-        correctAnswer: question.correctAnswer,
-        whyWrong: '',
-        whyRight: '',
-      });
-      invalidateQueryCache('/api/error-logs');
-      setLoggedQuestions(current => new Set(current).add(question.id));
-      toast.success(`Question ${question.questionNumber} added to Error Log`);
-    } catch (error) {
-      console.error('Failed to add question to Error Log:', error);
-      toast.error('Unable to add to Error Log');
-    }
-  };
 
   const filteredQuestions = useMemo(() => {
     if (!data) return [];
@@ -228,7 +210,6 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
               <TableHeader><TableRow><TableHead className="w-28">Question</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-center">Correct answer</TableHead><TableHead className="text-center">Your answer</TableHead><TableHead className="text-center">Time spent</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
               <TableBody>
                 {pageQuestions.map(question => {
-                  const logged = loggedQuestions.has(question.id);
                   return (
                     <TableRow key={question.id}>
                       <TableCell><p className="font-medium text-foreground">Q{question.questionNumber}</p><p className="mt-0.5 text-xs text-muted-foreground">{question.module}</p></TableCell>
@@ -236,7 +217,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
                       <TableCell className="text-center font-semibold text-foreground">{question.correctAnswer}</TableCell>
                       <TableCell className={`text-center font-semibold ${question.isCorrect ? 'text-success' : 'text-danger'}`}>{question.userAnswer || 'Omitted'}</TableCell>
                       <TableCell className="whitespace-nowrap text-center font-medium text-foreground">{formatQuestionDuration(question.activeDurationMs)}</TableCell>
-                      <TableCell><div className="flex items-center justify-end gap-2"><Button variant={logged ? 'accent' : 'ghost'} size="sm" disabled={logged} onClick={() => handleAddToErrorLog(question)} title={logged ? 'Added to Error Log' : 'Add to Error Log'}><Bookmark size={14} className={logged ? 'fill-current' : ''} />{logged ? 'Logged' : 'Log'}</Button><Button size="sm" onClick={() => setReviewingQuestion(question)}><Eye size={14} /> Review</Button></div></TableCell>
+                      <TableCell><div className="flex items-center justify-end gap-2">{!question.isCorrect && <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard/error-log')} title="Open Error Log"><Bookmark size={14} className="fill-current" />Error Log</Button>}<Button size="sm" onClick={() => setReviewingQuestion(question)}><Eye size={14} /> Review</Button></div></TableCell>
                     </TableRow>
                   );
                 })}
