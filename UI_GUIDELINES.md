@@ -245,6 +245,18 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Hiển thị question count, progress percentage, last attempt và score khi có dữ liệu thật.
 - Các trạng thái dùng English: `Not started`, `In progress`, `Completed`.
 
+### Vocabulary
+
+- Vocabulary dùng mental model `set-first, study-second`: chọn material trước, sau đó mới chọn Review hoặc Quiz. Không trình bày study mode như các feature card độc lập phía trên library.
+- Page header chỉ có title và description. `Vocabulary sets` là section đầu tiên; `New set` là outline action của section, không phải CTA cạnh tranh trong header.
+- Set card phải compact. Selected state dùng neutral `bg-muted`, border/ring nhẹ và `aria-pressed`; không invert thành solid primary/dark card. Chỉ hiển thị badge khi source/state cần phân biệt như `System`, `Assigned`, `Draft`.
+- Set selector và selected summary không lặp description. Set đang chọn có một compact summary surface ngay dưới collection: title, word/mastery metadata và action hierarchy dynamic `Start studying` / `Continue studying` / `Review words` primary, `Take quiz` outline. Assign/Edit/Delete là contextual actions trong overflow menu theo capability thật.
+- Mọi standard action trong Vocabulary dùng canonical shadcn `components/ui/button.tsx`; không dùng `AppUI.Button`, không tự override height/shadow cho primary/outline utility action. Study interaction đặc thù có thể tăng touch target nhưng vẫn phải render qua canonical Button.
+- Words là `rich list` trong một `DataSurface`, không phải grid card. Desktop có header nhẹ `Word | Definition | Progress`; mỗi row phục vụ scan nhanh theo thứ tự word, Vietnamese translation, short definition, progress và optional last-reviewed metadata. Mobile ẩn header nhưng giữ cùng thứ tự nội dung.
+- Search và progress filter nằm trong `DataToolbar`. Filter dùng shared Dropdown Menu; filtered-empty có `Clear filters`, pagination nằm trong footer của cùng surface.
+- Click word mở shared right-side Sheet để progressive-disclose full definition, example, progress và last-reviewed date. Không render nút `View` lặp lại trên từng row.
+- Không hiển thị due count, spaced-repetition schedule hoặc adaptive recommendation cho tới khi backend có canonical scheduling logic. Review/quiz session tiếp tục dùng dữ liệu và progress thật.
+
 ### Classroom Lessons
 
 - `Lessons` là curriculum builder phân cấp, không phải dashboard, KPI surface, table hay collection card.
