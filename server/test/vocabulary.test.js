@@ -55,6 +55,28 @@ test('quiz shuffling returns a new array without losing options', () => {
   assert.deepEqual(source, ['a', 'b', 'c', 'd']);
 });
 
+test('study ranges keep the original one-based word order', () => {
+  const source = ['one', 'two', 'three', 'four', 'five'];
+  assert.deepEqual(_private.rangeSourceItems(source, 2, 4), {
+    items: ['two', 'three', 'four'],
+    rangeStart: 2,
+    rangeEnd: 4,
+  });
+  assert.deepEqual(source, ['one', 'two', 'three', 'four', 'five']);
+});
+
+test('study ranges clamp the end and reject a start after the final word', () => {
+  assert.deepEqual(_private.rangeSourceItems(['one', 'two', 'three'], 2, 99), {
+    items: ['two', 'three'],
+    rangeStart: 2,
+    rangeEnd: 3,
+  });
+  assert.throws(
+    () => _private.rangeSourceItems(['one', 'two'], 3, 4),
+    error => error.statusCode === 400 && /starts after the final word/.test(error.body.error),
+  );
+});
+
 test('a wrong quiz answer immediately returns a mastered word to learning', () => {
   assert.deepEqual(_private.nextTermMastery({
     existing: { mastery: 'MASTERED', correctStreak: 8 },

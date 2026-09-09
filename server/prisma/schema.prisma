@@ -894,22 +894,27 @@ model VocabularyActivityItem {
 }
 
 model VocabularyStudySession {
-  id           String                      @id @default(uuid())
-  userId       Int
-  setId        String
-  activityId   String?
-  mode         VocabularyStudyMode
-  status       VocabularySessionStatus     @default(IN_PROGRESS)
-  totalItems   Int
-  correctCount Int                         @default(0)
-  startedAt    DateTime                    @default(now())
-  completedAt  DateTime?
-  user         User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  set          VocabularySet               @relation(fields: [setId], references: [id], onDelete: Cascade)
-  activity     ClassActivity?              @relation(fields: [activityId], references: [id], onDelete: SetNull)
-  questions    VocabularySessionQuestion[]
+  id             String                      @id @default(uuid())
+  userId         Int
+  setId          String
+  activityId     String?
+  mode           VocabularyStudyMode
+  status         VocabularySessionStatus     @default(IN_PROGRESS)
+  totalItems     Int
+  correctCount   Int                         @default(0)
+  rangeStart     Int?
+  rangeEnd       Int?
+  shuffle        Boolean                     @default(false)
+  startedAt      DateTime                    @default(now())
+  lastActivityAt DateTime                    @default(now())
+  completedAt    DateTime?
+  user           User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  set            VocabularySet               @relation(fields: [setId], references: [id], onDelete: Cascade)
+  activity       ClassActivity?              @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  questions      VocabularySessionQuestion[]
 
   @@index([userId, status, startedAt])
+  @@index([userId, setId, mode, status, lastActivityAt])
   @@index([activityId, userId])
 }
 
@@ -923,6 +928,7 @@ model VocabularySessionQuestion {
   exampleSentence String?
   options         Json
   order           Int
+  sourceOrder     Int?
   selectedMeaning String?
   isCorrect       Boolean?
   answeredAt      DateTime?

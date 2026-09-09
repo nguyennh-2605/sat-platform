@@ -17,6 +17,7 @@ router.post('/sets/:setId/publish', authorizeRole(['ADMIN']), controller.publish
 router.post('/sets/:setId/archive', controller.archiveSet);
 router.post('/sets/:setId/sessions', controller.createSession);
 router.get('/sessions/:sessionId', controller.getSession);
+router.patch('/sessions/:sessionId/order', controller.updateSessionOrder);
 router.post('/sessions/:sessionId/questions/:questionId/answer', controller.answerQuestion);
 router.post('/activities', staffOnly, controller.assignSet);
 router.get('/activities/class/:classId', controller.listClassActivities);

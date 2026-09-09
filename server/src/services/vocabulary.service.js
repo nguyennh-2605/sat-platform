@@ -13,6 +13,17 @@ const shuffle = values => {
   return result;
 };
 
+const rangeSourceItems = (items, startIndex, endIndex) => {
+  const rangeStart = Math.max(1, intId(startIndex) || 1);
+  const rangeEnd = Math.min(items.length, Math.max(rangeStart, intId(endIndex) || items.length));
+  if (rangeStart > items.length) throw new ApiError(400, { error: 'The study range starts after the final word.' });
+  return {
+    items: items.slice(rangeStart - 1, rangeEnd),
+    rangeStart,
+    rangeEnd,
+  };
+};
+
 const validateTerms = rawTerms => {
   if (!Array.isArray(rawTerms)) throw new ApiError(400, { error: 'Terms must be an array.' });
   const seen = new Set();
@@ -52,22 +63,47 @@ const getAccessibleSet = async ({ setId, userId, userRole, activityId, includeTe
   return set;
 };
 
-const setSummary = (set, progress = []) => ({
-  id: set.id,
-  title: set.title,
-  description: set.description,
-  scope: set.scope,
-  status: set.status,
-  sourceLanguage: set.sourceLanguage,
-  translationLanguage: set.translationLanguage,
-  version: set.version,
-  ownerId: set.ownerId,
-  createdAt: set.createdAt,
-  updatedAt: set.updatedAt,
-  publishedAt: set.publishedAt,
-  termCount: set._count?.terms ?? set.terms?.length ?? 0,
-  masteredCount: progress.filter(item => item.mastery === 'MASTERED').length,
-});
+const activeSessionSummary = session => session ? ({
+  id: session.id,
+  mode: session.mode,
+  answeredCount: session.questions.filter(question => question.answeredAt).length,
+  totalItems: session.totalItems,
+  rangeStart: session.rangeStart,
+  rangeEnd: session.rangeEnd,
+  nextSourceOrder: session.questions.find(question => !question.answeredAt)?.sourceOrder || null,
+  shuffle: session.shuffle,
+  startedAt: session.startedAt,
+  lastActivityAt: session.lastActivityAt,
+}) : null;
+
+const setSummary = (set, progress = [], activeFlashcardSession = null, activeQuizSession = null) => {
+  const studied = progress.filter(item => item.seenCount > 0);
+  const lastStudiedAt = studied.reduce((latest, item) => {
+    if (!item.lastReviewedAt) return latest;
+    return !latest || item.lastReviewedAt > latest ? item.lastReviewedAt : latest;
+  }, null);
+  return {
+    id: set.id,
+    title: set.title,
+    description: set.description,
+    scope: set.scope,
+    status: set.status,
+    sourceLanguage: set.sourceLanguage,
+    translationLanguage: set.translationLanguage,
+    version: set.version,
+    ownerId: set.ownerId,
+    createdAt: set.createdAt,
+    updatedAt: set.updatedAt,
+    publishedAt: set.publishedAt,
+    termCount: set._count?.terms ?? set.terms?.length ?? 0,
+    studiedCount: studied.length,
+    learningCount: studied.filter(item => item.mastery === 'LEARNING').length,
+    masteredCount: studied.filter(item => item.mastery === 'MASTERED').length,
+    lastStudiedAt,
+    activeFlashcardSession: activeSessionSummary(activeFlashcardSession),
+    activeQuizSession: activeSessionSummary(activeQuizSession),
+  };
+};
 
 exports.listSets = async ({ scope = 'SYSTEM', query, userId, userRole }) => {
   const normalizedScope = String(scope).toUpperCase();
@@ -103,17 +139,36 @@ exports.listSets = async ({ scope = 'SYSTEM', query, userId, userRole }) => {
     },
     take: 100,
   });
-  const masteredProgress = sets.length ? await prisma.vocabularyTermProgress.findMany({
-    where: { userId: intId(userId), mastery: 'MASTERED', term: { setId: { in: sets.map(set => set.id) } } },
-    select: { term: { select: { setId: true } } },
-  }) : [];
-  const masteredBySet = masteredProgress.reduce((counts, item) => {
-    counts.set(item.term.setId, (counts.get(item.term.setId) || 0) + 1);
-    return counts;
+  const setIds = sets.map(set => set.id);
+  const [progressRows, activeSessions] = sets.length ? await Promise.all([
+    prisma.vocabularyTermProgress.findMany({
+      where: { userId: intId(userId), seenCount: { gt: 0 }, term: { setId: { in: setIds } } },
+      select: { mastery: true, seenCount: true, lastReviewedAt: true, term: { select: { setId: true } } },
+    }),
+    prisma.vocabularyStudySession.findMany({
+      where: { userId: intId(userId), setId: { in: setIds }, mode: { in: ['FLASHCARD', 'QUIZ'] }, status: 'IN_PROGRESS' },
+      orderBy: { lastActivityAt: 'desc' },
+      include: { questions: { orderBy: { order: 'asc' }, select: { answeredAt: true, sourceOrder: true } } },
+    }),
+  ]) : [[], []];
+  const progressBySet = progressRows.reduce((groups, item) => {
+    const values = groups.get(item.term.setId) || [];
+    values.push(item);
+    groups.set(item.term.setId, values);
+    return groups;
+  }, new Map());
+  const activeByCollection = activeSessions.reduce((sessions, session) => {
+    const key = `${session.setId}:${session.activityId || ''}:${session.mode}`;
+    if (!sessions.has(key)) sessions.set(key, session);
+    return sessions;
   }, new Map());
   return sets.map(set => ({
-    ...setSummary(set),
-    masteredCount: masteredBySet.get(set.id) || 0,
+    ...setSummary(
+      set,
+      progressBySet.get(set.id) || [],
+      activeByCollection.get(`${set.id}:${set.activities?.[0]?.activityId || ''}:FLASHCARD`),
+      activeByCollection.get(`${set.id}:${set.activities?.[0]?.activityId || ''}:QUIZ`),
+    ),
     ...(set.activities?.[0] ? { assignedActivityId: set.activities[0].activityId } : {}),
   }));
 };
@@ -123,9 +178,19 @@ exports.getSet = async ({ setId, userId, userRole, activityId }) => {
   const progress = await prisma.vocabularyTermProgress.findMany({
     where: { userId: intId(userId), termId: { in: set.terms.map(term => term.id) } },
   });
+  const activeSessions = await prisma.vocabularyStudySession.findMany({
+    where: { userId: intId(userId), setId: set.id, activityId: activityId ? String(activityId) : null, mode: { in: ['FLASHCARD', 'QUIZ'] }, status: 'IN_PROGRESS' },
+    orderBy: { lastActivityAt: 'desc' },
+    include: { questions: { orderBy: { order: 'asc' }, select: { answeredAt: true, sourceOrder: true } } },
+  });
   const progressByTerm = new Map(progress.map(item => [item.termId, item]));
   return {
-    ...setSummary(set, progress),
+    ...setSummary(
+      set,
+      progress,
+      activeSessions.find(session => session.mode === 'FLASHCARD'),
+      activeSessions.find(session => session.mode === 'QUIZ'),
+    ),
     canEdit: canManageSet(set, userId, userRole),
     terms: set.terms.map(term => ({ ...term, progress: progressByTerm.get(term.id) || null })),
   };
@@ -262,14 +327,20 @@ const sessionResponse = session => ({
   mode: session.mode,
   status: session.status,
   totalItems: session.totalItems,
+  answeredCount: session.questions.filter(question => question.answeredAt).length,
   correctCount: session.correctCount,
   score: session.totalItems ? Math.round((session.correctCount / session.totalItems) * 100) : 0,
+  rangeStart: session.rangeStart,
+  rangeEnd: session.rangeEnd,
+  shuffle: session.shuffle,
   startedAt: session.startedAt,
+  lastActivityAt: session.lastActivityAt,
   completedAt: session.completedAt,
   questions: session.questions.map(question => ({
     id: question.id,
     prompt: question.prompt,
     order: question.order,
+    sourceOrder: question.sourceOrder,
     options: question.options,
     selectedMeaning: question.selectedMeaning,
     isCorrect: question.isCorrect,
@@ -281,43 +352,45 @@ const sessionResponse = session => ({
   })),
 });
 
-exports.createSession = async ({ setId, activityId, mode, questionCount, startIndex, endIndex, masteries, restart, userId, userRole }) => {
+exports.createSession = async ({ setId, activityId, mode, questionCount, startIndex, endIndex, masteries, restart, shuffle: shuffleRequested, userId, userRole }) => {
   const set = await getAccessibleSet({ setId, userId, userRole, activityId });
   const normalizedMode = String(mode || 'FLASHCARD').toUpperCase();
   if (!['FLASHCARD', 'QUIZ'].includes(normalizedMode)) throw new ApiError(400, { error: 'Study mode is invalid.' });
   const existingSession = await prisma.vocabularyStudySession.findFirst({
     where: { userId: intId(userId), setId: set.id, activityId: activityId ? String(activityId) : null, mode: normalizedMode, status: 'IN_PROGRESS' },
-    orderBy: { startedAt: 'desc' },
+    orderBy: { lastActivityAt: 'desc' },
     include: { questions: { orderBy: { order: 'asc' } } },
   });
   if (existingSession && !restart) return sessionResponse(existingSession);
   if (existingSession && restart) await prisma.vocabularyStudySession.delete({ where: { id: existingSession.id } });
   let sourceItems = await sourceItemsForSession({ set, activityId, userId, mode: normalizedMode });
   if (!sourceItems.length) throw new ApiError(400, { error: 'This vocabulary set has no terms.' });
-  if (normalizedMode === 'QUIZ') {
-    const rangeStart = Math.max(1, intId(startIndex) || 1);
-    const rangeEnd = Math.min(sourceItems.length, Math.max(rangeStart, intId(endIndex) || sourceItems.length));
-    if (rangeStart > sourceItems.length) throw new ApiError(400, { error: 'The quiz range starts after the final word.' });
-    sourceItems = sourceItems.slice(rangeStart - 1, rangeEnd);
-    const requestedMasteries = Array.isArray(masteries) ? [...new Set(masteries.map(value => String(value).toUpperCase()))] : [];
-    const allowedMasteries = ['NOT_STUDIED', 'LEARNING', 'MASTERED'];
-    if (requestedMasteries.some(value => !allowedMasteries.includes(value))) throw new ApiError(400, { error: 'Quiz mastery filter is invalid.' });
-    if (requestedMasteries.length && requestedMasteries.length < allowedMasteries.length) {
-      const sourceTermIds = sourceItems.map(item => item.sourceTermId || item.id).filter(Boolean);
-      const progress = await prisma.vocabularyTermProgress.findMany({ where: { userId: intId(userId), termId: { in: sourceTermIds } }, select: { termId: true, mastery: true } });
-      const masteryByTerm = new Map(progress.map(item => [item.termId, item.mastery]));
-      sourceItems = sourceItems.filter(item => requestedMasteries.includes(masteryByTerm.get(item.sourceTermId || item.id) || 'NOT_STUDIED'));
-    }
-    if (sourceItems.length > 40) sourceItems = sourceItems.slice(0, 40);
+  sourceItems = sourceItems.map((item, index) => ({ ...item, sourceOrder: index + 1 }));
+  const assignedSession = Boolean(activityId);
+  const ranged = rangeSourceItems(sourceItems, assignedSession ? 1 : startIndex, assignedSession ? sourceItems.length : endIndex);
+  sourceItems = ranged.items;
+  const requestedMasteries = assignedSession || !Array.isArray(masteries)
+    ? []
+    : [...new Set(masteries.map(value => String(value).toUpperCase()))];
+  const allowedMasteries = ['NOT_STUDIED', 'LEARNING', 'MASTERED'];
+  if (requestedMasteries.some(value => !allowedMasteries.includes(value))) throw new ApiError(400, { error: 'Study mastery filter is invalid.' });
+  if (requestedMasteries.length && requestedMasteries.length < allowedMasteries.length) {
+    const sourceTermIds = sourceItems.map(item => item.sourceTermId || item.id).filter(Boolean);
+    const progress = await prisma.vocabularyTermProgress.findMany({ where: { userId: intId(userId), termId: { in: sourceTermIds } }, select: { termId: true, mastery: true } });
+    const masteryByTerm = new Map(progress.map(item => [item.termId, item.mastery]));
+    sourceItems = sourceItems.filter(item => requestedMasteries.includes(masteryByTerm.get(item.sourceTermId || item.id) || 'NOT_STUDIED'));
   }
-  if (!sourceItems.length) throw new ApiError(400, { error: 'No words match the selected quiz filters.' });
+  if (!sourceItems.length) throw new ApiError(400, { error: 'No words match the selected study filters.' });
   const uniqueMeanings = [...new Set(sourceItems.map(item => item.meaning))];
   if (normalizedMode === 'QUIZ' && uniqueMeanings.length < 4) throw new ApiError(400, { error: 'Quiz mode requires four distinct meanings.' });
   const assignedQuestionCount = activityId
     ? (await prisma.vocabularyActivity.findUnique({ where: { activityId: String(activityId) }, select: { questionCount: true } }))?.questionCount
     : null;
-  const limit = Math.min(sourceItems.length, Math.max(1, intId(questionCount) || assignedQuestionCount || sourceItems.length));
-  const selected = shuffle(sourceItems).slice(0, limit);
+  const requestedLimit = assignedSession ? assignedQuestionCount : intId(questionCount);
+  const modeLimit = normalizedMode === 'QUIZ' ? 40 : sourceItems.length;
+  const limit = Math.min(sourceItems.length, modeLimit, Math.max(1, requestedLimit || sourceItems.length));
+  const shouldShuffle = normalizedMode === 'QUIZ' || shuffleRequested === true;
+  const selected = (shouldShuffle ? shuffle(sourceItems) : [...sourceItems]).slice(0, limit);
   const session = await prisma.vocabularyStudySession.create({
     data: {
       userId: intId(userId),
@@ -325,6 +398,9 @@ exports.createSession = async ({ setId, activityId, mode, questionCount, startIn
       activityId: activityId ? String(activityId) : null,
       mode: normalizedMode,
       totalItems: selected.length,
+      rangeStart: ranged.rangeStart,
+      rangeEnd: ranged.rangeEnd,
+      shuffle: shouldShuffle,
       questions: {
         create: selected.map((item, order) => {
           const distractors = normalizedMode === 'QUIZ'
@@ -338,6 +414,7 @@ exports.createSession = async ({ setId, activityId, mode, questionCount, startIn
             exampleSentence: item.exampleSentence || null,
             options: normalizedMode === 'QUIZ' ? shuffle([item.meaning, ...distractors]) : [],
             order,
+            sourceOrder: item.sourceOrder,
           };
         }),
       },
@@ -354,6 +431,37 @@ exports.getSession = async ({ sessionId, userId }) => {
   });
   if (!session) throw new ApiError(404, { error: 'Study session not found.' });
   return sessionResponse(session);
+};
+
+exports.updateSessionOrder = async ({ sessionId, questionIds, shuffle: shuffleRequested, userId }) => {
+  const session = await prisma.vocabularyStudySession.findFirst({
+    where: { id: String(sessionId), userId: intId(userId) },
+    include: { questions: { orderBy: { order: 'asc' } } },
+  });
+  if (!session) throw new ApiError(404, { error: 'Study session not found.' });
+  if (session.mode !== 'FLASHCARD') throw new ApiError(400, { error: 'Only flashcard sessions can be reordered.' });
+  if (!Array.isArray(questionIds) || questionIds.length !== session.questions.length) {
+    throw new ApiError(400, { error: 'Flashcard order is invalid.' });
+  }
+  const normalizedIds = questionIds.map(String);
+  const expectedIds = new Set(session.questions.map(question => question.id));
+  if (new Set(normalizedIds).size !== expectedIds.size || normalizedIds.some(id => !expectedIds.has(id))) {
+    throw new ApiError(400, { error: 'Flashcard order is invalid.' });
+  }
+  await prisma.$transaction(async tx => {
+    await tx.vocabularySessionQuestion.updateMany({
+      where: { sessionId: session.id },
+      data: { order: { increment: session.questions.length + 1 } },
+    });
+    for (const [order, id] of normalizedIds.entries()) {
+      await tx.vocabularySessionQuestion.update({ where: { id }, data: { order } });
+    }
+    await tx.vocabularyStudySession.update({
+      where: { id: session.id },
+      data: { shuffle: shuffleRequested === true },
+    });
+  });
+  return exports.getSession({ sessionId, userId });
 };
 
 const nextTermMastery = ({ existing, correct, mode }) => {
@@ -426,10 +534,12 @@ exports.answerQuestion = async ({ sessionId, questionId, selectedMeaning, master
     if (session.mode === 'FLASHCARD' && !['KNOW', 'LEARNING'].includes(answer)) throw new ApiError(400, { error: 'Choose Know or Still learning.' });
     if (session.mode === 'QUIZ' && !(question.options || []).includes(answer)) throw new ApiError(400, { error: 'Choose one of the provided meanings.' });
     const correct = session.mode === 'FLASHCARD' ? answer === 'KNOW' : answer === question.correctMeaning;
+    const answeredAt = new Date();
     await tx.vocabularySessionQuestion.update({
       where: { id: question.id },
-      data: { selectedMeaning: answer, isCorrect: correct, answeredAt: new Date() },
+      data: { selectedMeaning: answer, isCorrect: correct, answeredAt },
     });
+    await tx.vocabularyStudySession.update({ where: { id: session.id }, data: { lastActivityAt: answeredAt } });
     await updateTermProgress(tx, { userId: intId(userId), termId: question.sourceTermId, correct, mode: session.mode });
     await finishSessionIfReady(tx, session.id);
   });
@@ -573,4 +683,4 @@ exports.getActivityPerformance = async ({ activityId, userId, userRole }) => {
   };
 };
 
-exports._private = { validateTerms, normalizeWord, shuffle, nextTermMastery };
+exports._private = { validateTerms, normalizeWord, shuffle, rangeSourceItems, nextTermMastery };

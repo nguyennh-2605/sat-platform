@@ -23,6 +23,7 @@ exports.publishSet = action(req => vocabularyService.publishSet({ setId: req.par
 exports.archiveSet = action(req => vocabularyService.archiveSet({ setId: req.params.setId, ...auth(req) }), 'Unable to archive the vocabulary set.');
 exports.createSession = action(req => vocabularyService.createSession({ setId: req.params.setId, ...req.body, ...auth(req) }), 'Unable to start the study session.', 201);
 exports.getSession = action(req => vocabularyService.getSession({ sessionId: req.params.sessionId, ...auth(req) }), 'Unable to load the study session.');
+exports.updateSessionOrder = action(req => vocabularyService.updateSessionOrder({ sessionId: req.params.sessionId, ...req.body, ...auth(req) }), 'Unable to update the flashcard order.');
 exports.answerQuestion = action(req => vocabularyService.answerQuestion({ sessionId: req.params.sessionId, questionId: req.params.questionId, ...req.body, ...auth(req) }), 'Unable to save the answer.');
 exports.assignSet = action(req => vocabularyService.assignSet({ data: req.body, ...auth(req) }), 'Unable to assign the vocabulary set.', 201);
 exports.listClassActivities = action(req => vocabularyService.listClassActivities({ classId: req.params.classId, ...auth(req) }), 'Unable to load vocabulary activities.');

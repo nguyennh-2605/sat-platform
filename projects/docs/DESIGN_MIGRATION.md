@@ -50,7 +50,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | Test Bank | `dashboard/file-manager` | `dashboard/tasks` | No standalone route currently; embedded assignment selector aligned |
 | Results Analytics | `dashboard/analytics` | `dashboard/default` | Implemented with real attempt data |
 | Error Log | `dashboard/tasks` | default data-table patterns | Implemented |
-| Vocabulary | `dashboard/tasks` | Quizlet/Knowt set-first workflow, rich-list patterns | Implemented as a set-first workspace with compact neutral set selection, contextual study actions, searchable/filterable word rich list, word detail Sheet, and preserved specialized quiz/flashcard interactions |
+| Vocabulary | `dashboard/tasks` | Quizlet/Knowt set-first workflow, rich-list patterns | Implemented as a set-first workspace with compact neutral set selection, contextual study actions, searchable/filterable word rich list, word detail Sheet, range/mastery study setup, persisted resumable sessions and reversible Shuffle, while preserving specialized quiz/flashcard interactions |
 | Score Report | `dashboard/analytics` | invoice/print composition | Implemented while preserving score and Math rendering rules |
 | Notifications | dashboard header menus | mail list patterns | Implemented for the global menu and classroom post workflow |
 | Profile/preferences | `dashboard/profile` | layout controls/theme switcher | Pending |
