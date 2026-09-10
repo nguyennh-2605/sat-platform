@@ -49,7 +49,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | Create/Edit Test workspace | `dashboard/invoice` | shared `field`, `select`, `tabs`, `card` primitives | Build/Review composition implemented without a stepper; Details and Import share the left card, live preview remains on the right, and Review actions live in the page header |
 | Test Bank | `dashboard/file-manager` | `dashboard/tasks` | No standalone route currently; embedded assignment selector aligned |
 | Results Analytics | `dashboard/analytics` | `dashboard/default` | Implemented with real attempt data |
-| Error Log | `dashboard/tasks` | default data-table patterns | Implemented as a compact mistake index with automatic idempotent wrong-answer capture, status/root-cause filters, full linked question context, and a student-authored reflection workspace |
+| Error Log | `dashboard/tasks` | working spreadsheet; shared DataSurface/Table and content-dialog | Six-column viewport-fit table, stacked mobile rows, shared rich-text toolbar, two-reflection review completion, automatic cursor loading, external manual sources, and lazy system-question modal |
 | Vocabulary | `dashboard/tasks` | Quizlet/Knowt set-first workflow, rich-list patterns | Implemented as a set-first workspace with coverage/mastery progress, dynamic new/learning review CTA, searchable word rich list, word detail Sheet, range/mastery setup, persisted resumable sessions, reversible Shuffle, flashcard completion loop, and desktop study shortcuts |
 | Score Report | `dashboard/analytics` | invoice/print composition | Implemented while preserving score and Math rendering rules |
 | Notifications | dashboard header menus | mail list patterns | Implemented for the global menu and classroom post workflow |

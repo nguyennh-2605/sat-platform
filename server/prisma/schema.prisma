@@ -350,6 +350,7 @@ model Answer {
 model ErrorLog {
   id            String             @id @default(uuid())
   source        String?
+  sourceUrl     String?
   category      String?
   userAnswer    String?
   correctAnswer String?
@@ -369,7 +370,7 @@ model ErrorLog {
   question      Question?          @relation(fields: [questionId], references: [id], onDelete: SetNull)
 
   @@unique([userId, submissionId, questionId])
-  @@index([userId, createdAt])
+  @@index([userId, createdAt, id])
   @@index([userId, reviewedAt, createdAt])
 }
 

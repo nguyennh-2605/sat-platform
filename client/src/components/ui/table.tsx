@@ -2,7 +2,8 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({ className, unwrapped = false, ...props }: React.ComponentProps<"table"> & { unwrapped?: boolean }) {
+  if (unwrapped) return <table data-slot="table" className={cn("w-full caption-bottom text-left text-sm", className)} {...props} />;
   return (
     <div
       data-slot="table-container"

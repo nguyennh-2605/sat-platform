@@ -214,9 +214,10 @@ Express Server (index.js → app.js)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/error-logs` | JWT + STUDENT | Get the student's paginated error logs with linked question context and review/root-cause filters |
-| `POST` | `/api/error-logs` | JWT + STUDENT | Create a manual error log entry for work completed outside the platform |
-| `PUT` | `/api/error-logs/:id` | JWT + STUDENT | Save student-authored reasoning or mark a complete reflection reviewed (owner-checked) |
+| `GET` | `/api/error-logs` | JWT + STUDENT | Lightweight cursor list (`limit=40`, `cursor`), stable createdAt/id ordering, server-side search/status/category filters; explicit page/pageSize retained for compatibility |
+| `GET` | `/api/error-logs/:id/question` | JWT + STUDENT | Owner-scoped lazy question context, choices, and explanation |
+| `POST` | `/api/error-logs` | JWT + STUDENT | Create a manual entry with required source name and optional validated http/https sourceUrl |
+| `PUT/PATCH` | `/api/error-logs/:id` | JWT + STUDENT | Save sanitized student-authored HTML and automatically update review completion (owner-checked) |
 | `DELETE` | `/api/error-logs/:id` | JWT + STUDENT | Delete error log (owner-checked) |
 
 ### 5.9 AI Features
@@ -515,8 +516,10 @@ Folder ──1:N── Test
 1. A completed test transaction creates one ErrorLog for each wrong Answer, uniquely keyed by student, submission, and question.
 2. The system snapshots source, skill, selected answer, and correct answer while linking the original Question for full review context.
 3. Every new entry starts in Needs review; the system does not generate or prefill the student's reflection.
-4. The student writes why they chose the answer, diagnoses the reasoning error, explains the correct reasoning, selects a root cause, and records a reusable takeaway.
-5. Mark reviewed succeeds only when every reflection field and the root-cause classification are complete.
+4. The student edits whyWrong and whyRight in virtualized spreadsheet cells. A shared toolbar formats the selected text in the one active Quill editor. Drafts survive virtual-row unmount; saves are debounced and serialized per entry.
+5. Reviewed requires nonempty semantic content in whyWrong and whyRight. Empty HTML reopens the review. Legacy whyChosen is retained and migrated into whyWrong; rootCause and takeaway remain nullable legacy data.
+6. List responses omit question content. A system Source opens an owner-scoped lazy question modal. A manual Source stores a required name and optional validated sourceUrl, opening http/https links in a new browser tab.
+7. The table uses composite cursor pagination and automatic end-of-list fetch. The client does not expose loaded counters or manual Load more controls.
 ```
 
 ---

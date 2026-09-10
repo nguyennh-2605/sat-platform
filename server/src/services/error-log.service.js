@@ -2,6 +2,7 @@ const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { parsePagination, paginationMeta } = require('../utils/pagination');
 const { findDomain, findSkill } = require('../utils/question-taxonomy');
+const { sanitizeReflection, isRichTextEmpty } = require('../utils/error-log-rich-text');
 
 const ROOT_CAUSES = [
   'KNOWLEDGE_GAP',
@@ -14,7 +15,26 @@ const ROOT_CAUSES = [
   'GUESSED',
 ];
 const ROOT_CAUSE_SET = new Set(ROOT_CAUSES);
-const ANALYSIS_FIELDS = ['whyChosen', 'whyWrong', 'whyRight', 'takeaway'];
+const ANALYSIS_FIELDS = ['whyWrong', 'whyRight'];
+const normalizeReflection = (value, field, maxLength = 16000) => {
+  const text = normalizeString(value, { field, maxLength });
+  if (!text) return text;
+  const html = sanitizeReflection(text);
+  return isRichTextEmpty(html) ? null : html;
+};
+
+const encodeCursor = row => Buffer.from(JSON.stringify({ createdAt: new Date(row.createdAt).toISOString(), id: row.id })).toString('base64url');
+const decodeCursor = value => {
+  if (value === undefined) return null;
+  try {
+    if (typeof value !== 'string' || value.length > 512 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error();
+    const cursor = JSON.parse(Buffer.from(value, 'base64url').toString());
+    if (typeof cursor.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(cursor.id) || typeof cursor.createdAt !== 'string' || !Number.isFinite(Date.parse(cursor.createdAt))) throw new Error();
+    return { id: cursor.id, createdAt: new Date(cursor.createdAt) };
+  } catch {
+    throw new ApiError(400, { message: 'Invalid error log cursor.' });
+  }
+};
 
 const normalizeRequestData = (value) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -53,20 +73,37 @@ const normalizeRootCause = (value) => {
   return value;
 };
 
+const normalizeSourceUrl = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string') throw new ApiError(400, { message: 'External link must be text.' });
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (normalized.length > 2048) throw new ApiError(400, { message: 'External link must be 2048 characters or fewer.' });
+  try {
+    const url = new URL(normalized);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
+    return url.toString();
+  } catch {
+    throw new ApiError(400, { message: 'Enter a complete http or https link.' });
+  }
+};
+
 const normalizeAnalysis = (data = {}) => ({
   ...(data.whyChosen !== undefined ? { whyChosen: normalizeString(data.whyChosen, { field: 'Why you chose the answer', maxLength: 4000 }) } : {}),
-  ...(data.whyWrong !== undefined ? { whyWrong: normalizeString(data.whyWrong, { field: 'Reasoning error', maxLength: 4000 }) } : {}),
-  ...(data.whyRight !== undefined ? { whyRight: normalizeString(data.whyRight, { field: 'Correct reasoning', maxLength: 4000 }) } : {}),
-  ...(data.takeaway !== undefined ? { takeaway: normalizeString(data.takeaway, { field: 'Takeaway', maxLength: 2000 }) } : {}),
+  ...(data.whyWrong !== undefined ? { whyWrong: normalizeReflection(data.whyWrong, 'Why I chose wrong') } : {}),
+  ...(data.whyRight !== undefined ? { whyRight: normalizeReflection(data.whyRight, 'Why answer is right') } : {}),
+  ...(data.takeaway !== undefined ? { takeaway: normalizeReflection(data.takeaway, 'Next step', 8000) } : {}),
   ...(data.rootCause !== undefined ? { rootCause: normalizeRootCause(data.rootCause) } : {}),
 });
 
 const isReviewComplete = (entry) => Boolean(
-  entry.rootCause && ANALYSIS_FIELDS.every(field => typeof entry[field] === 'string' && entry[field].trim())
+  ANALYSIS_FIELDS.every(field => typeof entry[field] === 'string' && !isRichTextEmpty(entry[field]))
 );
 
 const normalizeManualEntry = (data = {}) => ({
   source: normalizeString(data.source, { field: 'Source', maxLength: 200, required: true }),
+  sourceUrl: normalizeSourceUrl(data.sourceUrl),
   category: normalizeString(data.category ?? 'General', { field: 'Skill', maxLength: 120, required: true }),
   userAnswer: normalizeString(data.userAnswer, { field: 'Your answer', maxLength: 100, required: true }),
   correctAnswer: normalizeString(data.correctAnswer, { field: 'Correct answer', maxLength: 100, required: true }),
@@ -75,6 +112,7 @@ const normalizeManualEntry = (data = {}) => ({
 
 const normalizeManualObjectiveUpdate = (data = {}) => ({
   ...(data.source !== undefined ? { source: normalizeString(data.source, { field: 'Source', maxLength: 200, required: true }) } : {}),
+  ...(data.sourceUrl !== undefined ? { sourceUrl: normalizeSourceUrl(data.sourceUrl) } : {}),
   ...(data.category !== undefined ? { category: normalizeString(data.category, { field: 'Skill', maxLength: 120, required: true }) } : {}),
   ...(data.userAnswer !== undefined ? { userAnswer: normalizeString(data.userAnswer, { field: 'Your answer', maxLength: 100, required: true }) } : {}),
   ...(data.correctAnswer !== undefined ? { correctAnswer: normalizeString(data.correctAnswer, { field: 'Correct answer', maxLength: 100, required: true }) } : {}),
@@ -109,6 +147,10 @@ const buildAutomaticErrorLogRows = ({ userId, submissionId, test, answerRows }) 
 };
 
 exports.getErrorLogs = async ({ userId, query = {} }) => {
+  const cursorMode = query.limit !== undefined || query.cursor !== undefined || (query.page === undefined && query.pageSize === undefined);
+  const limit = query.limit === undefined ? 40 : Number(query.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new ApiError(400, { message: 'Limit must be between 1 and 100.' });
+  const cursor = decodeCursor(query.cursor);
   const pagination = parsePagination(query, { defaultPageSize: 10, maxPageSize: 50 });
   const search = String(query.search || '').trim().slice(0, 100);
   const status = String(query.status || 'ALL').toUpperCase();
@@ -125,6 +167,7 @@ exports.getErrorLogs = async ({ userId, query = {} }) => {
     ...(status === 'NEEDS_REVIEW' ? { reviewedAt: null } : {}),
     ...(status === 'REVIEWED' ? { reviewedAt: { not: null } } : {}),
     ...(rootCause ? { rootCause } : {}),
+    ...(query.category ? { category: String(query.category).slice(0, 120) } : {}),
     ...(search ? {
       OR: [
         { source: { contains: search, mode: 'insensitive' } },
@@ -139,6 +182,7 @@ exports.getErrorLogs = async ({ userId, query = {} }) => {
   const select = {
     id: true,
     source: true,
+    sourceUrl: true,
     category: true,
     userAnswer: true,
     correctAnswer: true,
@@ -152,17 +196,23 @@ exports.getErrorLogs = async ({ userId, query = {} }) => {
     updatedAt: true,
     submissionId: true,
     questionId: true,
-    question: {
-      select: {
-        type: true,
-        blocks: true,
-        questionText: true,
-        choices: true,
-        order: true,
-        section: { select: { name: true, order: true, test: { select: { title: true, subject: true } } } },
-      },
-    },
   };
+  if (cursorMode) {
+    delete select.whyChosen;
+    delete select.takeaway;
+    delete select.rootCause;
+    const pageWhere = cursor ? { AND: [where, { OR: [
+      { createdAt: { lt: cursor.createdAt } },
+      { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+    ] }] } : where;
+    const [rows, total, needsReview] = await prisma.$transaction([
+      prisma.errorLog.findMany({ where: pageWhere, select, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit + 1 }),
+      prisma.errorLog.count({ where }),
+      prisma.errorLog.count({ where: { AND: [where, { reviewedAt: null }] } }),
+    ]);
+    const items = rows.slice(0, limit);
+    return { items, nextCursor: rows.length > limit ? encodeCursor(items[items.length - 1]) : null, total, needsReview };
+  }
   const [total, items] = await prisma.$transaction([
     prisma.errorLog.count({ where }),
     prisma.errorLog.findMany({ where, select, orderBy: { createdAt: 'desc' }, skip: pagination.skip, take: pagination.pageSize }),
@@ -170,15 +220,26 @@ exports.getErrorLogs = async ({ userId, query = {} }) => {
   return { items, pagination: paginationMeta({ ...pagination, total }) };
 };
 
+exports.getErrorLogQuestion = async ({ id, userId }) => {
+  const entry = await prisma.errorLog.findFirst({ where: { id, userId }, select: {
+    question: { select: {
+      type: true, blocks: true, questionText: true, choices: true, explanation: true, order: true,
+      section: { select: { name: true, order: true, test: { select: { title: true, subject: true } } } },
+    } },
+  } });
+  if (!entry) throw new ApiError(404, { message: 'Error log entry not found.' });
+  return entry;
+};
+
 exports.createErrorLog = async ({ userId, data }) => {
   const requestData = normalizeRequestData(data);
-  const markReviewed = normalizeMarkReviewed(requestData.markReviewed) === true;
+  const markReviewed = normalizeMarkReviewed(requestData.markReviewed);
   const normalized = normalizeManualEntry(requestData);
   if (markReviewed && !isReviewComplete(normalized)) {
-    throw new ApiError(400, { message: 'Complete every reflection field and choose a root cause before marking this entry reviewed.' });
+    throw new ApiError(400, { message: 'Complete both reflection fields before marking this entry reviewed.' });
   }
   return prisma.errorLog.create({
-    data: { userId, ...normalized, reviewedAt: markReviewed ? new Date() : null },
+    data: { userId, ...normalized, reviewedAt: markReviewed !== false && isReviewComplete(normalized) ? new Date() : null },
   });
 };
 
@@ -197,11 +258,13 @@ exports.updateErrorLog = async ({ id, userId, data }) => {
   let reviewedAt = existingLog.reviewedAt;
   if (markReviewed === true) {
     if (!isReviewComplete(candidate)) {
-      throw new ApiError(400, { message: 'Complete every reflection field and choose a root cause before marking this entry reviewed.' });
+      throw new ApiError(400, { message: 'Complete both reflection fields before marking this entry reviewed.' });
     }
     reviewedAt = reviewedAt || new Date();
   } else if (markReviewed === false || !isReviewComplete(candidate)) {
     reviewedAt = null;
+  } else {
+    reviewedAt = reviewedAt || new Date();
   }
 
   return prisma.errorLog.update({ where: { id }, data: { ...normalized, reviewedAt } });
@@ -229,4 +292,7 @@ exports._errorLogHelpers = {
   normalizeManualEntry,
   normalizeMarkReviewed,
   normalizeRequestData,
+  normalizeSourceUrl,
+  encodeCursor,
+  decodeCursor,
 };

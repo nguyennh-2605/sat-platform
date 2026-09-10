@@ -7,6 +7,8 @@ router.use(authenticateToken, authorizeRole(['STUDENT']));
 
 router.get('/', errorLogController.getErrorLogs);
 router.post('/', errorLogController.createErrorLog);
+router.get('/:id/question', errorLogController.getErrorLogQuestion);
+router.patch('/:id', errorLogController.updateErrorLog);
 router.put('/:id', errorLogController.updateErrorLog);
 router.delete('/:id', errorLogController.deleteErrorLog);
 

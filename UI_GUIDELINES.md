@@ -247,11 +247,12 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ### Error Log
 
-- Error Log dùng mental model `index → reflection workspace`: bảng chính chỉ giữ `Skill`, `Source`, `Yours`, `Correct`, `Review`; không render reasoning dài thành row cao.
+- Error Log dùng working spreadsheet: `Category`, `Source`, `Correct`, `Yours`, `Why I chose wrong`, `Why answer is right`. Desktop dùng table tỷ lệ theo viewport; mobile xếp metadata và reflection theo chiều dọc. Không horizontal-scroll.
 - Câu sai được backend tự động thêm ở trạng thái `Needs review` khi submission hoàn tất. Việc retry submit không được tạo entry trùng; manual entry chỉ phục vụ bài làm ngoài platform hoặc dữ liệu legacy.
-- Click row mở dashboard content-dialog có question context và answer choices ở bên trái, reflection editor ở bên phải; mobile xếp dọc. Math và passage tiếp tục dùng renderer/typography của nội dung đề.
-- Hệ thống chỉ tự điền dữ liệu khách quan. `Why did you choose your answer?`, `What was wrong with that reasoning?`, `Why is the correct answer right?`, `Takeaway` và `Root cause` luôn do học sinh tự nhập, không AI-prefill.
-- `Mark reviewed` chỉ bật khi đủ bốn reflection và root cause; partial work dùng `Save draft`. Search phải tìm được source, skill và takeaway; status/root-cause filters nằm trong cùng DataToolbar.
+- Click Source hệ thống mở content-dialog lớn và mới tải question context/choices/explanation. Manual Source có name bắt buộc và http/https link tùy chọn; name có link được gạch chân, có external-link indicator và mở tab mới bằng noopener/noreferrer. Manual Source không link mở editor chi tiết.
+- Hệ thống chỉ tự điền dữ liệu khách quan. Hai reflection luôn do học sinh tự nhập, không AI-prefill. `whyChosen`, `takeaway` và `rootCause` cũ được giữ như legacy data nhưng không xuất hiện trong UI mới.
+- Chỉ ô reflection active mount Quill. Một formatting toolbar phía trên table áp dụng Bold, Italic, Underline, numbered/bullet list, Link và Clear formatting cho selection của ô active.
+- Autosave 850ms và flush khi blur; draft sống ngoài virtual row, có Saving/Saved/Retry. Reviewed tự cập nhật khi hai reflection có nội dung thật. Search/status/category filters nằm trong cùng DataToolbar. Cursor tự fetch khi gần cuối; chỉ hiện loading/error overlay tạm thời, không có loaded counter hoặc Load more. Không hiển thị Next SAT.
 
 ### Vocabulary
 

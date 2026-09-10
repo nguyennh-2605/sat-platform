@@ -1,6 +1,16 @@
 const ApiError = require('../utils/ApiError');
 const errorLogService = require('../services/error-log.service');
 
+exports.getErrorLogQuestion = async (req, res) => {
+  try {
+    res.json(await errorLogService.getErrorLogQuestion({ id: req.params.id, userId: req.user.userId }));
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error(error);
+    res.status(500).json({ message: 'Unable to load the question.' });
+  }
+};
+
 exports.getErrorLogs = async (req, res) => {
   try {
     const logs = await errorLogService.getErrorLogs({ userId: req.user.userId, query: req.query });

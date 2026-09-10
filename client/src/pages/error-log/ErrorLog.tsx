@@ -1,567 +1,256 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import {
-  AlertCircle,
-  ArrowRight,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  CircleDashed,
-  FileText,
-  Loader2,
-  Plus,
-  Save,
-  Trash2,
-  XCircle,
-} from 'lucide-react';
-import BlockRenderer from '../../components/content/BlockRenderer';
-import InteractiveText from '../../features/quiz/InteractiveText';
-import type { ContentBlock } from '../../types/quiz';
-import { capitalizeFirstLetter } from '../../utils/text';
-import axiosClient from '../../lib/axios';
-import { EmptyState, Modal, PageHeader } from '../../components/ui/AppUI';
-import { Badge } from '@/components/ui/badge';
+import { useCallback, useEffect, useRef, useState, type RefObject, type ReactNode } from 'react';
+import { TableVirtuoso, Virtuoso, type TableComponents } from 'react-virtuoso';
+import { Bold, CircleDashed, ExternalLink, Italic, Link2, List, ListOrdered, Loader2, Pencil, Plus, RemoveFormatting, Trash2, Underline } from 'lucide-react';
+import { EmptyState, Modal, PageHeader } from '@/components/ui/AppUI';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  DataPagination,
-  DataStateRow,
-  DataSurface,
-  DataToolbar,
-  DataToolbarActions,
-  DataToolbarGroup,
-  DataToolbarSearch,
-} from '@/components/ui/data-surface';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { DataSurface, DataToolbar, DataToolbarGroup, DataToolbarSearch } from '@/components/ui/data-surface';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { EMPTY_FORMATS, type RichTextEditorHandle, type RichTextFormats } from '@/components/ui/rich-text-editor';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { appToast } from '@/components/ui/toast';
-import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
+import axiosClient from '../../lib/axios';
+import { invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useIsMobile } from '../../hooks/use-mobile';
+import { QuestionModal } from './QuestionModal';
+import { RichTextCellEditor } from './RichTextCellEditor';
+import { cellKey, useReflectionDrafts, type EditableField } from './useReflectionDrafts';
+import { type ErrorEntry, type ReviewStatus } from './types';
 
-type RootCause =
-  | 'KNOWLEDGE_GAP'
-  | 'MISREAD_QUESTION'
-  | 'MISREAD_PASSAGE'
-  | 'WRONG_REASONING'
-  | 'CARELESS_MISTAKE'
-  | 'TIME_PRESSURE'
-  | 'CALCULATION_ERROR'
-  | 'GUESSED';
-type ReviewStatus = 'ALL' | 'NEEDS_REVIEW' | 'REVIEWED';
-
-interface ErrorQuestion {
-  type: 'MCQ' | 'SPR';
-  blocks: ContentBlock[];
-  questionText: string;
-  choices: Array<{ id: string; text: string }>;
-  order: number;
-  section: {
-    name: string;
-    order: number;
-    test: { title: string; subject: string };
-  };
-}
-
-interface ErrorEntry {
-  id: string;
-  source: string | null;
-  category: string | null;
-  userAnswer: string | null;
-  correctAnswer: string | null;
-  whyChosen: string | null;
-  whyWrong: string | null;
-  whyRight: string | null;
-  takeaway: string | null;
-  rootCause: RootCause | null;
-  reviewedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  submissionId: number | null;
-  questionId: number | null;
-  question: ErrorQuestion | null;
-}
-
-interface ErrorLogPage {
-  items: ErrorEntry[];
-  pagination: { page: number; pageSize: number; total: number; totalPages: number };
-}
-
-interface EntryDraft {
-  source: string;
-  category: string;
-  userAnswer: string;
-  correctAnswer: string;
-  whyChosen: string;
-  whyWrong: string;
-  whyRight: string;
-  takeaway: string;
-  rootCause: RootCause | '';
-}
-
-const ERROR_LOG_PAGE_SIZE = 10;
-const ROOT_CAUSES: Array<{ value: RootCause; label: string }> = [
-  { value: 'KNOWLEDGE_GAP', label: "Didn't know the concept or vocabulary" },
-  { value: 'MISREAD_QUESTION', label: 'Misread the question' },
-  { value: 'MISREAD_PASSAGE', label: 'Misread the passage' },
-  { value: 'WRONG_REASONING', label: 'Wrong reasoning' },
-  { value: 'CARELESS_MISTAKE', label: 'Careless mistake' },
-  { value: 'TIME_PRESSURE', label: 'Time pressure' },
-  { value: 'CALCULATION_ERROR', label: 'Calculation error' },
-  { value: 'GUESSED', label: 'Guessed' },
-];
-
-const blankDraft = (): EntryDraft => ({
-  source: '',
-  category: '',
-  userAnswer: '',
-  correctAnswer: '',
-  whyChosen: '',
-  whyWrong: '',
-  whyRight: '',
-  takeaway: '',
-  rootCause: '',
-});
-
-const entryDraft = (entry: ErrorEntry): EntryDraft => ({
-  source: entry.source || '',
-  category: entry.category || '',
-  userAnswer: entry.userAnswer || '',
-  correctAnswer: entry.correctAnswer || '',
-  whyChosen: entry.whyChosen || '',
-  whyWrong: entry.whyWrong || '',
-  whyRight: entry.whyRight || '',
-  takeaway: entry.takeaway || '',
-  rootCause: entry.rootCause || '',
-});
-
-const reviewIsComplete = (draft: EntryDraft) => Boolean(
-  draft.rootCause
-  && draft.whyChosen.trim()
-  && draft.whyWrong.trim()
-  && draft.whyRight.trim()
-  && draft.takeaway.trim()
-);
-
-const rootCauseLabel = (value: RootCause | null) => ROOT_CAUSES.find(option => option.value === value)?.label || null;
-const requestErrorMessage = (error: unknown, fallback: string) => {
-  const body = (error as { response?: { data?: { error?: string; message?: string } } })?.response?.data;
-  return body?.error || body?.message || fallback;
+interface ErrorPage { items: ErrorEntry[]; nextCursor: string | null; total: number; needsReview: number }
+const REFLECTIONS = [
+  { field: 'whyWrong', label: 'Why I chose wrong' },
+  { field: 'whyRight', label: 'Why answer is right' },
+] as const;
+const tableComponents: TableComponents<ErrorEntry> = {
+  Table: props => <Table {...props} unwrapped className="w-full table-fixed border-separate border-spacing-0" />,
+  TableHead: TableHeader, TableBody, TableRow,
 };
 
 export default function ErrorLog() {
+  const isMobile = useIsMobile();
   const [logs, setLogs] = useState<ErrorEntry[]>([]);
-  const [selectedEntry, setSelectedEntry] = useState<ErrorEntry | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ErrorEntry | null>(null);
-  const [draft, setDraft] = useState<EntryDraft>(blankDraft);
-  const [initialDraft, setInitialDraft] = useState<EntryDraft>(blankDraft);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ReviewStatus>('ALL');
-  const [rootCause, setRootCause] = useState<RootCause | 'ALL'>('ALL');
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalEntries, setTotalEntries] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const debouncedSearch = useDebounce(searchTerm, 250);
-
-  const fetchLogs = useCallback(async (force = false) => {
-    try {
-      setIsLoading(true);
-      setLoadError(null);
-      const params = new URLSearchParams({
-        page: String(currentPage),
-        pageSize: String(ERROR_LOG_PAGE_SIZE),
-        status,
-      });
-      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
-      if (rootCause !== 'ALL') params.set('rootCause', rootCause);
-      const data = await cachedGet<ErrorLogPage>(`/api/error-logs?${params}`, { ttlMs: 20_000, force });
-      setLogs(data.items);
-      setTotalEntries(data.pagination.total);
-      setTotalPages(data.pagination.totalPages);
-    } catch (error) {
-      setLoadError(requestErrorMessage(error, 'Unable to load your error log.'));
-    } finally {
-      setIsLoading(false);
+  const [category, setCategory] = useState('');
+  const debouncedSearch = useDebounce(search, 250);
+  const debouncedCategory = useDebounce(category, 250);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [counts, setCounts] = useState({ total: 0, needsReview: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
+  const [questionEntry, setQuestionEntry] = useState<ErrorEntry | null>(null);
+  const [manualEntry, setManualEntry] = useState<ErrorEntry | 'new' | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ErrorEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [active, setActive] = useState<string | null>(null);
+  const activeEditor = useRef<RichTextEditorHandle>(null);
+  const [activeFormats, setActiveFormats] = useState<RichTextFormats>(EMPTY_FORMATS);
+  const request = useRef<AbortController | null>(null);
+  const busy = useRef(false);
+  const rowReviewStates = useRef(new Map<string, boolean>());
+  const saved = useCallback((entry: ErrorEntry) => {
+    const previous = rowReviewStates.current.get(entry.id);
+    const reviewed = Boolean(entry.reviewedAt);
+    rowReviewStates.current.set(entry.id, reviewed);
+    if (previous !== undefined && previous !== reviewed) {
+      const delta = reviewed ? -1 : 1;
+      setCounts(value => ({
+        total: value.total + (status === 'ALL' ? 0 : status === 'NEEDS_REVIEW' ? delta : -delta),
+        needsReview: Math.max(0, value.needsReview + (status === 'REVIEWED' ? 0 : delta)),
+      }));
     }
-  }, [currentPage, debouncedSearch, rootCause, status]);
+    setLogs(rows => rows.map(row => row.id === entry.id ? { ...row, ...entry } : row));
+  }, [status]);
+  const { drafts, change, flush } = useReflectionDrafts(saved);
+  const filterKey = JSON.stringify([debouncedSearch, status, debouncedCategory, reload]);
 
-  useEffect(() => { void fetchLogs(); }, [fetchLogs]);
+  const load = useCallback(async (cursor: string | null, replace = false) => {
+    if (busy.current && !replace) return;
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    busy.current = true;
+    setLoading(true); setError('');
+    try {
+      const params = { limit: 40, cursor: cursor || undefined, search: debouncedSearch || undefined, status, category: debouncedCategory || undefined };
+      const data = await axiosClient.get<ErrorPage>('/api/error-logs', { params, signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (replace) rowReviewStates.current.clear();
+      data.items.forEach(item => rowReviewStates.current.set(item.id, Boolean(item.reviewedAt)));
+      setLogs(rows => replace ? data.items : [...rows, ...data.items.filter(item => !rows.some(row => row.id === item.id))]);
+      setNextCursor(data.nextCursor);
+      setCounts({ total: data.total, needsReview: data.needsReview });
+    } catch {
+      if (!controller.signal.aborted) setError('Unable to load your error log. Please try again.');
+    } finally {
+      if (!controller.signal.aborted) { busy.current = false; setLoading(false); }
+    }
+  }, [debouncedSearch, status, debouncedCategory]);
 
-  const openCreate = () => {
-    const empty = blankDraft();
-    setSelectedEntry(null);
-    setDraft(empty);
-    setInitialDraft(empty);
-    setEditorOpen(true);
+  useEffect(() => {
+    setLogs([]); setNextCursor(null);
+    void load(null, true);
+    return () => request.current?.abort();
+  }, [load, reload]);
+
+  const activate = (key: string) => {
+    if (active && active !== key) {
+      const [id, field] = active.split(':');
+      flush(id, field as EditableField);
+    }
+    setActiveFormats(EMPTY_FORMATS);
+    setActive(key);
   };
-
-  const openReview = (entry: ErrorEntry) => {
-    const nextDraft = entryDraft(entry);
-    setSelectedEntry(entry);
-    setDraft(nextDraft);
-    setInitialDraft(nextDraft);
-    setEditorOpen(true);
+  const deactivate = () => {
+    if (active) {
+      const [id, field] = active.split(':');
+      flush(id, field as EditableField);
+    }
+    setActive(null);
+    setActiveFormats(EMPTY_FORMATS);
   };
-
-  const isDirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(initialDraft), [draft, initialDraft]);
-  const closeEditor = () => {
-    if (isSaving) return;
-    if (isDirty && !window.confirm('Discard your unsaved changes?')) return;
-    setEditorOpen(false);
-  };
-
-  const handleSave = async (markReviewed: boolean) => {
-    if (!selectedEntry && (!draft.source.trim() || !draft.userAnswer.trim() || !draft.correctAnswer.trim())) {
-      appToast.error('Complete the source and answer fields.');
+  const hasFilters = Boolean(search || category || status !== 'ALL');
+  const clearFilters = () => { deactivate(); setSearch(''); setCategory(''); setStatus('ALL'); };
+  const openSource = (entry: ErrorEntry) => {
+    if (entry.questionId) return setQuestionEntry(entry);
+    if (entry.sourceUrl) {
+      window.open(entry.sourceUrl, '_blank', 'noopener,noreferrer');
       return;
     }
-    if (markReviewed && !reviewIsComplete(draft)) {
-      appToast.error('Complete every reflection field and choose a root cause.');
-      return;
-    }
-
-    const analysis = {
-      whyChosen: draft.whyChosen,
-      whyWrong: draft.whyWrong,
-      whyRight: draft.whyRight,
-      takeaway: draft.takeaway,
-      rootCause: draft.rootCause || null,
-      markReviewed,
-    };
-    const payload = selectedEntry?.questionId
-      ? analysis
-      : {
-          ...analysis,
-          source: draft.source,
-          category: draft.category || 'General',
-          userAnswer: draft.userAnswer,
-          correctAnswer: draft.correctAnswer,
-        };
-
-    try {
-      setIsSaving(true);
-      if (selectedEntry) await axiosClient.put(`/api/error-logs/${selectedEntry.id}`, payload);
-      else await axiosClient.post('/api/error-logs', payload);
-      appToast.success(markReviewed ? 'Review completed' : 'Draft saved');
-      setEditorOpen(false);
-      invalidateQueryCache('/api/error-logs');
-      if (!selectedEntry && currentPage !== 1) setCurrentPage(1);
-      else await fetchLogs(true);
-    } catch (error) {
-      appToast.error(requestErrorMessage(error, 'Unable to save this review.'));
-    } finally {
-      setIsSaving(false);
-    }
+    setManualEntry(entry);
   };
-
-  const handleDelete = async () => {
+  const deleteEntry = async () => {
     if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      setIsDeleting(true);
       await axiosClient.delete(`/api/error-logs/${deleteTarget.id}`);
-      appToast.success('Entry deleted');
-      setDeleteTarget(null);
       invalidateQueryCache('/api/error-logs');
-      if (logs.length === 1 && currentPage > 1) setCurrentPage(page => page - 1);
-      else await fetchLogs(true);
-    } catch (error) {
-      appToast.error(requestErrorMessage(error, 'Unable to delete this entry.'));
-    } finally {
-      setIsDeleting(false);
+      setDeleteTarget(null); setReload(value => value + 1);
+    } catch { appToast.error('Unable to delete this entry.'); }
+    finally { setDeleting(false); }
+  };
+
+  return <main className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
+    <PageHeader title="Error Log" description="Reflect on mistakes and explain the reasoning that leads to the correct answer." actions={<Button onClick={() => setManualEntry('new')}><Plus />Add entry</Button>} />
+    <DataSurface className="relative flex min-h-0 flex-1 flex-col">
+      <DataToolbar><DataToolbarGroup>
+        <DataToolbarSearch label="Search error log" placeholder="Search errors…" value={search} onChange={event => { deactivate(); setSearch(event.target.value); }} />
+        <Select value={status} onValueChange={value => { deactivate(); setStatus(value as ReviewStatus); }}><SelectTrigger className="w-36" aria-label="Review status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All statuses</SelectItem><SelectItem value="NEEDS_REVIEW">Needs review</SelectItem><SelectItem value="REVIEWED">Reviewed</SelectItem></SelectContent></Select>
+        <Input className="w-40" aria-label="Exact category filter" placeholder="Exact category…" value={category} onChange={event => { deactivate(); setCategory(event.target.value); }} />
+        {hasFilters && <Button variant="ghost" size="sm" onClick={clearFilters}>Reset</Button>}
+      </DataToolbarGroup></DataToolbar>
+      <FormattingToolbar editor={activeEditor} active={Boolean(active)} formats={activeFormats} />
+      <div className="border-b border-ui-border px-4 py-2 text-xs text-muted-foreground" aria-live="polite">{loading && !logs.length ? 'Loading errors…' : `${counts.total} ${counts.total === 1 ? 'error' : 'errors'} · ${counts.needsReview} need review`}<span className="ml-3">Both reflections complete a review.</span></div>
+      {logs.length ? (isMobile ? <Virtuoso
+        key={filterKey}
+        className="min-h-0 flex-1"
+        data={logs}
+        computeItemKey={(_index, entry) => entry.id}
+        increaseViewportBy={300}
+        endReached={() => { if (nextCursor && !error) void load(nextCursor); }}
+        itemContent={(_index, entry) => <article className="space-y-4 border-b border-ui-border/60 p-3">
+          <header className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-muted-foreground">{entry.category || 'General'}</p><Button variant="link" className={`h-auto max-w-full justify-start whitespace-normal p-0 text-left ${entry.sourceUrl ? 'underline underline-offset-4' : ''}`} onClick={() => openSource(entry)}>{entry.source || 'Untitled entry'}{entry.sourceUrl && <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />}</Button></div><Badge variant="outline" className="shrink-0">{entry.reviewedAt ? 'Reviewed' : 'Needs review'}</Badge></header>
+          <div className="grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-muted-foreground">Correct</p><p className="font-medium text-success">{entry.correctAnswer || '—'}</p></div><div><p className="text-xs text-muted-foreground">Yours</p><p className="font-medium text-danger">{entry.userAnswer || 'Omitted'}</p></div></div>
+          {REFLECTIONS.map(({ field, label }) => { const key = cellKey(entry.id, field); return <section key={field}><h3 className="mb-1 text-xs font-medium text-muted-foreground">{label}</h3><RichTextCellEditor id={key} label={`${label} for ${entry.source}`} value={drafts[key]?.value ?? entry[field] ?? ''} draft={drafts[key]} active={active === key} editorRef={activeEditor} onActivate={() => activate(key)} onChange={value => change(entry.id, field, value)} onFlush={() => flush(entry.id, field)} onFormatChange={setActiveFormats} /></section>; })}
+          <div className="flex justify-end gap-1">{!entry.questionId && <Button variant="ghost" size="icon-sm" aria-label={`Edit details for ${entry.source}`} onClick={() => setManualEntry(entry)}><Pencil /></Button>}<Button variant="ghost" size="icon-sm" aria-label={`Delete ${entry.source}`} disabled={Object.entries(drafts).some(([key, draft]) => key.startsWith(`${entry.id}:`) && draft.status !== 'saved')} onClick={() => setDeleteTarget(entry)}><Trash2 /></Button></div>
+        </article>}
+      /> : <TableVirtuoso
+        key={filterKey} className="min-h-0 flex-1" data={logs} components={tableComponents}
+        computeItemKey={(_index, entry) => entry.id} increaseViewportBy={400}
+        endReached={() => { if (nextCursor && !error) void load(nextCursor); }}
+        fixedHeaderContent={() => <TableRow className="bg-surface">
+          <TableHead className="w-[12%] px-2">Category</TableHead><TableHead className="w-[18%] px-2">Source</TableHead><TableHead className="w-[7%] px-2">Correct</TableHead><TableHead className="w-[7%] px-2">Yours</TableHead>
+          {REFLECTIONS.map(item => <TableHead className="w-[28%] px-2" key={item.field}>{item.label}</TableHead>)}
+        </TableRow>}
+        itemContent={(_index, entry) => <>
+          <TableCell className="align-top break-words px-2 font-medium">{entry.category || 'General'}</TableCell>
+          <TableCell className="align-top px-2"><Button variant="link" className={`h-auto max-w-full whitespace-normal p-0 text-left ${entry.sourceUrl ? 'underline underline-offset-4' : ''}`} onClick={() => openSource(entry)}>{entry.source || 'Untitled entry'}{entry.sourceUrl && <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />}</Button><div className="mt-2 flex flex-wrap items-center gap-1"><Badge variant="outline">{entry.reviewedAt ? 'Reviewed' : 'Needs review'}</Badge>{!entry.questionId && <Button variant="ghost" size="icon-sm" aria-label={`Edit details for ${entry.source}`} onClick={() => setManualEntry(entry)}><Pencil /></Button>}<Button variant="ghost" size="icon-sm" aria-label={`Delete ${entry.source}`} disabled={Object.entries(drafts).some(([key, draft]) => key.startsWith(`${entry.id}:`) && draft.status !== 'saved')} onClick={() => setDeleteTarget(entry)}><Trash2 /></Button></div></TableCell>
+          <TableCell className="align-top break-words px-2 font-medium text-success">{entry.correctAnswer || '—'}</TableCell><TableCell className="align-top break-words px-2 font-medium text-danger">{entry.userAnswer || 'Omitted'}</TableCell>
+          {REFLECTIONS.map(({ field, label }) => {
+            const key = cellKey(entry.id, field);
+            return <TableCell key={field} className="align-top px-2"><RichTextCellEditor id={key} label={`${label} for ${entry.source}`} value={drafts[key]?.value ?? entry[field] ?? ''} draft={drafts[key]} active={active === key} editorRef={activeEditor} onActivate={() => activate(key)} onChange={value => change(entry.id, field, value)} onFlush={() => flush(entry.id, field)} onFormatChange={setActiveFormats} /></TableCell>;
+          })}
+        </>}
+      />) : <div className="flex flex-1 items-center justify-center p-6">{loading ? <Loader2 className="animate-spin" aria-label="Loading error log" /> : error ? <p role="alert">{error}</p> : <EmptyState icon={<CircleDashed />} title={hasFilters ? 'No matching entries' : 'No mistakes to review'} description={hasFilters ? 'Adjust your search or filters.' : 'Wrong answers from submitted tests appear here automatically.'} action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined} />}</div>}
+      {logs.length > 0 && loading && <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ui-border bg-surface px-3 py-1.5 text-xs text-muted-foreground shadow-sm" role="status"><Loader2 className="size-3 animate-spin" />Loading more…</div>}
+      {logs.length > 0 && error && <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-control border border-danger/30 bg-surface px-3 py-1.5 text-xs text-danger shadow-sm" role="alert"><span>More entries could not be loaded.</span><Button variant="ghost" size="sm" onClick={() => void load(nextCursor)}>Retry</Button></div>}
+    </DataSurface>
+    <QuestionModal key={questionEntry?.id || 'closed'} entry={questionEntry} onClose={() => setQuestionEntry(null)} />
+    {manualEntry && <ManualEntryDialog entry={manualEntry} onClose={() => setManualEntry(null)} onSaved={() => { setManualEntry(null); setReload(value => value + 1); }} />}
+    <Modal open={Boolean(deleteTarget)} onClose={() => { if (!deleting) setDeleteTarget(null); }} presentation="content-dialog" title="Delete error entry?" className="max-w-md!" footer={<><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={() => void deleteEntry()}>Delete entry</Button></>}><p>This permanently removes this study note.</p></Modal>
+  </main>;
+}
+
+function FormattingToolbar({ editor, active, formats }: { editor: RefObject<RichTextEditorHandle | null>; active: boolean; formats: RichTextFormats }) {
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkValue, setLinkValue] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const openLink = (open: boolean) => {
+    setLinkOpen(open);
+    setLinkError('');
+    if (open) setLinkValue(formats.link || '');
+  };
+  const applyLink = () => {
+    const value = linkValue.trim();
+    if (!value) {
+      editor.current?.setLink(null);
+      setLinkOpen(false);
+      return;
+    }
+    try {
+      const url = new URL(value);
+      if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) throw new Error();
+      editor.current?.setLink(url.toString());
+      setLinkOpen(false);
+    } catch {
+      setLinkError('Enter a complete http, https, or mailto link.');
     }
   };
+  return <div role="toolbar" aria-label="Reflection formatting" className="flex min-h-10 flex-wrap items-center gap-1 border-b border-ui-border bg-muted/10 px-3 py-1.5">
+    <span className="mr-2 text-xs text-muted-foreground">{active ? 'Format selected text' : 'Select a reflection cell to format text'}</span>
+    <FormatButton label="Bold" active={formats.bold} disabled={!active} onPress={() => editor.current?.toggleInline('bold')}><Bold /></FormatButton>
+    <FormatButton label="Italic" active={formats.italic} disabled={!active} onPress={() => editor.current?.toggleInline('italic')}><Italic /></FormatButton>
+    <FormatButton label="Underline" active={formats.underline} disabled={!active} onPress={() => editor.current?.toggleInline('underline')}><Underline /></FormatButton>
+    <span className="mx-1 h-5 border-l border-ui-border" aria-hidden="true" />
+    <FormatButton label="Numbered list" active={formats.list === 'ordered'} disabled={!active} onPress={() => editor.current?.toggleList('ordered')}><ListOrdered /></FormatButton>
+    <FormatButton label="Bulleted list" active={formats.list === 'bullet'} disabled={!active} onPress={() => editor.current?.toggleList('bullet')}><List /></FormatButton>
+    <Popover open={linkOpen} onOpenChange={openLink}>
+      <PopoverTrigger asChild><Button type="button" variant={formats.link ? 'secondary' : 'ghost'} size="icon-sm" disabled={!active} aria-label="Add or edit link" aria-pressed={Boolean(formats.link)} title="Add or edit link"><Link2 /></Button></PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-3">
+        <Field><FieldLabel htmlFor="reflection-link">Link</FieldLabel><Input id="reflection-link" type="url" value={linkValue} onChange={event => setLinkValue(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); applyLink(); } }} placeholder="https://…" />{linkError && <p className="text-xs text-danger" role="alert">{linkError}</p>}</Field>
+        <div className="mt-3 flex justify-end gap-2">{formats.link && <Button variant="ghost" size="sm" onClick={() => { editor.current?.setLink(null); setLinkOpen(false); }}>Remove</Button>}<Button size="sm" onClick={applyLink}>Apply</Button></div>
+      </PopoverContent>
+    </Popover>
+    <FormatButton label="Clear formatting" disabled={!active} onPress={() => editor.current?.clearFormatting()}><RemoveFormatting /></FormatButton>
+  </div>;
+}
 
-  const clearFilters = () => {
-    setSearchTerm('');
-    setStatus('ALL');
-    setRootCause('ALL');
-    setCurrentPage(1);
+function FormatButton({ label, active = false, disabled, onPress, children }: { label: string; active?: boolean; disabled: boolean; onPress: () => void; children: ReactNode }) {
+  return <Button type="button" variant={active ? 'secondary' : 'ghost'} size="icon-sm" disabled={disabled} aria-label={label} aria-pressed={active} title={label} onPointerDown={event => event.preventDefault()} onClick={onPress}>{children}</Button>;
+}
+
+function ManualEntryDialog({ entry, onClose, onSaved }: { entry: ErrorEntry | 'new'; onClose: () => void; onSaved: () => void }) {
+  const [draft, setDraft] = useState({ source: entry === 'new' ? '' : entry.source || '', sourceUrl: entry === 'new' ? '' : entry.sourceUrl || '', category: entry === 'new' ? '' : entry.category || '', correctAnswer: entry === 'new' ? '' : entry.correctAnswer || '', userAnswer: entry === 'new' ? '' : entry.userAnswer || '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    setSaving(true); setError('');
+    try {
+      const payload = { ...draft, category: draft.category.trim() || 'General' };
+      if (entry === 'new') await axiosClient.post('/api/error-logs', payload);
+      else await axiosClient.patch(`/api/error-logs/${entry.id}`, payload);
+      invalidateQueryCache('/api/error-logs');
+      onSaved();
+    } catch { setError('Unable to save this entry. Please try again.'); }
+    finally { setSaving(false); }
   };
-  const hasFilters = Boolean(searchTerm || status !== 'ALL' || rootCause !== 'ALL');
-  const firstItem = totalEntries ? (currentPage - 1) * ERROR_LOG_PAGE_SIZE + 1 : 0;
-  const lastItem = Math.min(currentPage * ERROR_LOG_PAGE_SIZE, totalEntries);
-
-  return (
-    <div className="h-full overflow-y-auto">
-      <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
-        <PageHeader
-          title="Error Log"
-          description="Reconstruct your reasoning, diagnose the mistake, and decide what to do next time."
-          actions={<Button onClick={openCreate}><Plus aria-hidden="true" />Add entry</Button>}
-        />
-
-        <DataSurface className="hidden md:block">
-          <DataToolbar>
-            <DataToolbarGroup>
-              <div className="mr-2 shrink-0">
-                <h2 className="flex items-center gap-2 text-sm font-medium text-foreground"><AlertCircle className="text-danger" aria-hidden="true" />Mistake review</h2>
-                <p className="mt-0.5 text-caption text-muted-foreground">{isLoading ? 'Syncing…' : `${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'}`}</p>
-              </div>
-              <DataToolbarSearch
-                label="Search error log"
-                placeholder="Search skill, source, or takeaway…"
-                value={searchTerm}
-                onChange={event => { setSearchTerm(event.target.value); setCurrentPage(1); }}
-              />
-            </DataToolbarGroup>
-            <DataToolbarActions>
-              <StatusSelect value={status} onChange={value => { setStatus(value); setCurrentPage(1); }} />
-              <RootCauseSelect filter value={rootCause} onChange={value => { setRootCause(value as RootCause | 'ALL'); setCurrentPage(1); }} />
-              {hasFilters && <Button variant="ghost" size="sm" onClick={clearFilters}>Reset</Button>}
-            </DataToolbarActions>
-          </DataToolbar>
-
-          <Table className="min-w-[860px] table-fixed">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-56">Skill</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead className="w-24 text-center">Yours</TableHead>
-                <TableHead className="w-24 text-center">Correct</TableHead>
-                <TableHead className="w-52">Review</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? <LoadingRows /> : loadError ? (
-                <DataStateRow colSpan={5}>
-                  <EmptyState compact surface={false} icon={<AlertCircle />} title="Error log unavailable" description={loadError} action={<Button variant="outline" onClick={() => void fetchLogs(true)}>Retry</Button>} />
-                </DataStateRow>
-              ) : logs.length === 0 ? (
-                <DataStateRow colSpan={5}>
-                  <EmptyState
-                    compact
-                    surface={false}
-                    icon={<CircleDashed />}
-                    title={hasFilters ? 'No matching entries' : 'No mistakes to review'}
-                    description={hasFilters ? 'Adjust your search or filters.' : 'Wrong answers from submitted tests will appear here automatically.'}
-                    action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined}
-                  />
-                </DataStateRow>
-              ) : logs.map(log => (
-                <TableRow key={log.id} className="group cursor-pointer" onClick={() => openReview(log)}>
-                  <TableCell>
-                    <p className="truncate text-body font-medium text-foreground">{log.category || 'General'}</p>
-                    {log.rootCause && <p className="mt-0.5 truncate text-caption text-muted-foreground">{rootCauseLabel(log.rootCause)}</p>}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex min-w-0 items-start gap-2">
-                      <FileText className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-foreground">{capitalizeFirstLetter(log.source || 'Untitled entry')}</p>
-                        {log.takeaway && <p className="mt-0.5 truncate text-caption text-muted-foreground">{log.takeaway}</p>}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center"><AnswerMark value={log.userAnswer || '—'} correct={false} /></TableCell>
-                  <TableCell className="text-center"><AnswerMark value={log.correctAnswer || '—'} correct /></TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-between gap-2">
-                      <ReviewBadge reviewed={Boolean(log.reviewedAt)} />
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon-sm" aria-label={`Open review for ${log.source || 'entry'}`} title="Open review" onClick={event => { event.stopPropagation(); openReview(log); }}><ArrowRight /></Button>
-                        <Button variant="ghost" size="icon-sm" className="text-danger hover:bg-danger-soft hover:text-danger" aria-label={`Delete ${log.source || 'entry'}`} title="Delete entry" onClick={event => { event.stopPropagation(); setDeleteTarget(log); }}><Trash2 /></Button>
-                      </div>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {!isLoading && !loadError && totalEntries > 0 && (
-            <DataPagination><PaginationFooter first={firstItem} last={lastItem} total={totalEntries} page={currentPage} pages={totalPages} onPage={setCurrentPage} /></DataPagination>
-          )}
-        </DataSurface>
-
-        <div className="space-y-3 md:hidden">
-          <div className="space-y-2 rounded-card border border-ui-border bg-surface p-3">
-            <DataToolbarSearch label="Search error log" placeholder="Search mistakes…" value={searchTerm} onChange={event => { setSearchTerm(event.target.value); setCurrentPage(1); }} />
-            <div className="flex flex-wrap gap-2"><StatusSelect value={status} onChange={value => { setStatus(value); setCurrentPage(1); }} /><RootCauseSelect filter value={rootCause} onChange={value => { setRootCause(value as RootCause | 'ALL'); setCurrentPage(1); }} />{hasFilters && <Button variant="ghost" size="sm" onClick={clearFilters}>Reset</Button>}</div>
-          </div>
-          {isLoading ? <MobileLoadingCards /> : loadError ? (
-            <EmptyState icon={<AlertCircle />} title="Error log unavailable" description={loadError} action={<Button variant="outline" onClick={() => void fetchLogs(true)}>Retry</Button>} />
-          ) : logs.length === 0 ? (
-            <EmptyState icon={<CircleDashed />} title={hasFilters ? 'No matching entries' : 'No mistakes to review'} description={hasFilters ? 'Adjust your search or filters.' : 'Wrong answers from submitted tests will appear here automatically.'} action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined} />
-          ) : logs.map(log => (
-            <Card key={log.id} size="sm">
-              <CardHeader>
-                <CardTitle className="pr-2">{log.category || 'General'}</CardTitle>
-                <ReviewBadge reviewed={Boolean(log.reviewedAt)} />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="line-clamp-2 font-medium text-foreground">{capitalizeFirstLetter(log.source || 'Untitled entry')}</p>
-                <div className="flex gap-4"><span className="flex items-center gap-2 text-caption text-muted-foreground">Yours <AnswerMark value={log.userAnswer || '—'} correct={false} /></span><span className="flex items-center gap-2 text-caption text-muted-foreground">Correct <AnswerMark value={log.correctAnswer || '—'} correct /></span></div>
-                {log.takeaway && <p className="line-clamp-2 text-body text-muted-foreground">{log.takeaway}</p>}
-                <div className="flex items-center justify-between gap-2 pt-1"><Button variant="outline" onClick={() => openReview(log)}>Open review <ArrowRight /></Button><Button variant="ghost" size="icon" className="text-danger hover:bg-danger-soft hover:text-danger" aria-label={`Delete ${log.source || 'entry'}`} onClick={() => setDeleteTarget(log)}><Trash2 /></Button></div>
-              </CardContent>
-            </Card>
-          ))}
-          {!isLoading && !loadError && totalEntries > 0 && <div className="rounded-card border border-ui-border bg-surface p-3"><PaginationFooter first={firstItem} last={lastItem} total={totalEntries} page={currentPage} pages={totalPages} onPage={setCurrentPage} /></div>}
-        </div>
-      </main>
-
-      <ReviewWorkspace
-        open={editorOpen}
-        entry={selectedEntry}
-        draft={draft}
-        initialReviewed={Boolean(selectedEntry?.reviewedAt)}
-        saving={isSaving}
-        onDraft={setDraft}
-        onClose={closeEditor}
-        onSave={handleSave}
-      />
-
-      <Modal
-        open={Boolean(deleteTarget)}
-        onClose={() => !isDeleting && setDeleteTarget(null)}
-        closeOnBackdrop={!isDeleting}
-        presentation="content-dialog"
-        title="Delete error entry?"
-        subtitle={deleteTarget ? capitalizeFirstLetter(deleteTarget.source || 'Untitled entry') : undefined}
-        className="max-w-md!"
-        footer={<><Button variant="outline" disabled={isDeleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={isDeleting} onClick={() => void handleDelete()}>{isDeleting && <Loader2 className="animate-spin" aria-hidden="true" />}Delete entry</Button></>}
-      >
-        <p className="text-body leading-6 text-muted-foreground">This permanently removes the study note. This action cannot be undone.</p>
-      </Modal>
-    </div>
-  );
-}
-
-function ReviewWorkspace({ open, entry, draft, initialReviewed, saving, onDraft, onClose, onSave }: {
-  open: boolean;
-  entry: ErrorEntry | null;
-  draft: EntryDraft;
-  initialReviewed: boolean;
-  saving: boolean;
-  onDraft: (draft: EntryDraft) => void;
-  onClose: () => void;
-  onSave: (markReviewed: boolean) => Promise<void>;
-}) {
-  const linkedQuestion = entry?.question || null;
-  const complete = reviewIsComplete(draft);
-  const objectiveComplete = Boolean(entry || (draft.source.trim() && draft.userAnswer.trim() && draft.correctAnswer.trim()));
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      presentation="content-dialog"
-      title={entry ? 'Question review' : 'Add an error entry'}
-      subtitle={entry ? capitalizeFirstLetter(entry.source || 'Untitled entry') : 'Use this for a mistake completed outside the platform.'}
-      className="h-[calc(100vh-2rem)] max-w-6xl!"
-      footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button variant="outline" disabled={saving} onClick={() => void onSave(false)}>{saving ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}Save draft</Button><Button disabled={saving || !complete || !objectiveComplete} onClick={() => void onSave(true)}>{saving ? <Loader2 className="animate-spin" aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}{initialReviewed ? 'Save review' : 'Mark reviewed'}</Button></>}
-    >
-      <div className="grid h-full min-h-0 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] lg:overflow-hidden">
-        <section className="min-w-0 lg:overflow-y-auto lg:pr-2" aria-labelledby="question-context-heading">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 id="question-context-heading" className="text-title font-semibold text-foreground">Question context</h3>
-            {entry && <ReviewBadge reviewed={initialReviewed} />}
-          </div>
-          {entry && linkedQuestion ? <QuestionContext entry={entry} question={linkedQuestion} /> : (
-            <ManualContext draft={draft} onDraft={onDraft} locked={Boolean(entry?.questionId)} />
-          )}
-        </section>
-
-        <section className="min-w-0 border-t border-ui-border pt-4 lg:overflow-y-auto lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0" aria-labelledby="reflection-heading">
-          <h3 id="reflection-heading" className="text-title font-semibold text-foreground">Your reflection</h3>
-          <p className="mt-1 text-body text-muted-foreground">Write this in your own words. The system will not generate or fill these answers for you.</p>
-          <div className="mt-5 space-y-5">
-            <Field>
-              <FieldLabel htmlFor="error-root-cause">Root cause</FieldLabel>
-              <RootCauseSelect id="error-root-cause" value={draft.rootCause} onChange={value => onDraft({ ...draft, rootCause: value as RootCause | '' })} />
-              <FieldDescription>Choose the main reason this mistake happened.</FieldDescription>
-            </Field>
-            <ReflectionField id="why-chosen" label="Why did you choose your answer?" description="Reconstruct what you noticed and the decision you made."><Textarea id="why-chosen" rows={4} maxLength={4000} value={draft.whyChosen} onChange={event => onDraft({ ...draft, whyChosen: event.target.value })} placeholder="I chose this because…" /></ReflectionField>
-            <ReflectionField id="reasoning-error" label="What was wrong with that reasoning?" description="Name the exact misconception, unsupported assumption, or missed detail."><Textarea id="reasoning-error" rows={4} maxLength={4000} value={draft.whyWrong} onChange={event => onDraft({ ...draft, whyWrong: event.target.value })} placeholder="That reasoning failed because…" /></ReflectionField>
-            <ReflectionField id="correct-reasoning" label="Why is the correct answer right?" description="Explain the logic that makes the correct answer fit."><Textarea id="correct-reasoning" rows={4} maxLength={4000} value={draft.whyRight} onChange={event => onDraft({ ...draft, whyRight: event.target.value })} placeholder="The correct answer works because…" /></ReflectionField>
-            <ReflectionField id="takeaway" label="What will you do differently next time?" description="Write one reusable, specific action for a similar question."><Textarea id="takeaway" rows={3} maxLength={2000} value={draft.takeaway} onChange={event => onDraft({ ...draft, takeaway: event.target.value })} placeholder="Next time, I will…" /></ReflectionField>
-            {!complete && <div className="flex gap-2 rounded-control border border-warning/30 bg-warning-soft p-3 text-body text-warning"><CircleDashed className="mt-0.5 shrink-0" aria-hidden="true" /><p>Complete all four reflections and choose a root cause to mark this entry reviewed. You can save a partial draft at any time.</p></div>}
-          </div>
-        </section>
-      </div>
-    </Modal>
-  );
-}
-
-function QuestionContext({ entry, question }: { entry: ErrorEntry; question: ErrorQuestion }) {
-  const subject = question.section.test.subject;
-  return (
-    <div className="space-y-5 rounded-card border border-ui-border bg-surface p-4 sm:p-5">
-      <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground"><Badge variant="outline">{subject === 'RW' ? 'Reading & Writing' : 'Math'}</Badge><span>{question.section.name || `Module ${question.section.order}`}</span><span aria-hidden="true">·</span><span>Question {question.order}</span></div>
-      {question.blocks?.length > 0 && <BlockRenderer blocks={question.blocks} subject={subject} readOnly variant="exam" />}
-      <div className="exam-content font-medium text-foreground"><InteractiveText content={question.questionText} isMath={subject === 'MATH'} readOnly inheritTypography /></div>
-      {question.type === 'MCQ' && question.choices?.length > 0 && (
-        <div className="space-y-2" aria-label="Answer choices">
-          {question.choices.map((choice, index) => {
-            const label = String.fromCharCode(65 + index);
-            const correct = label === entry.correctAnswer || choice.id === entry.correctAnswer || choice.text === entry.correctAnswer;
-            const selected = label === entry.userAnswer || choice.id === entry.userAnswer || choice.text === entry.userAnswer;
-            return <div key={`${label}-${index}`} className={`flex gap-3 rounded-control border p-3 ${correct ? 'border-success/40 bg-success-soft' : selected ? 'border-danger/40 bg-danger-soft' : 'border-ui-border bg-surface'}`}><span className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-caption font-semibold ${correct ? 'border-success text-success' : selected ? 'border-danger text-danger' : 'border-ui-border text-muted-foreground'}`}>{label}</span><div className="min-w-0 flex-1 exam-content"><InteractiveText content={choice.text} isMath={subject === 'MATH'} readOnly inheritTypography /></div>{correct ? <CheckCircle2 className="shrink-0 text-success" aria-label="Correct answer" /> : selected ? <XCircle className="shrink-0 text-danger" aria-label="Your answer" /> : null}</div>;
-          })}
-        </div>
-      )}
-      <div className="grid gap-3 border-t border-ui-border pt-4 sm:grid-cols-2"><AnswerSummary label="Your answer" value={entry.userAnswer || 'Omitted'} correct={false} /><AnswerSummary label="Correct answer" value={entry.correctAnswer || '—'} correct /></div>
-    </div>
-  );
-}
-
-function ManualContext({ draft, onDraft, locked }: { draft: EntryDraft; onDraft: (draft: EntryDraft) => void; locked: boolean }) {
-  return (
-    <div className="space-y-4 rounded-card border border-ui-border bg-surface p-4 sm:p-5">
-      <p className="text-body text-muted-foreground">Question content is not available for this manual or legacy entry. Add enough context to recognize it later.</p>
-      <Field><FieldLabel htmlFor="error-source">Source <span className="text-danger">*</span></FieldLabel><Input id="error-source" autoFocus={!locked} disabled={locked} maxLength={200} value={draft.source} onChange={event => onDraft({ ...draft, source: event.target.value })} placeholder="Test 4 · Module 2 · Question 5" /></Field>
-      <Field><FieldLabel htmlFor="error-skill">Skill</FieldLabel><Input id="error-skill" disabled={locked} maxLength={120} list="error-skill-suggestions" value={draft.category} onChange={event => onDraft({ ...draft, category: event.target.value })} placeholder="Words in Context" /><datalist id="error-skill-suggestions"><option value="Words in Context" /><option value="Text Structure and Purpose" /><option value="Cross-Text Connections" /><option value="Inferences" /><option value="Standard English Conventions" /><option value="Algebra" /></datalist></Field>
-      <div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="error-user-answer">Your answer <span className="text-danger">*</span></FieldLabel><Input id="error-user-answer" disabled={locked} maxLength={100} value={draft.userAnswer} onChange={event => onDraft({ ...draft, userAnswer: event.target.value })} placeholder="D or Omitted" /></Field><Field><FieldLabel htmlFor="error-correct-answer">Correct answer <span className="text-danger">*</span></FieldLabel><Input id="error-correct-answer" disabled={locked} maxLength={100} value={draft.correctAnswer} onChange={event => onDraft({ ...draft, correctAnswer: event.target.value })} placeholder="B" /></Field></div>
-    </div>
-  );
-}
-
-function ReflectionField({ id, label, description, children }: { id: string; label: string; description: string; children: ReactNode }) {
-  return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel>{children}<FieldDescription>{description}</FieldDescription></Field>;
-}
-
-function StatusSelect({ value, onChange }: { value: ReviewStatus; onChange: (value: ReviewStatus) => void }) {
-  return <Select value={value} onValueChange={value => onChange(value as ReviewStatus)}><SelectTrigger aria-label="Review status" className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All statuses</SelectItem><SelectItem value="NEEDS_REVIEW">Needs review</SelectItem><SelectItem value="REVIEWED">Reviewed</SelectItem></SelectContent></Select>;
-}
-
-function RootCauseSelect({ id, value, onChange, filter = false }: { id?: string; value: RootCause | 'ALL' | ''; onChange: (value: RootCause | 'ALL' | '') => void; filter?: boolean }) {
-  return <Select value={value || undefined} onValueChange={value => onChange(value as RootCause | 'ALL')}><SelectTrigger id={id} aria-label={filter ? 'Root cause filter' : 'Root cause'} className={filter ? 'w-44' : 'w-full'}><SelectValue placeholder={filter ? 'All root causes' : 'Select a root cause'} /></SelectTrigger><SelectContent>{filter && <SelectItem value="ALL">All root causes</SelectItem>}{ROOT_CAUSES.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>;
-}
-
-function ReviewBadge({ reviewed }: { reviewed: boolean }) {
-  return reviewed
-    ? <Badge variant="outline" className="border-success/30 bg-success-soft text-success"><CheckCircle2 aria-hidden="true" />Reviewed</Badge>
-    : <Badge variant="outline" className="border-warning/30 bg-warning-soft text-warning"><CircleDashed aria-hidden="true" />Needs review</Badge>;
-}
-
-function AnswerMark({ value, correct }: { value: string; correct: boolean }) {
-  return <span className={`mx-auto flex min-h-7 min-w-7 max-w-20 items-center justify-center truncate rounded-control border px-2 text-caption font-semibold ${correct ? 'border-success/30 bg-success-soft text-success' : 'border-danger/30 bg-danger-soft text-danger'}`} title={value}>{value}</span>;
-}
-
-function AnswerSummary({ label, value, correct }: { label: string; value: string; correct: boolean }) {
-  return <div className="flex items-center justify-between gap-3"><span className="text-body text-muted-foreground">{label}</span><AnswerMark value={value} correct={correct} /></div>;
-}
-
-function LoadingRows() {
-  return <>{Array.from({ length: 6 }, (_, index) => <TableRow key={index}><TableCell><Skeleton className="h-4 w-36" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell><Skeleton className="mx-auto size-7" /></TableCell><TableCell><Skeleton className="mx-auto size-7" /></TableCell><TableCell><Skeleton className="h-5 w-28" /></TableCell></TableRow>)}</>;
-}
-
-function MobileLoadingCards() {
-  return <>{Array.from({ length: 3 }, (_, index) => <Card key={index} size="sm"><CardHeader><Skeleton className="h-4 w-36" /><Skeleton className="h-5 w-24" /></CardHeader><CardContent className="space-y-3"><Skeleton className="h-4 w-full" /><Skeleton className="h-8 w-48" /></CardContent></Card>)}</>;
-}
-
-function PaginationFooter({ first, last, total, page, pages, onPage }: { first: number; last: number; total: number; page: number; pages: number; onPage: (page: number) => void }) {
-  return <><p className="text-caption text-muted-foreground">Showing <strong>{first}–{last}</strong> of <strong>{total}</strong></p><div className="flex items-center gap-2"><Button variant="outline" size="icon" disabled={page === 1} onClick={() => onPage(page - 1)} aria-label="Previous page"><ChevronLeft /></Button><span className="min-w-20 text-center text-caption font-semibold text-muted-foreground">{page} / {pages}</span><Button variant="outline" size="icon" disabled={page === pages} onClick={() => onPage(page + 1)} aria-label="Next page"><ChevronRight /></Button></div></>;
+  return <Modal open onClose={() => { if (!saving) onClose(); }} presentation="content-dialog" title={entry === 'new' ? 'Add an error entry' : 'Edit entry details'} subtitle="Add context here, then write your reflection in the table." className="max-w-lg!" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !draft.source.trim() || !draft.userAnswer.trim() || !draft.correctAnswer.trim()} onClick={() => void save()}>{saving ? 'Saving…' : 'Save entry'}</Button></>}>
+    <div className="space-y-4">{([{ field: 'source', label: 'Source name', max: 200, type: 'text', placeholder: 'Khan Academy worksheet' }, { field: 'sourceUrl', label: 'External link (optional)', max: 2048, type: 'url', placeholder: 'https://…' }, { field: 'category', label: 'Category', max: 120, type: 'text', placeholder: 'Algebra' }, { field: 'correctAnswer', label: 'Correct answer', max: 100, type: 'text', placeholder: 'B' }, { field: 'userAnswer', label: 'Your answer', max: 100, type: 'text', placeholder: 'A or Omitted' }] as const).map(({ field, label, max, type, placeholder }) => <Field key={field}><FieldLabel htmlFor={`manual-${field}`}>{label}</FieldLabel><Input id={`manual-${field}`} type={type} maxLength={max} placeholder={placeholder} value={draft[field]} onChange={event => setDraft(value => ({ ...value, [field]: event.target.value }))} /></Field>)}{error && <p role="alert" className="text-danger">{error}</p>}</div>
+  </Modal>;
 }
