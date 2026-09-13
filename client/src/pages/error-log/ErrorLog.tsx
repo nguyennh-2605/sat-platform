@@ -21,11 +21,12 @@ import { RichTextCellEditor } from './RichTextCellEditor';
 import { cellKey, useReflectionDrafts, type EditableField } from './useReflectionDrafts';
 import { type ErrorEntry, type ReviewStatus } from './types';
 
-interface ErrorPage { items: ErrorEntry[]; nextCursor: string | null; total: number; needsReview: number }
+interface ErrorPage { items: ErrorEntry[]; nextCursor: string | null; total?: number; needsReview?: number }
 const REFLECTIONS = [
   { field: 'whyWrong', label: 'Why I chose wrong' },
   { field: 'whyRight', label: 'Why answer is right' },
 ] as const;
+const entryOrigin = (entry: ErrorEntry) => entry.origin ?? (entry.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
 const tableComponents: TableComponents<ErrorEntry> = {
   Table: props => <Table {...props} unwrapped className="w-full table-fixed border-separate border-spacing-0" />,
   TableHead: TableHeader, TableBody, TableRow,
@@ -54,6 +55,7 @@ export default function ErrorLog() {
   const request = useRef<AbortController | null>(null);
   const busy = useRef(false);
   const rowReviewStates = useRef(new Map<string, boolean>());
+  const rowVersions = useRef(new Map<string, number>());
   const saved = useCallback((entry: ErrorEntry) => {
     const previous = rowReviewStates.current.get(entry.id);
     const reviewed = Boolean(entry.reviewedAt);
@@ -65,9 +67,11 @@ export default function ErrorLog() {
         needsReview: Math.max(0, value.needsReview + (status === 'REVIEWED' ? 0 : delta)),
       }));
     }
+    if (entry.version !== undefined) rowVersions.current.set(entry.id, entry.version);
     setLogs(rows => rows.map(row => row.id === entry.id ? { ...row, ...entry } : row));
   }, [status]);
-  const { drafts, change, flush } = useReflectionDrafts(saved);
+  const getVersion = useCallback((id: string) => rowVersions.current.get(id), []);
+  const { drafts, change, flush, resolveConflict } = useReflectionDrafts(saved, getVersion);
   const filterKey = JSON.stringify([debouncedSearch, status, debouncedCategory, reload]);
 
   const load = useCallback(async (cursor: string | null, replace = false) => {
@@ -81,11 +85,16 @@ export default function ErrorLog() {
       const params = { limit: 40, cursor: cursor || undefined, search: debouncedSearch || undefined, status, category: debouncedCategory || undefined };
       const data = await axiosClient.get<ErrorPage>('/api/error-logs', { params, signal: controller.signal });
       if (controller.signal.aborted) return;
-      if (replace) rowReviewStates.current.clear();
-      data.items.forEach(item => rowReviewStates.current.set(item.id, Boolean(item.reviewedAt)));
+      if (replace) { rowReviewStates.current.clear(); rowVersions.current.clear(); }
+      data.items.forEach(item => {
+        rowReviewStates.current.set(item.id, Boolean(item.reviewedAt));
+        if (item.version !== undefined) rowVersions.current.set(item.id, item.version);
+      });
       setLogs(rows => replace ? data.items : [...rows, ...data.items.filter(item => !rows.some(row => row.id === item.id))]);
       setNextCursor(data.nextCursor);
-      setCounts({ total: data.total, needsReview: data.needsReview });
+      if (data.total !== undefined && data.needsReview !== undefined) {
+        setCounts({ total: data.total, needsReview: data.needsReview });
+      }
     } catch {
       if (!controller.signal.aborted) setError('Unable to load your error log. Please try again.');
     } finally {
@@ -118,7 +127,7 @@ export default function ErrorLog() {
   const hasFilters = Boolean(search || category || status !== 'ALL');
   const clearFilters = () => { deactivate(); setSearch(''); setCategory(''); setStatus('ALL'); };
   const openSource = (entry: ErrorEntry) => {
-    if (entry.questionId) return setQuestionEntry(entry);
+    if (entryOrigin(entry) === 'SYSTEM_QUESTION') return setQuestionEntry(entry);
     if (entry.sourceUrl) {
       window.open(entry.sourceUrl, '_blank', 'noopener,noreferrer');
       return;
@@ -157,8 +166,8 @@ export default function ErrorLog() {
         itemContent={(_index, entry) => <article className="space-y-4 border-b border-ui-border/60 p-3">
           <header className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-muted-foreground">{entry.category || 'General'}</p><Button variant="link" className={`h-auto max-w-full justify-start whitespace-normal p-0 text-left ${entry.sourceUrl ? 'underline underline-offset-4' : ''}`} onClick={() => openSource(entry)}>{entry.source || 'Untitled entry'}{entry.sourceUrl && <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />}</Button></div><Badge variant="outline" className="shrink-0">{entry.reviewedAt ? 'Reviewed' : 'Needs review'}</Badge></header>
           <div className="grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-muted-foreground">Correct</p><p className="font-medium text-success">{entry.correctAnswer || '—'}</p></div><div><p className="text-xs text-muted-foreground">Yours</p><p className="font-medium text-danger">{entry.userAnswer || 'Omitted'}</p></div></div>
-          {REFLECTIONS.map(({ field, label }) => { const key = cellKey(entry.id, field); return <section key={field}><h3 className="mb-1 text-xs font-medium text-muted-foreground">{label}</h3><RichTextCellEditor id={key} label={`${label} for ${entry.source}`} value={drafts[key]?.value ?? entry[field] ?? ''} draft={drafts[key]} active={active === key} editorRef={activeEditor} onActivate={() => activate(key)} onChange={value => change(entry.id, field, value)} onFlush={() => flush(entry.id, field)} onFormatChange={setActiveFormats} /></section>; })}
-          <div className="flex justify-end gap-1">{!entry.questionId && <Button variant="ghost" size="icon-sm" aria-label={`Edit details for ${entry.source}`} onClick={() => setManualEntry(entry)}><Pencil /></Button>}<Button variant="ghost" size="icon-sm" aria-label={`Delete ${entry.source}`} disabled={Object.entries(drafts).some(([key, draft]) => key.startsWith(`${entry.id}:`) && draft.status !== 'saved')} onClick={() => setDeleteTarget(entry)}><Trash2 /></Button></div>
+          {REFLECTIONS.map(({ field, label }) => { const key = cellKey(entry.id, field); return <section key={field}><h3 className="mb-1 text-xs font-medium text-muted-foreground">{label}</h3><RichTextCellEditor id={key} label={`${label} for ${entry.source}`} value={drafts[key]?.value ?? entry[field] ?? ''} draft={drafts[key]} active={active === key} editorRef={activeEditor} onActivate={() => activate(key)} onChange={value => change(entry.id, field, value)} onFlush={() => flush(entry.id, field)} onResolveConflict={resolution => resolveConflict(entry.id, field, resolution)} onFormatChange={setActiveFormats} /></section>; })}
+          <div className="flex justify-end gap-1">{entryOrigin(entry) === 'MANUAL' && <Button variant="ghost" size="icon-sm" aria-label={`Edit details for ${entry.source}`} onClick={() => setManualEntry(entry)}><Pencil /></Button>}<Button variant="ghost" size="icon-sm" aria-label={`Delete ${entry.source}`} disabled={Object.entries(drafts).some(([key, draft]) => key.startsWith(`${entry.id}:`) && draft.status !== 'saved')} onClick={() => setDeleteTarget(entry)}><Trash2 /></Button></div>
         </article>}
       /> : <TableVirtuoso
         key={filterKey} className="min-h-0 flex-1" data={logs} components={tableComponents}
@@ -170,11 +179,11 @@ export default function ErrorLog() {
         </TableRow>}
         itemContent={(_index, entry) => <>
           <TableCell className="align-top break-words px-2 font-medium">{entry.category || 'General'}</TableCell>
-          <TableCell className="align-top px-2"><Button variant="link" className={`h-auto max-w-full whitespace-normal p-0 text-left ${entry.sourceUrl ? 'underline underline-offset-4' : ''}`} onClick={() => openSource(entry)}>{entry.source || 'Untitled entry'}{entry.sourceUrl && <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />}</Button><div className="mt-2 flex flex-wrap items-center gap-1"><Badge variant="outline">{entry.reviewedAt ? 'Reviewed' : 'Needs review'}</Badge>{!entry.questionId && <Button variant="ghost" size="icon-sm" aria-label={`Edit details for ${entry.source}`} onClick={() => setManualEntry(entry)}><Pencil /></Button>}<Button variant="ghost" size="icon-sm" aria-label={`Delete ${entry.source}`} disabled={Object.entries(drafts).some(([key, draft]) => key.startsWith(`${entry.id}:`) && draft.status !== 'saved')} onClick={() => setDeleteTarget(entry)}><Trash2 /></Button></div></TableCell>
+          <TableCell className="align-top px-2"><Button variant="link" className={`h-auto max-w-full whitespace-normal p-0 text-left ${entry.sourceUrl ? 'underline underline-offset-4' : ''}`} onClick={() => openSource(entry)}>{entry.source || 'Untitled entry'}{entry.sourceUrl && <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />}</Button><div className="mt-2 flex flex-wrap items-center gap-1"><Badge variant="outline">{entry.reviewedAt ? 'Reviewed' : 'Needs review'}</Badge>{entryOrigin(entry) === 'MANUAL' && <Button variant="ghost" size="icon-sm" aria-label={`Edit details for ${entry.source}`} onClick={() => setManualEntry(entry)}><Pencil /></Button>}<Button variant="ghost" size="icon-sm" aria-label={`Delete ${entry.source}`} disabled={Object.entries(drafts).some(([key, draft]) => key.startsWith(`${entry.id}:`) && draft.status !== 'saved')} onClick={() => setDeleteTarget(entry)}><Trash2 /></Button></div></TableCell>
           <TableCell className="align-top break-words px-2 font-medium text-success">{entry.correctAnswer || '—'}</TableCell><TableCell className="align-top break-words px-2 font-medium text-danger">{entry.userAnswer || 'Omitted'}</TableCell>
           {REFLECTIONS.map(({ field, label }) => {
             const key = cellKey(entry.id, field);
-            return <TableCell key={field} className="align-top px-2"><RichTextCellEditor id={key} label={`${label} for ${entry.source}`} value={drafts[key]?.value ?? entry[field] ?? ''} draft={drafts[key]} active={active === key} editorRef={activeEditor} onActivate={() => activate(key)} onChange={value => change(entry.id, field, value)} onFlush={() => flush(entry.id, field)} onFormatChange={setActiveFormats} /></TableCell>;
+            return <TableCell key={field} className="align-top px-2"><RichTextCellEditor id={key} label={`${label} for ${entry.source}`} value={drafts[key]?.value ?? entry[field] ?? ''} draft={drafts[key]} active={active === key} editorRef={activeEditor} onActivate={() => activate(key)} onChange={value => change(entry.id, field, value)} onFlush={() => flush(entry.id, field)} onResolveConflict={resolution => resolveConflict(entry.id, field, resolution)} onFormatChange={setActiveFormats} /></TableCell>;
           })}
         </>}
       />) : <div className="flex flex-1 items-center justify-center p-6">{loading ? <Loader2 className="animate-spin" aria-label="Loading error log" /> : error ? <p role="alert">{error}</p> : <EmptyState icon={<CircleDashed />} title={hasFilters ? 'No matching entries' : 'No mistakes to review'} description={hasFilters ? 'Adjust your search or filters.' : 'Wrong answers from submitted tests appear here automatically.'} action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined} />}</div>}
@@ -237,17 +246,24 @@ function FormatButton({ label, active = false, disabled, onPress, children }: { 
 
 function ManualEntryDialog({ entry, onClose, onSaved }: { entry: ErrorEntry | 'new'; onClose: () => void; onSaved: () => void }) {
   const [draft, setDraft] = useState({ source: entry === 'new' ? '' : entry.source || '', sourceUrl: entry === 'new' ? '' : entry.sourceUrl || '', category: entry === 'new' ? '' : entry.category || '', correctAnswer: entry === 'new' ? '' : entry.correctAnswer || '', userAnswer: entry === 'new' ? '' : entry.userAnswer || '' });
+  const [clientMutationId] = useState(() => entry === 'new' ? crypto.randomUUID() : null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const save = async () => {
     setSaving(true); setError('');
     try {
       const payload = { ...draft, category: draft.category.trim() || 'General' };
-      if (entry === 'new') await axiosClient.post('/api/error-logs', payload);
-      else await axiosClient.patch(`/api/error-logs/${entry.id}`, payload);
+      if (entry === 'new') await axiosClient.post('/api/error-logs', { ...payload, clientMutationId });
+      else await axiosClient.patch(`/api/error-logs/${entry.id}`, {
+        ...payload,
+        ...(entry.version !== undefined ? { expectedVersion: entry.version } : {}),
+      });
       invalidateQueryCache('/api/error-logs');
       onSaved();
-    } catch { setError('Unable to save this entry. Please try again.'); }
+    } catch (requestError) {
+      const conflict = (requestError as { response?: { status?: number } }).response?.status === 409;
+      setError(conflict ? 'This entry changed in another tab. Close and reopen it before editing.' : 'Unable to save this entry. Please try again.');
+    }
     finally { setSaving(false); }
   };
   return <Modal open onClose={() => { if (!saving) onClose(); }} presentation="content-dialog" title={entry === 'new' ? 'Add an error entry' : 'Edit entry details'} subtitle="Add context here, then write your reflection in the table." className="max-w-lg!" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !draft.source.trim() || !draft.userAnswer.trim() || !draft.correctAnswer.trim()} onClick={() => void save()}>{saving ? 'Saving…' : 'Save entry'}</Button></>}>

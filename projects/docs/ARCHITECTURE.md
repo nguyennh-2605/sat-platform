@@ -104,6 +104,7 @@ Express Server (index.js → app.js)
 - **3-layer**: Routes → Controllers → Services → Database. Services never touch `req`/`res`.
 - **Error handling**: Services throw `ApiError(statusCode, { message })`. Controllers catch and return `{ success: false, error }`.
 - **Authorization**: Every protected service function verifies the requesting user owns the resource or has the correct role.
+- **Request correlation**: Every request receives a validated client-supplied or server-generated `x-request-id`, which is echoed in the response. Error Log failures emit structured JSON with that ID, route, status, duration, error name, and Prisma code when available.
 - **Abuse protection**: Credential, registration, Google OAuth, refresh, account-upgrade, and managed-upload endpoints use bounded in-memory rate limiters. Production trusts one reverse-proxy hop by default so limits use the client IP on Render.
 - **Process lifecycle**: `SIGTERM` and `SIGINT` stop accepting new requests, drain active HTTP work for up to 10 seconds, and disconnect Prisma before exit.
 - **SSE Notifications**: In-memory `Map<userId, Set<Response>>` maintains active connections; events are pushed in real-time and persisted to DB.
@@ -214,11 +215,14 @@ Express Server (index.js → app.js)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/error-logs` | JWT + STUDENT | Lightweight cursor list (`limit=40`, `cursor`), stable createdAt/id ordering, server-side search/status/category filters; explicit page/pageSize retained for compatibility |
-| `GET` | `/api/error-logs/:id/question` | JWT + STUDENT | Owner-scoped lazy question context, choices, and explanation |
-| `POST` | `/api/error-logs` | JWT + STUDENT | Create a manual entry with required source name and optional validated http/https sourceUrl |
-| `PUT/PATCH` | `/api/error-logs/:id` | JWT + STUDENT | Save sanitized student-authored HTML and automatically update review completion (owner-checked) |
-| `DELETE` | `/api/error-logs/:id` | JWT + STUDENT | Delete error log (owner-checked) |
+| `GET` | `/api/error-logs` | JWT + STUDENT | Lightweight cursor list (`limit=40`, `cursor`) with stable `createdAt/id` ordering and server-side search/status/category filters. Only the first cursor page includes `total` and `needsReview`; explicit `page/pageSize` remains compatible and uses the same composite ordering |
+| `GET` | `/api/error-logs/:id/question` | JWT + STUDENT | Owner-scoped lazy question context from the immutable snapshot, falling back to the live relation only for legacy rows |
+| `POST` | `/api/error-logs` | JWT + STUDENT | Idempotently create a manual entry with required source name, optional validated http/https `sourceUrl`, and optional `clientMutationId` |
+| `PATCH` | `/api/error-logs/:id` | JWT + STUDENT | Save sanitized reflections or editable manual-source fields. `reviewedAt` is derived from both reflections; `expectedVersion` enables optimistic concurrency and stale writes return `409` with the current row |
+| `PUT` | `/api/error-logs/:id` | JWT + STUDENT | Deprecated compatibility alias for PATCH; currently accepted and returns deprecation headers |
+| `DELETE` | `/api/error-logs/:id` | JWT + STUDENT | Owner-scoped delete; missing and non-owned IDs both return `404` |
+
+Dynamic Error Log routes validate UUIDs before service access. During the rolling-deployment window, deprecated `markReviewed`, `whyChosen`, `takeaway`, and `rootCause` inputs are accepted but ignored and marked with deprecation headers; legacy columns remain stored for migration safety but are neither changed nor searchable. Search reads the maintained plain-text `searchText` projection rather than raw rich HTML.
 
 ### 5.9 AI Features
 
@@ -343,11 +347,11 @@ Folder ──1:N── Test
 
 **Answer**: `id`, `submissionId`, `questionId`, `selectedChoice`, `isCorrect`
 
-**ErrorLog**: student-owned mistake review with objective source/answer snapshots, optional `Submission` and `Question` links, student-authored `whyChosen`, `whyWrong`, `whyRight`, `takeaway`, quick `rootCause`, and `reviewedAt`. New wrong answers are logged automatically and idempotently when a test submission is committed; manual and legacy entries remain supported.
+**ErrorLog**: student-owned mistake review with explicit `origin` (`SYSTEM_QUESTION` or `MANUAL`), objective source/answer data, immutable `questionSnapshot` for new system rows, optional `Submission` and `Question` links, two writable reflections (`whyWrong`, `whyRight`), derived `reviewedAt`, optimistic `version`, manual-create `clientMutationId`, and a plain-text `searchText` projection. New wrong answers are logged automatically and idempotently when a test submission is committed. Legacy `whyChosen`, `takeaway`, and `rootCause` columns remain preserved but are outside the current API/UI contract.
 
 **AuditEvent**: durable product-domain mutation history with `action`, `category`, optional actor reference plus actor snapshot, entity identity/label snapshot, allowlisted metadata, and `createdAt`. `AdminAuditLog` remains separate for privileged Admin CLI security operations. Submission analytics and raw operational errors are not duplicated into AuditEvent.
 
-**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestScope` (SYSTEM, PERSONAL), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR)
+**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestScope` (SYSTEM, PERSONAL), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR), `ErrorLogOrigin` (SYSTEM_QUESTION, MANUAL)
 
 ---
 
@@ -514,12 +518,14 @@ Folder ──1:N── Test
 
 ```text
 1. A completed test transaction creates one ErrorLog for each wrong Answer, uniquely keyed by student, submission, and question.
-2. The system snapshots source, skill, selected answer, and correct answer while linking the original Question for full review context.
+2. The system writes `origin=SYSTEM_QUESTION` and snapshots source, category, selected/correct answers, and immutable question content while retaining the original Question link. Legacy rows without a snapshot fall back to that relation.
 3. Every new entry starts in Needs review; the system does not generate or prefill the student's reflection.
-4. The student edits whyWrong and whyRight in virtualized spreadsheet cells. A shared toolbar formats the selected text in the one active Quill editor. Drafts survive virtual-row unmount; saves are debounced and serialized per entry.
-5. Reviewed requires nonempty semantic content in whyWrong and whyRight. Empty HTML reopens the review. Legacy whyChosen is retained and migrated into whyWrong; rootCause and takeaway remain nullable legacy data.
-6. List responses omit question content. A system Source opens an owner-scoped lazy question modal. A manual Source stores a required name and optional validated sourceUrl, opening http/https links in a new browser tab.
-7. The table uses composite cursor pagination and automatic end-of-list fetch. The client does not expose loaded counters or manual Load more controls.
+4. The student edits whyWrong and whyRight in virtualized spreadsheet cells. A shared toolbar formats the selected text in the one active Quill editor. Drafts survive virtual-row unmount; saves are debounced and serialized per row.
+5. Each save sends the row's `expectedVersion`. The server updates reflections, `searchText`, derived `reviewedAt`, and the incremented version atomically; a stale version returns `409` plus the current public row for conflict recovery.
+6. Reviewed requires nonempty semantic content in both reflections and cannot be set directly. Empty HTML reopens the review. Deprecated `markReviewed`, `whyChosen`, `takeaway`, and `rootCause` inputs are ignored during rolling deployment; the legacy columns remain unchanged in storage only.
+7. A manual create uses `origin=MANUAL` and may send a stable `clientMutationId`, so retrying the same request returns the existing row. Its source name is required; an optional validated http/https `sourceUrl` opens in a new browser tab.
+8. List responses omit question content and search the maintained plain-text projection. A system Source opens an owner-scoped modal that reads the immutable snapshot first.
+9. The table automatically fetches composite-cursor pages; only the initial page calculates counts. The compatibility offset path uses stable `createdAt DESC, id DESC` ordering. The client does not expose loaded counters or manual Load more controls.
 ```
 
 ---

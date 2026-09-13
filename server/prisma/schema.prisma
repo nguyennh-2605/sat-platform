@@ -348,30 +348,37 @@ model Answer {
 }
 
 model ErrorLog {
-  id            String             @id @default(uuid())
-  source        String?
-  sourceUrl     String?
-  category      String?
-  userAnswer    String?
-  correctAnswer String?
-  whyChosen     String?
-  whyWrong      String?
-  whyRight      String?
-  takeaway      String?
-  rootCause     ErrorLogRootCause?
-  reviewedAt    DateTime?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  userId        Int
-  submissionId  Int?
-  questionId    Int?
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  submission    Submission?        @relation(fields: [submissionId], references: [id], onDelete: SetNull)
-  question      Question?          @relation(fields: [questionId], references: [id], onDelete: SetNull)
+  id               String             @id @default(uuid())
+  origin           ErrorLogOrigin     @default(MANUAL)
+  source           String?
+  sourceUrl        String?
+  category         String?
+  searchText       String?
+  userAnswer       String?
+  correctAnswer    String?
+  questionSnapshot Json?
+  whyChosen        String?
+  whyWrong         String?
+  whyRight         String?
+  takeaway         String?
+  rootCause        ErrorLogRootCause?
+  reviewedAt       DateTime?
+  version          Int                @default(1)
+  clientMutationId String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  userId           Int
+  submissionId     Int?
+  questionId       Int?
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submission       Submission?        @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  question         Question?          @relation(fields: [questionId], references: [id], onDelete: SetNull)
 
   @@unique([userId, submissionId, questionId])
+  @@unique([userId, clientMutationId])
   @@index([userId, createdAt, id])
-  @@index([userId, reviewedAt, createdAt])
+  @@index([userId, reviewedAt, createdAt, id])
+  @@index([userId, category, createdAt, id])
 }
 
 model Notification {
@@ -486,6 +493,11 @@ enum ScorePolicy {
 enum QuestionType {
   MCQ // Trắc nghiệm
   SPR // Tự luận điền số (Grid-in)
+}
+
+enum ErrorLogOrigin {
+  SYSTEM_QUESTION
+  MANUAL
 }
 
 enum ErrorLogRootCause {

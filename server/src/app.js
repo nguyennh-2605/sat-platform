@@ -5,6 +5,7 @@ const { corsOptions } = require('./config/cors');
 const apiRoutes = require('./routes');
 const { authenticateToken } = require('./middleware/auth.middleware');
 const { createRateLimiter } = require('./middleware/rate-limit.middleware');
+const { attachRequestContext } = require('./middleware/request-context.middleware');
 
 // Login controllers (kept at root level since not part of REST API)
 const { register, login, googleLogin, upgrade, refresh, logout } = require('./controllers/auth.controller');
@@ -45,6 +46,7 @@ if (Number.isInteger(configuredProxyHops) && configuredProxyHops >= 0) {
 
 // --- MIDDLEWARE ---
 app.use(cors(corsOptions));
+app.use(attachRequestContext);
 app.use(express.json({ limit: '2mb' }));
 
 // --- AUTH ROUTES (Direct authentication endpoints) ---

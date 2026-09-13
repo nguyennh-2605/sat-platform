@@ -5,18 +5,20 @@ interface ErrorQuestion {
   type: 'MCQ' | 'SPR';
   blocks: ContentBlock[];
   questionText: string;
-  choices: Array<{ id: string; text: string }>;
+  choices: Array<{ id: string; text: string } | string>;
   explanation?: string | null;
   order: number;
-  section: {
-    name: string;
-    order: number;
-    test: { title: string; subject: string };
+  section?: {
+    name?: string;
+    order?: number;
+    test?: { title?: string; subject?: string };
   };
 }
 
 interface ErrorEntry {
   id: string;
+  version?: number;
+  origin?: 'SYSTEM_QUESTION' | 'MANUAL';
   source: string | null;
   sourceUrl: string | null;
   category: string | null;
