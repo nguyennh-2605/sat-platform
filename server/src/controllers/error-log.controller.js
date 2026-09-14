@@ -55,6 +55,14 @@ exports.getErrorLogs = async (req, res) => {
   }
 };
 
+exports.getErrorLogFacets = async (req, res) => {
+  try {
+    res.json(await errorLogService.getErrorLogFacets({ userId: req.user.userId, query: req.query }));
+  } catch (error) {
+    return handleError({ error, req, res, fallbackMessage: 'Unable to load error log filters.' });
+  }
+};
+
 exports.createErrorLog = async (req, res) => {
   try {
     exposeDeprecation(req, res);

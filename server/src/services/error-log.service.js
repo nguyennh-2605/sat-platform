@@ -280,6 +280,32 @@ exports.getErrorLogs = async ({ userId, query = {} }) => {
   return { items, pagination: paginationMeta({ ...pagination, total }) };
 };
 
+exports.getErrorLogFacets = async ({ userId, query = {} }) => {
+  const search = String(query.search || '').trim().slice(0, 100);
+  const category = String(query.category || '').trim().slice(0, 120);
+  const countWhere = {
+    userId,
+    ...(category ? { category } : {}),
+    ...(search ? { searchText: { contains: search, mode: 'insensitive' } } : {}),
+  };
+  const [all, needsReview, categoryRows] = await prisma.$transaction([
+    prisma.errorLog.count({ where: countWhere }),
+    prisma.errorLog.count({ where: { AND: [countWhere, { reviewedAt: null }] } }),
+    prisma.errorLog.findMany({
+      where: { userId },
+      select: { category: true },
+      distinct: ['category'],
+      orderBy: { category: 'asc' },
+    }),
+  ]);
+  return {
+    all,
+    needsReview,
+    reviewed: Math.max(0, all - needsReview),
+    categories: categoryRows.map(row => row.category).filter(Boolean),
+  };
+};
+
 exports.getErrorLogQuestion = async ({ id, userId }) => {
   const entry = await prisma.errorLog.findFirst({ where: { id, userId }, select: {
     questionSnapshot: true,

@@ -17,6 +17,17 @@ Use a viewport-fit working spreadsheet: Category, Source, Correct, Yours, Why I 
 9. Reuse one active ReactQuill editor with a shared toolbar above the table. Preserve drafts above virtual rows, debounce saves for 850ms, flush on blur, and expose Saving/Saved/conflict/Retry states.
 10. Verify manual creation and retry idempotency, external navigation, autosave/reload, stale-version conflicts, automatic Reviewed transitions, immutable/legacy modal states, pagination boundaries, search projection, sanitization, UUID validation, owner-scoped 404s, structured errors, desktop fit, and mobile stacking. Run frontend build/targeted lint, server tests, Prisma checks, and diff checks.
 
+## Grid-first performance and interaction iteration
+
+1. Keep react-virtuoso; isolate draft updates instead of replacing virtualization. Drafts live in a keyed registry with per-cell, per-row-dirty, and aggregate-save subscriptions so typing does not update ErrorLog root state.
+2. Memoize desktop rows, mobile cards, and sanitized read-only HTML. Deduplicate format state and schedule Quill selection-format reads once per animation frame.
+3. Lazy-load Quill and its stylesheet only when the first rich-text cell becomes active. Preserve the hardened-runtime native fallback.
+4. Replace separate filter, formatting, and count strips with one sticky shadcn DataToolbar. Add status chips backed by owner-scoped facets, a shared searchable Combobox for exact categories, and a compact accessible status icon column.
+5. Keep reflection cells compact and read-only until selected. Mount one expanded editor outside the virtual rows: an anchored non-modal Popover on desktop and a bottom Sheet on mobile, so editing long notes never changes row height.
+6. Support Enter/F2, formatting shortcuts, link shortcut, Tab/Shift+Tab cell movement, Escape, and save-and-exit through one capture dispatcher that ignores IME composition and prevents duplicate Quill handling. Edit links inline in the shared toolbar so selection and focus remain stable.
+7. Switch between table and stacked cards from the actual DataSurface width, including laptop layouts with the navigation sidebar open, so the workspace never requires horizontal scrolling.
+8. Show reflection previews at their natural height up to 320px on desktop and 288px on mobile. Detect real overflow before showing Show more/less, preserve expansion in a keyed registry across virtual-row unmounts, freeze the active preview while typing, and reuse sanitized output through a bounded cache.
+
 ## Compatibility and rollout
 
 - Run `prisma migrate deploy` before deploying the new client/server. Migrations `20260910110000_error_log_spreadsheet`, `20260911090000_add_error_log_source_url`, `20260912090000_error_log_integrity_and_search`, and `20260912100000_backfill_error_log_question_snapshots` have been applied to the local sat_db.

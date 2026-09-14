@@ -1,21 +1,8 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import type { ClipboardEvent } from 'react';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import { forwardRef, lazy, Suspense, useEffect, useImperativeHandle, useRef } from 'react';
+import type { ClipboardEvent, KeyboardEvent } from 'react';
 
 import { cn } from '@/lib/utils';
 import { sanitizeRichText } from '@/components/ui/rich-text-content';
-
-const basicToolbar = [
-  ['bold', 'italic', 'underline'],
-  [{ list: 'ordered' }, { list: 'bullet' }],
-  ['link'],
-  ['clean'],
-];
-
-const basicFormats = ['bold', 'italic', 'underline', 'list', 'link'];
-const standardModules = { toolbar: basicToolbar };
-const standardModulesWithoutToolbar = { toolbar: false };
 const hasUsableArrayConstructor = typeof Array.prototype.constructor === 'function';
 
 interface RichTextEditorProps {
@@ -27,9 +14,11 @@ interface RichTextEditorProps {
   disabled?: boolean;
   className?: string;
   compact?: boolean;
+  expanded?: boolean;
   autoFocus?: boolean;
   hideToolbar?: boolean;
   onFormatChange?: (formats: RichTextFormats) => void;
+  onShortcut?: (shortcut: RichTextShortcut) => void;
 }
 
 interface RichTextFormats {
@@ -48,113 +37,59 @@ interface RichTextEditorHandle {
   focus: () => void;
 }
 
+type RichTextShortcut = 'bold' | 'italic' | 'underline' | 'ordered-list' | 'bullet-list' | 'link' | 'previous-cell' | 'next-cell' | 'commit' | 'escape';
+
+function getRichTextShortcut(event: KeyboardEvent<HTMLElement>): RichTextShortcut | null {
+  if (event.nativeEvent.isComposing || event.key === 'Process') return null;
+  if (event.key === 'Tab') return event.shiftKey ? 'previous-cell' : 'next-cell';
+  if (event.key === 'Escape') return 'escape';
+
+  const modifier = event.ctrlKey || event.metaKey;
+  if (!modifier) return null;
+  if (event.code === 'Enter' || event.key === 'Enter') return 'commit';
+  if (event.shiftKey && event.code === 'Digit7') return 'ordered-list';
+  if (event.shiftKey && event.code === 'Digit8') return 'bullet-list';
+  if (event.code === 'KeyB') return 'bold';
+  if (event.code === 'KeyI') return 'italic';
+  if (event.code === 'KeyU') return 'underline';
+  if (event.code === 'KeyK') return 'link';
+  return null;
+}
+
 const EMPTY_FORMATS: RichTextFormats = { bold: false, italic: false, underline: false, list: null, link: null };
+const LazyQuillRichTextEditor = lazy(() => import('@/components/ui/quill-rich-text-editor'));
 
-const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function QuillRichTextEditor({ id, labelledBy, value, onChange, placeholder, disabled = false, className, compact = false, autoFocus = false, hideToolbar = false, onFormatChange }, forwardedRef) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const quillRef = useRef<ReactQuill>(null);
-  const lastSelection = useRef<{ index: number; length: number } | null>(null);
-
-  const withEditor = (callback: (editor: ReturnType<ReactQuill['getEditor']>, selection: { index: number; length: number }) => void) => {
-    const editor = quillRef.current?.getEditor();
-    if (!editor) return;
-    const selection = editor.getSelection() || lastSelection.current || { index: editor.getLength() - 1, length: 0 };
-    editor.setSelection(selection.index, selection.length, 'silent');
-    editor.focus();
-    callback(editor, selection);
-  };
-
-  useImperativeHandle(forwardedRef, () => ({
-    toggleInline(format) {
-      withEditor((editor, selection) => editor.format(format, !editor.getFormat(selection)[format], 'user'));
-    },
-    toggleList(list) {
-      withEditor((editor, selection) => editor.format('list', editor.getFormat(selection).list === list ? false : list, 'user'));
-    },
-    setLink(href) {
-      withEditor(editor => editor.format('link', href || false, 'user'));
-    },
-    clearFormatting() {
-      withEditor((editor, selection) => editor.removeFormat(selection.index, selection.length, 'user'));
-    },
-    focus() { quillRef.current?.getEditor().focus(); },
-  }));
-
-  const publishFormats = () => {
-    const editor = quillRef.current?.getEditor();
-    const selection = editor?.getSelection() || lastSelection.current;
-    if (!editor || !selection) return onFormatChange?.(EMPTY_FORMATS);
-    const formats = editor.getFormat(selection);
-    onFormatChange?.({
-      bold: Boolean(formats.bold), italic: Boolean(formats.italic), underline: Boolean(formats.underline),
-      list: formats.list === 'ordered' || formats.list === 'bullet' ? formats.list : null,
-      link: typeof formats.link === 'string' ? formats.link : null,
-    });
-  };
-
-  useEffect(() => {
-    if (autoFocus) rootRef.current?.querySelector<HTMLElement>('.ql-editor')?.focus();
-  }, [autoFocus]);
-
-  useEffect(() => {
-    const editor = rootRef.current?.querySelector<HTMLElement>('.ql-editor');
-    if (!editor) return;
-    if (labelledBy) editor.setAttribute('aria-labelledby', labelledBy);
-    else editor.removeAttribute('aria-labelledby');
-  }, [labelledBy]);
-
-  return <div
-    ref={rootRef}
-    data-slot="rich-text-editor"
-    className={cn(
-      'overflow-hidden rounded-lg border border-input bg-background transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50',
-      '[&_.ql-toolbar.ql-snow]:border-0 [&_.ql-toolbar.ql-snow]:border-b [&_.ql-toolbar.ql-snow]:border-ui-border [&_.ql-toolbar.ql-snow]:bg-muted/20',
-      '[&_.ql-container.ql-snow]:border-0 [&_.ql-editor]:min-h-40 [&_.ql-editor]:font-sans [&_.ql-editor]:text-sm [&_.ql-editor]:leading-6 [&_.ql-editor]:text-foreground',
-      '[&_.ql-editor.ql-blank:before]:text-muted-foreground [&_.ql-editor.ql-blank:before]:not-italic [&_.ql-stroke]:stroke-muted-foreground [&_.ql-fill]:fill-muted-foreground',
-      disabled && 'pointer-events-none opacity-60',
-      compact && '[&_.ql-editor]:min-h-24 [&_.ql-editor]:max-h-80 [&_.ql-editor]:overflow-y-auto [&_.ql-toolbar]:p-1',
-      className,
-    )}
-  >
-    <ReactQuill
-      ref={quillRef}
-      id={id}
-      theme="snow"
-      value={value}
-      onChange={(nextValue, _delta, source) => {
-        if (source === 'user' && nextValue !== value) onChange(nextValue);
-        queueMicrotask(publishFormats);
-      }}
-      onChangeSelection={range => { if (range) lastSelection.current = range; queueMicrotask(publishFormats); }}
-      placeholder={placeholder}
-      readOnly={disabled}
-      modules={hideToolbar ? standardModulesWithoutToolbar : standardModules}
-      formats={basicFormats}
-      useSemanticHTML
-    />
-  </div>;
+const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function QuillRichTextEditor(props, forwardedRef) {
+  return <Suspense fallback={<div className="min-h-24 animate-pulse rounded-control border border-input bg-muted/20" role="status" aria-label="Loading editor" />}>
+    <LazyQuillRichTextEditor ref={forwardedRef} {...props} />
+  </Suspense>;
 });
 
-const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function NativeRichTextEditor({ id, labelledBy, value, onChange, placeholder, disabled = false, className, compact = false, autoFocus = false, hideToolbar = false, onFormatChange }, forwardedRef) {
+const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function NativeRichTextEditor({ id, labelledBy, value, onChange, placeholder, disabled = false, className, compact = false, expanded = false, autoFocus = false, hideToolbar = false, onFormatChange, onShortcut }, forwardedRef) {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastSelection = useRef<Range | null>(null);
   const lastEmittedValue = useRef(value);
+  const lastFormats = useRef<RichTextFormats>(EMPTY_FORMATS);
 
   const publishFormats = () => {
     const editor = editorRef.current;
     const selection = document.getSelection();
     const anchor = selection?.anchorNode;
-    if (!editor || !anchor || !editor.contains(anchor)) return onFormatChange?.(EMPTY_FORMATS);
+    if (!editor || !anchor || !editor.contains(anchor)) return;
     const element = anchor.nodeType === Node.ELEMENT_NODE ? anchor as Element : anchor.parentElement;
     const list = element?.closest('ol') ? 'ordered' : element?.closest('ul') ? 'bullet' : null;
     const link = element?.closest('a')?.getAttribute('href') || null;
-    onFormatChange?.({
+    const next: RichTextFormats = {
       bold: document.queryCommandState('bold'),
       italic: document.queryCommandState('italic'),
       underline: document.queryCommandState('underline'),
       list,
       link,
-    });
+    };
+    const previous = lastFormats.current;
+    if (previous.bold === next.bold && previous.italic === next.italic && previous.underline === next.underline && previous.list === next.list && previous.link === next.link) return;
+    lastFormats.current = next;
+    onFormatChange?.(next);
   };
 
   const rememberSelection = () => {
@@ -222,6 +157,13 @@ const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProp
       disabled && 'pointer-events-none opacity-60',
       className,
     )}
+    onKeyDownCapture={event => {
+      const shortcut = onShortcut ? getRichTextShortcut(event) : null;
+      if (!shortcut) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onShortcut?.(shortcut);
+    }}
   >
     {!hideToolbar && <div className="flex flex-wrap gap-1 border-b border-ui-border bg-muted/20 p-1" role="toolbar" aria-label="Rich text formatting">
       <button type="button" className="rounded px-2 py-1 font-semibold hover:bg-muted" onMouseDown={event => event.preventDefault()} onClick={() => runCommand('bold')} aria-label="Bold">B</button>
@@ -243,6 +185,7 @@ const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProp
       className={cn(
         'min-h-40 px-3 py-2 font-sans text-sm leading-6 text-foreground outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]',
         compact && 'min-h-24 max-h-80 overflow-y-auto',
+        expanded && 'min-h-72 max-h-96 overflow-y-auto',
       )}
       dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
       onInput={emitValue}
@@ -258,4 +201,5 @@ const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProp
 const RichTextEditor = hasUsableArrayConstructor ? QuillRichTextEditor : NativeRichTextEditor;
 
 export { RichTextEditor, EMPTY_FORMATS };
-export type { RichTextEditorHandle, RichTextFormats };
+export { getRichTextShortcut };
+export type { RichTextEditorHandle, RichTextEditorProps, RichTextFormats, RichTextShortcut };

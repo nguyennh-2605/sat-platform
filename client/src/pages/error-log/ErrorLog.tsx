@@ -1,47 +1,63 @@
-import { useCallback, useEffect, useRef, useState, type RefObject, type ReactNode } from 'react';
-import { TableVirtuoso, Virtuoso, type TableComponents } from 'react-virtuoso';
-import { Bold, CircleDashed, ExternalLink, Italic, Link2, List, ListOrdered, Loader2, Pencil, Plus, RemoveFormatting, Trash2, Underline } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { TableVirtuoso, Virtuoso, type TableComponents, type TableVirtuosoHandle, type VirtuosoHandle } from 'react-virtuoso';
+import { CircleDashed, Loader2, Plus } from 'lucide-react';
+
 import { EmptyState, Modal, PageHeader } from '@/components/ui/AppUI';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { DataSurface, DataToolbar, DataToolbarGroup, DataToolbarSearch } from '@/components/ui/data-surface';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { EMPTY_FORMATS, type RichTextEditorHandle, type RichTextFormats } from '@/components/ui/rich-text-editor';
+import { DataSurface } from '@/components/ui/data-surface';
 import { Field, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { EMPTY_FORMATS, type RichTextEditorHandle, type RichTextFormats, type RichTextShortcut } from '@/components/ui/rich-text-editor';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { appToast } from '@/components/ui/toast';
 import axiosClient from '../../lib/axios';
 import { invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useIsMobile } from '../../hooks/use-mobile';
+import { ErrorLogDesktopRow, ErrorLogMobileCard, type ActivePreviewSnapshot, type ErrorLogRowActions } from './ErrorLogRows';
+import { ErrorLogToolbar, type ErrorLogFacets } from './ErrorLogToolbar';
+import { ExpandedReflectionEditor, type ActiveReflection } from './ExpandedReflectionEditor';
 import { QuestionModal } from './QuestionModal';
-import { RichTextCellEditor } from './RichTextCellEditor';
 import { cellKey, useReflectionDrafts, type EditableField } from './useReflectionDrafts';
+import { usePreviewExpansionStore } from './usePreviewExpansionStore';
 import { type ErrorEntry, type ReviewStatus } from './types';
 
-interface ErrorPage { items: ErrorEntry[]; nextCursor: string | null; total?: number; needsReview?: number }
-const REFLECTIONS = [
-  { field: 'whyWrong', label: 'Why I chose wrong' },
-  { field: 'whyRight', label: 'Why answer is right' },
-] as const;
-const entryOrigin = (entry: ErrorEntry) => entry.origin ?? (entry.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
+interface ErrorPage { items: ErrorEntry[]; nextCursor: string | null }
+
+const reflectionFields: EditableField[] = ['whyWrong', 'whyRight'];
+const emptyFacets: ErrorLogFacets = { all: 0, needsReview: 0, reviewed: 0, categories: [] };
+const statusPreferenceKey = 'error-log-review-status';
 const tableComponents: TableComponents<ErrorEntry> = {
   Table: props => <Table {...props} unwrapped className="w-full table-fixed border-separate border-spacing-0" />,
-  TableHead: TableHeader, TableBody, TableRow,
+  TableHead: TableHeader,
+  TableBody,
+  TableRow: props => <TableRow {...props} className="[&>td]:border-b [&>td]:border-ui-border/60" />,
 };
+
+const initialStatus = (): ReviewStatus => {
+  if (typeof window === 'undefined') return 'NEEDS_REVIEW';
+  const stored = window.localStorage.getItem(statusPreferenceKey);
+  return stored === 'ALL' || stored === 'REVIEWED' || stored === 'NEEDS_REVIEW' ? stored : 'NEEDS_REVIEW';
+};
+
+const sameFormats = (left: RichTextFormats, right: RichTextFormats) => left.bold === right.bold
+  && left.italic === right.italic
+  && left.underline === right.underline
+  && left.list === right.list
+  && left.link === right.link;
 
 export default function ErrorLog() {
   const isMobile = useIsMobile();
+  const [compactLayout, setCompactLayout] = useState(false);
   const [logs, setLogs] = useState<ErrorEntry[]>([]);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<ReviewStatus>('ALL');
+  const [status, setStatus] = useState<ReviewStatus>(initialStatus);
   const [category, setCategory] = useState('');
   const debouncedSearch = useDebounce(search, 250);
-  const debouncedCategory = useDebounce(category, 250);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [counts, setCounts] = useState({ total: 0, needsReview: 0 });
+  const [facets, setFacets] = useState<ErrorLogFacets>(emptyFacets);
+  const [facetsLoaded, setFacetsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
@@ -50,29 +66,49 @@ export default function ErrorLog() {
   const [deleteTarget, setDeleteTarget] = useState<ErrorEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [active, setActive] = useState<string | null>(null);
-  const activeEditor = useRef<RichTextEditorHandle>(null);
+  const [activePreview, setActivePreview] = useState<ActivePreviewSnapshot | null>(null);
   const [activeFormats, setActiveFormats] = useState<RichTextFormats>(EMPTY_FORMATS);
+  const [linkRequest, setLinkRequest] = useState(0);
+  const activeEditor = useRef<RichTextEditorHandle>(null);
+  const activeAnchor = useRef<HTMLElement | null>(null);
+  const dataSurface = useRef<HTMLElement | null>(null);
+  const tableRef = useRef<TableVirtuosoHandle>(null);
+  const mobileRef = useRef<VirtuosoHandle>(null);
   const request = useRef<AbortController | null>(null);
+  const facetsRequest = useRef<AbortController | null>(null);
   const busy = useRef(false);
   const rowReviewStates = useRef(new Map<string, boolean>());
   const rowVersions = useRef(new Map<string, number>());
+
   const saved = useCallback((entry: ErrorEntry) => {
     const previous = rowReviewStates.current.get(entry.id);
     const reviewed = Boolean(entry.reviewedAt);
     rowReviewStates.current.set(entry.id, reviewed);
     if (previous !== undefined && previous !== reviewed) {
-      const delta = reviewed ? -1 : 1;
-      setCounts(value => ({
-        total: value.total + (status === 'ALL' ? 0 : status === 'NEEDS_REVIEW' ? delta : -delta),
-        needsReview: Math.max(0, value.needsReview + (status === 'REVIEWED' ? 0 : delta)),
+      const delta = reviewed ? 1 : -1;
+      setFacets(value => ({
+        ...value,
+        needsReview: Math.max(0, value.needsReview - delta),
+        reviewed: Math.max(0, value.reviewed + delta),
       }));
     }
     if (entry.version !== undefined) rowVersions.current.set(entry.id, entry.version);
     setLogs(rows => rows.map(row => row.id === entry.id ? { ...row, ...entry } : row));
-  }, [status]);
+  }, []);
   const getVersion = useCallback((id: string) => rowVersions.current.get(id), []);
-  const { drafts, change, flush, resolveConflict } = useReflectionDrafts(saved, getVersion);
-  const filterKey = JSON.stringify([debouncedSearch, status, debouncedCategory, reload]);
+  const { store: draftStore, change, flush, resolveConflict } = useReflectionDrafts(saved, getVersion);
+  const previewStore = usePreviewExpansionStore();
+  const filterKey = JSON.stringify([debouncedSearch, status, category, reload]);
+
+  useLayoutEffect(() => {
+    const surface = dataSurface.current;
+    if (!surface) return;
+    const update = (width: number) => setCompactLayout(width < 900);
+    update(surface.getBoundingClientRect().width);
+    const observer = new ResizeObserver(entries => update(entries[0]?.contentRect.width ?? surface.getBoundingClientRect().width));
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, []);
 
   const load = useCallback(async (cursor: string | null, replace = false) => {
     if (busy.current && !replace) return;
@@ -80,115 +116,257 @@ export default function ErrorLog() {
     const controller = new AbortController();
     request.current = controller;
     busy.current = true;
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     try {
-      const params = { limit: 40, cursor: cursor || undefined, search: debouncedSearch || undefined, status, category: debouncedCategory || undefined };
+      const params = { limit: 40, cursor: cursor || undefined, search: debouncedSearch || undefined, status, category: category || undefined };
       const data = await axiosClient.get<ErrorPage>('/api/error-logs', { params, signal: controller.signal });
       if (controller.signal.aborted) return;
-      if (replace) { rowReviewStates.current.clear(); rowVersions.current.clear(); }
+      if (replace) {
+        rowReviewStates.current.clear();
+        rowVersions.current.clear();
+        previewStore.prune(new Set(data.items.flatMap(item => reflectionFields.map(field => cellKey(item.id, field)))));
+      }
       data.items.forEach(item => {
         rowReviewStates.current.set(item.id, Boolean(item.reviewedAt));
         if (item.version !== undefined) rowVersions.current.set(item.id, item.version);
       });
       setLogs(rows => replace ? data.items : [...rows, ...data.items.filter(item => !rows.some(row => row.id === item.id))]);
       setNextCursor(data.nextCursor);
-      if (data.total !== undefined && data.needsReview !== undefined) {
-        setCounts({ total: data.total, needsReview: data.needsReview });
-      }
     } catch {
       if (!controller.signal.aborted) setError('Unable to load your error log. Please try again.');
     } finally {
-      if (!controller.signal.aborted) { busy.current = false; setLoading(false); }
+      if (!controller.signal.aborted) {
+        busy.current = false;
+        setLoading(false);
+      }
     }
-  }, [debouncedSearch, status, debouncedCategory]);
+  }, [category, debouncedSearch, previewStore, status]);
 
   useEffect(() => {
-    setLogs([]); setNextCursor(null);
+    setLogs([]);
+    setNextCursor(null);
     void load(null, true);
     return () => request.current?.abort();
   }, [load, reload]);
 
-  const activate = (key: string) => {
+  useEffect(() => {
+    facetsRequest.current?.abort();
+    const controller = new AbortController();
+    facetsRequest.current = controller;
+    setFacetsLoaded(false);
+    void axiosClient.get<ErrorLogFacets>('/api/error-logs/facets', {
+      params: { search: debouncedSearch || undefined, category: category || undefined },
+      signal: controller.signal,
+    }).then(data => {
+      if (!controller.signal.aborted) {
+        setFacets(data);
+        setFacetsLoaded(true);
+      }
+    }).catch(() => {
+      // Keep counts hidden and retain the last category options when metadata fails.
+    });
+    return () => controller.abort();
+  }, [category, debouncedSearch, reload]);
+
+  const activate = useCallback((key: string, anchor: HTMLElement, previewValue: string) => {
     if (active && active !== key) {
       const [id, field] = active.split(':');
       flush(id, field as EditableField);
     }
+    activeAnchor.current = anchor;
+    setActivePreview({ key, value: previewValue });
     setActiveFormats(EMPTY_FORMATS);
     setActive(key);
-  };
-  const deactivate = () => {
+  }, [active, flush]);
+
+  const deactivate = useCallback((restoreFocus = false) => {
+    const closingKey = active;
     if (active) {
       const [id, field] = active.split(':');
       flush(id, field as EditableField);
     }
     setActive(null);
+    setActivePreview(null);
     setActiveFormats(EMPTY_FORMATS);
-  };
-  const hasFilters = Boolean(search || category || status !== 'ALL');
-  const clearFilters = () => { deactivate(); setSearch(''); setCategory(''); setStatus('ALL'); };
-  const openSource = (entry: ErrorEntry) => {
-    if (entryOrigin(entry) === 'SYSTEM_QUESTION') return setQuestionEntry(entry);
+    activeAnchor.current = null;
+    if (restoreFocus && closingKey) requestAnimationFrame(() => {
+      const target = [...document.querySelectorAll<HTMLElement>('[data-reflection-key]')]
+        .find(element => element.dataset.reflectionKey === closingKey);
+      target?.focus();
+    });
+  }, [active, flush]);
+
+  const navigate = useCallback((direction: -1 | 1) => {
+    if (!active) return;
+    const keys = logs.flatMap(entry => reflectionFields.map(field => cellKey(entry.id, field)));
+    const currentIndex = keys.indexOf(active);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= keys.length) {
+      deactivate(true);
+      return;
+    }
+    const [activeId, activeField] = active.split(':');
+    flush(activeId, activeField as EditableField);
+    const rowIndex = Math.floor(targetIndex / reflectionFields.length);
+    const target = keys[targetIndex];
+    if (compactLayout) mobileRef.current?.scrollToIndex({ index: rowIndex, align: 'center', behavior: 'auto' });
+    else tableRef.current?.scrollToIndex({ index: rowIndex, align: 'center', behavior: 'auto' });
+    setActiveFormats(EMPTY_FORMATS);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const anchor = [...document.querySelectorAll<HTMLElement>('[data-reflection-key]')]
+        .find(element => element.dataset.reflectionKey === target);
+      if (!anchor) {
+        deactivate();
+        return;
+      }
+      activeAnchor.current = anchor;
+      const [targetId, targetField] = target.split(':');
+      const targetEntry = logs.find(entry => entry.id === targetId);
+      const previewValue = draftStore.getDraft(target)?.value
+        ?? targetEntry?.[targetField as EditableField]
+        ?? '';
+      setActivePreview({ key: target, value: previewValue });
+      setActive(target);
+    }));
+  }, [active, compactLayout, deactivate, draftStore, flush, logs]);
+
+  const formatChange = useCallback((next: RichTextFormats) => {
+    setActiveFormats(previous => sameFormats(previous, next) ? previous : next);
+  }, []);
+  const command = useCallback((next: Extract<RichTextShortcut, 'bold' | 'italic' | 'underline' | 'ordered-list' | 'bullet-list' | 'link'>) => {
+    if (next === 'link') {
+      setLinkRequest(value => value + 1);
+      return;
+    }
+    if (next === 'ordered-list' || next === 'bullet-list') activeEditor.current?.toggleList(next === 'ordered-list' ? 'ordered' : 'bullet');
+    else activeEditor.current?.toggleInline(next);
+  }, []);
+  const changeStatus = useCallback((value: ReviewStatus) => {
+    deactivate();
+    setStatus(value);
+    window.localStorage.setItem(statusPreferenceKey, value);
+  }, [deactivate]);
+  const clearFilters = useCallback(() => {
+    deactivate();
+    setSearch('');
+    setCategory('');
+    setStatus('ALL');
+    window.localStorage.setItem(statusPreferenceKey, 'ALL');
+  }, [deactivate]);
+  const openSource = useCallback((entry: ErrorEntry) => {
+    const origin = entry.origin ?? (entry.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
+    if (origin === 'SYSTEM_QUESTION') {
+      setQuestionEntry(entry);
+      return;
+    }
     if (entry.sourceUrl) {
       window.open(entry.sourceUrl, '_blank', 'noopener,noreferrer');
       return;
     }
     setManualEntry(entry);
-  };
+  }, []);
+
+  const rowActions = useMemo<ErrorLogRowActions>(() => ({
+    activate,
+    openSource,
+    editEntry: setManualEntry,
+    deleteEntry: setDeleteTarget,
+  }), [activate, openSource]);
+
+  const activeReflection = useMemo<ActiveReflection | null>(() => {
+    if (!active) return null;
+    const [entryId, field] = active.split(':');
+    const entry = logs.find(item => item.id === entryId);
+    if (!entry || (field !== 'whyWrong' && field !== 'whyRight')) return null;
+    return { entry, field, key: active };
+  }, [active, logs]);
+
   const deleteEntry = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
       await axiosClient.delete(`/api/error-logs/${deleteTarget.id}`);
       invalidateQueryCache('/api/error-logs');
-      setDeleteTarget(null); setReload(value => value + 1);
-    } catch { appToast.error('Unable to delete this entry.'); }
-    finally { setDeleting(false); }
+      setDeleteTarget(null);
+      setReload(value => value + 1);
+    } catch {
+      appToast.error('Unable to delete this entry.');
+    } finally {
+      setDeleting(false);
+    }
   };
+
+  const hasFilters = Boolean(search || category || status !== 'ALL');
+  const headers = <TableRow className="h-11 bg-muted/20 hover:bg-muted/20 [&>th]:border-b [&>th]:border-ui-border-strong">
+    <TableHead className="w-[4%] px-1"><span className="sr-only">Status</span></TableHead>
+    <TableHead className="w-[11%] border-r border-ui-border/60 px-2">Category</TableHead>
+    <TableHead className="w-[17%] border-r border-ui-border/60 px-2">Source</TableHead>
+    <TableHead className="w-[7%] px-2">Correct</TableHead>
+    <TableHead className="w-[7%] border-r border-ui-border/70 px-2">Yours</TableHead>
+    <TableHead className="w-[25%] border-r border-ui-border/70 px-2">Why I chose wrong</TableHead>
+    <TableHead className="w-[25%] px-2">Why answer is right</TableHead>
+    <TableHead className="w-[4%] px-1"><span className="sr-only">Actions</span></TableHead>
+  </TableRow>;
 
   return <main className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
     <PageHeader title="Error Log" description="Reflect on mistakes and explain the reasoning that leads to the correct answer." actions={<Button onClick={() => setManualEntry('new')}><Plus />Add entry</Button>} />
-    <DataSurface className="relative flex min-h-0 flex-1 flex-col">
-      <DataToolbar><DataToolbarGroup>
-        <DataToolbarSearch label="Search error log" placeholder="Search errors…" value={search} onChange={event => { deactivate(); setSearch(event.target.value); }} />
-        <Select value={status} onValueChange={value => { deactivate(); setStatus(value as ReviewStatus); }}><SelectTrigger className="w-36" aria-label="Review status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All statuses</SelectItem><SelectItem value="NEEDS_REVIEW">Needs review</SelectItem><SelectItem value="REVIEWED">Reviewed</SelectItem></SelectContent></Select>
-        <Input className="w-40" aria-label="Exact category filter" placeholder="Exact category…" value={category} onChange={event => { deactivate(); setCategory(event.target.value); }} />
-        {hasFilters && <Button variant="ghost" size="sm" onClick={clearFilters}>Reset</Button>}
-      </DataToolbarGroup></DataToolbar>
-      <FormattingToolbar editor={activeEditor} active={Boolean(active)} formats={activeFormats} />
-      <div className="border-b border-ui-border px-4 py-2 text-xs text-muted-foreground" aria-live="polite">{loading && !logs.length ? 'Loading errors…' : `${counts.total} ${counts.total === 1 ? 'error' : 'errors'} · ${counts.needsReview} need review`}<span className="ml-3">Both reflections complete a review.</span></div>
-      {logs.length ? (isMobile ? <Virtuoso
+    <DataSurface ref={dataSurface} className="relative flex min-h-0 flex-1 flex-col">
+      <ErrorLogToolbar
+        search={search}
+        status={status}
+        category={category}
+        facets={facets}
+        facetsLoaded={facetsLoaded}
+        active={Boolean(active)}
+        formats={activeFormats}
+        editor={activeEditor}
+        draftStore={draftStore}
+        linkRequest={linkRequest}
+        onSearchChange={value => { deactivate(); setSearch(value); }}
+        onStatusChange={changeStatus}
+        onCategoryChange={value => { deactivate(); setCategory(value); }}
+        onReset={clearFilters}
+      />
+      {logs.length ? compactLayout ? <Virtuoso
+        ref={mobileRef}
         key={filterKey}
         className="min-h-0 flex-1"
         data={logs}
         computeItemKey={(_index, entry) => entry.id}
         increaseViewportBy={300}
         endReached={() => { if (nextCursor && !error) void load(nextCursor); }}
-        itemContent={(_index, entry) => <article className="space-y-4 border-b border-ui-border/60 p-3">
-          <header className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-muted-foreground">{entry.category || 'General'}</p><Button variant="link" className={`h-auto max-w-full justify-start whitespace-normal p-0 text-left ${entry.sourceUrl ? 'underline underline-offset-4' : ''}`} onClick={() => openSource(entry)}>{entry.source || 'Untitled entry'}{entry.sourceUrl && <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />}</Button></div><Badge variant="outline" className="shrink-0">{entry.reviewedAt ? 'Reviewed' : 'Needs review'}</Badge></header>
-          <div className="grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-muted-foreground">Correct</p><p className="font-medium text-success">{entry.correctAnswer || '—'}</p></div><div><p className="text-xs text-muted-foreground">Yours</p><p className="font-medium text-danger">{entry.userAnswer || 'Omitted'}</p></div></div>
-          {REFLECTIONS.map(({ field, label }) => { const key = cellKey(entry.id, field); return <section key={field}><h3 className="mb-1 text-xs font-medium text-muted-foreground">{label}</h3><RichTextCellEditor id={key} label={`${label} for ${entry.source}`} value={drafts[key]?.value ?? entry[field] ?? ''} draft={drafts[key]} active={active === key} editorRef={activeEditor} onActivate={() => activate(key)} onChange={value => change(entry.id, field, value)} onFlush={() => flush(entry.id, field)} onResolveConflict={resolution => resolveConflict(entry.id, field, resolution)} onFormatChange={setActiveFormats} /></section>; })}
-          <div className="flex justify-end gap-1">{entryOrigin(entry) === 'MANUAL' && <Button variant="ghost" size="icon-sm" aria-label={`Edit details for ${entry.source}`} onClick={() => setManualEntry(entry)}><Pencil /></Button>}<Button variant="ghost" size="icon-sm" aria-label={`Delete ${entry.source}`} disabled={Object.entries(drafts).some(([key, draft]) => key.startsWith(`${entry.id}:`) && draft.status !== 'saved')} onClick={() => setDeleteTarget(entry)}><Trash2 /></Button></div>
-        </article>}
+        itemContent={(_index, entry) => <ErrorLogMobileCard entry={entry} activeKey={active} activePreview={activePreview} draftStore={draftStore} previewStore={previewStore} actions={rowActions} />}
       /> : <TableVirtuoso
-        key={filterKey} className="min-h-0 flex-1" data={logs} components={tableComponents}
-        computeItemKey={(_index, entry) => entry.id} increaseViewportBy={400}
+        ref={tableRef}
+        key={filterKey}
+        className="min-h-0 flex-1"
+        data={logs}
+        components={tableComponents}
+        computeItemKey={(_index, entry) => entry.id}
+        increaseViewportBy={400}
         endReached={() => { if (nextCursor && !error) void load(nextCursor); }}
-        fixedHeaderContent={() => <TableRow className="bg-surface">
-          <TableHead className="w-[12%] px-2">Category</TableHead><TableHead className="w-[18%] px-2">Source</TableHead><TableHead className="w-[7%] px-2">Correct</TableHead><TableHead className="w-[7%] px-2">Yours</TableHead>
-          {REFLECTIONS.map(item => <TableHead className="w-[28%] px-2" key={item.field}>{item.label}</TableHead>)}
-        </TableRow>}
-        itemContent={(_index, entry) => <>
-          <TableCell className="align-top break-words px-2 font-medium">{entry.category || 'General'}</TableCell>
-          <TableCell className="align-top px-2"><Button variant="link" className={`h-auto max-w-full whitespace-normal p-0 text-left ${entry.sourceUrl ? 'underline underline-offset-4' : ''}`} onClick={() => openSource(entry)}>{entry.source || 'Untitled entry'}{entry.sourceUrl && <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />}</Button><div className="mt-2 flex flex-wrap items-center gap-1"><Badge variant="outline">{entry.reviewedAt ? 'Reviewed' : 'Needs review'}</Badge>{entryOrigin(entry) === 'MANUAL' && <Button variant="ghost" size="icon-sm" aria-label={`Edit details for ${entry.source}`} onClick={() => setManualEntry(entry)}><Pencil /></Button>}<Button variant="ghost" size="icon-sm" aria-label={`Delete ${entry.source}`} disabled={Object.entries(drafts).some(([key, draft]) => key.startsWith(`${entry.id}:`) && draft.status !== 'saved')} onClick={() => setDeleteTarget(entry)}><Trash2 /></Button></div></TableCell>
-          <TableCell className="align-top break-words px-2 font-medium text-success">{entry.correctAnswer || '—'}</TableCell><TableCell className="align-top break-words px-2 font-medium text-danger">{entry.userAnswer || 'Omitted'}</TableCell>
-          {REFLECTIONS.map(({ field, label }) => {
-            const key = cellKey(entry.id, field);
-            return <TableCell key={field} className="align-top px-2"><RichTextCellEditor id={key} label={`${label} for ${entry.source}`} value={drafts[key]?.value ?? entry[field] ?? ''} draft={drafts[key]} active={active === key} editorRef={activeEditor} onActivate={() => activate(key)} onChange={value => change(entry.id, field, value)} onFlush={() => flush(entry.id, field)} onResolveConflict={resolution => resolveConflict(entry.id, field, resolution)} onFormatChange={setActiveFormats} /></TableCell>;
-          })}
-        </>}
-      />) : <div className="flex flex-1 items-center justify-center p-6">{loading ? <Loader2 className="animate-spin" aria-label="Loading error log" /> : error ? <p role="alert">{error}</p> : <EmptyState icon={<CircleDashed />} title={hasFilters ? 'No matching entries' : 'No mistakes to review'} description={hasFilters ? 'Adjust your search or filters.' : 'Wrong answers from submitted tests appear here automatically.'} action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined} />}</div>}
+        fixedHeaderContent={() => headers}
+        itemContent={(_index, entry) => <ErrorLogDesktopRow entry={entry} activeKey={active} activePreview={activePreview} draftStore={draftStore} previewStore={previewStore} actions={rowActions} />}
+      /> : loading ? <LoadingRows mobile={compactLayout} headers={headers} /> : <div className="flex flex-1 items-center justify-center p-6">{error
+        ? <div className="space-y-3 text-center" role="alert"><p>Unable to load your error log.</p><Button variant="outline" onClick={() => void load(null, true)}>Retry</Button></div>
+        : <EmptyState icon={<CircleDashed />} title={hasFilters ? 'No matching entries' : 'No mistakes to review'} description={hasFilters ? 'Adjust your search or filters.' : 'Wrong answers from submitted tests appear here automatically.'} action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined} />}</div>}
       {logs.length > 0 && loading && <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ui-border bg-surface px-3 py-1.5 text-xs text-muted-foreground shadow-sm" role="status"><Loader2 className="size-3 animate-spin" />Loading more…</div>}
       {logs.length > 0 && error && <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-control border border-danger/30 bg-surface px-3 py-1.5 text-xs text-danger shadow-sm" role="alert"><span>More entries could not be loaded.</span><Button variant="ghost" size="sm" onClick={() => void load(nextCursor)}>Retry</Button></div>}
+      {activeReflection && activeAnchor.current && <ExpandedReflectionEditor
+        active={activeReflection}
+        anchorRef={activeAnchor}
+        isMobile={isMobile}
+        draftStore={draftStore}
+        editorRef={activeEditor}
+        onChange={value => change(activeReflection.entry.id, activeReflection.field, value)}
+        onFlush={() => flush(activeReflection.entry.id, activeReflection.field)}
+        onClose={deactivate}
+        onNavigate={navigate}
+        onResolveConflict={resolution => resolveConflict(activeReflection.entry.id, activeReflection.field, resolution)}
+        onFormatChange={formatChange}
+        onFormatCommand={command}
+      />}
     </DataSurface>
     <QuestionModal key={questionEntry?.id || 'closed'} entry={questionEntry} onClose={() => setQuestionEntry(null)} />
     {manualEntry && <ManualEntryDialog entry={manualEntry} onClose={() => setManualEntry(null)} onSaved={() => { setManualEntry(null); setReload(value => value + 1); }} />}
@@ -196,52 +374,9 @@ export default function ErrorLog() {
   </main>;
 }
 
-function FormattingToolbar({ editor, active, formats }: { editor: RefObject<RichTextEditorHandle | null>; active: boolean; formats: RichTextFormats }) {
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkValue, setLinkValue] = useState('');
-  const [linkError, setLinkError] = useState('');
-  const openLink = (open: boolean) => {
-    setLinkOpen(open);
-    setLinkError('');
-    if (open) setLinkValue(formats.link || '');
-  };
-  const applyLink = () => {
-    const value = linkValue.trim();
-    if (!value) {
-      editor.current?.setLink(null);
-      setLinkOpen(false);
-      return;
-    }
-    try {
-      const url = new URL(value);
-      if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) throw new Error();
-      editor.current?.setLink(url.toString());
-      setLinkOpen(false);
-    } catch {
-      setLinkError('Enter a complete http, https, or mailto link.');
-    }
-  };
-  return <div role="toolbar" aria-label="Reflection formatting" className="flex min-h-10 flex-wrap items-center gap-1 border-b border-ui-border bg-muted/10 px-3 py-1.5">
-    <span className="mr-2 text-xs text-muted-foreground">{active ? 'Format selected text' : 'Select a reflection cell to format text'}</span>
-    <FormatButton label="Bold" active={formats.bold} disabled={!active} onPress={() => editor.current?.toggleInline('bold')}><Bold /></FormatButton>
-    <FormatButton label="Italic" active={formats.italic} disabled={!active} onPress={() => editor.current?.toggleInline('italic')}><Italic /></FormatButton>
-    <FormatButton label="Underline" active={formats.underline} disabled={!active} onPress={() => editor.current?.toggleInline('underline')}><Underline /></FormatButton>
-    <span className="mx-1 h-5 border-l border-ui-border" aria-hidden="true" />
-    <FormatButton label="Numbered list" active={formats.list === 'ordered'} disabled={!active} onPress={() => editor.current?.toggleList('ordered')}><ListOrdered /></FormatButton>
-    <FormatButton label="Bulleted list" active={formats.list === 'bullet'} disabled={!active} onPress={() => editor.current?.toggleList('bullet')}><List /></FormatButton>
-    <Popover open={linkOpen} onOpenChange={openLink}>
-      <PopoverTrigger asChild><Button type="button" variant={formats.link ? 'secondary' : 'ghost'} size="icon-sm" disabled={!active} aria-label="Add or edit link" aria-pressed={Boolean(formats.link)} title="Add or edit link"><Link2 /></Button></PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-3">
-        <Field><FieldLabel htmlFor="reflection-link">Link</FieldLabel><Input id="reflection-link" type="url" value={linkValue} onChange={event => setLinkValue(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); applyLink(); } }} placeholder="https://…" />{linkError && <p className="text-xs text-danger" role="alert">{linkError}</p>}</Field>
-        <div className="mt-3 flex justify-end gap-2">{formats.link && <Button variant="ghost" size="sm" onClick={() => { editor.current?.setLink(null); setLinkOpen(false); }}>Remove</Button>}<Button size="sm" onClick={applyLink}>Apply</Button></div>
-      </PopoverContent>
-    </Popover>
-    <FormatButton label="Clear formatting" disabled={!active} onPress={() => editor.current?.clearFormatting()}><RemoveFormatting /></FormatButton>
-  </div>;
-}
-
-function FormatButton({ label, active = false, disabled, onPress, children }: { label: string; active?: boolean; disabled: boolean; onPress: () => void; children: ReactNode }) {
-  return <Button type="button" variant={active ? 'secondary' : 'ghost'} size="icon-sm" disabled={disabled} aria-label={label} aria-pressed={active} title={label} onPointerDown={event => event.preventDefault()} onClick={onPress}>{children}</Button>;
+function LoadingRows({ mobile, headers }: { mobile: boolean; headers: ReactNode }) {
+  if (mobile) return <div className="flex-1 space-y-4 p-4" aria-label="Loading error log">{Array.from({ length: 4 }, (_, index) => <div key={index} className="space-y-3 border-b border-ui-border/60 pb-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/3" /><Skeleton className="h-16 w-full" /></div>)}</div>;
+  return <Table unwrapped className="w-full table-fixed" aria-label="Loading error log"><TableHeader>{headers}</TableHeader><TableBody>{Array.from({ length: 5 }, (_, index) => <TableRow key={index}><TableCell colSpan={8} className="h-16"><Skeleton className="h-4 w-full" /></TableCell></TableRow>)}</TableBody></Table>;
 }
 
 function ManualEntryDialog({ entry, onClose, onSaved }: { entry: ErrorEntry | 'new'; onClose: () => void; onSaved: () => void }) {
@@ -250,21 +385,20 @@ function ManualEntryDialog({ entry, onClose, onSaved }: { entry: ErrorEntry | 'n
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const save = async () => {
-    setSaving(true); setError('');
+    setSaving(true);
+    setError('');
     try {
       const payload = { ...draft, category: draft.category.trim() || 'General' };
       if (entry === 'new') await axiosClient.post('/api/error-logs', { ...payload, clientMutationId });
-      else await axiosClient.patch(`/api/error-logs/${entry.id}`, {
-        ...payload,
-        ...(entry.version !== undefined ? { expectedVersion: entry.version } : {}),
-      });
+      else await axiosClient.patch(`/api/error-logs/${entry.id}`, { ...payload, ...(entry.version !== undefined ? { expectedVersion: entry.version } : {}) });
       invalidateQueryCache('/api/error-logs');
       onSaved();
     } catch (requestError) {
       const conflict = (requestError as { response?: { status?: number } }).response?.status === 409;
       setError(conflict ? 'This entry changed in another tab. Close and reopen it before editing.' : 'Unable to save this entry. Please try again.');
+    } finally {
+      setSaving(false);
     }
-    finally { setSaving(false); }
   };
   return <Modal open onClose={() => { if (!saving) onClose(); }} presentation="content-dialog" title={entry === 'new' ? 'Add an error entry' : 'Edit entry details'} subtitle="Add context here, then write your reflection in the table." className="max-w-lg!" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !draft.source.trim() || !draft.userAnswer.trim() || !draft.correctAnswer.trim()} onClick={() => void save()}>{saving ? 'Saving…' : 'Save entry'}</Button></>}>
     <div className="space-y-4">{([{ field: 'source', label: 'Source name', max: 200, type: 'text', placeholder: 'Khan Academy worksheet' }, { field: 'sourceUrl', label: 'External link (optional)', max: 2048, type: 'url', placeholder: 'https://…' }, { field: 'category', label: 'Category', max: 120, type: 'text', placeholder: 'Algebra' }, { field: 'correctAnswer', label: 'Correct answer', max: 100, type: 'text', placeholder: 'B' }, { field: 'userAnswer', label: 'Your answer', max: 100, type: 'text', placeholder: 'A or Omitted' }] as const).map(({ field, label, max, type, placeholder }) => <Field key={field}><FieldLabel htmlFor={`manual-${field}`}>{label}</FieldLabel><Input id={`manual-${field}`} type={type} maxLength={max} placeholder={placeholder} value={draft[field]} onChange={event => setDraft(value => ({ ...value, [field]: event.target.value }))} /></Field>)}{error && <p role="alert" className="text-danger">{error}</p>}</div>

@@ -14,6 +14,7 @@ router.param('id', (req, res, next, id) => {
 });
 
 router.get('/', errorLogController.getErrorLogs);
+router.get('/facets', errorLogController.getErrorLogFacets);
 router.post('/', errorLogController.createErrorLog);
 router.get('/:id/question', errorLogController.getErrorLogQuestion);
 router.patch('/:id', errorLogController.updateErrorLog);

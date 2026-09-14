@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react';
+import { memo, useMemo, type ComponentProps } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -6,7 +6,14 @@ interface RichTextContentProps extends Omit<ComponentProps<'div'>, 'children' | 
   html: string;
 }
 
-function RichTextContent({ html, className, ...props }: RichTextContentProps) {
+const allowedTags = new Set(['a', 'b', 'blockquote', 'br', 'code', 'em', 'h1', 'h2', 'h3', 'i', 'li', 'ol', 'p', 'pre', 's', 'strong', 'u', 'ul']);
+const sanitizedCache = new Map<string, string>();
+const maxCacheEntries = 300;
+const maxCacheableLength = 50_000;
+
+const RichTextContent = memo(function RichTextContent({ html, className, ...props }: RichTextContentProps) {
+  const sanitizedHtml = useMemo(() => sanitizeRichText(html), [html]);
+
   return <div
     data-slot="rich-text-content"
     className={cn(
@@ -21,15 +28,20 @@ function RichTextContent({ html, className, ...props }: RichTextContentProps) {
       '[&_h1]:my-3 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:my-3 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:my-2 [&_h3]:text-sm [&_h3]:font-semibold',
       className,
     )}
-    dangerouslySetInnerHTML={{ __html: sanitizeRichText(html) }}
+    dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     {...props}
   />;
-}
+});
 
 function sanitizeRichText(value: string) {
   if (typeof DOMParser === 'undefined') return '';
+  const cached = sanitizedCache.get(value);
+  if (cached !== undefined) {
+    sanitizedCache.delete(value);
+    sanitizedCache.set(value, cached);
+    return cached;
+  }
   const parsed = new DOMParser().parseFromString(value, 'text/html');
-  const allowedTags = new Set(['a', 'b', 'blockquote', 'br', 'code', 'em', 'h1', 'h2', 'h3', 'i', 'li', 'ol', 'p', 'pre', 's', 'strong', 'u', 'ul']);
   [...parsed.body.querySelectorAll('*')].forEach(node => {
     const tagName = node.tagName.toLowerCase();
     if (!allowedTags.has(tagName)) {
@@ -49,7 +61,15 @@ function sanitizeRichText(value: string) {
       // Invalid links remain readable without a clickable destination.
     }
   });
-  return parsed.body.innerHTML;
+  const sanitized = parsed.body.innerHTML;
+  if (value.length <= maxCacheableLength) {
+    sanitizedCache.set(value, sanitized);
+    if (sanitizedCache.size > maxCacheEntries) {
+      const oldest = sanitizedCache.keys().next().value;
+      if (oldest !== undefined) sanitizedCache.delete(oldest);
+    }
+  }
+  return sanitized;
 }
 
 export { RichTextContent, sanitizeRichText };

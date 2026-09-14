@@ -253,6 +253,47 @@ test('manual source links are optional, normalized, and limited to http or https
   assert.equal(entry.sourceUrl, 'https://example.com/test');
 });
 
+test('filter facets return status counts independent of the selected status and owner-scoped categories', async t => {
+  const countCalls = [];
+  let categoryQuery;
+  t.mock.method(prisma.errorLog, 'count', options => {
+    countCalls.push(options);
+    return options;
+  });
+  t.mock.method(prisma.errorLog, 'findMany', options => {
+    categoryQuery = options;
+    return options;
+  });
+  t.mock.method(prisma, '$transaction', async () => [12, 7, [
+    { category: 'Algebra' },
+    { category: 'Words in Context' },
+  ]]);
+
+  const facets = await service.getErrorLogFacets({
+    userId: 7,
+    query: { search: 'coefficient', category: 'Algebra', status: 'REVIEWED' },
+  });
+
+  assert.deepEqual(facets, {
+    all: 12,
+    needsReview: 7,
+    reviewed: 5,
+    categories: ['Algebra', 'Words in Context'],
+  });
+  assert.deepEqual(countCalls[0], { where: {
+    userId: 7,
+    category: 'Algebra',
+    searchText: { contains: 'coefficient', mode: 'insensitive' },
+  } });
+  assert.deepEqual(countCalls[1], { where: { AND: [countCalls[0].where, { reviewedAt: null }] } });
+  assert.deepEqual(categoryQuery, {
+    where: { userId: 7 },
+    select: { category: true },
+    distinct: ['category'],
+    orderBy: { category: 'asc' },
+  });
+});
+
 test('reflection HTML keeps semantic formatting and removes executable content and unsafe URLs', () => {
   const html = sanitizeReflection('<p onclick="evil()"><strong>Reason</strong> <u>detail</u></p><script>evil()</script><img src=x onerror=evil()><a href="javascript:evil()">bad</a><a href="https://example.com">good</a>');
   assert.match(html, /<strong>Reason<\/strong>/);
