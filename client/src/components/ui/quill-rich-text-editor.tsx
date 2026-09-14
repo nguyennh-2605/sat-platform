@@ -15,6 +15,17 @@ const basicFormats = ['bold', 'italic', 'underline', 'list', 'link'];
 const standardModules = { toolbar: basicToolbar };
 const standardModulesWithoutToolbar = { toolbar: false };
 const emptyFormats: RichTextFormats = { bold: false, italic: false, underline: false, list: null, link: null };
+type InlineFormat = 'bold' | 'italic' | 'underline';
+const isNativeInlineShortcut = (shortcut: ReturnType<typeof getRichTextShortcut>) => shortcut === 'bold'
+  || shortcut === 'italic'
+  || shortcut === 'underline';
+const getInlineFormatShortcut = (event: { altKey: boolean; code: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): InlineFormat | null => {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return null;
+  if (event.code === 'KeyB') return 'bold';
+  if (event.code === 'KeyI') return 'italic';
+  if (event.code === 'KeyU') return 'underline';
+  return null;
+};
 
 const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function QuillRichTextEditor({ id, labelledBy, value, onChange, placeholder, disabled = false, className, compact = false, expanded = false, autoFocus = false, hideToolbar = false, onFormatChange, onShortcut }, forwardedRef) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -22,31 +33,8 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
   const lastSelection = useRef<{ index: number; length: number } | null>(null);
   const lastFormats = useRef<RichTextFormats>(emptyFormats);
   const formatFrame = useRef<number | null>(null);
-
-  const withEditor = (callback: (editor: ReturnType<ReactQuill['getEditor']>, selection: { index: number; length: number }) => void) => {
-    const editor = quillRef.current?.getEditor();
-    if (!editor) return;
-    const selection = editor.getSelection() || lastSelection.current || { index: editor.getLength() - 1, length: 0 };
-    editor.setSelection(selection.index, selection.length, 'silent');
-    editor.focus();
-    callback(editor, selection);
-  };
-
-  useImperativeHandle(forwardedRef, () => ({
-    toggleInline(format) {
-      withEditor((editor, selection) => editor.format(format, !editor.getFormat(selection)[format], 'user'));
-    },
-    toggleList(list) {
-      withEditor((editor, selection) => editor.format('list', editor.getFormat(selection).list === list ? false : list, 'user'));
-    },
-    setLink(href) {
-      withEditor(editor => editor.format('link', href || false, 'user'));
-    },
-    clearFormatting() {
-      withEditor((editor, selection) => editor.removeFormat(selection.index, selection.length, 'user'));
-    },
-    focus() { quillRef.current?.getEditor().focus(); },
-  }));
+  const compositionFrame = useRef<number | null>(null);
+  const deferredCompositionFormats = useRef(new Set<InlineFormat>());
 
   const publishFormats = () => {
     const editor = quillRef.current?.getEditor();
@@ -73,8 +61,37 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
     });
   };
 
+  const withEditor = (callback: (editor: ReturnType<ReactQuill['getEditor']>, selection: { index: number; length: number }) => void) => {
+    const editor = quillRef.current?.getEditor();
+    if (!editor) return;
+    const selection = editor.getSelection() || lastSelection.current || { index: editor.getLength() - 1, length: 0 };
+    editor.setSelection(selection.index, selection.length, 'silent');
+    editor.focus();
+    callback(editor, selection);
+    lastSelection.current = editor.getSelection() || selection;
+    publishFormats();
+    scheduleFormats();
+  };
+
+  useImperativeHandle(forwardedRef, () => ({
+    toggleInline(format) {
+      withEditor((editor, selection) => editor.format(format, !editor.getFormat(selection)[format], 'user'));
+    },
+    toggleList(list) {
+      withEditor((editor, selection) => editor.format('list', editor.getFormat(selection).list === list ? false : list, 'user'));
+    },
+    setLink(href) {
+      withEditor(editor => editor.format('link', href || false, 'user'));
+    },
+    clearFormatting() {
+      withEditor((editor, selection) => editor.removeFormat(selection.index, selection.length, 'user'));
+    },
+    focus() { quillRef.current?.getEditor().focus(); },
+  }));
+
   useEffect(() => () => {
     if (formatFrame.current !== null) cancelAnimationFrame(formatFrame.current);
+    if (compositionFrame.current !== null) cancelAnimationFrame(compositionFrame.current);
   }, []);
 
   useEffect(() => {
@@ -102,11 +119,44 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
       className,
     )}
     onKeyDownCapture={event => {
+      const composingFormat = event.nativeEvent.isComposing ? getInlineFormatShortcut(event) : null;
+      if (composingFormat) {
+        event.preventDefault();
+        event.stopPropagation();
+        const deferred = deferredCompositionFormats.current;
+        if (deferred.has(composingFormat)) deferred.delete(composingFormat);
+        else deferred.add(composingFormat);
+        return;
+      }
       const shortcut = onShortcut ? getRichTextShortcut(event) : null;
       if (!shortcut) return;
+      // Quill's keyboard module owns inline shortcuts. Its binding applies the
+      // pending format directly to a collapsed caret during ordinary input;
+      // composing shortcuts are deferred above. The app dispatcher still owns
+      // navigation, exit, lists, and links.
+      if (isNativeInlineShortcut(shortcut)) return;
       event.preventDefault();
       event.stopPropagation();
       onShortcut?.(shortcut);
+    }}
+    onKeyDown={event => {
+      const shortcut = onShortcut ? getRichTextShortcut(event) : null;
+      if (isNativeInlineShortcut(shortcut)) event.stopPropagation();
+    }}
+    onKeyUpCapture={event => {
+      if (isNativeInlineShortcut(onShortcut ? getRichTextShortcut(event) : null)) scheduleFormats();
+    }}
+    onCompositionEndCapture={() => {
+      const deferred = [...deferredCompositionFormats.current];
+      deferredCompositionFormats.current.clear();
+      if (deferred.length === 0) return;
+      if (compositionFrame.current !== null) cancelAnimationFrame(compositionFrame.current);
+      compositionFrame.current = requestAnimationFrame(() => {
+        compositionFrame.current = null;
+        withEditor((editor, selection) => {
+          deferred.forEach(format => editor.format(format, !editor.getFormat(selection)[format], 'user'));
+        });
+      });
     }}
   >
     <ReactQuill

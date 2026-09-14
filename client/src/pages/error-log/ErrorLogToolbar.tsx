@@ -128,7 +128,7 @@ function FormattingControls({ editor, active, formats, linkRequest }: { editor: 
   };
 
   return <TooltipProvider>
-    <div role="toolbar" aria-label="Reflection formatting" className="flex min-w-0 flex-wrap items-center gap-1">
+    <div data-reflection-toolbar role="toolbar" aria-label="Reflection formatting" className="flex min-w-0 flex-wrap items-center gap-1">
       <FormatButton label="Bold" shortcut="Ctrl/Cmd+B" active={formats.bold} disabled={!active} onPress={() => editor.current?.toggleInline('bold')}><Bold /></FormatButton>
       <FormatButton label="Italic" shortcut="Ctrl/Cmd+I" active={formats.italic} disabled={!active} onPress={() => editor.current?.toggleInline('italic')}><Italic /></FormatButton>
       <FormatButton label="Underline" shortcut="Ctrl/Cmd+U" active={formats.underline} disabled={!active} onPress={() => editor.current?.toggleInline('underline')}><Underline /></FormatButton>

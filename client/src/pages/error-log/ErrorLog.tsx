@@ -69,14 +69,15 @@ export default function ErrorLog() {
   const [activePreview, setActivePreview] = useState<ActivePreviewSnapshot | null>(null);
   const [activeFormats, setActiveFormats] = useState<RichTextFormats>(EMPTY_FORMATS);
   const [linkRequest, setLinkRequest] = useState(0);
+  const [navigationPending, setNavigationPending] = useState(false);
   const activeEditor = useRef<RichTextEditorHandle>(null);
-  const activeAnchor = useRef<HTMLElement | null>(null);
+  const activeKeyRef = useRef<string | null>(null);
   const dataSurface = useRef<HTMLElement | null>(null);
   const tableRef = useRef<TableVirtuosoHandle>(null);
   const mobileRef = useRef<VirtuosoHandle>(null);
   const request = useRef<AbortController | null>(null);
+  const loadPromise = useRef<Promise<ErrorPage | null> | null>(null);
   const facetsRequest = useRef<AbortController | null>(null);
-  const busy = useRef(false);
   const rowReviewStates = useRef(new Map<string, boolean>());
   const rowVersions = useRef(new Map<string, number>());
 
@@ -110,37 +111,45 @@ export default function ErrorLog() {
     return () => observer.disconnect();
   }, []);
 
-  const load = useCallback(async (cursor: string | null, replace = false) => {
-    if (busy.current && !replace) return;
-    request.current?.abort();
+  const load = useCallback((cursor: string | null, replace = false): Promise<ErrorPage | null> => {
+    if (loadPromise.current && !replace) return loadPromise.current;
+    if (replace) request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
-    busy.current = true;
     setLoading(true);
     setError('');
-    try {
-      const params = { limit: 40, cursor: cursor || undefined, search: debouncedSearch || undefined, status, category: category || undefined };
-      const data = await axiosClient.get<ErrorPage>('/api/error-logs', { params, signal: controller.signal });
-      if (controller.signal.aborted) return;
-      if (replace) {
-        rowReviewStates.current.clear();
-        rowVersions.current.clear();
-        previewStore.prune(new Set(data.items.flatMap(item => reflectionFields.map(field => cellKey(item.id, field)))));
+    const operation = (async () => {
+      try {
+        const params = { limit: 40, cursor: cursor || undefined, search: debouncedSearch || undefined, status, category: category || undefined };
+        const data = await axiosClient.get<ErrorPage>('/api/error-logs', { params, signal: controller.signal });
+        if (controller.signal.aborted) return null;
+        if (replace) {
+          rowReviewStates.current.clear();
+          rowVersions.current.clear();
+          previewStore.prune(new Set(data.items.flatMap(item => reflectionFields.map(field => cellKey(item.id, field)))));
+        }
+        data.items.forEach(item => {
+          rowReviewStates.current.set(item.id, Boolean(item.reviewedAt));
+          if (item.version !== undefined) rowVersions.current.set(item.id, item.version);
+        });
+        setLogs(rows => replace ? data.items : [...rows, ...data.items.filter(item => !rows.some(row => row.id === item.id))]);
+        setNextCursor(data.nextCursor);
+        return data;
+      } catch {
+        if (!controller.signal.aborted) setError('Unable to load your error log. Please try again.');
+        return null;
+      } finally {
+        if (request.current === controller) {
+          request.current = null;
+          setLoading(false);
+        }
       }
-      data.items.forEach(item => {
-        rowReviewStates.current.set(item.id, Boolean(item.reviewedAt));
-        if (item.version !== undefined) rowVersions.current.set(item.id, item.version);
-      });
-      setLogs(rows => replace ? data.items : [...rows, ...data.items.filter(item => !rows.some(row => row.id === item.id))]);
-      setNextCursor(data.nextCursor);
-    } catch {
-      if (!controller.signal.aborted) setError('Unable to load your error log. Please try again.');
-    } finally {
-      if (!controller.signal.aborted) {
-        busy.current = false;
-        setLoading(false);
-      }
-    }
+    })();
+    loadPromise.current = operation;
+    void operation.finally(() => {
+      if (loadPromise.current === operation) loadPromise.current = null;
+    });
+    return operation;
   }, [category, debouncedSearch, previewStore, status]);
 
   useEffect(() => {
@@ -169,16 +178,24 @@ export default function ErrorLog() {
     return () => controller.abort();
   }, [category, debouncedSearch, reload]);
 
-  const activate = useCallback((key: string, anchor: HTMLElement, previewValue: string) => {
+  const scrollToRow = useCallback((rowIndex: number) => {
+    if (compactLayout) mobileRef.current?.scrollToIndex({ index: rowIndex, align: 'center', behavior: 'auto' });
+    else tableRef.current?.scrollToIndex({ index: rowIndex, align: 'center', behavior: 'auto' });
+  }, [compactLayout]);
+
+  const activate = useCallback((key: string, previewValue: string) => {
     if (active && active !== key) {
       const [id, field] = active.split(':');
       flush(id, field as EditableField);
     }
-    activeAnchor.current = anchor;
     setActivePreview({ key, value: previewValue });
     setActiveFormats(EMPTY_FORMATS);
     setActive(key);
-  }, [active, flush]);
+    activeKeyRef.current = key;
+    const [entryId] = key.split(':');
+    const rowIndex = logs.findIndex(entry => entry.id === entryId);
+    if (rowIndex >= 0) requestAnimationFrame(() => scrollToRow(rowIndex));
+  }, [active, flush, logs, scrollToRow]);
 
   const deactivate = useCallback((restoreFocus = false) => {
     const closingKey = active;
@@ -189,47 +206,69 @@ export default function ErrorLog() {
     setActive(null);
     setActivePreview(null);
     setActiveFormats(EMPTY_FORMATS);
-    activeAnchor.current = null;
-    if (restoreFocus && closingKey) requestAnimationFrame(() => {
+    activeKeyRef.current = null;
+    if (!restoreFocus || !closingKey) return;
+    const [entryId] = closingKey.split(':');
+    const rowIndex = logs.findIndex(entry => entry.id === entryId);
+    const focusCell = () => {
       const target = [...document.querySelectorAll<HTMLElement>('[data-reflection-key]')]
         .find(element => element.dataset.reflectionKey === closingKey);
       target?.focus();
+      return Boolean(target);
+    };
+    requestAnimationFrame(() => {
+      if (focusCell()) return;
+      if (rowIndex >= 0) scrollToRow(rowIndex);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!focusCell()) document.querySelector<HTMLInputElement>('[data-error-log-toolbar] input')?.focus();
+      }));
     });
-  }, [active, flush]);
+  }, [active, flush, logs, scrollToRow]);
 
   const navigate = useCallback((direction: -1 | 1) => {
-    if (!active) return;
+    if (!active || navigationPending) return;
     const keys = logs.flatMap(entry => reflectionFields.map(field => cellKey(entry.id, field)));
     const currentIndex = keys.indexOf(active);
     const targetIndex = currentIndex + direction;
-    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= keys.length) {
+    if (currentIndex < 0 || targetIndex < 0) {
       deactivate(true);
       return;
     }
     const [activeId, activeField] = active.split(':');
     flush(activeId, activeField as EditableField);
-    const rowIndex = Math.floor(targetIndex / reflectionFields.length);
-    const target = keys[targetIndex];
-    if (compactLayout) mobileRef.current?.scrollToIndex({ index: rowIndex, align: 'center', behavior: 'auto' });
-    else tableRef.current?.scrollToIndex({ index: rowIndex, align: 'center', behavior: 'auto' });
-    setActiveFormats(EMPTY_FORMATS);
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const anchor = [...document.querySelectorAll<HTMLElement>('[data-reflection-key]')]
-        .find(element => element.dataset.reflectionKey === target);
-      if (!anchor) {
-        deactivate();
-        return;
-      }
-      activeAnchor.current = anchor;
+    const selectTarget = (target: string, entries: ErrorEntry[], rowIndex: number) => {
       const [targetId, targetField] = target.split(':');
-      const targetEntry = logs.find(entry => entry.id === targetId);
+      const targetEntry = entries.find(entry => entry.id === targetId);
       const previewValue = draftStore.getDraft(target)?.value
         ?? targetEntry?.[targetField as EditableField]
         ?? '';
+      setActiveFormats(EMPTY_FORMATS);
       setActivePreview({ key: target, value: previewValue });
       setActive(target);
-    }));
-  }, [active, compactLayout, deactivate, draftStore, flush, logs]);
+      activeKeyRef.current = target;
+      requestAnimationFrame(() => scrollToRow(rowIndex));
+    };
+    if (targetIndex < keys.length) {
+      selectTarget(keys[targetIndex], logs, Math.floor(targetIndex / reflectionFields.length));
+      return;
+    }
+    if (direction < 0 || !nextCursor) {
+      deactivate(true);
+      return;
+    }
+    const expectedActive = active;
+    setNavigationPending(true);
+    void load(nextCursor).then(page => {
+      if (!page || activeKeyRef.current !== expectedActive) return;
+      const loadedIds = new Set(logs.map(entry => entry.id));
+      const nextEntry = page.items.find(entry => !loadedIds.has(entry.id));
+      if (!nextEntry) {
+        if (!page.nextCursor) deactivate(true);
+        return;
+      }
+      selectTarget(cellKey(nextEntry.id, 'whyWrong'), [...logs, ...page.items], logs.length);
+    }).finally(() => setNavigationPending(false));
+  }, [active, deactivate, draftStore, flush, load, logs, navigationPending, nextCursor, scrollToRow]);
 
   const formatChange = useCallback((next: RichTextFormats) => {
     setActiveFormats(previous => sameFormats(previous, next) ? previous : next);
@@ -328,7 +367,7 @@ export default function ErrorLog() {
         onCategoryChange={value => { deactivate(); setCategory(value); }}
         onReset={clearFilters}
       />
-      {logs.length ? compactLayout ? <Virtuoso
+      <div className="relative flex min-h-0 flex-1 flex-col">{logs.length ? compactLayout ? <Virtuoso
         ref={mobileRef}
         key={filterKey}
         className="min-h-0 flex-1"
@@ -352,11 +391,11 @@ export default function ErrorLog() {
         ? <div className="space-y-3 text-center" role="alert"><p>Unable to load your error log.</p><Button variant="outline" onClick={() => void load(null, true)}>Retry</Button></div>
         : <EmptyState icon={<CircleDashed />} title={hasFilters ? 'No matching entries' : 'No mistakes to review'} description={hasFilters ? 'Adjust your search or filters.' : 'Wrong answers from submitted tests appear here automatically.'} action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined} />}</div>}
       {logs.length > 0 && loading && <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ui-border bg-surface px-3 py-1.5 text-xs text-muted-foreground shadow-sm" role="status"><Loader2 className="size-3 animate-spin" />Loading more…</div>}
-      {logs.length > 0 && error && <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-control border border-danger/30 bg-surface px-3 py-1.5 text-xs text-danger shadow-sm" role="alert"><span>More entries could not be loaded.</span><Button variant="ghost" size="sm" onClick={() => void load(nextCursor)}>Retry</Button></div>}
-      {activeReflection && activeAnchor.current && <ExpandedReflectionEditor
+      {logs.length > 0 && error && <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-control border border-danger/30 bg-surface px-3 py-1.5 text-xs text-danger shadow-sm" role="alert"><span>More entries could not be loaded.</span><Button variant="ghost" size="sm" onClick={() => void load(nextCursor)}>Retry</Button></div>}</div>
+      {activeReflection && <ExpandedReflectionEditor
         active={activeReflection}
-        anchorRef={activeAnchor}
         isMobile={isMobile}
+        navigationPending={navigationPending}
         draftStore={draftStore}
         editorRef={activeEditor}
         onChange={value => change(activeReflection.entry.id, activeReflection.field, value)}

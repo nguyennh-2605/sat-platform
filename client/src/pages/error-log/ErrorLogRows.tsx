@@ -16,7 +16,7 @@ const reflections = [
 ] as const;
 
 export interface ErrorLogRowActions {
-  activate: (key: string, anchor: HTMLElement, previewValue: string) => void;
+  activate: (key: string, previewValue: string) => void;
   openSource: (entry: ErrorEntry) => void;
   editEntry: (entry: ErrorEntry) => void;
   deleteEntry: (entry: ErrorEntry) => void;
@@ -66,7 +66,7 @@ function ReflectionCell({ entry, field, label, activeKey, activePreview, draftSt
     draftStore={draftStore}
     previewStore={previewStore}
     previewMaxHeight={previewMaxHeight}
-    onActivate={(anchor, previewValue) => actions.activate(key, anchor, previewValue)}
+    onActivate={previewValue => actions.activate(key, previewValue)}
   />;
 }
 

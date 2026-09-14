@@ -1,8 +1,8 @@
-import type { RefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
+import { DataDock } from '@/components/ui/data-surface';
 import { RichTextContent } from '@/components/ui/rich-text-content';
 import { RichTextEditor, type RichTextEditorHandle, type RichTextFormats, type RichTextShortcut } from '@/components/ui/rich-text-editor';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -17,8 +17,8 @@ export interface ActiveReflection {
 
 interface ExpandedReflectionEditorProps {
   active: ActiveReflection;
-  anchorRef: RefObject<HTMLElement | null>;
   isMobile: boolean;
+  navigationPending: boolean;
   draftStore: ReflectionDraftStore;
   editorRef: RefObject<RichTextEditorHandle | null>;
   onChange: (value: string) => void;
@@ -35,23 +35,35 @@ const fieldLabels: Record<EditableField, string> = {
   whyRight: 'Why answer is right',
 };
 
-const isFormattingToolbar = (target: EventTarget | null) => target instanceof HTMLElement
-  && Boolean(target.closest('[data-error-log-toolbar]'));
+const isReflectionEditingSurface = (target: EventTarget | null) => target instanceof Element
+  && Boolean(target.closest('[data-reflection-editor], [data-reflection-toolbar]'));
 
 export function ExpandedReflectionEditor(props: ExpandedReflectionEditorProps) {
+  const { active, isMobile, onClose } = props;
+
+  useEffect(() => {
+    if (isMobile) return;
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      if (!isReflectionEditingSurface(event.target)) onClose(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown, true);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true);
+  }, [active.key, isMobile, onClose]);
+
   const closeFromSurface = (open: boolean) => {
     if (!open) props.onClose(false);
   };
   const keepOpenForToolbar = (event: { target: EventTarget | null; preventDefault: () => void }) => {
-    if (isFormattingToolbar(event.target)) event.preventDefault();
+    if (isReflectionEditingSurface(event.target)) event.preventDefault();
   };
 
   if (props.isMobile) {
     return <Sheet open modal={false} onOpenChange={closeFromSurface}>
       <SheetContent
+        data-reflection-editor
         side="bottom"
         showOverlay={false}
-        className="max-h-[85vh] gap-0 rounded-t-xl border-ui-border p-0"
+        className="max-h-[85vh] gap-0 rounded-t-xl border-2 border-ring/80 p-0"
         onOpenAutoFocus={event => event.preventDefault()}
         onCloseAutoFocus={event => event.preventDefault()}
         onInteractOutside={keepOpenForToolbar}
@@ -65,32 +77,30 @@ export function ExpandedReflectionEditor(props: ExpandedReflectionEditorProps) {
     </Sheet>;
   }
 
-  return <Popover open modal={false} onOpenChange={closeFromSurface}>
-    <PopoverAnchor virtualRef={props.anchorRef} />
-    <PopoverContent
-      side="bottom"
-      align="start"
-      sideOffset={6}
-      collisionPadding={16}
-      sticky="always"
-      className="w-[min(48rem,calc(100vw-2rem))] p-0"
-      onOpenAutoFocus={event => event.preventDefault()}
-      onCloseAutoFocus={event => event.preventDefault()}
-      onInteractOutside={keepOpenForToolbar}
-    >
-      <header className="flex items-start gap-3 border-b border-ui-border px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-sm font-medium text-foreground">{fieldLabels[props.active.field]}</h2>
-          <p className="truncate text-xs text-muted-foreground">{props.active.entry.source || 'Untitled entry'}</p>
-        </div>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Close reflection editor" onClick={() => props.onClose(true)}><X /></Button>
+  const titleId = `${props.active.key}-dock-title`;
+  const source = props.active.entry.source || 'Untitled entry';
+  return <DataDock
+    data-reflection-editor
+    placement="floating"
+    role="dialog"
+    aria-modal="false"
+    aria-labelledby={titleId}
+    aria-busy={props.navigationPending}
+    className="max-h-[min(30rem,calc(100%-7rem))] animate-in border-2 border-ring/80 fade-in shadow-xl zoom-in-95 duration-150"
+  >
+      <header className="flex min-h-11 shrink-0 items-center gap-3 border-b border-ui-border px-4 py-2">
+        <h2 id={titleId} className="flex min-w-0 flex-1 items-center gap-1.5 font-heading text-sm font-medium text-foreground">
+          <span className="shrink-0">{fieldLabels[props.active.field]}</span>
+          <span className="text-muted-foreground" aria-hidden="true">·</span>
+          <span className="truncate font-normal text-muted-foreground" title={source}>{source}</span>
+        </h2>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Close reflection editor" onClick={() => props.onClose(false)}><X /></Button>
       </header>
       <EditorBody {...props} />
-    </PopoverContent>
-  </Popover>;
+  </DataDock>;
 }
 
-function EditorBody({ active, draftStore, editorRef, onChange, onFlush, onClose, onNavigate, onResolveConflict, onFormatChange, onFormatCommand }: ExpandedReflectionEditorProps) {
+function EditorBody({ active, navigationPending, draftStore, editorRef, onChange, onFlush, onClose, onNavigate, onResolveConflict, onFormatChange, onFormatCommand }: ExpandedReflectionEditorProps) {
   const draft = useCellDraft(draftStore, active.key);
   const value = draft?.value ?? active.entry[active.field] ?? '';
   const labelId = `${cellKey(active.entry.id, active.field)}-expanded-label`;
@@ -107,7 +117,7 @@ function EditorBody({ active, draftStore, editorRef, onChange, onFlush, onClose,
     onFormatCommand(shortcut);
   };
 
-  return <div className="space-y-3 p-4">
+  return <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
     <span id={labelId} className="sr-only">{fieldLabels[active.field]} for {active.entry.source || 'untitled entry'}</span>
     <RichTextEditor
       key={active.key}
@@ -117,6 +127,7 @@ function EditorBody({ active, draftStore, editorRef, onChange, onFlush, onClose,
       expanded
       autoFocus
       hideToolbar
+      className="border-ring/70"
       value={value}
       onChange={onChange}
       onFormatChange={onFormatChange}
@@ -130,6 +141,6 @@ function EditorBody({ active, draftStore, editorRef, onChange, onFlush, onClose,
     </div> : draft?.status === 'error' && <div role="alert" className="flex items-center justify-between gap-3 text-xs text-danger">
       <span>{draft.error}</span><Button size="sm" variant="ghost" onClick={onFlush}>Retry</Button>
     </div>}
-    <p className="text-xs text-muted-foreground">Tab moves between reflection cells. Ctrl/Cmd+Enter saves and closes.</p>
+    <p className="text-xs text-muted-foreground">{navigationPending ? 'Loading the next reflection…' : 'Tab moves between reflection cells. Ctrl/Cmd+Enter saves and closes.'}</p>
   </div>;
 }

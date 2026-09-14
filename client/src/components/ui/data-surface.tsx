@@ -48,6 +48,25 @@ function DataToolbarActions({ className, ...props }: React.ComponentProps<'div'>
   return <div data-slot="data-toolbar-actions" className={cn('flex shrink-0 items-center gap-2 lg:ml-auto', className)} {...props} />;
 }
 
+interface DataDockProps extends React.ComponentProps<'section'> {
+  placement?: 'inline' | 'floating';
+}
+
+function DataDock({ className, placement = 'inline', ...props }: DataDockProps) {
+  return <section
+    data-slot="data-dock"
+    data-placement={placement}
+    className={cn(
+      'flex min-h-0 flex-col bg-surface',
+      placement === 'floating'
+        ? 'absolute bottom-3 right-3 z-30 w-[min(48rem,calc(100%-1.5rem))] overflow-hidden rounded-card border border-ui-border shadow-lg'
+        : 'shrink-0 border-t border-ui-border',
+      className,
+    )}
+    {...props}
+  />;
+}
+
 interface DataToolbarSearchProps extends Omit<React.ComponentProps<typeof Input>, 'type'> {
   label?: string;
 }
@@ -103,6 +122,7 @@ function DataPagination({ className, ...props }: React.ComponentProps<'footer'>)
 }
 
 export {
+  DataDock,
   DataPagination,
   DataPrimaryCell,
   DataPrimaryText,

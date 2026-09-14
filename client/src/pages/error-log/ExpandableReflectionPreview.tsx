@@ -58,7 +58,7 @@ export function ExpandableReflectionPreview({ dataKey, html, label, active, expa
       >
         <div ref={viewportRef} className={cn(!expanded && maxHeightClassName, !expanded && 'overflow-hidden')}>
           {html
-            ? <RichTextContent html={html} />
+            ? <RichTextContent html={html} density="compact" />
             : <span className="text-sm text-muted-foreground">Add reflection…</span>}
         </div>
       </div>
