@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Clock3, LoaderCircle, Pause, Play, RotateCcw, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Mascot } from '@/components/brand/Mascot';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Progress } from '@/components/ui/progress';
@@ -85,9 +86,12 @@ export function FocusClock() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-4">
         <div className="grid gap-4">
-          <div>
-            <p className="text-sm font-semibold">Focus clock</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">One study session, synchronized across your tabs.</p>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold">Focus clock</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">One study session, synchronized across your tabs.</p>
+            </div>
+            <Mascot state="focus" size="sm" animated />
           </div>
 
           {session ? (

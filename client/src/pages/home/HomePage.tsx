@@ -2,6 +2,8 @@ import { useSyncExternalStore } from 'react';
 import { ArrowRight, BarChart3, BookOpenCheck, CheckCircle2, GraduationCap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { BrandMark } from '@/components/brand/BrandMark';
+import { Mascot } from '@/components/brand/Mascot';
 import { Button, Card } from '../../components/ui/AppUI';
 import { getAuthStatus, logoutAuthSession, subscribeAuthSession } from '../../lib/authSession';
 
@@ -27,8 +29,8 @@ export default function HomePage() {
     <header className="relative z-20 border-b border-ui-border bg-surface/90 backdrop-blur-sm">
       <div className="mx-auto flex min-h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2.5 rounded-control">
-          <span className="flex h-9 w-9 items-center justify-center rounded-control bg-primary text-white"><BookOpenCheck size={19} aria-hidden="true" /></span>
-          <span className="text-body font-semibold tracking-[0.04em]">SAT MASTER</span>
+          <BrandMark size="lg" />
+          <span className="text-body font-semibold tracking-[0.04em]">SONDER SAT</span>
         </Link>
         <nav className="flex items-center gap-2" aria-label="Account">
           {isLoggedIn ? <>
@@ -60,7 +62,7 @@ export default function HomePage() {
             </ul>
           </div>
 
-          <div className="relative mx-auto w-full max-w-lg" aria-label="SAT Master workspace preview">
+          <div className="relative mx-auto w-full max-w-lg" aria-label="Sonder SAT workspace preview">
             <div className="absolute -inset-8 -z-10 rounded-full bg-primary/10 blur-3xl" />
             <Card className="overflow-hidden border-primary/20 p-0 shadow-elevated">
               <div className="flex items-center justify-between border-b border-ui-border bg-surface-subtle px-5 py-4"><span className="text-body font-semibold">Today’s focus</span><span className="rounded-full bg-primary-soft px-2.5 py-1 text-caption font-semibold text-primary">Study plan</span></div>
@@ -69,7 +71,7 @@ export default function HomePage() {
                 <PreviewRow number="02" title="Review vocabulary" meta="24 words" />
                 <PreviewRow number="03" title="Analyze recent mistakes" meta="5 entries" />
               </div>
-              <div className="border-t border-ui-border bg-sidebar p-5 text-white"><p className="text-caption uppercase tracking-widest text-sidebar-muted">One workspace</p><p className="mt-2 text-heading font-semibold">Practice → Review → Improve</p></div>
+              <div className="flex items-center justify-between gap-4 border-t border-ui-border bg-sidebar py-3 pl-5 pr-3 text-sidebar-foreground"><div><p className="text-caption uppercase tracking-widest text-sidebar-muted">One workspace</p><p className="mt-2 text-heading font-semibold">Practice → Review → Improve</p></div><Mascot state="idle" size="sm" animated eager /></div>
             </Card>
           </div>
         </div>
@@ -82,7 +84,7 @@ export default function HomePage() {
         </div>
       </section>
     </main>
-    <footer className="bg-sidebar px-4 py-8 text-sidebar-foreground sm:px-6 lg:px-8"><div className="mx-auto flex max-w-[1280px] flex-col justify-between gap-3 text-caption sm:flex-row"><span className="font-semibold text-white">SAT MASTER</span><span>Focused preparation for the Digital SAT.</span></div></footer>
+    <footer className="bg-sidebar px-4 py-8 text-sidebar-foreground sm:px-6 lg:px-8"><div className="mx-auto flex max-w-[1280px] flex-col justify-between gap-3 text-caption sm:flex-row"><span className="font-semibold">SONDER SAT</span><span>Focused preparation for the Digital SAT.</span></div></footer>
   </div>;
 }
 

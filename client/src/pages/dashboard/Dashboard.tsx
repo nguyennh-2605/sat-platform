@@ -15,6 +15,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { BrandMark } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -102,13 +103,11 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
       <SidebarHeader className="flex-row items-center gap-1">
         <SidebarMenu className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
           <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg" tooltip="SAT Master">
+            <SidebarMenuButton asChild size="lg" tooltip="Sonder SAT">
               <NavLink to="/dashboard">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <BookOpenCheck className="size-4" aria-hidden="true" />
-                </span>
+                <BrandMark />
                 <span className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">SAT Master</span>
+                  <span className="truncate font-semibold">Sonder SAT</span>
                   <span className="truncate text-xs text-sidebar-foreground/65">Learning workspace</span>
                 </span>
               </NavLink>
@@ -196,7 +195,7 @@ function DashboardSearch() {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Search workspace</DialogTitle>
-          <DialogDescription>Jump to a SAT Master section.</DialogDescription>
+          <DialogDescription>Jump to a Sonder SAT section.</DialogDescription>
         </DialogHeader>
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />

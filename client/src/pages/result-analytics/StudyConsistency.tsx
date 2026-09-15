@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Clock3, Flame, RefreshCw } from 'lucide-react';
 import { Label, Pie, PieChart, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
+import { Mascot } from '@/components/brand/Mascot';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { EmptyState } from '@/components/ui/AppUI';
@@ -199,7 +200,7 @@ export function StudyConsistency({ range }: { range: AnalyticsRange }) {
     <div><h2 id="consistency-title" className="text-lg font-semibold text-foreground">Study consistency</h2><p className="mt-1 text-sm text-muted-foreground">Tracked focus time from completed Focus Clock sessions. Subject filters do not change this section.</p></div>
     {pending ? <Card><CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Skeleton className="h-24" /><Skeleton className="h-24" /><Skeleton className="h-24" /><Skeleton className="h-24" /></CardContent></Card>
       : error ? <Card><CardContent><EmptyState surface={false} compact icon={<RefreshCw />} title="Study consistency could not be loaded" description="Your performance analytics is still available. Try loading tracked focus time again." action={<Button variant="outline" size="sm" onClick={() => setReload(value => value + 1)}><RefreshCw />Try again</Button>} /></CardContent></Card>
-        : !data || data.summary.sessionCount === 0 ? <Card><CardContent><EmptyState surface={false} compact icon={<Clock3 />} title="No tracked focus time yet" description="Start the Focus Clock in the dashboard header, then finish the session to add it here." /></CardContent></Card>
+        : !data || data.summary.sessionCount === 0 ? <Card><CardContent><EmptyState surface={false} compact visual={<Mascot state="sleeping" size="sm" animated />} title="No tracked focus time yet" description="Start the Focus Clock in the dashboard header, then finish the session to add it here." /></CardContent></Card>
           : <div className="grid gap-4">
             <Card><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Metric icon={Clock3} label="Tracked time" value={formatTrackedTime(data.summary.trackedMs)} detail={`${data.summary.sessionCount} completed session${data.summary.sessionCount === 1 ? '' : 's'}`} />

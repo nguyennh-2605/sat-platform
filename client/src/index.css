@@ -405,6 +405,35 @@
   animation: quiz-confetti-fall 1.8s ease-out both;
 }
 
+@keyframes mascot-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1px) scale(1.012); }
+}
+
+@keyframes mascot-focus {
+  0%, 82%, 100% { transform: translateY(0); }
+  88% { transform: translateY(-2px); }
+  94% { transform: translateY(0); }
+}
+
+@keyframes mascot-success {
+  0% { opacity: 0; transform: translateY(6px) scale(0.94); }
+  65% { opacity: 1; transform: translateY(-2px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mascot-sleep {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(1px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mascot-idle { animation: mascot-breathe 4.8s ease-in-out infinite; }
+  .mascot-focus { animation: mascot-focus 5.5s ease-in-out infinite; }
+  .mascot-success { animation: mascot-success 420ms ease-out both; }
+  .mascot-sleeping { animation: mascot-sleep 5.8s ease-in-out infinite; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .quiz-confetti-piece { display: none; }
 }

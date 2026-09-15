@@ -347,6 +347,7 @@ export function TableShell({ className, ...props }: HTMLAttributes<HTMLDivElemen
 
 interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   icon?: ReactNode;
+  visual?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
@@ -354,12 +355,14 @@ interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> 
   surface?: boolean;
 }
 
-export function EmptyState({ icon, title, description, action, compact = false, surface = true, className, ...props }: EmptyStateProps) {
+export function EmptyState({ icon, visual, title, description, action, compact = false, surface = true, className, ...props }: EmptyStateProps) {
   const content = (
     <>
-      <span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary-soft text-primary" aria-hidden="true">
-        {icon || <Inbox size={19} />}
-      </span>
+      {visual || (
+        <span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary-soft text-primary" aria-hidden="true">
+          {icon || <Inbox size={19} />}
+        </span>
+      )}
       <h3 className="mt-3 text-title font-semibold text-foreground">{title}</h3>
       {description && <p className="mt-1 max-w-md text-body text-muted-foreground">{description}</p>}
       {action && <div className="mt-5">{action}</div>}

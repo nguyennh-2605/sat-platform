@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import { ArrowLeft, BookOpenCheck, Check, Eye, EyeOff, GraduationCap, Lock, Mail, User } from 'lucide-react';
+import { ArrowLeft, Check, Eye, EyeOff, GraduationCap, Lock, Mail, User } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { BrandMark } from '@/components/brand/BrandMark';
+import { Mascot } from '@/components/brand/Mascot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -108,10 +110,8 @@ export default function AuthPage() {
     <div className="grid min-h-svh bg-background lg:grid-cols-2">
       <aside className="relative hidden overflow-hidden border-r bg-muted/35 p-10 lg:flex lg:flex-col lg:justify-between xl:p-14">
         <button type="button" onClick={() => navigate('/')} className="flex w-fit items-center gap-2.5 rounded-lg text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BookOpenCheck className="size-4" aria-hidden="true" />
-          </span>
-          SAT Master
+          <BrandMark />
+          Sonder SAT
         </button>
 
         <div className="max-w-lg">
@@ -131,6 +131,7 @@ export default function AuthPage() {
         </div>
 
         <p className="text-xs text-muted-foreground">Digital SAT preparation</p>
+        <Mascot state="idle" size="lg" animated eager className="pointer-events-none absolute bottom-4 right-8 opacity-90 xl:bottom-8 xl:right-12" />
       </aside>
 
       <main className="flex min-h-svh items-center justify-center p-4 sm:p-8 lg:p-12">
@@ -141,17 +142,15 @@ export default function AuthPage() {
           </Button>
 
           <div className="mb-6 flex items-center gap-2 lg:hidden">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <BookOpenCheck className="size-4" aria-hidden="true" />
-            </span>
-            <span className="text-sm font-semibold">SAT Master</span>
+            <BrandMark />
+            <span className="text-sm font-semibold">Sonder SAT</span>
           </div>
 
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-2xl">{isLoginMode ? 'Welcome back' : 'Create your account'}</CardTitle>
               <CardDescription>
-                {isLoginMode ? 'Sign in to continue your SAT learning plan.' : 'Choose your role and create a SAT Master account.'}
+                {isLoginMode ? 'Sign in to continue your SAT learning plan.' : 'Choose your role and create a Sonder SAT account.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -218,7 +217,7 @@ export default function AuthPage() {
               </div>
 
               <p className="mt-5 text-center text-sm text-muted-foreground">
-                {isLoginMode ? 'New to SAT Master? ' : 'Already have an account? '}
+                {isLoginMode ? 'New to Sonder SAT? ' : 'Already have an account? '}
                 <button type="button" onClick={switchMode} className="font-medium text-foreground underline underline-offset-4">
                   {isLoginMode ? 'Create an account' : 'Sign in'}
                 </button>
@@ -226,7 +225,7 @@ export default function AuthPage() {
             </CardContent>
           </Card>
 
-          <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">By continuing, you agree to use SAT Master responsibly as a learning tool.</p>
+          <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">By continuing, you agree to use Sonder SAT responsibly as a learning tool.</p>
         </div>
       </main>
     </div>

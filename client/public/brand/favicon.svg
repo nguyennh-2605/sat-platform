@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="3 6 58 57" role="img" aria-label="Sonder SAT cat">
+  <path fill="#222" stroke="#171717" stroke-linejoin="round" stroke-width="2.4" d="M9.5 36.5c0-6.1 1.8-11.7 5.2-15.6l2.6-10.3a2 2 0 0 1 3.3-1l7 6a29 29 0 0 1 8.8 0l7-6a2 2 0 0 1 3.3 1l2.6 10.3a23.5 23.5 0 0 1 5.2 15.6c0 7.8-9.3 12-22.5 12s-22.5-4.2-22.5-12Z"/>
+  <path fill="none" stroke="#171717" stroke-linecap="round" stroke-width="2" d="m11 31-6-1m5.5 5.5-6 .5M53 31l6-1m-5.5 5.5 6 .5"/>
+  <circle cx="24.5" cy="29.5" r="2" fill="#fff"/>
+  <circle cx="39.5" cy="29.5" r="2" fill="#fff"/>
+  <path fill="#fff" d="m30.4 33.2 1.6 1.4 1.6-1.4Z"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-width="1.7" d="M32 34.3v.8c0 1.4-1.2 2.4-2.7 2.4-1 0-1.8-.4-2.3-1.1M32 35.1c0 1.4 1.2 2.4 2.7 2.4 1 0 1.8-.4 2.3-1.1"/>
+  <path fill="#ef4444" stroke="#171717" stroke-linejoin="round" stroke-width="2.2" d="m39.5 44.5 11-1 1.2 14.3a2.6 2.6 0 0 1-2.4 2.8l-6.2.5a2.6 2.6 0 0 1-2.8-2.4l-.8-14.2Z"/>
+  <path fill="#ef4444" stroke="#171717" stroke-linejoin="round" stroke-width="2.2" d="M8.5 36.5c11.2 4.2 35.8 4.2 47 0l.5 7c-8.5 8.1-39.2 8.9-48-.1l.5-6.9Z"/>
+  <path fill="#fff" d="M43.2 53.4a1.6 1.6 0 0 1 1.6-1.6 1.6 1.6 0 1 1 1.6 1.6 1.6 1.6 0 1 1-1.6 1.6 1.6 1.6 0 1 1-1.6-1.6Z"/>
+</svg>
