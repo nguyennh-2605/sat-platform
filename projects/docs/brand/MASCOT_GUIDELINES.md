@@ -59,6 +59,8 @@ Dark-mode variants use a targeted edit that changes only the coat from black to 
 
 ## Favicon
 
-The browser favicon is a logo derivative, not a scaled-down mascot illustration. Use `favicon-tab.svg` only for browser tabs. It keeps the cat-head silhouette and red scarf, removes the hanging scarf tail and fine details, and uses a light optical keyline so the black cat remains visible on both light and dark browser chrome.
+The browser favicon is a logo derivative, not a scaled-down mascot illustration. Use `favicon-tab.svg` for browser tabs. It keeps a smooth cat-head silhouette, a shallow red scarf with a short vertical fold, and a thin muted keyline. The face stays charcoal on both light and dark browser chrome. The 64-unit square canvas includes safe space around every edge; avoid cumulative scale/translation transforms that clip the contour.
+
+Transparent raster exports `favicon-tab-16.png`, `favicon-tab-32.png`, and `favicon-tab-48.png` must be regenerated from this SVG when it changes. The 32px export is the PNG fallback; SVG is declared last as the preferred scalable icon. Review actual-size raster renders on both light and dark surfaces, not only an enlarged SVG.
 
 Use the more detailed `favicon.svg` and `favicon-dark.svg` only through `BrandMark` inside the product. Those in-app marks may switch with the page theme; the browser favicon always remains the optically corrected black cat.
