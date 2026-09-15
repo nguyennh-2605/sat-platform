@@ -13,7 +13,7 @@ const skill = { code: 'MATH_NONLINEAR_EQUATIONS', name: 'Nonlinear Equations', s
 
 const makeAnswers = (correctCount, total, timed = true) => Array.from({ length: total }, (_, index) => ({
   isCorrect: index < correctCount,
-  question: { id: index + 1, domain, skill },
+  question: { id: index + 1, domainCode: domain.code, skillCode: skill.code },
   duration: timed ? (index % 3 === 0 ? 150000 : 60000) : null,
 }));
 
@@ -37,8 +37,8 @@ test('student analytics excludes incomplete attempts and exposes diagnostic sect
   const completed = makeSubmission();
   const doing = makeSubmission({ id: 2, status: 'DOING', correct: 10 });
   const errorLogs = [
-    { category: skill.name, reviewedAt: null, question: { domain: { code: domain.code }, skill: { code: skill.code }, section: { test: { subject: 'MATH' } } } },
-    { category: skill.name, reviewedAt: new Date(), question: { domain: { code: domain.code }, skill: { code: skill.code }, section: { test: { subject: 'MATH' } } } },
+    { category: skill.name, reviewedAt: null, question: { domainCode: domain.code, skillCode: skill.code, section: { test: { subject: 'MATH' } } } },
+    { category: skill.name, reviewedAt: new Date(), question: { domainCode: domain.code, skillCode: skill.code, section: { test: { subject: 'MATH' } } } },
   ];
 
   const payload = buildStudentAnalyticsPayload([completed, doing], errorLogs, { range: '90', subject: 'MATH', now: new Date('2026-08-25T00:00:00Z') });
@@ -52,6 +52,15 @@ test('student analytics excludes incomplete attempts and exposes diagnostic sect
   assert.equal(payload.focusAreas[0].action, 'REVIEW_MISTAKES');
   assert.equal(payload.pacing.timedQuestions, 10);
   assert.equal(payload.pacing.slowQuestions, 4);
+  assert.equal(payload.pacing.averageTimeMs, 96000);
+  assert.equal(payload.pacing.correctAverageMs, 90000);
+  assert.equal(payload.pacing.incorrectAverageMs, 105000);
+  assert.deepEqual(payload.pacing.patterns, {
+    fastCorrect: 4,
+    slowCorrect: 2,
+    fastWrong: 2,
+    slowWrong: 2,
+  });
   assert.equal(payload.meta.classificationCoverage.percentage, 100);
 });
 

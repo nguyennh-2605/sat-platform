@@ -333,6 +333,7 @@ model Submission {
   @@unique([deliveryId, userId, attemptNo])
   @@index([deliveryId, status])
   @@index([userId, startedAt])
+  @@index([userId, status, startedAt, id])
   @@index([testId, status])
 }
 

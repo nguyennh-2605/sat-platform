@@ -6,19 +6,15 @@ const ANALYTICS_SUBMISSION_SELECT = {
   id: true,
   status: true,
   startedAt: true,
-  beganAt: true,
   endTime: true,
   assignmentId: true,
   classTestId: true,
   deliveryId: true,
   test: {
     select: {
-      id: true,
       title: true,
       subject: true,
       mode: true,
-      category: true,
-      scope: true,
     },
   },
   answers: {
@@ -27,14 +23,14 @@ const ANALYTICS_SUBMISSION_SELECT = {
       question: {
         select: {
           id: true,
-          domain: { select: { code: true, name: true, subject: true, sortOrder: true } },
-          skill: { select: { code: true, name: true, sortOrder: true } },
+          domainCode: true,
+          skillCode: true,
         },
       },
     },
   },
   questionTimings: {
-    select: { questionId: true, activeDurationMs: true, visitCount: true },
+    select: { questionId: true, activeDurationMs: true },
   },
 };
 
@@ -90,19 +86,20 @@ const decodeAttemptCursor = value => {
   }
 };
 
-exports.getData = async ({ userId, range, days, subject, now = new Date() }) => {
+const getDataWithDb = async ({ db, userId, range, days, subject, now = new Date() }) => {
   const filters = normalizeAnalyticsFilters({ range, days, subject, now });
   const [rawData, errorLogs] = await Promise.all([
-    prisma.submission.findMany({
+    db.submission.findMany({
       where: {
         userId,
         status: 'COMPLETED',
         ...(filters.cutoff ? { startedAt: { gte: filters.cutoff } } : {}),
+        ...(filters.subject === 'ALL' ? {} : { test: { subject: filters.subject } }),
       },
       orderBy: [{ startedAt: 'asc' }, { id: 'asc' }],
       select: ANALYTICS_SUBMISSION_SELECT,
     }),
-    prisma.errorLog.findMany({
+    db.errorLog.findMany({
       where: {
         userId,
         ...(filters.cutoff ? { createdAt: { gte: filters.cutoff } } : {}),
@@ -110,11 +107,10 @@ exports.getData = async ({ userId, range, days, subject, now = new Date() }) => 
       select: {
         category: true,
         reviewedAt: true,
-        createdAt: true,
         question: {
           select: {
-            domain: { select: { code: true } },
-            skill: { select: { code: true } },
+            domainCode: true,
+            skillCode: true,
             section: { select: { test: { select: { subject: true } } } },
           },
         },
@@ -129,7 +125,7 @@ exports.getData = async ({ userId, range, days, subject, now = new Date() }) => 
   });
 };
 
-exports.getAttempts = async ({ userId, query = {}, now = new Date() }) => {
+const getAttemptsWithDb = async ({ db, userId, query = {}, now = new Date() }) => {
   const filters = normalizeAnalyticsFilters({
     range: query.range,
     days: query.days,
@@ -165,7 +161,7 @@ exports.getAttempts = async ({ userId, query = {}, now = new Date() }) => {
       { startedAt: cursor.startedAt, id: { lt: cursor.id } },
     ] }],
   } : baseWhere;
-  const rows = await prisma.submission.findMany({
+  const rows = await db.submission.findMany({
     where,
     orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
@@ -179,16 +175,35 @@ exports.getAttempts = async ({ userId, query = {}, now = new Date() }) => {
       classTestId: true,
       deliveryId: true,
       test: { select: { title: true, subject: true, mode: true } },
-      answers: { select: { isCorrect: true } },
-      questionTimings: { select: { activeDurationMs: true } },
+      _count: { select: { answers: true } },
     },
   });
-  const items = rows.slice(0, limit).map(row => {
-    const totalQuestions = row.answers.length;
-    const correctCount = row.answers.filter(answer => answer.isCorrect).length;
-    const activeDurationMs = isTimingEligible(row)
-      ? row.questionTimings.reduce((sum, timing) => sum + timing.activeDurationMs, 0)
-      : 0;
+  const pageRows = rows.slice(0, limit);
+  const submissionIds = pageRows.map(row => row.id);
+  const timedSubmissionIds = pageRows.filter(isTimingEligible).map(row => row.id);
+  const [correctCounts, timingTotals] = await Promise.all([
+    submissionIds.length
+      ? db.answer.groupBy({
+        by: ['submissionId'],
+        where: { submissionId: { in: submissionIds }, isCorrect: true },
+        _count: { _all: true },
+      })
+      : [],
+    timedSubmissionIds.length
+      ? db.questionTiming.groupBy({
+        by: ['submissionId'],
+        where: { submissionId: { in: timedSubmissionIds } },
+        _sum: { activeDurationMs: true },
+      })
+      : [],
+  ]);
+  const correctCountBySubmission = new Map(correctCounts.map(item => [item.submissionId, item._count._all]));
+  const timingBySubmission = new Map(timingTotals.map(item => [item.submissionId, item._sum.activeDurationMs || 0]));
+
+  const items = pageRows.map(row => {
+    const totalQuestions = row._count.answers;
+    const correctCount = correctCountBySubmission.get(row.id) || 0;
+    const activeDurationMs = timingBySubmission.get(row.id) || 0;
     const elapsedDurationMs = row.endTime
       ? Math.max(0, new Date(row.endTime).getTime() - new Date(row.beganAt || row.startedAt).getTime())
       : null;
@@ -208,43 +223,62 @@ exports.getAttempts = async ({ userId, query = {}, now = new Date() }) => {
   });
   return {
     items,
-    nextCursor: rows.length > limit ? encodeAttemptCursor(items.length ? rows[limit - 1] : rows[0]) : null,
+    nextCursor: rows.length > limit ? encodeAttemptCursor(rows[limit - 1]) : null,
   };
 };
 
 exports.normalizeAnalyticsFilters = normalizeAnalyticsFilters;
 
-exports.getSubmissionDetail = async ({ id, userId }) => {
-  // 1. Lấy Submission + Test + Answers + Question + Section
-  const submission = await prisma.submission.findFirst({
+const getSubmissionDetailWithDb = async ({ db, id, userId }) => {
+  const submissionId = Number(id);
+  if (!Number.isSafeInteger(submissionId) || submissionId < 1) {
+    throw new ApiError(400, { message: 'Submission id must be a positive integer.' });
+  }
+
+  const submission = await db.submission.findFirst({
     where: {
-      id: parseInt(id),
-      userId: userId // QUAN TRỌNG: Chỉ cho phép xem bài của chính mình
+      id: submissionId,
+      userId,
+      status: 'COMPLETED',
     },
-    include: {
+    select: {
+      startedAt: true,
+      beganAt: true,
+      endTime: true,
       test: {
-        select: { title: true, subject: true, description: true }
+        select: { title: true, subject: true },
       },
       answers: {
         orderBy: { question: { order: 'asc' } },
-        include: {
-          question: { include: { section: true } }
-        }
+        select: {
+          selectedChoice: true,
+          isCorrect: true,
+          question: {
+            select: {
+              id: true,
+              order: true,
+              blocks: true,
+              questionText: true,
+              choices: true,
+              correctAnswer: true,
+              section: { select: { order: true } },
+            },
+          },
+        },
       },
       questionTimings: {
-        select: { questionId: true, activeDurationMs: true }
+        select: { questionId: true, activeDurationMs: true },
       },
-    }
+    },
   });
 
   if (!submission) {
-    throw new ApiError(404, { message: "Không tìm thấy bài làm hoặc bạn không có quyền truy cập." });
+    throw new ApiError(404, { message: 'Completed submission not found.' });
   }
 
-  // Tính toán thời gian làm bài (Duration)
-  let durationString = "N/A";
+  let durationString = 'N/A';
   if (submission.startedAt && submission.endTime) {
-    const diffSeconds = Math.floor((new Date(submission.endTime) - new Date(submission.startedAt)) / 1000);
+    const diffSeconds = Math.max(0, Math.floor((new Date(submission.endTime) - new Date(submission.beganAt || submission.startedAt)) / 1000));
     const h = Math.floor(diffSeconds / 3600);
     const m = Math.floor((diffSeconds % 3600) / 60);
     const s = diffSeconds % 60;
@@ -279,6 +313,13 @@ exports.getSubmissionDetail = async ({ id, userId }) => {
     startedAt: submission.startedAt.toISOString(),
     completedAt: submission.endTime?.toISOString() || null,
     duration: durationString,
-    questions: formattedQuestions
+    questions: formattedQuestions,
   };
 };
+
+exports.getData = params => getDataWithDb({ ...params, db: prisma });
+exports.getAttempts = params => getAttemptsWithDb({ ...params, db: prisma });
+exports.getSubmissionDetail = params => getSubmissionDetailWithDb({ ...params, db: prisma });
+exports.getDataWithDb = getDataWithDb;
+exports.getAttemptsWithDb = getAttemptsWithDb;
+exports.getSubmissionDetailWithDb = getSubmissionDetailWithDb;

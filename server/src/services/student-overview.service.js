@@ -1,6 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
-const { buildAnalyticsPayload } = require('../utils/analytics-transform');
+const { buildStudentOverviewAnalytics } = require('../utils/analytics-transform');
 const { buildAttemptSummary } = require('../utils/practice-test-progress');
 const classTodoService = require('./class-todo.service');
 
@@ -158,7 +158,7 @@ async function getOverviewWithDb({ db, userId, now = new Date(), getTodos = clas
         startedAt: true,
         endTime: true,
         test: { select: { id: true, title: true, subject: true } },
-        answers: { select: { isCorrect: true, question: { select: { domain: { select: { code: true, name: true, subject: true, sortOrder: true } }, skill: { select: { code: true, name: true, sortOrder: true } } } } } },
+        answers: { select: { isCorrect: true, question: { select: { domainCode: true } } } },
       },
     }),
     db.submission.findFirst({
@@ -201,7 +201,7 @@ async function getOverviewWithDb({ db, userId, now = new Date(), getTodos = clas
     }),
   ]);
 
-  const analytics = buildAnalyticsPayload(rawSubmissions, { days: OVERVIEW_DAYS, now });
+  const analytics = buildStudentOverviewAnalytics(rawSubmissions, { days: OVERVIEW_DAYS, now });
   const performance = subjectPerformance(analytics.chartData);
   const weakSubject = recommendedWeakSubject(performance, analytics);
   const practice = systemTests

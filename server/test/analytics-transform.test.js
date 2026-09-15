@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildAnalyticsPayload } = require('../src/utils/analytics-transform');
+const { buildAnalyticsPayload, buildStudentOverviewAnalytics } = require('../src/utils/analytics-transform');
 
 const answer = (isCorrect, domain = null, skill = null) => ({
   isCorrect,
@@ -50,4 +50,40 @@ test('analytics heatmap always returns twelve weeks and records activity', () =>
 
   assert.equal(payload.heatmapData.length, 84);
   assert.equal(payload.heatmapData.at(-1).count, 1);
+});
+
+test('student overview analytics uses scalar domain codes and ignores incomplete attempts', () => {
+  const payload = buildStudentOverviewAnalytics([
+    {
+      id: 1,
+      status: 'COMPLETED',
+      startedAt: new Date('2026-09-10T08:00:00Z'),
+      test: { title: 'Math Check', subject: 'MATH' },
+      answers: [
+        { isCorrect: true, question: { domainCode: mathAlgebra.code } },
+        { isCorrect: false, question: { domainCode: null } },
+      ],
+    },
+    {
+      id: 2,
+      status: 'DOING',
+      startedAt: new Date('2026-09-11T08:00:00Z'),
+      test: { title: 'Ignored', subject: 'RW' },
+      answers: [{ isCorrect: true, question: { domainCode: rwCraft.code } }],
+    },
+  ], { days: 90, now: new Date('2026-09-15T12:00:00Z') });
+
+  assert.deepEqual(payload.summary, {
+    overallAccuracy: 50,
+    correctAnswers: 1,
+    questionsAttempted: 2,
+    completedTests: 1,
+  });
+  assert.equal(payload.chartData.length, 1);
+  assert.deepEqual(payload.classificationCoverage, {
+    classified: 1,
+    total: 2,
+    percentage: 50,
+    uncategorizedAttempted: 1,
+  });
 });

@@ -43,10 +43,12 @@ const domainByCode = new Map(taxonomyDomainList.map(domain => [domain.code, doma
 const domainByName = new Map(taxonomyDomainList.map(domain => [domain.name, domain]));
 
 function classifyErrorLog(log) {
-  const linkedSkill = log.question?.skill?.code ? skillByCode.get(log.question.skill.code) : null;
+  const linkedSkillCode = log.question?.skillCode || log.question?.skill?.code;
+  const linkedSkill = linkedSkillCode ? skillByCode.get(linkedSkillCode) : null;
   const categorySkill = skillByName.get(log.category);
   const skill = linkedSkill || categorySkill || null;
-  const linkedDomain = log.question?.domain?.code ? domainByCode.get(log.question.domain.code) : null;
+  const linkedDomainCode = log.question?.domainCode || log.question?.domain?.code;
+  const linkedDomain = linkedDomainCode ? domainByCode.get(linkedDomainCode) : null;
   const categoryDomain = domainByName.get(log.category);
   const domain = linkedDomain || (skill ? domainByCode.get(skill.domainCode) : null) || categoryDomain || null;
   const subject = log.question?.section?.test?.subject || domain?.subject || null;
@@ -54,13 +56,17 @@ function classifyErrorLog(log) {
 }
 
 function buildMistakeReview(errorLogs, subject) {
-  const selected = errorLogs.filter(log => subject === 'ALL' || classifyErrorLog(log).subject === subject);
   const byArea = new Map();
   const bySkill = new Map();
   const byDomain = new Map();
+  let saved = 0;
+  let reviewed = 0;
 
-  for (const log of selected) {
+  for (const log of errorLogs) {
     const classified = classifyErrorLog(log);
+    if (subject !== 'ALL' && classified.subject !== subject) continue;
+    saved += 1;
+    if (log.reviewedAt) reviewed += 1;
     const areaKey = classified.skill?.code || classified.domain?.code || `CATEGORY:${log.category || 'General'}`;
     const areaName = classified.skill?.name || classified.domain?.name || log.category || 'General';
     const update = (map, key) => {
@@ -79,8 +85,6 @@ function buildMistakeReview(errorLogs, subject) {
     update(byDomain, classified.domain?.code);
   }
 
-  const saved = selected.length;
-  const reviewed = selected.filter(log => log.reviewedAt).length;
   return {
     summary: {
       saved,
@@ -122,7 +126,7 @@ function buildPerformance(submissions, errorLogs, subject) {
     const timingByQuestion = new Map((isTimingEligible(submission) ? submission.questionTimings || [] : []).map(timing => [timing.questionId, timing.activeDurationMs]));
     for (const answer of submission.answers || []) {
       total += 1;
-      const domainCode = answer.question?.domain?.code;
+      const domainCode = answer.question?.domainCode || answer.question?.domain?.code;
       const state = states.get(domainCode);
       if (!state) continue;
       classified += 1;
@@ -133,7 +137,8 @@ function buildPerformance(submissions, errorLogs, subject) {
       const duration = timingByQuestion.get(answer.question?.id);
       if (Number.isFinite(duration) && duration > 0) state.timings.push(duration);
 
-      const skill = state.skills.get(answer.question?.skill?.code);
+      const skillCode = answer.question?.skillCode || answer.question?.skill?.code;
+      const skill = state.skills.get(skillCode);
       if (!skill) continue;
       skill.attempted += 1;
       if (answer.isCorrect) skill.correct += 1;
@@ -242,8 +247,17 @@ function buildFocusAreas(domains) {
 }
 
 function buildPacing(submissions, subject) {
-  const timed = [];
   let answered = 0;
+  let timedQuestions = 0;
+  let totalDurationMs = 0;
+  let correctQuestions = 0;
+  let correctDurationMs = 0;
+  let incorrectQuestions = 0;
+  let incorrectDurationMs = 0;
+  let slowQuestions = 0;
+  const patterns = { fastCorrect: 0, slowCorrect: 0, fastWrong: 0, slowWrong: 0 };
+  const skillGroups = new Map();
+
   for (const submission of submissions) {
     if (subject !== 'ALL' && normalizedSubject(submission.test?.subject) !== subject) continue;
     if (!isTimingEligible(submission)) continue;
@@ -252,54 +266,60 @@ function buildPacing(submissions, subject) {
       answered += 1;
       const durationMs = timingByQuestion.get(answer.question?.id);
       if (!Number.isFinite(durationMs) || durationMs <= 0) continue;
-      timed.push({
-        durationMs,
-        correct: Boolean(answer.isCorrect),
-        skillCode: answer.question?.skill?.code || null,
-        skillName: answer.question?.skill?.name || null,
-        domainName: answer.question?.domain?.name || null,
+      timedQuestions += 1;
+      totalDurationMs += durationMs;
+      const slow = durationMs > SLOW_QUESTION_MS;
+      if (slow) slowQuestions += 1;
+      if (answer.isCorrect) {
+        correctQuestions += 1;
+        correctDurationMs += durationMs;
+        patterns[slow ? 'slowCorrect' : 'fastCorrect'] += 1;
+      } else {
+        incorrectQuestions += 1;
+        incorrectDurationMs += durationMs;
+        patterns[slow ? 'slowWrong' : 'fastWrong'] += 1;
+      }
+
+      const skillCode = answer.question?.skillCode || answer.question?.skill?.code;
+      if (!skillCode) continue;
+      const domainCode = answer.question?.domainCode || answer.question?.domain?.code;
+      const taxonomySkill = skillByCode.get(skillCode);
+      const taxonomyDomain = domainByCode.get(domainCode);
+      const current = skillGroups.get(skillCode) || {
+        code: skillCode,
+        name: taxonomySkill?.name || answer.question?.skill?.name || null,
+        domainName: taxonomyDomain?.name || answer.question?.domain?.name || null,
         subject: normalizedSubject(submission.test?.subject),
-      });
+        timedQuestions: 0,
+        totalDurationMs: 0,
+        correct: 0,
+      };
+      current.timedQuestions += 1;
+      current.totalDurationMs += durationMs;
+      if (answer.isCorrect) current.correct += 1;
+      skillGroups.set(skillCode, current);
     }
   }
 
-  const correct = timed.filter(item => item.correct);
-  const incorrect = timed.filter(item => !item.correct);
-  const slow = timed.filter(item => item.durationMs > SLOW_QUESTION_MS);
-  const pattern = (isSlow, isCorrect) => timed.filter(item => (item.durationMs > SLOW_QUESTION_MS) === isSlow && item.correct === isCorrect).length;
-  const skillGroups = new Map();
-  for (const item of timed) {
-    if (!item.skillCode) continue;
-    const current = skillGroups.get(item.skillCode) || { code: item.skillCode, name: item.skillName, domainName: item.domainName, subject: item.subject, durations: [], correct: 0 };
-    current.durations.push(item.durationMs);
-    if (item.correct) current.correct += 1;
-    skillGroups.set(item.skillCode, current);
-  }
-
   return {
-    available: timed.length > 0,
-    timedQuestions: timed.length,
+    available: timedQuestions > 0,
+    timedQuestions,
     answeredQuestions: answered,
-    coverage: answered ? round((timed.length / answered) * 100) : null,
-    averageTimeMs: averageOf(timed.map(item => item.durationMs)),
-    correctAverageMs: averageOf(correct.map(item => item.durationMs)),
-    incorrectAverageMs: averageOf(incorrect.map(item => item.durationMs)),
-    slowQuestions: slow.length,
-    patterns: {
-      fastCorrect: pattern(false, true),
-      slowCorrect: pattern(true, true),
-      fastWrong: pattern(false, false),
-      slowWrong: pattern(true, false),
-    },
+    coverage: answered ? round((timedQuestions / answered) * 100) : null,
+    averageTimeMs: timedQuestions ? Math.round(totalDurationMs / timedQuestions) : null,
+    correctAverageMs: correctQuestions ? Math.round(correctDurationMs / correctQuestions) : null,
+    incorrectAverageMs: incorrectQuestions ? Math.round(incorrectDurationMs / incorrectQuestions) : null,
+    slowQuestions,
+    patterns,
     skills: [...skillGroups.values()]
       .map(item => ({
         code: item.code,
         name: item.name,
         domainName: item.domainName,
         subject: item.subject,
-        timedQuestions: item.durations.length,
-        avgTimeMs: averageOf(item.durations),
-        accuracy: accuracyOf(item.correct, item.durations.length),
+        timedQuestions: item.timedQuestions,
+        avgTimeMs: Math.round(item.totalDurationMs / item.timedQuestions),
+        accuracy: accuracyOf(item.correct, item.timedQuestions),
       }))
       .sort((first, second) => second.avgTimeMs - first.avgTimeMs)
       .slice(0, 8),
@@ -409,6 +429,58 @@ function buildStudentAnalyticsPayload(rawData, errorLogs = [], { range = '90', s
         source: sourceOf(submission),
       };
     }),
+  };
+}
+
+function buildStudentOverviewAnalytics(rawData, { days = 90, now = new Date() } = {}) {
+  const daysLimit = Number.parseInt(days, 10) || 90;
+  const startDate = new Date(now);
+  startDate.setUTCDate(startDate.getUTCDate() - daysLimit);
+  startDate.setUTCHours(0, 0, 0, 0);
+  const validDomainCodes = new Set(taxonomyDomainList.map(domain => domain.code));
+  const chartData = [];
+  let correctAnswers = 0;
+  let questionsAttempted = 0;
+  let classified = 0;
+
+  for (const submission of rawData) {
+    if (submission.status !== 'COMPLETED' || new Date(submission.startedAt) < startDate) continue;
+    let submissionCorrect = 0;
+    let submissionClassified = 0;
+    const answers = submission.answers || [];
+    for (const answer of answers) {
+      if (answer.isCorrect) submissionCorrect += 1;
+      const domainCode = answer.question?.domainCode || answer.question?.domain?.code;
+      if (domainCode && validDomainCodes.has(domainCode)) submissionClassified += 1;
+    }
+    const totalQuestions = answers.length;
+    correctAnswers += submissionCorrect;
+    questionsAttempted += totalQuestions;
+    classified += submissionClassified;
+    chartData.push({
+      date: submission.startedAt,
+      testName: submission.test?.title || 'Practice Test',
+      subject: submission.test?.subject || 'RW',
+      correctCount: submissionCorrect,
+      totalQuestions,
+      accuracy: totalQuestions ? Math.round((submissionCorrect / totalQuestions) * 100) : 0,
+    });
+  }
+
+  return {
+    summary: {
+      overallAccuracy: questionsAttempted ? round((correctAnswers / questionsAttempted) * 100) : 0,
+      correctAnswers,
+      questionsAttempted,
+      completedTests: chartData.length,
+    },
+    chartData,
+    classificationCoverage: {
+      classified,
+      total: questionsAttempted,
+      percentage: questionsAttempted ? Math.round((classified / questionsAttempted) * 100) : null,
+      uncategorizedAttempted: questionsAttempted - classified,
+    },
   };
 }
 
@@ -542,6 +614,7 @@ function buildAnalyticsPayload(rawData, { days = 7, now = new Date() } = {}) {
 
 module.exports = {
   buildAnalyticsPayload,
+  buildStudentOverviewAnalytics,
   buildStudentAnalyticsPayload,
   confidenceOf,
   isTimingEligible,
