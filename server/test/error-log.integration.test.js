@@ -70,7 +70,7 @@ if (!testDatabaseUrl) {
         data: {
           clientMutationId: `concurrent:${randomUUID()}`,
           source: 'Concurrency worksheet',
-          category: 'Algebra',
+          category: 'Linear Equations in One Variable',
           userAnswer: 'A',
           correctAnswer: 'B',
         },

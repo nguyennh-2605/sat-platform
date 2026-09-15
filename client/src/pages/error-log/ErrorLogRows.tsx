@@ -36,9 +36,12 @@ interface ErrorLogRowProps {
   actions: ErrorLogRowActions;
 }
 
-const entryOrigin = (entry: ErrorEntry) => entry.origin ?? (entry.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
-
 function SourceButton({ entry, onOpen }: { entry: ErrorEntry; onOpen: () => void }) {
+  const origin = entry.origin ?? (entry.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
+  const clickable = origin === 'SYSTEM_QUESTION' || Boolean(entry.sourceUrl);
+  if (!clickable) {
+    return <span className="block max-w-full break-words text-sm font-medium">{entry.source || 'Untitled entry'}</span>;
+  }
   return <Button variant="link" className={`h-auto max-w-full justify-start whitespace-normal p-0 text-left ${entry.sourceUrl ? 'underline underline-offset-4' : ''}`} onClick={onOpen}>
     {entry.source || 'Untitled entry'}{entry.sourceUrl && <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />}
   </Button>;
@@ -48,7 +51,7 @@ function RowMenu({ entry, disabled, actions }: { entry: ErrorEntry; disabled: bo
   return <DropdownMenu>
     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" disabled={disabled} aria-label={`Actions for ${entry.source}`}><MoreHorizontal /></Button></DropdownMenuTrigger>
     <DropdownMenuContent align="end">
-      {entryOrigin(entry) === 'MANUAL' && <DropdownMenuItem onSelect={() => actions.editEntry(entry)}><Pencil />Edit details</DropdownMenuItem>}
+      <DropdownMenuItem onSelect={() => actions.editEntry(entry)}><Pencil />Edit details</DropdownMenuItem>
       <DropdownMenuItem variant="destructive" onSelect={() => actions.deleteEntry(entry)}><Trash2 />Delete entry</DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>;

@@ -1,5 +1,6 @@
 const ApiError = require('../utils/ApiError');
 const errorLogService = require('../services/error-log.service');
+const errorLogGoogleSheetsService = require('../services/error-log-google-sheets.service');
 const DEPRECATED_FIELDS = ['markReviewed', 'whyChosen', 'takeaway', 'rootCause'];
 
 const exposeDeprecation = (req, res) => {
@@ -60,6 +61,19 @@ exports.getErrorLogFacets = async (req, res) => {
     res.json(await errorLogService.getErrorLogFacets({ userId: req.user.userId, query: req.query }));
   } catch (error) {
     return handleError({ error, req, res, fallbackMessage: 'Unable to load error log filters.' });
+  }
+};
+
+exports.exportGoogleSheet = async (req, res) => {
+  try {
+    const result = await errorLogGoogleSheetsService.exportToGoogleSheet({
+      userId: req.user.userId,
+      googleAccessToken: req.body?.googleAccessToken,
+      platformOrigin: req.body?.platformOrigin || req.get('origin'),
+    });
+    res.status(201).json(result);
+  } catch (error) {
+    return handleError({ error, req, res, fallbackMessage: 'Unable to export the error log to Google Sheets.' });
   }
 };
 

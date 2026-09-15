@@ -8,22 +8,26 @@ import { DataSurface } from '@/components/ui/data-surface';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { EMPTY_FORMATS, type RichTextEditorHandle, type RichTextFormats, type RichTextShortcut } from '@/components/ui/rich-text-editor';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { appToast } from '@/components/ui/toast';
 import axiosClient from '../../lib/axios';
-import { invalidateQueryCache } from '../../lib/queryCache';
+import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useIsMobile } from '../../hooks/use-mobile';
 import { ErrorLogDesktopRow, ErrorLogMobileCard, type ActivePreviewSnapshot, type ErrorLogRowActions } from './ErrorLogRows';
 import { ErrorLogToolbar, type ErrorLogFacets } from './ErrorLogToolbar';
 import { ExpandedReflectionEditor, type ActiveReflection } from './ExpandedReflectionEditor';
+import { GoogleSheetsExportButton } from './GoogleSheetsExportButton';
 import { QuestionModal } from './QuestionModal';
 import { cellKey, useReflectionDrafts, type EditableField } from './useReflectionDrafts';
 import { usePreviewExpansionStore } from './usePreviewExpansionStore';
 import { type ErrorEntry, type ReviewStatus } from './types';
 
 interface ErrorPage { items: ErrorEntry[]; nextCursor: string | null }
+interface TaxonomySkill { code: string; name: string }
+interface TaxonomyDomain { code: string; name: string; subject: 'RW' | 'MATH'; skills: TaxonomySkill[] }
 
 const reflectionFields: EditableField[] = ['whyWrong', 'whyRight'];
 const emptyFacets: ErrorLogFacets = { all: 0, needsReview: 0, reviewed: 0, categories: [] };
@@ -301,9 +305,7 @@ export default function ErrorLog() {
     }
     if (entry.sourceUrl) {
       window.open(entry.sourceUrl, '_blank', 'noopener,noreferrer');
-      return;
     }
-    setManualEntry(entry);
   }, []);
 
   const rowActions = useMemo<ErrorLogRowActions>(() => ({
@@ -349,7 +351,7 @@ export default function ErrorLog() {
   </TableRow>;
 
   return <main className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
-    <PageHeader title="Error Log" description="Reflect on mistakes and explain the reasoning that leads to the correct answer." actions={<Button onClick={() => setManualEntry('new')}><Plus />Add entry</Button>} />
+    <PageHeader title="Error Log" description="Reflect on mistakes and explain the reasoning that leads to the correct answer." actions={<div className="flex flex-wrap items-center justify-end gap-2"><GoogleSheetsExportButton draftStore={draftStore} /><Button onClick={() => setManualEntry('new')}><Plus />Add entry</Button></div>} />
     <DataSurface ref={dataSurface} className="relative flex min-h-0 flex-1 flex-col">
       <ErrorLogToolbar
         search={search}
@@ -421,25 +423,79 @@ function LoadingRows({ mobile, headers }: { mobile: boolean; headers: ReactNode 
 function ManualEntryDialog({ entry, onClose, onSaved }: { entry: ErrorEntry | 'new'; onClose: () => void; onSaved: () => void }) {
   const [draft, setDraft] = useState({ source: entry === 'new' ? '' : entry.source || '', sourceUrl: entry === 'new' ? '' : entry.sourceUrl || '', category: entry === 'new' ? '' : entry.category || '', correctAnswer: entry === 'new' ? '' : entry.correctAnswer || '', userAnswer: entry === 'new' ? '' : entry.userAnswer || '' });
   const [clientMutationId] = useState(() => entry === 'new' ? crypto.randomUUID() : null);
+  const [taxonomy, setTaxonomy] = useState<TaxonomyDomain[]>([]);
+  const [taxonomyStatus, setTaxonomyStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [taxonomyReload, setTaxonomyReload] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const origin = entry === 'new' ? 'MANUAL' : entry.origin ?? (entry.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
+  const showSourceUrl = origin === 'MANUAL';
+  const knownCategories = useMemo(() => new Set(taxonomy.flatMap(domain => domain.skills.map(skill => skill.name))), [taxonomy]);
+  const hasCustomCategory = Boolean(draft.category && taxonomyStatus === 'ready' && !knownCategories.has(draft.category) && draft.category !== 'General');
+
+  useEffect(() => {
+    let active = true;
+    setTaxonomyStatus('loading');
+    void cachedGet<TaxonomyDomain[]>('/api/tests/taxonomy', {
+      ttlMs: 24 * 60 * 60 * 1000,
+      force: taxonomyReload > 0,
+    }).then(data => {
+      if (!active) return;
+      setTaxonomy(data);
+      setTaxonomyStatus('ready');
+    }).catch(() => {
+      if (active) setTaxonomyStatus('error');
+    });
+    return () => { active = false; };
+  }, [taxonomyReload]);
+
   const save = async () => {
     setSaving(true);
     setError('');
     try {
-      const payload = { ...draft, category: draft.category.trim() || 'General' };
+      const payload = {
+        source: draft.source,
+        category: draft.category,
+        correctAnswer: draft.correctAnswer,
+        userAnswer: draft.userAnswer,
+        ...(showSourceUrl ? { sourceUrl: draft.sourceUrl } : {}),
+      };
       if (entry === 'new') await axiosClient.post('/api/error-logs', { ...payload, clientMutationId });
       else await axiosClient.patch(`/api/error-logs/${entry.id}`, { ...payload, ...(entry.version !== undefined ? { expectedVersion: entry.version } : {}) });
       invalidateQueryCache('/api/error-logs');
       onSaved();
     } catch (requestError) {
-      const conflict = (requestError as { response?: { status?: number } }).response?.status === 409;
-      setError(conflict ? 'This entry changed in another tab. Close and reopen it before editing.' : 'Unable to save this entry. Please try again.');
+      const response = (requestError as { response?: { status?: number; data?: { message?: string } } }).response;
+      setError(response?.status === 409
+        ? 'This entry changed in another tab. Close and reopen it before editing.'
+        : response?.data?.message || 'Unable to save this entry. Please try again.');
     } finally {
       setSaving(false);
     }
   };
-  return <Modal open onClose={() => { if (!saving) onClose(); }} presentation="content-dialog" title={entry === 'new' ? 'Add an error entry' : 'Edit entry details'} subtitle="Add context here, then write your reflection in the table." className="max-w-lg!" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !draft.source.trim() || !draft.userAnswer.trim() || !draft.correctAnswer.trim()} onClick={() => void save()}>{saving ? 'Saving…' : 'Save entry'}</Button></>}>
-    <div className="space-y-4">{([{ field: 'source', label: 'Source name', max: 200, type: 'text', placeholder: 'Khan Academy worksheet' }, { field: 'sourceUrl', label: 'External link (optional)', max: 2048, type: 'url', placeholder: 'https://…' }, { field: 'category', label: 'Category', max: 120, type: 'text', placeholder: 'Algebra' }, { field: 'correctAnswer', label: 'Correct answer', max: 100, type: 'text', placeholder: 'B' }, { field: 'userAnswer', label: 'Your answer', max: 100, type: 'text', placeholder: 'A or Omitted' }] as const).map(({ field, label, max, type, placeholder }) => <Field key={field}><FieldLabel htmlFor={`manual-${field}`}>{label}</FieldLabel><Input id={`manual-${field}`} type={type} maxLength={max} placeholder={placeholder} value={draft[field]} onChange={event => setDraft(value => ({ ...value, [field]: event.target.value }))} /></Field>)}{error && <p role="alert" className="text-danger">{error}</p>}</div>
+  const saveDisabled = saving || !draft.source.trim() || !draft.category || !draft.userAnswer.trim() || !draft.correctAnswer.trim();
+  return <Modal open onClose={() => { if (!saving) onClose(); }} presentation="content-dialog" title={entry === 'new' ? 'Add an error entry' : 'Edit entry details'} subtitle={entry === 'new' ? 'Add context here, then write your reflection in the table.' : 'Update the source, category, and answers for this entry.'} className="max-w-lg!" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saveDisabled} onClick={() => void save()}>{saving ? 'Saving…' : 'Save entry'}</Button></>}>
+    <div className="space-y-4">
+      <Field><FieldLabel htmlFor="manual-source">Source name</FieldLabel><Input id="manual-source" maxLength={200} placeholder="Khan Academy worksheet" value={draft.source} onChange={event => setDraft(value => ({ ...value, source: event.target.value }))} /></Field>
+      {showSourceUrl && <Field><FieldLabel htmlFor="manual-sourceUrl">External link (optional)</FieldLabel><Input id="manual-sourceUrl" type="url" maxLength={2048} placeholder="https://…" value={draft.sourceUrl} onChange={event => setDraft(value => ({ ...value, sourceUrl: event.target.value }))} /></Field>}
+      <Field>
+        <FieldLabel htmlFor="manual-category">Category</FieldLabel>
+        <Select value={draft.category || undefined} disabled={taxonomyStatus !== 'ready'} onValueChange={value => setDraft(current => ({ ...current, category: value }))}>
+          <SelectTrigger id="manual-category" className="w-full"><SelectValue placeholder={taxonomyStatus === 'loading' ? 'Loading categories…' : 'Choose a category'} /></SelectTrigger>
+          <SelectContent position="popper" align="start">
+            {hasCustomCategory && <SelectGroup><SelectLabel>Current category</SelectLabel><SelectItem value={draft.category}>{draft.category}</SelectItem></SelectGroup>}
+            <SelectGroup><SelectLabel>Other</SelectLabel><SelectItem value="General">General</SelectItem></SelectGroup>
+            {taxonomy.map(domain => <SelectGroup key={domain.code}>
+              <SelectLabel>{domain.subject === 'RW' ? 'Reading & Writing' : 'Math'} · {domain.name}</SelectLabel>
+              {domain.skills.map(skill => <SelectItem key={skill.code} value={skill.name}>{skill.name}</SelectItem>)}
+            </SelectGroup>)}
+          </SelectContent>
+        </Select>
+        {taxonomyStatus === 'error' && <div className="flex items-center justify-between gap-3 text-sm text-danger" role="alert"><span>Categories could not be loaded.</span><Button type="button" variant="ghost" size="sm" onClick={() => setTaxonomyReload(value => value + 1)}>Retry</Button></div>}
+      </Field>
+      <Field><FieldLabel htmlFor="manual-correctAnswer">Correct answer</FieldLabel><Input id="manual-correctAnswer" maxLength={100} placeholder="B" value={draft.correctAnswer} onChange={event => setDraft(value => ({ ...value, correctAnswer: event.target.value }))} /></Field>
+      <Field><FieldLabel htmlFor="manual-userAnswer">Your answer</FieldLabel><Input id="manual-userAnswer" maxLength={100} placeholder="A or Omitted" value={draft.userAnswer} onChange={event => setDraft(value => ({ ...value, userAnswer: event.target.value }))} /></Field>
+      {error && <p role="alert" className="text-danger">{error}</p>}
+    </div>
   </Modal>;
 }

@@ -1,13 +1,14 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { parsePagination, paginationMeta } = require('../utils/pagination');
-const { findDomain, findSkill } = require('../utils/question-taxonomy');
+const { findDomain, findSkill, skills } = require('../utils/question-taxonomy');
 const { sanitizeReflection, isRichTextEmpty, richTextToPlainText } = require('../utils/error-log-rich-text');
 
 const ANALYSIS_FIELDS = ['whyWrong', 'whyRight'];
 const DEPRECATED_WRITE_FIELDS = ['markReviewed', 'whyChosen', 'takeaway', 'rootCause'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_CONFLICT_RETRIES = 3;
+const ERROR_LOG_CATEGORY_NAMES = new Set(['General', ...skills.map(skill => skill.name)]);
 const ERROR_LOG_SELECT = {
   id: true,
   source: true,
@@ -105,6 +106,15 @@ const normalizeSourceUrl = (value) => {
   }
 };
 
+const normalizeErrorLogCategory = (value, { currentCategory } = {}) => {
+  const category = normalizeString(value, { field: 'Category', maxLength: 120, required: true });
+  const normalizedCurrent = typeof currentCategory === 'string' ? currentCategory.trim() : null;
+  if (!ERROR_LOG_CATEGORY_NAMES.has(category) && category !== normalizedCurrent) {
+    throw new ApiError(400, { message: 'Choose a valid SAT category.' });
+  }
+  return category;
+};
+
 const normalizeAnalysis = (data = {}) => ({
   ...(data.whyWrong !== undefined ? { whyWrong: normalizeReflection(data.whyWrong, 'Why I chose wrong') } : {}),
   ...(data.whyRight !== undefined ? { whyRight: normalizeReflection(data.whyRight, 'Why answer is right') } : {}),
@@ -117,16 +127,16 @@ const isReviewComplete = (entry) => Boolean(
 const normalizeManualEntry = (data = {}) => ({
   source: normalizeString(data.source, { field: 'Source', maxLength: 200, required: true }),
   sourceUrl: normalizeSourceUrl(data.sourceUrl),
-  category: normalizeString(data.category ?? 'General', { field: 'Category', maxLength: 120, required: true }),
+  category: normalizeErrorLogCategory(data.category ?? 'General'),
   userAnswer: normalizeString(data.userAnswer, { field: 'Your answer', maxLength: 100, required: true }),
   correctAnswer: normalizeString(data.correctAnswer, { field: 'Correct answer', maxLength: 100, required: true }),
   ...normalizeAnalysis(data),
 });
 
-const normalizeManualObjectiveUpdate = (data = {}) => ({
+const normalizeObjectiveUpdate = (data = {}, { allowSourceUrl = false, currentCategory } = {}) => ({
   ...(data.source !== undefined ? { source: normalizeString(data.source, { field: 'Source', maxLength: 200, required: true }) } : {}),
-  ...(data.sourceUrl !== undefined ? { sourceUrl: normalizeSourceUrl(data.sourceUrl) } : {}),
-  ...(data.category !== undefined ? { category: normalizeString(data.category, { field: 'Category', maxLength: 120, required: true }) } : {}),
+  ...(allowSourceUrl && data.sourceUrl !== undefined ? { sourceUrl: normalizeSourceUrl(data.sourceUrl) } : {}),
+  ...(data.category !== undefined ? { category: normalizeErrorLogCategory(data.category, { currentCategory }) } : {}),
   ...(data.userAnswer !== undefined ? { userAnswer: normalizeString(data.userAnswer, { field: 'Your answer', maxLength: 100, required: true }) } : {}),
   ...(data.correctAnswer !== undefined ? { correctAnswer: normalizeString(data.correctAnswer, { field: 'Correct answer', maxLength: 100, required: true }) } : {}),
 });
@@ -356,13 +366,13 @@ exports.updateErrorLog = async ({ id, userId, data }) => {
   for (let attempt = 0; attempt < MAX_CONFLICT_RETRIES; attempt += 1) {
     try {
       return await prisma.$transaction(async tx => {
-        const existingLog = await tx.errorLog.findFirst({ where: { id, userId } });
+        const existingLog = await tx.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_SELECT });
         if (!existingLog) throw new ApiError(404, { message: 'Error log entry not found.' });
         if (expectedVersion !== undefined && existingLog.version !== expectedVersion) throw conflictError(existingLog);
 
         const origin = existingLog.origin || (existingLog.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
         const normalized = {
-          ...(origin === 'MANUAL' ? normalizeManualObjectiveUpdate(requestData) : {}),
+          ...normalizeObjectiveUpdate(requestData, { allowSourceUrl: origin === 'MANUAL', currentCategory: existingLog.category }),
           ...normalizeAnalysis(requestData),
         };
         if (Object.keys(normalized).length === 0) {
@@ -417,6 +427,7 @@ exports._errorLogHelpers = {
   normalizeAnalysis,
   normalizeClientMutationId,
   normalizeExpectedVersion,
+  normalizeErrorLogCategory,
   normalizeManualEntry,
   normalizeRequestData,
   normalizeSourceUrl,

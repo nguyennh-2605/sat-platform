@@ -30,6 +30,7 @@ const {
   normalizeAnalysis,
   normalizeClientMutationId,
   normalizeExpectedVersion,
+  normalizeErrorLogCategory,
   normalizeManualEntry,
   normalizeQuestionForClient,
   normalizeRequestData,
@@ -182,7 +183,7 @@ test('review status is derived only from the two current reflection fields', () 
 test('manual normalization creates searchable plain text without executable markup', () => {
   const entry = normalizeManualEntry({
     source: '  Outside worksheet  ',
-    category: ' Algebra ',
+    category: ' Linear Equations in One Variable ',
     userAnswer: ' 3 ',
     correctAnswer: ' 4 ',
     whyWrong: '<p>I copied the <strong>coefficient</strong>.</p>',
@@ -190,13 +191,26 @@ test('manual normalization creates searchable plain text without executable mark
   });
 
   assert.equal(entry.source, 'Outside worksheet');
-  assert.equal(entry.category, 'Algebra');
+  assert.equal(entry.category, 'Linear Equations in One Variable');
   assert.equal(entry.whyWrong, '<p>I copied the <strong>coefficient</strong>.</p>');
   assert.equal(
     buildSearchText(entry),
-    'Outside worksheet Algebra I copied the coefficient. Substitute first.',
+    'Outside worksheet Linear Equations in One Variable I copied the coefficient. Substitute first.',
   );
   assert.doesNotMatch(buildSearchText(entry), /<[^>]+>/);
+});
+
+test('manual categories use the SAT skill list while unchanged legacy values remain editable', () => {
+  assert.equal(normalizeErrorLogCategory(' Words in Context '), 'Words in Context');
+  assert.equal(normalizeErrorLogCategory(' Algebra ', { currentCategory: 'Algebra' }), 'Algebra');
+  assert.throws(
+    () => normalizeErrorLogCategory('Algebra'),
+    error => error.statusCode === 400 && error.body.message === 'Choose a valid SAT category.',
+  );
+  assert.throws(
+    () => normalizeErrorLogCategory('Made-up category', { currentCategory: 'Algebra' }),
+    error => error.statusCode === 400,
+  );
 });
 
 test('deprecated review controls and diagnosis fields are detected but ignored during rolling deployment', async t => {
@@ -295,11 +309,13 @@ test('filter facets return status counts independent of the selected status and 
 });
 
 test('reflection HTML keeps semantic formatting and removes executable content and unsafe URLs', () => {
-  const html = sanitizeReflection('<p onclick="evil()"><strong>Reason</strong> <u>detail</u></p><script>evil()</script><img src=x onerror=evil()><a href="javascript:evil()">bad</a><a href="https://example.com">good</a>');
+  const html = sanitizeReflection('<p onclick="evil()"><strong>Reason</strong> <strong><em>bold italic</em></strong> <u>detail</u></p><script>evil()</script><img src=x onerror=evil()><a href="javascript:evil()">bad</a><a href="https://example.com">good</a>');
   assert.match(html, /<strong>Reason<\/strong>/);
+  assert.match(html, /<strong><em>bold italic<\/em><\/strong>/);
   assert.match(html, /<u>detail<\/u>/);
   assert.match(html, /rel="noopener noreferrer"/);
   assert.doesNotMatch(html, /onclick|onerror|javascript:|<script|<img|evil\(\)/);
+  assert.equal(buildSearchText({ source: 'A & B', category: 'Words in Context', whyWrong: '<p>Use &amp; compare&nbsp;carefully</p>' }), 'A & B Words in Context Use & compare carefully');
   for (const empty of ['<p><br></p>', '<p>&nbsp;</p>', '<p>&#160;</p>', '<p>\u200B</p>', '<script>text</script>']) {
     assert.equal(isRichTextEmpty(sanitizeReflection(empty)), true, empty);
     assert.equal(normalizeAnalysis({ whyWrong: empty }).whyWrong, null);
@@ -502,6 +518,66 @@ test('a concurrent disjoint edit retries its CAS and derives Reviewed from the m
   assert.match(result.searchText, /Competing explanation Requested evidence/);
 });
 
+test('system-question entries allow objective edits without changing their immutable snapshot', async t => {
+  const questionSnapshot = { questionText: 'Original question', correctAnswer: 'B' };
+  let entry = {
+    id: UUID_A,
+    userId: 7,
+    origin: 'SYSTEM_QUESTION',
+    source: 'Practice Test · Module 1 · Question 1',
+    sourceUrl: null,
+    category: 'Words in Context',
+    userAnswer: 'D',
+    correctAnswer: 'B',
+    whyWrong: null,
+    whyRight: null,
+    questionSnapshot,
+    reviewedAt: null,
+    version: 1,
+    createdAt: new Date('2026-09-10T00:00:00.000Z'),
+    updatedAt: new Date('2026-09-10T00:00:00.000Z'),
+    submissionId: 42,
+    questionId: 10,
+  };
+
+  t.mock.method(prisma, '$transaction', async callback => callback({
+    errorLog: {
+      findFirst: async () => ({ ...entry }),
+      updateMany: async args => {
+        assert.equal(args.data.source, 'Custom review name');
+        assert.equal(args.data.category, 'Linear Functions');
+        assert.equal(args.data.correctAnswer, 'C');
+        assert.equal(args.data.userAnswer, 'A');
+        assert.equal(args.data.sourceUrl, undefined);
+        assert.equal(args.data.questionSnapshot, undefined);
+        const nextVersion = entry.version + 1;
+        entry = { ...entry, ...args.data, version: nextVersion };
+        return { count: 1 };
+      },
+    },
+  }));
+
+  const result = await service.updateErrorLog({
+    id: UUID_A,
+    userId: 7,
+    data: {
+      expectedVersion: 1,
+      source: ' Custom review name ',
+      sourceUrl: 'https://example.com/ignored-for-system-entry',
+      category: ' Linear Functions ',
+      correctAnswer: ' C ',
+      userAnswer: ' A ',
+    },
+  });
+
+  assert.equal(result.source, 'Custom review name');
+  assert.equal(result.category, 'Linear Functions');
+  assert.equal(result.correctAnswer, 'C');
+  assert.equal(result.userAnswer, 'A');
+  assert.equal(result.questionSnapshot, questionSnapshot);
+  assert.match(result.searchText, /Custom review name Linear Functions/);
+});
+
 test('an explicit stale version returns a 409 with the current public row', async t => {
   const current = {
     id: UUID_A,
@@ -605,7 +681,7 @@ test('manual create is idempotent per user and client mutation id', async t => {
     createCalls += 1;
     assert.equal(args.data.origin, 'MANUAL');
     assert.equal(args.data.clientMutationId, 'device-1:row-42');
-    assert.equal(args.data.searchText, 'Outside worksheet Algebra Wrong reason Right evidence');
+    assert.equal(args.data.searchText, 'Outside worksheet Linear Equations in One Variable Wrong reason Right evidence');
     assert.ok(args.data.reviewedAt instanceof Date);
     assert.equal(args.select.version, true);
     if (persisted) {
@@ -628,7 +704,7 @@ test('manual create is idempotent per user and client mutation id', async t => {
     data: {
       clientMutationId: 'device-1:row-42',
       source: 'Outside worksheet',
-      category: 'Algebra',
+      category: 'Linear Equations in One Variable',
       userAnswer: 'A',
       correctAnswer: 'B',
       whyWrong: '<p>Wrong reason</p>',

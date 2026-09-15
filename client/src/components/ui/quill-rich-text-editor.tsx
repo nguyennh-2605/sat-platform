@@ -84,7 +84,16 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
       withEditor(editor => editor.format('link', href || false, 'user'));
     },
     clearFormatting() {
-      withEditor((editor, selection) => editor.removeFormat(selection.index, selection.length, 'user'));
+      withEditor((editor, selection) => {
+        if (selection.length > 0) {
+          editor.removeFormat(selection.index, selection.length, 'user');
+          return;
+        }
+        const formats = editor.getFormat(selection);
+        ['bold', 'italic', 'underline', 'list', 'link'].forEach(format => {
+          if (formats[format]) editor.format(format, false, 'user');
+        });
+      });
     },
     focus() { quillRef.current?.getEditor().focus(); },
   }));
