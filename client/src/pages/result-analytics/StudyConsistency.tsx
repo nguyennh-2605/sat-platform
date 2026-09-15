@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Clock3, Flame, RefreshCw } from 'lucide-react';
+import { Label, Pie, PieChart, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { EmptyState } from '@/components/ui/AppUI';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import axiosClient from '@/lib/axios';
+import { cachedGet } from '@/lib/queryCache';
 import { cn } from '@/lib/utils';
 import { FOCUS_SESSION_CHANGED_EVENT } from '@/features/focus-timer/focus-timer.types';
 import type { AnalyticsRange, StudyActivityType, StudyTimeSummaryResponse } from './analytics.types';
@@ -17,6 +18,14 @@ const activityLabels: Record<StudyActivityType, string> = {
   HOMEWORK: 'Homework',
   OTHER: 'Other study',
 };
+
+const activityChartConfig = {
+  PRACTICE: { label: activityLabels.PRACTICE, color: 'var(--chart-5)' },
+  VOCABULARY: { label: activityLabels.VOCABULARY, color: 'var(--chart-4)' },
+  ERROR_LOG: { label: activityLabels.ERROR_LOG, color: 'var(--chart-3)' },
+  HOMEWORK: { label: activityLabels.HOMEWORK, color: 'var(--chart-2)' },
+  OTHER: { label: activityLabels.OTHER, color: 'var(--chart-1)' },
+} satisfies ChartConfig;
 
 const dateOrdinal = (date: string) => {
   const [year, month, day] = date.split('-').map(Number);
@@ -89,6 +98,79 @@ function Metric({ icon: Icon, label, value, detail }: { icon: typeof Clock3; lab
   </div>;
 }
 
+interface ActivityChartItem {
+  activityType: StudyActivityType;
+  label: string;
+  trackedMs: number;
+  sessionCount: number;
+  percentage: number;
+  fill: string;
+}
+
+interface ActivityTooltipPayload { payload: ActivityChartItem }
+
+function ActivityTooltip({ active, payload }: { active?: boolean; payload?: ActivityTooltipPayload[] }) {
+  const item = payload?.[0]?.payload;
+  if (!active || !item) return null;
+  return <div className="min-w-44 rounded-control border border-ui-border bg-background p-3 text-xs shadow-raised">
+    <div className="flex items-center gap-2 font-medium text-foreground"><span className="size-2 rounded-sm" style={{ backgroundColor: item.fill }} aria-hidden="true" />{item.label}</div>
+    <p className="mt-1.5 tabular-nums text-muted-foreground">{formatTrackedTime(item.trackedMs)} · {item.percentage}% · {item.sessionCount} session{item.sessionCount === 1 ? '' : 's'}</p>
+  </div>;
+}
+
+function ActivityDistribution({ data }: { data: StudyTimeSummaryResponse }) {
+  const chartData = data.activities.map(activity => ({
+    ...activity,
+    label: activityLabels[activity.activityType],
+    fill: activityChartConfig[activity.activityType].color,
+  }));
+  const accessibleBreakdown = chartData.map(item => `${item.label} ${item.percentage}%`).join(', ');
+
+  return <div className="grid items-center gap-5 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] lg:grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)]">
+    <ChartContainer
+      config={activityChartConfig}
+      className="mx-auto aspect-square h-52 max-w-full"
+      role="img"
+      aria-label={`Tracked focus time by activity. ${accessibleBreakdown}.`}
+    >
+      <PieChart>
+        <Tooltip cursor={false} content={<ActivityTooltip />} />
+        <Pie
+          cornerRadius={6}
+          data={chartData}
+          dataKey="trackedMs"
+          innerRadius={58}
+          nameKey="label"
+          outerRadius={84}
+          paddingAngle={2}
+          stroke="var(--card)"
+          strokeWidth={4}
+        >
+          <Label content={({ viewBox }) => {
+            if (!(viewBox && 'cx' in viewBox && 'cy' in viewBox)) return null;
+            return <text dominantBaseline="middle" textAnchor="middle" x={viewBox.cx} y={viewBox.cy}>
+              <tspan className="fill-muted-foreground text-xs" x={viewBox.cx} y={(viewBox.cy ?? 0) - 8}>Total</tspan>
+              <tspan className="fill-foreground text-lg font-medium tabular-nums" x={viewBox.cx} y={(viewBox.cy ?? 0) + 14}>{formatTrackedTime(data.summary.trackedMs)}</tspan>
+            </text>;
+          }} />
+        </Pie>
+      </PieChart>
+    </ChartContainer>
+    <div className="flex min-w-0 flex-col gap-3">
+      {chartData.map(item => <div className="grid grid-cols-[1fr_auto] items-end gap-3" key={item.activityType}>
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="h-2 w-1 rounded-full" style={{ backgroundColor: item.fill }} aria-hidden="true" />
+            <p className="truncate text-xs text-muted-foreground">{item.label}</p>
+          </div>
+          <p className="font-medium tabular-nums text-foreground">{formatTrackedTime(item.trackedMs)}</p>
+        </div>
+        <p className="font-medium tabular-nums text-foreground">{item.percentage}%</p>
+      </div>)}
+    </div>
+  </div>;
+}
+
 export function StudyConsistency({ range }: { range: AnalyticsRange }) {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', []);
   const [reload, setReload] = useState(0);
@@ -100,14 +182,12 @@ export function StudyConsistency({ range }: { range: AnalyticsRange }) {
   const error = !pending && result.error;
 
   useEffect(() => {
-    const controller = new AbortController();
-    axiosClient.get<StudyTimeSummaryResponse, StudyTimeSummaryResponse>(requestUrl, { signal: controller.signal })
-      .then(response => setResult({ key: requestKey, data: response, error: false }))
-      .catch(requestError => {
-        if ((requestError as { code?: string }).code !== 'ERR_CANCELED') setResult({ key: requestKey, data: null, error: true });
-      });
-    return () => controller.abort();
-  }, [requestKey, requestUrl]);
+    let active = true;
+    void cachedGet<StudyTimeSummaryResponse>(requestUrl, { ttlMs: 60_000, force: reload > 0 })
+      .then(response => { if (active) setResult({ key: requestKey, data: response, error: false }); })
+      .catch(() => { if (active) setResult({ key: requestKey, data: null, error: true }); });
+    return () => { active = false; };
+  }, [reload, requestKey, requestUrl]);
 
   useEffect(() => {
     const refreshAfterSessionChange = () => setReload(value => value + 1);
@@ -129,12 +209,7 @@ export function StudyConsistency({ range }: { range: AnalyticsRange }) {
             </CardContent></Card>
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
               <Card><CardHeader><CardTitle>Focus calendar</CardTitle><CardDescription>Daily tracked time in {data.timeZone.replaceAll('_', ' ')}.</CardDescription></CardHeader><CardContent><StudyCalendar data={data} /></CardContent></Card>
-              <Card><CardHeader><CardTitle>Time by activity</CardTitle><CardDescription>Based on the activity selected when each timer started.</CardDescription></CardHeader><CardContent className="space-y-4">
-                {data.activities.map(activity => <div key={activity.activityType}>
-                  <div className="mb-1.5 flex items-center justify-between gap-3 text-sm"><span className="font-medium">{activityLabels[activity.activityType]}</span><span className="tabular-nums text-muted-foreground">{formatTrackedTime(activity.trackedMs)} · {activity.percentage}%</span></div>
-                  <Progress value={activity.percentage} aria-label={`${activityLabels[activity.activityType]}: ${activity.percentage}% of tracked focus time`} />
-                </div>)}
-              </CardContent></Card>
+              <Card><CardHeader><CardTitle>Time by activity</CardTitle><CardDescription>Based on the activity selected when each timer started.</CardDescription></CardHeader><CardContent><ActivityDistribution data={data} /></CardContent></Card>
             </div>
           </div>}
   </section>;

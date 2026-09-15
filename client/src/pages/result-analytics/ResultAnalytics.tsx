@@ -50,6 +50,10 @@ export default function ResultAnalytics() {
   const requestPending = result.key !== requestKey;
   const data = requestPending ? null : result.data;
   const error = !requestPending && result.error;
+  const hasLearningData = Boolean(data && (data.snapshot.completedTests > 0 || data.mistakeReview.saved > 0));
+  const navigationLinks = useMemo(() => data && hasLearningData
+    ? sectionLinks
+    : sectionLinks.filter(item => item.id === 'consistency'), [data, hasLearningData]);
 
   useEffect(() => {
     let active = true;
@@ -64,7 +68,7 @@ export default function ResultAnalytics() {
   }, [reload, requestKey, requestUrl]);
 
   useEffect(() => {
-    const sections = sectionLinks
+    const sections = navigationLinks
       .map(item => document.getElementById(item.id))
       .filter((item): item is HTMLElement => Boolean(item));
     if (!sections.length) return;
@@ -76,7 +80,7 @@ export default function ResultAnalytics() {
     }, { rootMargin: '-120px 0px -65% 0px', threshold: [0, 0.1] });
     sections.forEach(section => observer.observe(section));
     return () => observer.disconnect();
-  }, [data]);
+  }, [navigationLinks]);
 
   const updateFilter = (key: 'range' | 'subject', value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -91,8 +95,6 @@ export default function ResultAnalytics() {
     setActiveSection('skills');
     document.getElementById('skills')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   };
-
-  const hasLearningData = Boolean(data && (data.snapshot.completedTests > 0 || data.mistakeReview.saved > 0));
 
   return <div className="h-full overflow-y-auto">
     <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 p-4 md:p-6">
@@ -111,7 +113,7 @@ export default function ResultAnalytics() {
             </Select>
           </div>
           <nav aria-label="Analytics sections" className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1">
-            {sectionLinks.map(item => <a key={item.id} href={`#${item.id}`} aria-current={activeSection === item.id ? 'location' : undefined} onClick={() => setActiveSection(item.id)} className={cn('shrink-0 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', activeSection === item.id && 'bg-muted text-foreground')}>{item.label}</a>)}
+            {navigationLinks.map(item => <a key={item.id} href={`#${item.id}`} aria-current={activeSection === item.id ? 'location' : undefined} onClick={() => setActiveSection(item.id)} className={cn('shrink-0 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', activeSection === item.id && 'bg-muted text-foreground')}>{item.label}</a>)}
           </nav>
         </div>
       </div>

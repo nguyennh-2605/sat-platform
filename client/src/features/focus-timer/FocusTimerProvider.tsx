@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useLocation } from 'react-router-dom';
 import axiosClient from '@/lib/axios';
 import { getAuthStatus, subscribeAuthSession } from '@/lib/authSession';
+import { invalidateQueryCache } from '@/lib/queryCache';
 import { FocusTimerContext } from './focus-timer-context';
 import { FOCUS_SESSION_CHANGED_EVENT, type StartFocusSessionInput, type StudyContextSuggestion, type StudySession, type StudySessionEnvelope } from './focus-timer.types';
 
@@ -68,6 +69,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
 
   const broadcastChange = useCallback(() => {
     const message = { type: 'SESSION_CHANGED', at: Date.now() };
+    invalidateQueryCache('/api/study-sessions/summary');
     channelRef.current?.postMessage(message);
     try { localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(message)); } catch { /* Cross-tab sync is best effort. */ }
     window.dispatchEvent(new Event(FOCUS_SESSION_CHANGED_EVENT));
@@ -92,6 +94,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!enabled || !userId) return;
     const receiveChange = () => {
+      invalidateQueryCache('/api/study-sessions/summary');
       void refresh();
       window.dispatchEvent(new Event(FOCUS_SESSION_CHANGED_EVENT));
     };
