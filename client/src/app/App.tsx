@@ -7,6 +7,7 @@ import { APP_TOAST_OPTIONS } from '../components/ui/toast';
 import { QuizToolProvider } from '../context/QuizToolContext';
 import { AuthSessionGuard } from '../features/auth/AuthSessionGuard';
 import { getAuthStatus, subscribeAuthSession } from '../lib/authSession';
+import { FocusTimerProvider } from '../features/focus-timer/FocusTimerProvider';
 
 const HomePage = lazy(() => import('../pages/home/HomePage'));
 const AuthPage = lazy(() => import('../pages/auth/AuthPage'));
@@ -47,8 +48,9 @@ function App() {
         <Toaster position="top-right" reverseOrder={false} gutter={8} toastOptions={APP_TOAST_OPTIONS} />
         <Router>
           <AuthSessionGuard />
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
+          <FocusTimerProvider>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>}>
@@ -65,8 +67,9 @@ function App() {
                 <Route path="class/:classId/assignment/:assignmentId" element={<AssignmentDetail />} />
               </Route>
               <Route path="/test/:id" element={<RequireAuth><ExamRoom /></RequireAuth>} />
-            </Routes>
-          </Suspense>
+              </Routes>
+            </Suspense>
+          </FocusTimerProvider>
         </Router>
       </GoogleOAuthProvider>
     </QuizToolProvider>

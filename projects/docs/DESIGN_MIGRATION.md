@@ -40,7 +40,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | SAT Platform surface | Primary reference | Secondary reference | Status |
 | --- | --- | --- | --- |
 | Design tokens and primitives | `src/app/globals.css`, `src/components/ui/` | `components.json` | Foundation complete |
-| Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | Implemented; single global toolbar, visual QA pending |
+| Dashboard shell | `dashboard/layout.tsx` and dashboard `_components/` | sidebar primitives | Implemented; single global toolbar plus a server-backed, cross-tab Student Focus Clock; visual QA pending |
 | Dashboard Home | `dashboard/default`, `dashboard/crm`, `dashboard/finance`, `dashboard/analytics` | `dashboard/academy`, `dashboard/productivity` | Role-dispatched; Admin uses real KPI/chart/attention/snapshot data plus a Studio-style AuditEvent Recent Activity table; Student follows Productivity's 9/3 task-and-calendar layout; Teacher uses an Academy-style action-first overview with class scope, deadline attention, compact schedule, 30-day class pulse, independently loaded learning insights, and evidence-based check-ins; visual QA pending |
 | Authentication | `auth/v2` | `auth/v1` | Implemented; visual QA pending |
 | Classroom list/detail | `dashboard/academy` | `dashboard/tasks` | Implemented with an Announcements-first class landing feed, basic rich text, persisted pinned posts, Lessons placement, Assignment/Test-only Activities, shared delivery composers, members, performance, and no local sticky page header. Assignment Detail now uses a role-aware shared shell, sticky Student work rail, and Teacher Student Work master-detail review queue with optional points/feedback |

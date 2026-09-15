@@ -148,7 +148,9 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 - Dashboard header cao `48px`, sticky khi phù hợp, có border dưới và blur nhẹ có kiểm soát như Studio Admin.
 - Sidebar desktop mặc định khoảng `272px`, hỗ trợ mobile sheet; content phải dùng được khi sidebar thu gọn.
-- Avatar, notification và account controls nằm bên phải header theo reference.
+- Student Focus Clock, theme, notification và account controls nằm bên phải header theo reference; role khác không thấy Focus Clock.
+- Focus Clock là compact outline control trong global header, hiển thị thời gian còn lại bằng số tabular và mở shared Popover để Start/Pause/Resume/Finish/Cancel. Preset là 25/50 phút, custom giới hạn 5–240 phút. Trên mobile có thể ẩn word label nhưng không ẩn thời gian hoặc trạng thái.
+- Focus Clock dùng server-authoritative StudySession và giữ provider ở router level để timer tiếp tục khi chuyển giữa dashboard và Exam Room. Countdown chỉ tick local; mutation mới gọi API. Tab khác chỉ nhận change signal qua BroadcastChannel rồi refetch, không tin session payload từ tab gửi.
 - Nội dung trang mặc định dùng `p-4 md:p-6`; layout centered có thể giới hạn ở `max-w-screen-2xl`.
 - Page background dùng semantic `bg-background`, không hardcode màu trong feature.
 - Card dùng semantic surface/border, radius gọn và shadow tối thiểu như reference.
@@ -346,7 +348,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Thứ tự nội dung là Focus Areas, Performance Snapshot, Accuracy Trend, Skill Performance, Mistake Review, Pacing và Attempts. Focus Area chỉ xuất hiện khi đủ sample và phải có CTA thật tới breakdown hoặc Error Log.
 - Accuracy không được gọi là SAT score. Trend dùng ngày, tên attempt, correct/total và subject thật; không dựng estimated score khi chưa có calibration.
 - Skill performance theo hierarchy Subject → Domain → Skill. Dưới 5 câu là `Not enough data`, 5–9 là `Early signal`, từ 10 câu mới đủ điều kiện rank.
-- Error Log chỉ được tổng hợp và deep-link bằng category/review status; reflection vẫn thuộc Error Log. Pacing chỉ dùng QuestionTiming hợp lệ, luôn nêu số câu và coverage, không biến missing timing thành zero.
+- Error Log chỉ được tổng hợp và deep-link bằng category/review status; reflection vẫn thuộc Error Log. Pacing chỉ dùng QuestionTiming của submission EXAM đã hoàn thành, luôn nêu số câu và coverage, không biến missing timing thành zero.
 - Attempts chỉ chứa submission `COMPLETED`; bài `DOING` thuộc Overview/Continue Learning. Activity Heatmap không xuất hiện cho đến khi có telemetry thống nhất bao phủ Practice, Error Log, Vocabulary và Homework.
 - Giáo viên dùng bố cục Test Performance: KPI strip, Question Performance Breakdown và Student Rankings.
 - Không dùng số liệu giả. Empty state tốt hơn dữ liệu demo. Reading & Writing và Math phải có label cùng semantic chart colors, không phụ thuộc màu là tín hiệu duy nhất.

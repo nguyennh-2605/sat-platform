@@ -208,11 +208,24 @@ Express Server (index.js → app.js)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/results-analytics` | JWT + STUDENT | Student diagnostic analytics for `range=30|90|all` and `subject=ALL|RW|MATH`: snapshot, rule-based focus areas, attempt accuracy trend, domain/skill performance, Error Log review state, classification coverage, and pacing coverage. Legacy bounded `days` remains accepted during rollout |
+| `GET` | `/api/results-analytics` | JWT + STUDENT | Student diagnostic analytics for `range=30|90|all` and `subject=ALL|RW|MATH`: snapshot, rule-based focus areas, attempt accuracy trend, domain/skill performance, Error Log review state, classification coverage, and pacing coverage from completed EXAM submissions only. Legacy bounded `days` remains accepted during rollout |
 | `GET` | `/api/results-analytics/attempts` | JWT + STUDENT | Cursor-paginated completed attempts with range, subject, source, and title filters; in-progress submissions are intentionally excluded |
 | `GET` | `/api/results-analytics/submission/:id` | JWT + STUDENT | Detailed submission with every question/answer |
 
-### 5.8 Error Logs
+### 5.8 Focus Sessions
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/study-sessions/active` | JWT + STUDENT | Returns the student's current running or paused focus session, reconciling an elapsed timer on the server |
+| `POST` | `/api/study-sessions` | JWT + STUDENT | Starts an idempotent 5–240 minute focus session; returns `409` when another active session exists |
+| `POST` | `/api/study-sessions/:id/pause` | JWT + STUDENT | Pauses an owned running session using optimistic `expectedVersion` |
+| `POST` | `/api/study-sessions/:id/resume` | JWT + STUDENT | Resumes an owned paused session using optimistic `expectedVersion` |
+| `POST` | `/api/study-sessions/:id/finish` | JWT + STUDENT | Completes and saves elapsed focus time |
+| `POST` | `/api/study-sessions/:id/cancel` | JWT + STUDENT | Cancels an active focus session while retaining its audit-safe timing record |
+
+The database enforces at most one `RUNNING` or `PAUSED` session per student with a partial unique index. Mutations additionally take a transaction-scoped per-user advisory lock, validate ownership, and increment `version`. The browser renders the countdown locally between mutations, uses the returned server clock to offset device drift, and only refetches after visibility/network recovery or a cross-tab `BroadcastChannel` signal.
+
+### 5.9 Error Logs
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -227,7 +240,7 @@ Express Server (index.js → app.js)
 
 Dynamic Error Log routes validate UUIDs before service access. During the rolling-deployment window, deprecated `markReviewed`, `whyChosen`, `takeaway`, and `rootCause` inputs are accepted but ignored and marked with deprecation headers; legacy columns remain stored for migration safety but are neither changed nor searchable. Search reads the maintained plain-text `searchText` projection rather than raw rich HTML.
 
-### 5.9 AI Features
+### 5.10 AI Features
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -236,7 +249,7 @@ Dynamic Error Log routes validate UUIDs before service access. During the rollin
 | `POST` | `/api/challenge/generate` | JWT | Generate an AI-created SAT question |
 | `POST` | `/api/challenge/evaluate` | JWT | AI evaluates student's answer reasoning |
 
-### 5.10 Notifications
+### 5.11 Notifications
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -244,7 +257,7 @@ Dynamic Error Log routes validate UUIDs before service access. During the rollin
 | `GET` | `/api/notifications` | JWT | Get last 50 notifications |
 | `PUT` | `/api/notifications/read-all` | JWT | Mark all notifications as read |
 
-### 5.11 Admin Overview
+### 5.12 Admin Overview
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
@@ -254,7 +267,7 @@ Dynamic Error Log routes validate UUIDs before service access. During the rollin
 
 Admin Overview uses complete platform days in the configured `APP_TIMEZONE`. It deliberately reports Total Classrooms rather than inferring an active/inactive lifecycle that the current Class model does not yet store. Student Error Logs, ordinary Draft tests, and transient imports are not treated as operational alerts. Recent Activity begins with real post-migration AuditEvent mutations and is not synthesized from entity timestamps.
 
-### 5.12 Student Overview
+### 5.13 Student Overview
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
@@ -266,7 +279,7 @@ Admin Overview uses complete platform days in the configured `APP_TIMEZONE`. It 
 
 Student Overview uses only persisted product data. Coursework and personal planning are combined in a Productivity-style task surface. Assignment, test, and vocabulary completion comes from their authoritative submission/activity records; only personal tasks and announcements can be checked directly. Accuracy remains evidence-based, while current and target SAT scores are explicitly self-reported preferences.
 
-### 5.13 Teacher Overview
+### 5.14 Teacher Overview
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
@@ -275,7 +288,7 @@ Student Overview uses only persisted product data. Coursework and personal plann
 
 Teacher Overview only exposes classes owned by the authenticated teacher. Core workflow data and answer-level learning insights load independently so analytics failures do not hide deadlines or classroom status. Check-in suggestions use explicit overdue, inactivity, or sustained score-decline rules; the page does not invent a manual grading queue for auto-scored activities.
 
-### 5.14 Managed Files
+### 5.15 Managed Files
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
@@ -352,9 +365,11 @@ Folder ──1:N── Test
 
 **ErrorLog**: student-owned mistake review with explicit `origin` (`SYSTEM_QUESTION` or `MANUAL`), objective source/answer data, immutable `questionSnapshot` for new system rows, optional `Submission` and `Question` links, two writable reflections (`whyWrong`, `whyRight`), derived `reviewedAt`, optimistic `version`, manual-create `clientMutationId`, and a plain-text `searchText` projection. New wrong answers are logged automatically and idempotently when a test submission is committed. Legacy `whyChosen`, `takeaway`, and `rootCause` columns remain preserved but are outside the current API/UI contract.
 
+**StudySession**: server-authoritative student focus record with `status` (`RUNNING`, `PAUSED`, `COMPLETED`, `CANCELLED`), fixed source/activity/resource classification, planned and accumulated milliseconds, resume/end timestamps, optimistic `version`, and optional idempotent `clientMutationId`. It is intentionally narrower than generic product telemetry and does not replace the separate Vocabulary learning session model.
+
 **AuditEvent**: durable product-domain mutation history with `action`, `category`, optional actor reference plus actor snapshot, entity identity/label snapshot, allowlisted metadata, and `createdAt`. `AdminAuditLog` remains separate for privileged Admin CLI security operations. Submission analytics and raw operational errors are not duplicated into AuditEvent.
 
-**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestScope` (SYSTEM, PERSONAL), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR), `ErrorLogOrigin` (SYSTEM_QUESTION, MANUAL)
+**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestScope` (SYSTEM, PERSONAL), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR), `ErrorLogOrigin` (SYSTEM_QUESTION, MANUAL), and the `StudySession*` status/source/activity/resource enums
 
 ---
 
@@ -531,6 +546,17 @@ Folder ──1:N── Test
 9. Read-only reflection previews use natural variable height up to a desktop/mobile safety cap, offer Show more only after measured overflow, and retain expansion in a keyed registry across virtual-row unmounts. The active preview is frozen while its external editor receives draft updates, preventing row remeasurement on each keystroke. Sanitized HTML is memoized through a bounded cache; Quill and its stylesheet load only when an editor is first mounted. Quill's native keyboard module owns Bold/Italic/Underline so a collapsed caret retains pending inline formats through typing and IME composition; the capture dispatcher owns application-level navigation, exit, link, and list commands without double-handling inline shortcuts. Tab navigation can await the next cursor page without closing the dock and restores focus to the originating virtual cell when editing exits by keyboard.
 10. The table automatically fetches composite-cursor pages; only the initial page calculates counts. The compatibility offset path uses stable `createdAt DESC, id DESC` ordering. The client does not expose loaded counters or manual Load more controls. The client switches to stacked cards from the measured DataSurface width so an open sidebar cannot introduce horizontal scrolling.
 11. Export to Sheets requests the least-privilege incremental `drive.file` consent only when the student clicks the export action. The server uses the short-lived access token once, loads all Error Log rows directly in chronological order, creates a native sheet styled after the working spreadsheet, and does not store the Google token. The category validation contains every canonical SAT skill plus any legacy values present in the export. System-question source links return to `/dashboard/error-log`; manual sources retain their validated external URL. Reflection HTML is converted to multiline Sheets text with supported bold, italic, underline, and link runs preserved; the reference-only Tips/Lesson column remains blank and editable. If a post-create write fails, the error response includes the new sheet URL so the client can expose the potentially incomplete file. The Google Cloud project behind `VITE_GOOGLE_CLIENT_ID` must have the Google Sheets API enabled and the deployment origin registered as an authorized JavaScript origin.
+```
+
+### 8.13 Global Focus Clock Flow
+
+```text
+1. The router-level FocusTimerProvider restores the authenticated student's active StudySession, so navigating between the dashboard and full-screen Exam Room does not reset time.
+2. The dashboard header offers 25/50/custom-minute starts and classifies the current route as Practice, Vocabulary, Error Log, Homework, or Other. Route context is only a suggestion and no generic ActivityEvent is created.
+3. The server creates at most one active session per student. Start retries use clientMutationId; pause, resume, finish, and cancel use expectedVersion and owner-scoped transitions.
+4. While running, the client derives the display from accumulatedMs plus lastResumedAt and the server clock offset. It does not write once per second.
+5. A mutation broadcasts only a change signal; sibling tabs refetch the canonical server state. Visibility and online recovery also reconcile state.
+6. Reaching zero completes the session, while server reads independently auto-complete overdue running sessions at the planned end time.
 ```
 
 ---

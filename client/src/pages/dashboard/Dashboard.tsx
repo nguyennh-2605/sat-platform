@@ -48,6 +48,7 @@ import { DashboardRouteViewport } from '../../features/navigation/DashboardRoute
 import { DashboardBackProvider, useDashboardBackAction } from '../../features/navigation/DashboardBackContext';
 import NotificationBell from '../../features/notifications/NotificationBell';
 import { logoutAuthSession } from '../../lib/authSession';
+import { FocusClock } from '../../features/focus-timer/FocusClock';
 
 const navigation = [
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -283,6 +284,7 @@ export default function Dashboard() {
           <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b bg-background/80 px-4 backdrop-blur-sm">
             <DashboardHeaderNavigation />
             <div className="flex items-center gap-1">
+              {localStorage.getItem('userRole') === 'STUDENT' && <FocusClock />}
               <ThemeToggle />
               <NotificationBell currentUserId={userId} />
             </div>

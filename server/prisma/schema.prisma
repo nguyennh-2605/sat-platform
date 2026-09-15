@@ -45,6 +45,7 @@ model User {
   resourceProgress      ResourceProgress[]
   auditEvents           AuditEvent[]             @relation("AuditEventActor")
   fileAssets            FileAsset[]              @relation("FileAssetOwner")
+  studySessions         StudySession[]
 }
 
 model RefreshSession {
@@ -381,6 +382,31 @@ model ErrorLog {
   @@index([userId, category, createdAt, id])
 }
 
+model StudySession {
+  id                String             @id @default(uuid())
+  userId            Int
+  status            StudySessionStatus @default(RUNNING)
+  source            StudySessionSource @default(FOCUS_CLOCK)
+  activityType      StudyActivityType  @default(OTHER)
+  resourceType      StudyResourceType?
+  resourceId        String?
+  label             String?
+  plannedDurationMs Int
+  accumulatedMs     Int                @default(0)
+  startedAt         DateTime           @default(now())
+  lastResumedAt     DateTime?
+  endedAt           DateTime?
+  version           Int                @default(1)
+  clientMutationId  String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientMutationId])
+  @@index([userId, status, startedAt])
+  @@index([userId, endedAt])
+}
+
 model Notification {
   id        String   @id @default(uuid())
   userId    Int // ID của người nhận thông báo (Giáo viên hoặc Học sinh)
@@ -460,6 +486,34 @@ enum TestScope {
 enum SubmissionStatus {
   DOING
   COMPLETED
+}
+
+enum StudySessionStatus {
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum StudySessionSource {
+  FOCUS_CLOCK
+  TEST
+  VOCABULARY
+  HOMEWORK
+}
+
+enum StudyActivityType {
+  PRACTICE
+  VOCABULARY
+  ERROR_LOG
+  HOMEWORK
+  OTHER
+}
+
+enum StudyResourceType {
+  TEST
+  VOCABULARY_SET
+  ASSIGNMENT
 }
 
 enum SubmissionContentSlot {
