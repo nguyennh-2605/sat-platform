@@ -342,12 +342,15 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 
 ## 9. Analytics
 
-- Bám sát `dashboard/analytics` và `dashboard/default`: KPI strip, Score Progress, Activity Heatmap, Section Performance và Recent Activity.
+- Student Analytics là một diagnostic workspace cuộn liên tục, không phải một Overview thứ hai và không dùng tab giả. Range/subject filters cùng sticky anchor navigation phải giữ được bằng URL.
+- Thứ tự nội dung là Focus Areas, Performance Snapshot, Accuracy Trend, Skill Performance, Mistake Review, Pacing và Attempts. Focus Area chỉ xuất hiện khi đủ sample và phải có CTA thật tới breakdown hoặc Error Log.
+- Accuracy không được gọi là SAT score. Trend dùng ngày, tên attempt, correct/total và subject thật; không dựng estimated score khi chưa có calibration.
+- Skill performance theo hierarchy Subject → Domain → Skill. Dưới 5 câu là `Not enough data`, 5–9 là `Early signal`, từ 10 câu mới đủ điều kiện rank.
+- Error Log chỉ được tổng hợp và deep-link bằng category/review status; reflection vẫn thuộc Error Log. Pacing chỉ dùng QuestionTiming hợp lệ, luôn nêu số câu và coverage, không biến missing timing thành zero.
+- Attempts chỉ chứa submission `COMPLETED`; bài `DOING` thuộc Overview/Continue Learning. Activity Heatmap không xuất hiện cho đến khi có telemetry thống nhất bao phủ Practice, Error Log, Vocabulary và Homework.
 - Giáo viên dùng bố cục Test Performance: KPI strip, Question Performance Breakdown và Student Rankings.
-- Không dùng số liệu giả. Empty state tốt hơn dữ liệu demo.
-- Reading & Writing và Math phải phân biệt bằng label/icon cùng semantic chart colors; không phụ thuộc màu là tín hiệu duy nhất.
-- Ngày và heatmap phải xử lý UTC ở backend để không phụ thuộc timezone của Vercel/Render.
-- Table header nhỏ, uppercase khi phù hợp; row gọn và có hover rất nhẹ.
+- Không dùng số liệu giả. Empty state tốt hơn dữ liệu demo. Reading & Writing và Math phải có label cùng semantic chart colors, không phụ thuộc màu là tín hiệu duy nhất.
+- Ngày phải chuẩn hóa UTC ở backend; table header nhỏ, row gọn và có hover rất nhẹ.
 
 ## 10. Responsive và accessibility
 

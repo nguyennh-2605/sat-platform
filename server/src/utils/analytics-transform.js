@@ -1,4 +1,416 @@
-const { getTaxonomy } = require('./question-taxonomy');
+const { domains: taxonomyDomainList, getTaxonomy, skills: taxonomySkillList } = require('./question-taxonomy');
+
+const MIN_RANKABLE_ANSWERS = 10;
+const MIN_TREND_GROUP_ANSWERS = 5;
+const WEAK_ACCURACY_THRESHOLD = 80;
+const NEGATIVE_TREND_THRESHOLD = -8;
+const SLOW_QUESTION_MS = 2 * 60 * 1000;
+
+const round = value => Number(value.toFixed(1));
+const accuracyOf = (correct, attempted) => attempted ? round((correct / attempted) * 100) : null;
+const completedAtOf = submission => new Date(submission.endTime || submission.startedAt);
+const normalizedSubject = value => value === 'MATH' ? 'MATH' : 'RW';
+
+const confidenceOf = attempted => {
+  if (attempted < 5) return 'NOT_ENOUGH_DATA';
+  if (attempted < MIN_RANKABLE_ANSWERS) return 'EARLY_SIGNAL';
+  return 'RANKABLE';
+};
+
+const trendOf = points => {
+  if (points.length < MIN_TREND_GROUP_ANSWERS * 2) return null;
+  const ordered = [...points].sort((first, second) => first.date - second.date);
+  const splitAt = Math.floor(ordered.length / 2);
+  const previous = ordered.slice(0, splitAt);
+  const recent = ordered.slice(splitAt);
+  if (previous.length < MIN_TREND_GROUP_ANSWERS || recent.length < MIN_TREND_GROUP_ANSWERS) return null;
+  const previousAccuracy = accuracyOf(previous.filter(point => point.correct).length, previous.length);
+  const recentAccuracy = accuracyOf(recent.filter(point => point.correct).length, recent.length);
+  return round(recentAccuracy - previousAccuracy);
+};
+
+const averageOf = values => values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+
+const isTimingEligible = submission => submission?.status === 'COMPLETED' && submission?.test?.mode === 'EXAM';
+
+const sourceOf = submission => submission.deliveryId || submission.classTestId || submission.assignmentId
+  ? 'CLASSROOM'
+  : 'SELF_STUDY';
+
+const skillByCode = new Map(taxonomySkillList.map(skill => [skill.code, skill]));
+const skillByName = new Map(taxonomySkillList.map(skill => [skill.name, skill]));
+const domainByCode = new Map(taxonomyDomainList.map(domain => [domain.code, domain]));
+const domainByName = new Map(taxonomyDomainList.map(domain => [domain.name, domain]));
+
+function classifyErrorLog(log) {
+  const linkedSkill = log.question?.skill?.code ? skillByCode.get(log.question.skill.code) : null;
+  const categorySkill = skillByName.get(log.category);
+  const skill = linkedSkill || categorySkill || null;
+  const linkedDomain = log.question?.domain?.code ? domainByCode.get(log.question.domain.code) : null;
+  const categoryDomain = domainByName.get(log.category);
+  const domain = linkedDomain || (skill ? domainByCode.get(skill.domainCode) : null) || categoryDomain || null;
+  const subject = log.question?.section?.test?.subject || domain?.subject || null;
+  return { skill, domain, subject };
+}
+
+function buildMistakeReview(errorLogs, subject) {
+  const selected = errorLogs.filter(log => subject === 'ALL' || classifyErrorLog(log).subject === subject);
+  const byArea = new Map();
+  const bySkill = new Map();
+  const byDomain = new Map();
+
+  for (const log of selected) {
+    const classified = classifyErrorLog(log);
+    const areaKey = classified.skill?.code || classified.domain?.code || `CATEGORY:${log.category || 'General'}`;
+    const areaName = classified.skill?.name || classified.domain?.name || log.category || 'General';
+    const update = (map, key) => {
+      if (!key) return;
+      const current = map.get(key) || { saved: 0, needsReview: 0, reviewed: 0 };
+      current.saved += 1;
+      if (log.reviewedAt) current.reviewed += 1;
+      else current.needsReview += 1;
+      map.set(key, current);
+    };
+    update(byArea, areaKey);
+    const area = byArea.get(areaKey);
+    area.name = areaName;
+    area.category = log.category || areaName;
+    update(bySkill, classified.skill?.code);
+    update(byDomain, classified.domain?.code);
+  }
+
+  const saved = selected.length;
+  const reviewed = selected.filter(log => log.reviewedAt).length;
+  return {
+    summary: {
+      saved,
+      needsReview: saved - reviewed,
+      reviewed,
+      completion: saved ? round((reviewed / saved) * 100) : null,
+    },
+    topAreas: [...byArea.values()]
+      .sort((first, second) => second.saved - first.saved || second.needsReview - first.needsReview || first.name.localeCompare(second.name))
+      .slice(0, 5),
+    bySkill,
+    byDomain,
+  };
+}
+
+function buildPerformance(submissions, errorLogs, subject) {
+  const selectedTaxonomy = getTaxonomy(subject === 'ALL' ? undefined : subject);
+  const states = new Map(selectedTaxonomy.map(domain => [domain.code, {
+    ...domain,
+    correct: 0,
+    attempted: 0,
+    points: [],
+    timings: [],
+    skills: new Map(domain.skills.map(skill => [skill.code, {
+      ...skill,
+      correct: 0,
+      attempted: 0,
+      points: [],
+      timings: [],
+    }])),
+  }]));
+  const mistakes = buildMistakeReview(errorLogs, subject);
+  let total = 0;
+  let classified = 0;
+
+  for (const submission of submissions) {
+    if (subject !== 'ALL' && normalizedSubject(submission.test?.subject) !== subject) continue;
+    const date = completedAtOf(submission);
+    const timingByQuestion = new Map((isTimingEligible(submission) ? submission.questionTimings || [] : []).map(timing => [timing.questionId, timing.activeDurationMs]));
+    for (const answer of submission.answers || []) {
+      total += 1;
+      const domainCode = answer.question?.domain?.code;
+      const state = states.get(domainCode);
+      if (!state) continue;
+      classified += 1;
+      const point = { correct: Boolean(answer.isCorrect), date };
+      state.attempted += 1;
+      if (answer.isCorrect) state.correct += 1;
+      state.points.push(point);
+      const duration = timingByQuestion.get(answer.question?.id);
+      if (Number.isFinite(duration) && duration > 0) state.timings.push(duration);
+
+      const skill = state.skills.get(answer.question?.skill?.code);
+      if (!skill) continue;
+      skill.attempted += 1;
+      if (answer.isCorrect) skill.correct += 1;
+      skill.points.push(point);
+      if (Number.isFinite(duration) && duration > 0) skill.timings.push(duration);
+    }
+  }
+
+  const domains = [...states.values()].map(domain => {
+    const mistake = mistakes.byDomain.get(domain.code) || { saved: 0, needsReview: 0, reviewed: 0 };
+    return {
+      code: domain.code,
+      name: domain.name,
+      subject: domain.subject,
+      sortOrder: domain.sortOrder,
+      correct: domain.correct,
+      attempted: domain.attempted,
+      accuracy: accuracyOf(domain.correct, domain.attempted),
+      confidence: confidenceOf(domain.attempted),
+      trendDelta: trendOf(domain.points),
+      mistakes: mistake.saved,
+      needsReview: mistake.needsReview,
+      avgTimeMs: averageOf(domain.timings),
+      skills: [...domain.skills.values()].map(skill => {
+        const skillMistake = mistakes.bySkill.get(skill.code) || { saved: 0, needsReview: 0, reviewed: 0 };
+        return {
+          code: skill.code,
+          name: skill.name,
+          correct: skill.correct,
+          attempted: skill.attempted,
+          accuracy: accuracyOf(skill.correct, skill.attempted),
+          confidence: confidenceOf(skill.attempted),
+          trendDelta: trendOf(skill.points),
+          mistakes: skillMistake.saved,
+          needsReview: skillMistake.needsReview,
+          avgTimeMs: averageOf(skill.timings),
+        };
+      }),
+    };
+  });
+
+  return {
+    domains,
+    mistakes,
+    coverage: {
+      classified,
+      total,
+      percentage: total ? round((classified / total) * 100) : null,
+      unclassified: total - classified,
+    },
+  };
+}
+
+function buildFocusAreas(domains) {
+  const skillCandidates = domains.flatMap(domain => domain.skills.map(skill => ({
+    ...skill,
+    subject: domain.subject,
+    domainCode: domain.code,
+    domainName: domain.name,
+    kind: 'SKILL',
+    category: skill.name,
+  })));
+  const domainCandidates = domains.map(domain => ({
+    ...domain,
+    domainCode: domain.code,
+    domainName: domain.name,
+    kind: 'DOMAIN',
+    category: domain.name,
+  }));
+  const qualifies = item => item.attempted >= MIN_RANKABLE_ANSWERS && (
+    item.accuracy < WEAK_ACCURACY_THRESHOLD
+    || item.trendDelta <= NEGATIVE_TREND_THRESHOLD
+    || item.needsReview > 0
+  );
+  const rank = item => (100 - item.accuracy)
+    + Math.max(0, -(item.trendDelta || 0)) * 0.5
+    + Math.min(item.needsReview, 10) * 2;
+  const selected = skillCandidates.filter(qualifies).sort((first, second) => rank(second) - rank(first));
+  const selectedDomains = new Set(selected.slice(0, 4).map(item => item.domainCode));
+  if (selected.length < 2) {
+    selected.push(...domainCandidates
+      .filter(item => qualifies(item) && !selectedDomains.has(item.domainCode))
+      .sort((first, second) => rank(second) - rank(first)));
+  }
+
+  return selected.slice(0, 4).map(item => ({
+    kind: item.kind,
+    code: item.code,
+    name: item.name,
+    category: item.category,
+    subject: item.subject,
+    domainCode: item.domainCode,
+    domainName: item.domainName,
+    accuracy: item.accuracy,
+    attempted: item.attempted,
+    trendDelta: item.trendDelta,
+    mistakes: item.mistakes,
+    needsReview: item.needsReview,
+    reasons: [
+      `${item.accuracy}% accuracy across ${item.attempted} questions`,
+      ...(item.trendDelta <= NEGATIVE_TREND_THRESHOLD ? [`Accuracy is down ${Math.abs(item.trendDelta)} points`] : []),
+      ...(item.needsReview ? [`${item.needsReview} mistake${item.needsReview === 1 ? '' : 's'} need review`] : []),
+    ],
+    action: item.needsReview ? 'REVIEW_MISTAKES' : 'VIEW_BREAKDOWN',
+  }));
+}
+
+function buildPacing(submissions, subject) {
+  const timed = [];
+  let answered = 0;
+  for (const submission of submissions) {
+    if (subject !== 'ALL' && normalizedSubject(submission.test?.subject) !== subject) continue;
+    if (!isTimingEligible(submission)) continue;
+    const timingByQuestion = new Map((submission.questionTimings || []).map(timing => [timing.questionId, timing.activeDurationMs]));
+    for (const answer of submission.answers || []) {
+      answered += 1;
+      const durationMs = timingByQuestion.get(answer.question?.id);
+      if (!Number.isFinite(durationMs) || durationMs <= 0) continue;
+      timed.push({
+        durationMs,
+        correct: Boolean(answer.isCorrect),
+        skillCode: answer.question?.skill?.code || null,
+        skillName: answer.question?.skill?.name || null,
+        domainName: answer.question?.domain?.name || null,
+        subject: normalizedSubject(submission.test?.subject),
+      });
+    }
+  }
+
+  const correct = timed.filter(item => item.correct);
+  const incorrect = timed.filter(item => !item.correct);
+  const slow = timed.filter(item => item.durationMs > SLOW_QUESTION_MS);
+  const pattern = (isSlow, isCorrect) => timed.filter(item => (item.durationMs > SLOW_QUESTION_MS) === isSlow && item.correct === isCorrect).length;
+  const skillGroups = new Map();
+  for (const item of timed) {
+    if (!item.skillCode) continue;
+    const current = skillGroups.get(item.skillCode) || { code: item.skillCode, name: item.skillName, domainName: item.domainName, subject: item.subject, durations: [], correct: 0 };
+    current.durations.push(item.durationMs);
+    if (item.correct) current.correct += 1;
+    skillGroups.set(item.skillCode, current);
+  }
+
+  return {
+    available: timed.length > 0,
+    timedQuestions: timed.length,
+    answeredQuestions: answered,
+    coverage: answered ? round((timed.length / answered) * 100) : null,
+    averageTimeMs: averageOf(timed.map(item => item.durationMs)),
+    correctAverageMs: averageOf(correct.map(item => item.durationMs)),
+    incorrectAverageMs: averageOf(incorrect.map(item => item.durationMs)),
+    slowQuestions: slow.length,
+    patterns: {
+      fastCorrect: pattern(false, true),
+      slowCorrect: pattern(true, true),
+      fastWrong: pattern(false, false),
+      slowWrong: pattern(true, false),
+    },
+    skills: [...skillGroups.values()]
+      .map(item => ({
+        code: item.code,
+        name: item.name,
+        domainName: item.domainName,
+        subject: item.subject,
+        timedQuestions: item.durations.length,
+        avgTimeMs: averageOf(item.durations),
+        accuracy: accuracyOf(item.correct, item.durations.length),
+      }))
+      .sort((first, second) => second.avgTimeMs - first.avgTimeMs)
+      .slice(0, 8),
+  };
+}
+
+function buildSnapshot(submissions) {
+  const totals = { ALL: { attempted: 0, correct: 0 }, RW: { attempted: 0, correct: 0 }, MATH: { attempted: 0, correct: 0 } };
+  for (const submission of submissions) {
+    const subject = normalizedSubject(submission.test?.subject);
+    for (const answer of submission.answers || []) {
+      totals.ALL.attempted += 1;
+      totals[subject].attempted += 1;
+      if (answer.isCorrect) {
+        totals.ALL.correct += 1;
+        totals[subject].correct += 1;
+      }
+    }
+  }
+  return {
+    overallAccuracy: accuracyOf(totals.ALL.correct, totals.ALL.attempted),
+    rwAccuracy: accuracyOf(totals.RW.correct, totals.RW.attempted),
+    mathAccuracy: accuracyOf(totals.MATH.correct, totals.MATH.attempted),
+    questionsAnswered: totals.ALL.attempted,
+    correctAnswers: totals.ALL.correct,
+    completedTests: submissions.length,
+  };
+}
+
+function buildStudentAnalyticsPayload(rawData, errorLogs = [], { range = '90', subject = 'ALL', now = new Date() } = {}) {
+  const completed = rawData
+    .filter(submission => submission.status === 'COMPLETED')
+    .sort((first, second) => completedAtOf(first) - completedAtOf(second));
+  const diagnostic = completed.filter(submission => subject === 'ALL' || normalizedSubject(submission.test?.subject) === subject);
+  const snapshot = buildSnapshot(diagnostic);
+  const performance = buildPerformance(completed, errorLogs, subject);
+  const trend = diagnostic.slice(-50).map(submission => {
+    const totalQuestions = submission.answers?.length || 0;
+    const correctCount = (submission.answers || []).filter(answer => answer.isCorrect).length;
+    return {
+      submissionId: submission.id,
+      date: completedAtOf(submission).toISOString(),
+      testName: submission.test?.title || 'Practice Test',
+      subject: normalizedSubject(submission.test?.subject),
+      correctCount,
+      totalQuestions,
+      accuracy: accuracyOf(correctCount, totalQuestions) || 0,
+    };
+  });
+  const pacing = buildPacing(completed, subject);
+
+  return {
+    generatedAt: now.toISOString(),
+    meta: {
+      range: String(range),
+      subject,
+      classificationCoverage: performance.coverage,
+      timingCoverage: {
+        timedQuestions: pacing.timedQuestions,
+        answeredQuestions: pacing.answeredQuestions,
+        percentage: pacing.coverage,
+      },
+    },
+    snapshot,
+    focusAreas: buildFocusAreas(performance.domains),
+    accuracyTrend: trend,
+    skillPerformance: performance.domains,
+    mistakeReview: {
+      ...performance.mistakes.summary,
+      topAreas: performance.mistakes.topAreas,
+    },
+    pacing,
+
+    // Transitional aliases keep the existing page and deployment smoke checks
+    // compatible while the richer diagnostic workspace rolls out.
+    summary: {
+      overallAccuracy: snapshot.overallAccuracy || 0,
+      correctAnswers: snapshot.correctAnswers,
+      questionsAttempted: snapshot.questionsAnswered,
+      completedTests: snapshot.completedTests,
+    },
+    scoreHistory: trend.slice(-7).map(item => ({
+      date: item.date,
+      testName: item.testName,
+      rw: item.subject === 'RW' ? item.accuracy : null,
+      math: item.subject === 'MATH' ? item.accuracy : null,
+    })),
+    sectionPerformance: performance.domains,
+    classificationCoverage: {
+      classified: performance.coverage.classified,
+      total: performance.coverage.total,
+      percentage: performance.coverage.percentage,
+      uncategorizedAttempted: performance.coverage.unclassified,
+    },
+    historyData: [...diagnostic].reverse().slice(0, 10).map(submission => {
+      const totalQuestions = submission.answers?.length || 0;
+      const correctCount = (submission.answers || []).filter(answer => answer.isCorrect).length;
+      return {
+        id: submission.id,
+        createdAt: completedAtOf(submission).toISOString(),
+        status: 'COMPLETED',
+        test: { title: submission.test?.title || 'Practice Test' },
+        subject: normalizedSubject(submission.test?.subject),
+        correctCount,
+        totalQuestions,
+        accuracy: accuracyOf(correctCount, totalQuestions) || 0,
+        source: sourceOf(submission),
+      };
+    }),
+  };
+}
 
 function buildAnalyticsPayload(rawData, { days = 7, now = new Date() } = {}) {
   const daysLimit = Number.parseInt(days, 10) || 7;
@@ -128,4 +540,11 @@ function buildAnalyticsPayload(rawData, { days = 7, now = new Date() } = {}) {
   };
 }
 
-module.exports = { buildAnalyticsPayload };
+module.exports = {
+  buildAnalyticsPayload,
+  buildStudentAnalyticsPayload,
+  confidenceOf,
+  isTimingEligible,
+  sourceOf,
+  trendOf,
+};

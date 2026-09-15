@@ -1,272 +1,129 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+
+import { PageHeader } from '@/components/ui/AppUI';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cachedGet } from '@/lib/queryCache';
+import { cn } from '@/lib/utils';
 import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { format } from 'date-fns';
-import { ArrowRight, BookmarkCheck, Calendar, CheckCircle2, PenTool } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { Badge, Button, Card, EmptyState, PageHeader } from '../../components/ui/AppUI';
-import { DataSurface } from '@/components/ui/data-surface';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { SatCountdown } from '../../features/sat-countdown/SatCountdown';
-import { cachedGet } from '../../lib/queryCache';
-import { capitalizeFirstLetter } from '../../utils/text';
+  AccuracyTrend,
+  AnalyticsEmpty,
+  AnalyticsLoadError,
+  AnalyticsLoading,
+  Attempts,
+  FocusAreas,
+  MistakeReview,
+  PacingAnalytics,
+  PerformanceSnapshot,
+  SkillPerformance,
+} from './AnalyticsSections';
+import type { AnalyticsRange, AnalyticsResponse, AnalyticsSubject } from './analytics.types';
 
-interface AnalyticsSummary {
-  overallAccuracy: number;
-  correctAnswers: number;
-  questionsAttempted: number;
-  completedTests: number;
-}
+const sectionLinks = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'skills', label: 'Skills' },
+  { id: 'mistakes', label: 'Mistakes' },
+  { id: 'pacing', label: 'Pacing' },
+  { id: 'attempts', label: 'Attempts' },
+] as const;
 
-interface ScoreHistoryPoint {
-  date: string;
-  testName: string;
-  rw: number | null;
-  math: number | null;
-}
+const readRange = (value: string | null): AnalyticsRange => value === '30' || value === 'all' ? value : '90';
+const readSubject = (value: string | null): AnalyticsSubject => value === 'RW' || value === 'MATH' ? value : 'ALL';
 
-interface HeatmapPoint {
-  date: string;
-  count: number;
-}
+export default function ResultAnalytics() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const range = readRange(searchParams.get('range'));
+  const subject = readSubject(searchParams.get('subject'));
+  const [reload, setReload] = useState(0);
+  const [result, setResult] = useState<{ key: string; data: AnalyticsResponse | null; error: boolean }>({ key: '', data: null, error: false });
+  const [activeSection, setActiveSection] = useState<(typeof sectionLinks)[number]['id']>('overview');
+  const [focusedDomain, setFocusedDomain] = useState<string | null>(null);
 
-interface SectionPerformanceItem {
-  code: string;
-  name: string;
-  subject: 'RW' | 'MATH';
-  sortOrder: number;
-  correct: number;
-  accuracy: number | null;
-  attempted: number;
-  skills: Array<{ code: string; name: string; correct: number; attempted: number; accuracy: number | null }>;
-}
-
-interface ClassificationCoverage {
-  classified: number;
-  total: number;
-  percentage: number | null;
-  uncategorizedAttempted: number;
-}
-
-interface HistoryItem {
-  id: number;
-  createdAt: string;
-  status: 'DOING' | 'COMPLETED';
-  subject: 'RW' | 'MATH';
-  test: { title: string };
-  correctCount: number;
-  totalQuestions: number;
-  accuracy: number;
-}
-
-interface AnalyticsResponse {
-  summary?: AnalyticsSummary;
-  scoreHistory?: ScoreHistoryPoint[];
-  heatmapData?: HeatmapPoint[];
-  sectionPerformance?: SectionPerformanceItem[];
-  classificationCoverage?: ClassificationCoverage;
-  historyData?: HistoryItem[];
-}
-
-const emptySummary: AnalyticsSummary = {
-  overallAccuracy: 0,
-  correctAnswers: 0,
-  questionsAttempted: 0,
-  completedTests: 0,
-};
-
-const heatmapColors = ['#EAF2EE', '#C2DDD4', '#6BBFA0', '#3AAD82', '#1B7A5A'];
-
-const getHeatmapLevel = (count: number) => {
-  if (count <= 0) return 0;
-  if (count === 1) return 1;
-  if (count === 2) return 2;
-  if (count === 3) return 3;
-  return 4;
-};
-
-const ResultAnalytics = () => {
-  const navigate = useNavigate();
-  const userName = localStorage.getItem('userName') || 'Student';
-  const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState<AnalyticsSummary>(emptySummary);
-  const [scoreHistory, setScoreHistory] = useState<ScoreHistoryPoint[]>([]);
-  const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
-  const [sectionPerformance, setSectionPerformance] = useState<SectionPerformanceItem[]>([]);
-  const [classificationCoverage, setClassificationCoverage] = useState<ClassificationCoverage | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const requestUrl = useMemo(() => {
+    const params = new URLSearchParams({ range, subject });
+    return `/api/results-analytics?${params.toString()}`;
+  }, [range, subject]);
+  const requestKey = `${requestUrl}:${reload}`;
+  const requestPending = result.key !== requestKey;
+  const data = requestPending ? null : result.data;
+  const error = !requestPending && result.error;
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      setLoading(true);
-      try {
-        const response = await cachedGet<AnalyticsResponse>('/api/results-analytics?days=84', { ttlMs: 60_000 });
-        setSummary(response.summary || emptySummary);
-        setScoreHistory(Array.isArray(response.scoreHistory) ? response.scoreHistory : []);
-        setHeatmapData(Array.isArray(response.heatmapData) ? response.heatmapData : []);
-        setSectionPerformance(Array.isArray(response.sectionPerformance) ? response.sectionPerformance : []);
-        setClassificationCoverage(response.classificationCoverage || null);
-        setHistory(Array.isArray(response.historyData) ? response.historyData : []);
-      } catch (error) {
-        console.error('Failed to load analytics:', error);
-        toast.error('Unable to load analytics');
-      } finally {
-        setLoading(false);
-      }
-    };
+    let active = true;
+    void cachedGet<AnalyticsResponse>(requestUrl, { ttlMs: 60_000, force: reload > 0 })
+      .then(response => {
+        if (active) setResult({ key: requestKey, data: response, error: false });
+      })
+      .catch(() => {
+        if (active) setResult({ key: requestKey, data: null, error: true });
+      });
+    return () => { active = false; };
+  }, [reload, requestKey, requestUrl]);
 
-    fetchAnalytics();
-  }, []);
+  useEffect(() => {
+    const sections = sectionLinks
+      .map(item => document.getElementById(item.id))
+      .filter((item): item is HTMLElement => Boolean(item));
+    if (!sections.length) return;
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries
+        .filter(entry => entry.isIntersecting)
+        .sort((first, second) => first.boundingClientRect.top - second.boundingClientRect.top)[0];
+      if (visible) setActiveSection(visible.target.id as (typeof sectionLinks)[number]['id']);
+    }, { rootMargin: '-120px 0px -65% 0px', threshold: [0, 0.1] });
+    sections.forEach(section => observer.observe(section));
+    return () => observer.disconnect();
+  }, [data]);
 
-  const rwSections = useMemo(
-    () => sectionPerformance.filter(section => section.subject === 'RW').sort((first, second) => first.sortOrder - second.sortOrder),
-    [sectionPerformance],
-  );
-  const mathSections = useMemo(
-    () => sectionPerformance.filter(section => section.subject === 'MATH').sort((first, second) => first.sortOrder - second.sortOrder),
-    [sectionPerformance],
-  );
+  const updateFilter = (key: 'range' | 'subject', value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (key === 'range' && value === '90') next.delete('range');
+    else if (key === 'subject' && value === 'ALL') next.delete('subject');
+    else next.set(key, value);
+    setSearchParams(next, { replace: true });
+  };
 
-  return (
-    <div className="h-full overflow-y-auto">
-      <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
-          <PageHeader title={`Hello, ${userName.trim().split(/\s+/)[0] || 'Student'}`} description="Track SAT accuracy, score progress, and recent study activity in one view." actions={<SatCountdown />} />
-          <Card className="grid grid-cols-1 gap-0 overflow-hidden p-0 md:grid-cols-3">
-            <MetricCard label="Overall Accuracy" value={`${summary.overallAccuracy}%`} icon={<CheckCircle2 size={22} />} iconClassName="bg-primary-soft text-primary" valueClassName="text-primary" loading={loading} />
-            <MetricCard label="Correct Answers" value={summary.correctAnswers.toLocaleString('en-US')} suffix="answers" icon={<BookmarkCheck size={22} />} iconClassName="bg-accent-soft text-warning" valueClassName="text-warning" loading={loading} />
-            <MetricCard label="Questions Attempted" value={summary.questionsAttempted.toLocaleString('en-US')} suffix={`${summary.completedTests} completed tests`} icon={<PenTool size={22} />} iconClassName="bg-muted text-subtle-foreground" valueClassName="text-foreground" loading={loading} />
-          </Card>
+  const viewBreakdown = (domainCode: string) => {
+    setFocusedDomain(domainCode);
+    setActiveSection('skills');
+    document.getElementById('skills')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  };
 
-          <Card className="mb-6 p-5">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="font-semibold text-foreground">Score Progress</h2>
-                <p className="text-caption text-muted-foreground">Accuracy percentage across your latest 7 completed tests</p>
-              </div>
-              <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground">
-                <Legend color="#1B7A5A" label="RW" />
-                <Legend color="#E8C040" label="Math" />
-              </div>
-            </div>
+  const hasLearningData = Boolean(data && (data.snapshot.completedTests > 0 || data.mistakeReview.saved > 0));
 
-            <div className="h-[220px] w-full">
-              {loading ? (
-                <div className="h-full w-full animate-pulse rounded-control bg-background" />
-              ) : scoreHistory.length === 0 ? (
-                <EmptyState title="No score history yet" description="Complete a test to see your score progress." compact surface={false} className="h-full" />
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={scoreHistory} margin={{ top: 4, right: 12, bottom: 0, left: -10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E2EDE9" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={{ stroke: '#CBD5E1' }} tickLine={false} />
-                    <YAxis domain={[0, 100]} tickFormatter={value => `${value}%`} tick={{ fontSize: 11, fill: '#64748B' }} axisLine={{ stroke: '#CBD5E1' }} tickLine={false} />
-                    <Tooltip content={<ScoreTooltip />} />
-                    <Line connectNulls type="monotone" dataKey="rw" name="RW" stroke="#1B7A5A" strokeWidth={2.5} dot={{ r: 4, fill: '#1B7A5A', strokeWidth: 0 }} activeDot={{ r: 6 }} />
-                    <Line connectNulls type="monotone" dataKey="math" name="Math" stroke="#E8C040" strokeWidth={2.5} dot={{ r: 4, fill: '#E8C040', strokeWidth: 0 }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </Card>
+  return <div className="h-full overflow-y-auto">
+    <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 p-4 md:p-6">
+      <PageHeader title="Analytics" description="Understand your performance, weak skills, and study patterns." />
 
-          <Card className="mb-6 p-5">
-            <div className="mb-4 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-              <div>
-                <h2 className="flex items-center gap-2 font-semibold text-foreground"><Calendar size={18} className="text-primary" /> Activity Heatmap</h2>
-                <p className="mt-0.5 text-caption text-muted-foreground">Your study activity over the last 12 weeks</p>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                <span>Less</span>
-                <div className="flex gap-1">{heatmapColors.map(color => <span key={color} className="h-3 w-3 rounded-[2px]" style={{ backgroundColor: color }} />)}</div>
-                <span>More</span>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="h-16 animate-pulse rounded-control bg-background" />
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {heatmapData.map(point => (
-                  <div key={point.date} className="h-4 w-4 cursor-default rounded-[3px] transition-transform hover:scale-110" style={{ backgroundColor: heatmapColors[getHeatmapLevel(point.count)] }} title={`${point.date}: ${point.count} ${point.count === 1 ? 'activity' : 'activities'}`} />
-                ))}
-              </div>
-            )}
-          </Card>
-
-          <Card className="mb-6 p-6">
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-foreground">Section Performance Breakdown</h2><p className="mt-1 text-xs text-muted-foreground">Accuracy by official SAT content domain during the selected period.</p></div>{!loading && classificationCoverage && classificationCoverage.uncategorizedAttempted > 0 && <Badge tone="warning">{classificationCoverage.uncategorizedAttempted} uncategorized question{classificationCoverage.uncategorizedAttempted === 1 ? '' : 's'}</Badge>}</div>
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-              <SectionGroup title="Reading & Writing" tone="green" items={rwSections} color="#1B7A5A" />
-              <SectionGroup title="Math" tone="gold" items={mathSections} color="#E8C040" />
-            </div>
-          </Card>
-
-          <DataSurface className="mb-8">
-            <div className="border-b p-5">
-              <h2 className="font-semibold text-foreground">Recent Activity</h2>
-              <p className="text-xs text-muted-foreground">Detailed history of your latest attempts</p>
-            </div>
-              <Table className="min-w-[680px]">
-                <TableHeader><TableRow><TableHead>Test name</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {loading ? (
-                    [1, 2, 3].map(row => <TableRow key={row}><TableCell colSpan={4}><div className="h-8 animate-pulse rounded-sm bg-muted" /></TableCell></TableRow>)
-                  ) : history.length === 0 ? (
-                    <TableRow className="hover:bg-transparent"><TableCell colSpan={4} className="h-40 text-center text-muted-foreground">No recent activity yet.</TableCell></TableRow>
-                  ) : history.map(item => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium text-foreground">{capitalizeFirstLetter(item.test.title)}</TableCell>
-                      <TableCell><Badge tone={item.status === 'COMPLETED' ? 'success' : 'warning'}>{item.status === 'COMPLETED' ? 'Completed' : 'Incomplete'}</Badge></TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{format(new Date(item.createdAt), 'MMM d, yyyy')}</TableCell>
-                      <TableCell className="text-right"><Button variant="outline" size="sm" disabled={item.status !== 'COMPLETED'} onClick={() => navigate('/dashboard/score-report', { state: { resultId: item.id } })}>View Details <ArrowRight size={12} /></Button></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-          </DataSurface>
-      </main>
-    </div>
-  );
-};
-
-function MetricCard({ label, value, suffix, icon, iconClassName, valueClassName, loading }: { label: string; value: string; suffix?: string; icon: ReactNode; iconClassName: string; valueClassName: string; loading: boolean }) {
-  return (
-    <div className="flex items-center gap-4 border-b p-5 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconClassName}`}>{icon}</div>
-      <div className="min-w-0">
-        <p className="mb-0.5 text-xs font-medium text-muted-foreground">{label}</p>
-        {loading ? <div className="mt-1 h-8 w-24 animate-pulse rounded-sm bg-muted" /> : <div className="flex items-baseline gap-1.5"><span className={`font-mono text-3xl font-semibold ${valueClassName}`}>{value}</span>{suffix && <span className="truncate text-xs text-muted-foreground">{suffix}</span>}</div>}
+      <div className="sticky top-0 z-20 -mx-1 rounded-xl border border-ui-border bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85">
+        <div className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={range} onValueChange={value => updateFilter('range', value)}>
+              <SelectTrigger aria-label="Analytics time period"><SelectValue /></SelectTrigger>
+              <SelectContent position="popper" align="start"><SelectItem value="30">Last 30 days</SelectItem><SelectItem value="90">Last 90 days</SelectItem><SelectItem value="all">All time</SelectItem></SelectContent>
+            </Select>
+            <Select value={subject} onValueChange={value => updateFilter('subject', value)}>
+              <SelectTrigger aria-label="Analytics subject"><SelectValue /></SelectTrigger>
+              <SelectContent position="popper" align="start"><SelectItem value="ALL">All subjects</SelectItem><SelectItem value="RW">Reading & Writing</SelectItem><SelectItem value="MATH">Math</SelectItem></SelectContent>
+            </Select>
+          </div>
+          <nav aria-label="Analytics sections" className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1">
+            {sectionLinks.map(item => <a key={item.id} href={`#${item.id}`} aria-current={activeSection === item.id ? 'location' : undefined} onClick={() => setActiveSection(item.id)} className={cn('shrink-0 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', activeSection === item.id && 'bg-muted text-foreground')}>{item.label}</a>)}
+          </nav>
+        </div>
       </div>
-    </div>
-  );
-}
 
-function Legend({ color, label }: { color: string; label: string }) {
-  return <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-3 rounded-full" style={{ background: color }} />{label}</span>;
+      {requestPending ? <AnalyticsLoading /> : error ? <AnalyticsLoadError onRetry={() => setReload(value => value + 1)} /> : !data ? null : !hasLearningData ? <AnalyticsEmpty /> : <>
+        <FocusAreas items={data.focusAreas} onViewBreakdown={viewBreakdown} />
+        <PerformanceSnapshot data={data.snapshot} />
+        <AccuracyTrend data={data.accuracyTrend} />
+        {data.meta.classificationCoverage.unclassified > 0 && <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground"><AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" /><span>{data.meta.classificationCoverage.unclassified} answered question{data.meta.classificationCoverage.unclassified === 1 ? '' : 's'} could not be included in skill rankings because classification is missing.</span></div>}
+        <SkillPerformance domains={data.skillPerformance} focusedDomain={focusedDomain} />
+        <MistakeReview data={data.mistakeReview} />
+        <PacingAnalytics data={data.pacing} />
+        <Attempts range={range} subject={subject} />
+      </>}
+    </main>
+  </div>;
 }
-
-function ScoreTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: ScoreHistoryPoint; color: string }> }) {
-  if (!active || !payload?.length) return null;
-  const available = payload.filter(item => item.value !== null && item.value !== undefined);
-  if (available.length === 0) return null;
-  return <div className="min-w-[150px] rounded-lg border bg-popover p-3 text-xs text-popover-foreground shadow-md"><p className="mb-2 border-b pb-2 font-semibold">{capitalizeFirstLetter(available[0].payload.testName)}</p>{available.map(item => <p key={item.name} className="flex justify-between gap-5"><span>{item.name}</span><strong style={{ color: item.color }}>{item.value}%</strong></p>)}</div>;
-}
-
-function SectionGroup({ title, tone, items, color }: { title: string; tone: 'green' | 'gold'; items: SectionPerformanceItem[]; color: string }) {
-  return <div><Badge tone={tone} className="mb-4 rounded-md px-3 py-1.5">{title}</Badge>{items.length === 0 ? <p className="text-sm text-muted-foreground">No performance data yet.</p> : <div className="flex flex-col gap-4">{items.map(item => <SectionBar key={item.name} name={item.name} percentage={item.accuracy} color={color} />)}</div>}</div>;
-}
-
-function SectionBar({ name, percentage, color }: { name: string; percentage: number | null; color: string }) {
-  const hasData = percentage !== null;
-  return <div className="flex items-center gap-4"><p className="w-40 shrink-0 truncate text-sm font-semibold text-foreground" title={name}>{name}</p><div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full transition-all duration-500" style={{ width: hasData ? `${percentage}%` : '0%', background: color }} /></div><span className={`w-14 shrink-0 text-right font-mono text-xs font-semibold ${hasData ? '' : 'text-muted-foreground'}`} style={hasData ? { color } : undefined}>{hasData ? `${percentage}%` : 'No data'}</span></div>;
-}
-
-export default ResultAnalytics;
