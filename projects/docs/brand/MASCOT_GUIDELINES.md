@@ -59,4 +59,6 @@ Dark-mode variants use a targeted edit that changes only the coat from black to 
 
 ## Favicon
 
-The favicon is a deliberately simplified vector mark derived from the approved favicon panel. It retains the ears, small face, red scarf, scarf tail, and white emblem so it stays recognizable at 16×16 pixels.
+The browser favicon is a logo derivative, not a scaled-down mascot illustration. Use `favicon-tab.svg` only for browser tabs. It keeps the cat-head silhouette and red scarf, removes the hanging scarf tail and fine details, and uses a light optical keyline so the black cat remains visible on both light and dark browser chrome.
+
+Use the more detailed `favicon.svg` and `favicon-dark.svg` only through `BrandMark` inside the product. Those in-app marks may switch with the page theme; the browser favicon always remains the optically corrected black cat.
