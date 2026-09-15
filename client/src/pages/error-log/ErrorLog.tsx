@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TableVirtuoso, Virtuoso, type TableComponents, type TableVirtuosoHandle, type VirtuosoHandle } from 'react-virtuoso';
 import { CircleDashed, Loader2, Plus } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 import { EmptyState, Modal, PageHeader } from '@/components/ui/AppUI';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,8 @@ const tableComponents: TableComponents<ErrorEntry> = {
   TableRow: props => <TableRow {...props} className="[&>td]:border-b [&>td]:border-ui-border/60" />,
 };
 
-const initialStatus = (): ReviewStatus => {
+const initialStatus = (queryValue?: string | null): ReviewStatus => {
+  if (queryValue === 'ALL' || queryValue === 'REVIEWED' || queryValue === 'NEEDS_REVIEW') return queryValue;
   if (typeof window === 'undefined') return 'NEEDS_REVIEW';
   const stored = window.localStorage.getItem(statusPreferenceKey);
   return stored === 'ALL' || stored === 'REVIEWED' || stored === 'NEEDS_REVIEW' ? stored : 'NEEDS_REVIEW';
@@ -52,12 +54,13 @@ const sameFormats = (left: RichTextFormats, right: RichTextFormats) => left.bold
   && left.link === right.link;
 
 export default function ErrorLog() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const [compactLayout, setCompactLayout] = useState(false);
   const [logs, setLogs] = useState<ErrorEntry[]>([]);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<ReviewStatus>(initialStatus);
-  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState<ReviewStatus>(() => initialStatus(searchParams.get('status')));
+  const [category, setCategory] = useState(() => searchParams.get('category')?.trim().slice(0, 120) || '');
   const debouncedSearch = useDebounce(search, 250);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [facets, setFacets] = useState<ErrorLogFacets>(emptyFacets);
@@ -104,6 +107,13 @@ export default function ErrorLog() {
   const { store: draftStore, change, flush, resolveConflict } = useReflectionDrafts(saved, getVersion);
   const previewStore = usePreviewExpansionStore();
   const filterKey = JSON.stringify([debouncedSearch, status, category, reload]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (status === 'ALL') next.delete('status'); else next.set('status', status);
+    if (category) next.set('category', category); else next.delete('category');
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+  }, [category, searchParams, setSearchParams, status]);
 
   useLayoutEffect(() => {
     const surface = dataSurface.current;

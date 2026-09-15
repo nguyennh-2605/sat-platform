@@ -208,7 +208,8 @@ Express Server (index.js → app.js)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/results-analytics` | JWT + STUDENT | Analytics data (charts + history) for past N days |
+| `GET` | `/api/results-analytics` | JWT + STUDENT | Student diagnostic analytics for `range=30|90|all` and `subject=ALL|RW|MATH`: snapshot, rule-based focus areas, attempt accuracy trend, domain/skill performance, Error Log review state, classification coverage, and pacing coverage. Legacy bounded `days` remains accepted during rollout |
+| `GET` | `/api/results-analytics/attempts` | JWT + STUDENT | Cursor-paginated completed attempts with range, subject, source, and title filters; in-progress submissions are intentionally excluded |
 | `GET` | `/api/results-analytics/submission/:id` | JWT + STUDENT | Detailed submission with every question/answer |
 
 ### 5.8 Error Logs

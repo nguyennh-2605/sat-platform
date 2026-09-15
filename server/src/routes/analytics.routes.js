@@ -4,6 +4,7 @@ const analyticsController = require('../controllers/analytics.controller');
 const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
 
 router.get('/', authenticateToken, authorizeRole(['STUDENT']), analyticsController.getData);
+router.get('/attempts', authenticateToken, authorizeRole(['STUDENT']), analyticsController.getAttempts);
 router.get('/submission/:id', authenticateToken, authorizeRole(['STUDENT']), analyticsController.getSubmissionDetail);
 
 module.exports = router
