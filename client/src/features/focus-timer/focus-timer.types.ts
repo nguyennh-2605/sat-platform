@@ -2,6 +2,8 @@ export type StudySessionStatus = 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED
 export type StudyActivityType = 'PRACTICE' | 'VOCABULARY' | 'ERROR_LOG' | 'HOMEWORK' | 'OTHER';
 export type StudyResourceType = 'TEST' | 'VOCABULARY_SET' | 'ASSIGNMENT';
 
+export const FOCUS_SESSION_CHANGED_EVENT = 'focus:session-changed';
+
 export interface StudySession {
   id: string;
   status: StudySessionStatus;

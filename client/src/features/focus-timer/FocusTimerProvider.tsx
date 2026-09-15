@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import axiosClient from '@/lib/axios';
 import { getAuthStatus, subscribeAuthSession } from '@/lib/authSession';
 import { FocusTimerContext } from './focus-timer-context';
-import type { StartFocusSessionInput, StudyContextSuggestion, StudySession, StudySessionEnvelope } from './focus-timer.types';
+import { FOCUS_SESSION_CHANGED_EVENT, type StartFocusSessionInput, type StudyContextSuggestion, type StudySession, type StudySessionEnvelope } from './focus-timer.types';
 
 const ACTIVE_STATUSES = new Set(['RUNNING', 'PAUSED']);
 const SYNC_STORAGE_KEY = 'sat:focus-session-changed';
@@ -70,6 +70,7 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
     const message = { type: 'SESSION_CHANGED', at: Date.now() };
     channelRef.current?.postMessage(message);
     try { localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(message)); } catch { /* Cross-tab sync is best effort. */ }
+    window.dispatchEvent(new Event(FOCUS_SESSION_CHANGED_EVENT));
   }, []);
 
   useEffect(() => {
@@ -90,17 +91,20 @@ export function FocusTimerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!enabled || !userId) return;
-    const receiveChange = () => { void refresh(); };
+    const receiveChange = () => {
+      void refresh();
+      window.dispatchEvent(new Event(FOCUS_SESSION_CHANGED_EVENT));
+    };
     const onStorage = (event: StorageEvent) => { if (event.key === SYNC_STORAGE_KEY) receiveChange(); };
     const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(`sat:focus-session:${userId}`);
     channelRef.current = channel;
     channel?.addEventListener('message', receiveChange);
-    window.addEventListener('storage', onStorage);
+    if (!channel) window.addEventListener('storage', onStorage);
     return () => {
       channel?.removeEventListener('message', receiveChange);
       channel?.close();
       if (channelRef.current === channel) channelRef.current = null;
-      window.removeEventListener('storage', onStorage);
+      if (!channel) window.removeEventListener('storage', onStorage);
     };
   }, [enabled, refresh, userId]);
 

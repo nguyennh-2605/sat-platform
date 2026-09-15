@@ -19,9 +19,11 @@ import {
   SkillPerformance,
 } from './AnalyticsSections';
 import type { AnalyticsRange, AnalyticsResponse, AnalyticsSubject } from './analytics.types';
+import { StudyConsistency } from './StudyConsistency';
 
 const sectionLinks = [
   { id: 'overview', label: 'Overview' },
+  { id: 'consistency', label: 'Study' },
   { id: 'skills', label: 'Skills' },
   { id: 'mistakes', label: 'Mistakes' },
   { id: 'pacing', label: 'Pacing' },
@@ -117,6 +119,11 @@ export default function ResultAnalytics() {
       {requestPending ? <AnalyticsLoading /> : error ? <AnalyticsLoadError onRetry={() => setReload(value => value + 1)} /> : !data ? null : !hasLearningData ? <AnalyticsEmpty /> : <>
         <FocusAreas items={data.focusAreas} onViewBreakdown={viewBreakdown} />
         <PerformanceSnapshot data={data.snapshot} />
+      </>}
+
+      <StudyConsistency range={range} />
+
+      {data && hasLearningData && <>
         <AccuracyTrend data={data.accuracyTrend} />
         {data.meta.classificationCoverage.unclassified > 0 && <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground"><AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" /><span>{data.meta.classificationCoverage.unclassified} answered question{data.meta.classificationCoverage.unclassified === 1 ? '' : 's'} could not be included in skill rankings because classification is missing.</span></div>}
         <SkillPerformance domains={data.skillPerformance} focusedDomain={focusedDomain} />

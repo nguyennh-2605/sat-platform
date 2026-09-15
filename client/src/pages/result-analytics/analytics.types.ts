@@ -137,3 +137,23 @@ export interface AttemptsResponse {
   nextCursor: string | null;
 }
 
+export type StudyActivityType = 'PRACTICE' | 'VOCABULARY' | 'ERROR_LOG' | 'HOMEWORK' | 'OTHER';
+
+export interface StudyTimeSummaryResponse {
+  range: AnalyticsRange;
+  timeZone: string;
+  generatedAt: string;
+  period: { from: string | null; to: string };
+  summary: {
+    trackedMs: number;
+    sessionCount: number;
+    activeDays: number;
+    currentStreak: number;
+    longestStreak: number;
+    averageSessionMs: number | null;
+  };
+  daily: Array<{ date: string; trackedMs: number; sessionCount: number }>;
+  activities: Array<{ activityType: StudyActivityType; trackedMs: number; sessionCount: number; percentage: number }>;
+  chartWindow: { from: string; to: string; truncated: boolean };
+}
+

@@ -217,6 +217,7 @@ Express Server (index.js → app.js)
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/study-sessions/active` | JWT + STUDENT | Returns the student's current running or paused focus session, reconciling an elapsed timer on the server |
+| `GET` | `/api/study-sessions/summary` | JWT + STUDENT | Aggregates completed, positive-duration Focus Clock sessions for `range=30|90|all` in a validated IANA timezone; returns tracked time, active days, streaks, daily buckets, and activity breakdown |
 | `POST` | `/api/study-sessions` | JWT + STUDENT | Starts an idempotent 5–240 minute focus session; returns `409` when another active session exists |
 | `POST` | `/api/study-sessions/:id/pause` | JWT + STUDENT | Pauses an owned running session using optimistic `expectedVersion` |
 | `POST` | `/api/study-sessions/:id/resume` | JWT + STUDENT | Resumes an owned paused session using optimistic `expectedVersion` |
@@ -557,6 +558,8 @@ Folder ──1:N── Test
 4. While running, the client derives the display from accumulatedMs plus lastResumedAt and the server clock offset. It does not write once per second.
 5. A mutation broadcasts only a change signal; sibling tabs refetch the canonical server state. Visibility and online recovery also reconcile state.
 6. Reaching zero completes the session, while server reads independently auto-complete overdue running sessions at the planned end time.
+7. Student Analytics loads Study Consistency independently from the performance request. Only completed StudySession time is counted; active, paused, cancelled, Submission elapsed time, and Vocabulary session wall-clock time are excluded to prevent double-counting.
+8. Summary metrics follow the selected Analytics range and local calendar timezone. The all-time calendar is capped to the latest 365 days and declares truncation while all-time totals remain complete.
 ```
 
 ---

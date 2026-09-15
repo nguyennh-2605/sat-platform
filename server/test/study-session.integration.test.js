@@ -122,4 +122,46 @@ if (!testDatabaseUrl) {
     assert.equal(completed.accumulatedMs, completed.plannedDurationMs);
     assert.equal(completed.endedAt.getTime(), resumedAt.getTime() + completed.plannedDurationMs);
   });
+
+  test('study summary is owner-scoped and excludes cancelled sessions', async t => {
+    const owner = await createStudent(t);
+    const other = await createStudent(t);
+    await prisma.studySession.createMany({ data: [
+      {
+        userId: owner.id,
+        status: 'COMPLETED',
+        source: 'FOCUS_CLOCK',
+        activityType: 'ERROR_LOG',
+        plannedDurationMs: 25 * 60 * 1000,
+        accumulatedMs: 20 * 60 * 1000,
+        startedAt: new Date(Date.now() - 30 * 60 * 1000),
+        endedAt: new Date(),
+      },
+      {
+        userId: owner.id,
+        status: 'CANCELLED',
+        source: 'FOCUS_CLOCK',
+        activityType: 'VOCABULARY',
+        plannedDurationMs: 25 * 60 * 1000,
+        accumulatedMs: 10 * 60 * 1000,
+        startedAt: new Date(Date.now() - 20 * 60 * 1000),
+        endedAt: new Date(),
+      },
+      {
+        userId: other.id,
+        status: 'COMPLETED',
+        source: 'FOCUS_CLOCK',
+        activityType: 'PRACTICE',
+        plannedDurationMs: 50 * 60 * 1000,
+        accumulatedMs: 50 * 60 * 1000,
+        startedAt: new Date(Date.now() - 60 * 60 * 1000),
+        endedAt: new Date(),
+      },
+    ] });
+
+    const summary = await service.getSummary({ userId: owner.id, query: { range: '30', timeZone: 'UTC' } });
+    assert.equal(summary.summary.sessionCount, 1);
+    assert.equal(summary.summary.trackedMs, 20 * 60 * 1000);
+    assert.deepEqual(summary.activities.map(item => item.activityType), ['ERROR_LOG']);
+  });
 }

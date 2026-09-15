@@ -6,6 +6,7 @@ const router = express.Router();
 const studentOnly = [authenticateToken, authorizeRole(['STUDENT'])];
 
 router.get('/active', ...studentOnly, controller.getActive);
+router.get('/summary', ...studentOnly, controller.getSummary);
 router.post('/', ...studentOnly, controller.start);
 router.post('/:id/pause', ...studentOnly, controller.pause);
 router.post('/:id/resume', ...studentOnly, controller.resume);

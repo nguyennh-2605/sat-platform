@@ -14,6 +14,11 @@ exports.getActive = async (req, res) => {
   catch (error) { handleError(res, error); }
 };
 
+exports.getSummary = async (req, res) => {
+  try { res.json(await studySessionService.getSummary({ userId: userIdFor(req), query: req.query })); }
+  catch (error) { handleError(res, error); }
+};
+
 exports.start = async (req, res) => {
   try { res.status(201).json(await studySessionService.start({ userId: userIdFor(req), body: req.body })); }
   catch (error) { handleError(res, error); }

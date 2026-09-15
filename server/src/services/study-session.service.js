@@ -6,6 +6,7 @@ const {
   getElapsedMs,
   getAutomaticEndAt,
 } = require('../utils/study-session-state');
+const { normalizeStudyTimeQuery, aggregateStudyTime } = require('../utils/study-time-aggregation');
 
 const STUDY_SESSION_LOCK_KEY = 8347;
 const ACTIVE_STATUSES = ['RUNNING', 'PAUSED'];
@@ -85,6 +86,26 @@ exports.getActive = async ({ userId }) => prisma.$transaction(async (tx) => {
   const reconciled = await completeExpired(tx, active, now);
   return envelope(ACTIVE_STATUSES.includes(reconciled.status) ? reconciled : null, now);
 });
+
+exports.getSummary = async ({ userId, query }) => {
+  let normalized;
+  try { normalized = normalizeStudyTimeQuery(query); } catch (error) { throw badRequest(error); }
+  const now = new Date();
+  const coarseStart = normalized.range === 'all'
+    ? undefined
+    : new Date(now.getTime() - (Number(normalized.range) + 2) * 86_400_000);
+  const sessions = await prisma.studySession.findMany({
+    where: {
+      userId,
+      status: 'COMPLETED',
+      accumulatedMs: { gt: 0 },
+      endedAt: { not: null, lte: now, ...(coarseStart ? { gte: coarseStart } : {}) },
+    },
+    select: { status: true, activityType: true, accumulatedMs: true, plannedDurationMs: true, endedAt: true },
+    orderBy: { endedAt: 'asc' },
+  });
+  return aggregateStudyTime({ sessions, ...normalized, now });
+};
 
 exports.start = async ({ userId, body }) => {
   let input;

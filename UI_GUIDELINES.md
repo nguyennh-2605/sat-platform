@@ -345,7 +345,9 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 ## 9. Analytics
 
 - Student Analytics là một diagnostic workspace cuộn liên tục, không phải một Overview thứ hai và không dùng tab giả. Range/subject filters cùng sticky anchor navigation phải giữ được bằng URL.
-- Thứ tự nội dung là Focus Areas, Performance Snapshot, Accuracy Trend, Skill Performance, Mistake Review, Pacing và Attempts. Focus Area chỉ xuất hiện khi đủ sample và phải có CTA thật tới breakdown hoặc Error Log.
+- Thứ tự nội dung là Focus Areas, Performance Snapshot, Study Consistency, Accuracy Trend, Skill Performance, Mistake Review, Pacing và Attempts. Focus Area chỉ xuất hiện khi đủ sample và phải có CTA thật tới breakdown hoặc Error Log.
+- Study Consistency chỉ gọi dữ liệu là `Tracked focus time`: tính từ StudySession đã hoàn thành và có duration dương, không cộng Submission elapsed time hoặc Vocabulary wall-clock time. Section tải độc lập, dùng timezone IANA của browser để bucket ngày, range chung cho KPI, và giới hạn all-time calendar ở 365 ngày gần nhất với disclosure rõ. Subject filter không áp dụng cho section này.
+- Study calendar dùng compact day cells, legend chữ và accessible summary; màu không được là tín hiệu duy nhất. Breakdown theo activity dùng progress/list, không suy diễn tương quan giữa số giờ học và điểm số.
 - Accuracy không được gọi là SAT score. Trend dùng ngày, tên attempt, correct/total và subject thật; không dựng estimated score khi chưa có calibration.
 - Skill performance theo hierarchy Subject → Domain → Skill. Dưới 5 câu là `Not enough data`, 5–9 là `Early signal`, từ 10 câu mới đủ điều kiện rank.
 - Error Log chỉ được tổng hợp và deep-link bằng category/review status; reflection vẫn thuộc Error Log. Pacing chỉ dùng QuestionTiming của submission EXAM đã hoàn thành, luôn nêu số câu và coverage, không biến missing timing thành zero.
