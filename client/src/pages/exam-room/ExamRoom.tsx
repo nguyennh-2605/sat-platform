@@ -12,7 +12,6 @@ import ToolsHeader from '../../components/ui/ToolsHeader';
 import InteractiveText from '../../features/quiz/InteractiveText';
 import ReviewScreen from '../../features/quiz/ReviewModule';
 import type { QuestionData } from '../../types/quiz';
-import type { QuestionResult } from '../score-report/ScoreReport';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
 import ResizableSplitLayout from '../../components/layouts/ResizableSplitLayout';
 import SingleColumnLayout from '../../components/layouts/SingleColumnLayout';
@@ -170,6 +169,7 @@ function ExamRoom() {
 
   // Dữ liệu Backend trả về sau khi nộp bài
   interface BackendResult {
+    submissionId: number;
     score: number;
     totalQuestions: number;
     details: {
@@ -747,35 +747,6 @@ function ExamRoom() {
     });
   };
 
-  const getResults = (): QuestionResult[] => {
-    if (!apiResult) return [];
-    // Mapping dữ liệu sang dạng của Score Report
-    return questions.map((q, index) => {
-      const moduleName = index < splitIndex ? "Module 1" : "Module 2";
-      const questionNumber = moduleName === 'Module 1' ? index + 1 : index - splitIndex + 1;
-      // Backend tra ve mang detail => Ta tim theo id
-      const gradedInfo = apiResult.details.find(d => d.questionId === q.id);
-      return  {
-        id: q.id,
-        module: moduleName,
-        questionNumber: questionNumber,
-        blocks: q.blocks,
-        questionText: q.questionText,
-        choices: q.choices.map((c, i) => ({
-          id: c.id,
-          text: c.text,
-          label: String.fromCharCode(65 + i)
-        })),
-        correctAnswer: gradedInfo?.correctOption || "",
-        userAnswer: gradedInfo?.userSelected || null,
-        isCorrect: gradedInfo?.isCorrect || false,
-        activeDurationMs: testMode === 'EXAM'
-          ? questionTimingsRef.current[String(q.id)]?.activeDurationMs ?? null
-          : null,
-      };
-    });
-  };
-
   // Hàm bắt đầu kéo
   const handleMouseDown = () => {
     isDragging.current = true;
@@ -915,39 +886,8 @@ function ExamRoom() {
 
   // --- RENDER KẾT QUẢ ---
   if (isSubmitted && apiResult) {
-    const formatDuration = (totalSeconds: number) => {
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = totalSeconds % 60;
-      // Nếu có giờ thì hiện H:MM:SS, không thì hiện MM:SS
-      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
-
     const userId = localStorage.getItem('userId');
-    const savedMod1TimeUsed = localStorage.getItem(`mod1TimeUsed_${userId}_${id}_${contextKey}`);
-    const mod1TimeUsed = parseInt(savedMod1TimeUsed || "0", 10);
-    console.log("Tong thoi gian lam bai mod 1", mod1TimeUsed);
-    const savedMod2Start = localStorage.getItem(`mod2Start_${userId}_${id}_${contextKey}`);
-    let mod2TimeUsed = 0
-    if (savedMod2Start) {
-      mod2TimeUsed = Math.max(0, examConfig.mod2Duration - timeLeft);
-    }
-    const secondsUsed = mod1TimeUsed + mod2TimeUsed;
-
-    const completedAt = new Date();
-    const effectiveSecondsUsed = secondsUsed <= 0 ? TestInfo.duration * 60 : secondsUsed;
-    const reportData = {
-      examTitle: TestInfo.title,
-      subject: TestInfo.subject,
-      date: completedAt.toISOString(),
-      startedAt: new Date(completedAt.getTime() - effectiveSecondsUsed * 1000).toISOString(),
-      completedAt: completedAt.toISOString(),
-      duration: formatDuration(effectiveSecondsUsed),
-      questions: getResults()
-    }
-
-    return <Navigate to="/dashboard/score-report" replace state={{
-      reportData,
+    return <Navigate to={`/dashboard/score-report/${apiResult.submissionId}`} replace state={{
       cleanupKeys: [
         `mod2Start_${userId}_${id}_${contextKey}`,
         `mod1TimeUsed_${userId}_${id}_${contextKey}`,

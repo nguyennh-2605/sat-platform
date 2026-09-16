@@ -1,6 +1,10 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { buildStudentAnalyticsPayload, isTimingEligible, sourceOf } = require('../utils/analytics-transform');
+const { domains: taxonomyDomains, skills: taxonomySkills } = require('../utils/question-taxonomy');
+
+const domainByCode = new Map(taxonomyDomains.map(domain => [domain.code, domain]));
+const skillByCode = new Map(taxonomySkills.map(skill => [skill.code, skill]));
 
 const ANALYTICS_SUBMISSION_SELECT = {
   id: true,
@@ -85,6 +89,37 @@ const decodeAttemptCursor = value => {
     throw new ApiError(400, { message: 'Invalid attempts cursor.' });
   }
 };
+
+const roundPercentage = (correct, total) => total ? Number(((correct / total) * 100).toFixed(1)) : null;
+
+const normalizeChoices = choices => (Array.isArray(choices) ? choices : []).map((choice, index) => {
+  const fallbackId = String.fromCharCode(65 + index);
+  if (typeof choice === 'string') return { id: fallbackId, text: choice };
+  if (!choice || typeof choice !== 'object' || Array.isArray(choice)) {
+    return { id: fallbackId, text: String(choice ?? '') };
+  }
+  return {
+    id: String(choice.id || fallbackId),
+    text: String(choice.text ?? choice.content ?? ''),
+  };
+});
+
+const addOutcome = (target, question) => {
+  target.total += 1;
+  if (question.isCorrect) target.correct += 1;
+  else if (question.isOmitted) target.omitted += 1;
+  else target.incorrect += 1;
+  if (Number.isFinite(question.activeDurationMs) && question.activeDurationMs > 0) {
+    target.activeDurationMs += question.activeDurationMs;
+    target.timedQuestions += 1;
+  }
+};
+
+const finalizeOutcome = target => ({
+  ...target,
+  accuracy: roundPercentage(target.correct, target.total),
+  timingCoverage: target.total ? Number(((target.timedQuestions / target.total) * 100).toFixed(1)) : null,
+});
 
 const getDataWithDb = async ({ db, userId, range, days, subject, now = new Date() }) => {
   const filters = normalizeAnalyticsFilters({ range, days, subject, now });
@@ -242,32 +277,40 @@ const getSubmissionDetailWithDb = async ({ db, id, userId }) => {
       status: 'COMPLETED',
     },
     select: {
+      id: true,
+      attemptNo: true,
       startedAt: true,
       beganAt: true,
       endTime: true,
       test: {
-        select: { title: true, subject: true },
+        select: { title: true, subject: true, mode: true },
       },
       answers: {
-        orderBy: { question: { order: 'asc' } },
         select: {
           selectedChoice: true,
           isCorrect: true,
           question: {
             select: {
               id: true,
+              type: true,
               order: true,
               blocks: true,
               questionText: true,
               choices: true,
               correctAnswer: true,
-              section: { select: { order: true } },
+              explanation: true,
+              domainCode: true,
+              skillCode: true,
+              section: { select: { id: true, name: true, order: true } },
             },
           },
         },
       },
       questionTimings: {
         select: { questionId: true, activeDurationMs: true },
+      },
+      errorLogs: {
+        select: { id: true, questionId: true },
       },
     },
   });
@@ -276,44 +319,176 @@ const getSubmissionDetailWithDb = async ({ db, id, userId }) => {
     throw new ApiError(404, { message: 'Completed submission not found.' });
   }
 
-  let durationString = 'N/A';
-  if (submission.startedAt && submission.endTime) {
-    const diffSeconds = Math.max(0, Math.floor((new Date(submission.endTime) - new Date(submission.beganAt || submission.startedAt)) / 1000));
-    const h = Math.floor(diffSeconds / 3600);
-    const m = Math.floor((diffSeconds % 3600) / 60);
-    const s = diffSeconds % 60;
-    durationString = `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  }
+  const elapsedDurationMs = submission.endTime
+    ? Math.max(0, new Date(submission.endTime).getTime() - new Date(submission.beganAt || submission.startedAt).getTime())
+    : null;
+  const totalSeconds = elapsedDurationMs === null ? null : Math.floor(elapsedDurationMs / 1000);
+  const durationString = totalSeconds === null
+    ? 'N/A'
+    : `${totalSeconds >= 3600 ? `${Math.floor(totalSeconds / 3600)}:` : ''}${Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0')}:${(totalSeconds % 60).toString().padStart(2, '0')}`;
 
   const timingByQuestionId = new Map(
     submission.questionTimings.map(timing => [timing.questionId, timing.activeDurationMs])
   );
+  const errorLogByQuestionId = new Map(
+    submission.errorLogs.filter(log => log.questionId).map(log => [log.questionId, log.id])
+  );
 
-  const formattedQuestions = submission.answers.map((ans, index) => {
+  const questions = submission.answers.map((ans, index) => {
     const question = ans.question;
+    const moduleOrder = question.section?.order || 1;
+    const domain = question.domainCode ? domainByCode.get(question.domainCode) : null;
+    const candidateSkill = question.skillCode ? skillByCode.get(question.skillCode) : null;
+    const skill = candidateSkill?.domainCode === domain?.code ? candidateSkill : null;
+    const isOmitted = ans.selectedChoice === null || String(ans.selectedChoice).trim() === '';
+    const activeDurationMs = timingByQuestionId.get(question.id);
 
     return {
       id: question.id,
-      module: `Module ${question.section?.order || 1}`,
+      type: question.type === 'SPR' ? 'SPR' : 'MCQ',
+      module: {
+        id: question.section?.id || null,
+        name: question.section?.name || `Module ${moduleOrder}`,
+        order: moduleOrder,
+      },
       questionNumber: question.order || (index + 1),
       blocks: question.blocks || [],
       questionText: question.questionText,
-      choices: question.choices || [],
+      choices: normalizeChoices(question.choices),
       correctAnswer: question.correctAnswer,
       userAnswer: ans.selectedChoice,
       isCorrect: ans.isCorrect,
-      activeDurationMs: timingByQuestionId.get(question.id) ?? null,
+      isOmitted,
+      explanation: String(question.explanation || '').trim() || null,
+      domain: domain ? { code: domain.code, name: domain.name, sortOrder: domain.sortOrder } : null,
+      skill: skill ? { code: skill.code, name: skill.name, sortOrder: skill.sortOrder } : null,
+      activeDurationMs: Number.isFinite(activeDurationMs) && activeDurationMs > 0 ? activeDurationMs : null,
+      errorLogId: errorLogByQuestionId.get(question.id) || null,
     };
-  });
+  }).sort((first, second) => first.module.order - second.module.order
+    || first.questionNumber - second.questionNumber
+    || Number(first.id) - Number(second.id));
+
+  const summaryState = { total: 0, correct: 0, incorrect: 0, omitted: 0, activeDurationMs: 0, timedQuestions: 0 };
+  const moduleStates = new Map();
+  const domainStates = new Map(
+    taxonomyDomains
+      .filter(domain => domain.subject === submission.test.subject)
+      .map(domain => [domain.code, {
+        code: domain.code,
+        name: domain.name,
+        sortOrder: domain.sortOrder,
+        total: 0,
+        correct: 0,
+        incorrect: 0,
+        omitted: 0,
+        activeDurationMs: 0,
+        timedQuestions: 0,
+        skills: new Map(),
+      }])
+  );
+  for (const question of questions) {
+    addOutcome(summaryState, question);
+
+    const moduleState = moduleStates.get(question.module.order) || {
+      ...question.module,
+      total: 0,
+      correct: 0,
+      incorrect: 0,
+      omitted: 0,
+      activeDurationMs: 0,
+      timedQuestions: 0,
+    };
+    addOutcome(moduleState, question);
+    moduleStates.set(question.module.order, moduleState);
+
+    const domainKey = question.domain?.code || 'UNCLASSIFIED';
+    const domainState = domainStates.get(domainKey) || {
+      code: domainKey,
+      name: question.domain?.name || 'Unclassified',
+      sortOrder: question.domain?.sortOrder ?? 999,
+      total: 0,
+      correct: 0,
+      incorrect: 0,
+      omitted: 0,
+      activeDurationMs: 0,
+      timedQuestions: 0,
+      skills: new Map(),
+    };
+    addOutcome(domainState, question);
+    if (question.skill) {
+      const skillState = domainState.skills.get(question.skill.code) || {
+        ...question.skill,
+        total: 0,
+        correct: 0,
+        incorrect: 0,
+        omitted: 0,
+        activeDurationMs: 0,
+        timedQuestions: 0,
+      };
+      addOutcome(skillState, question);
+      domainState.skills.set(question.skill.code, skillState);
+    }
+    domainStates.set(domainKey, domainState);
+  }
+
+  const summary = finalizeOutcome(summaryState);
+  const modules = [...moduleStates.values()]
+    .sort((first, second) => first.order - second.order)
+    .map(finalizeOutcome);
+  const domains = [...domainStates.values()]
+    .sort((first, second) => first.sortOrder - second.sortOrder || first.name.localeCompare(second.name))
+    .map(domain => {
+      const { skills, ...domainOutcome } = domain;
+      return {
+        ...finalizeOutcome(domainOutcome),
+        skills: [...skills.values()]
+          .sort((first, second) => first.sortOrder - second.sortOrder || first.name.localeCompare(second.name))
+          .map(finalizeOutcome),
+      };
+    });
+  const timedQuestions = questions.filter(question => question.activeDurationMs !== null);
+  const slowestQuestion = timedQuestions.reduce((slowest, question) => (
+    !slowest || question.activeDurationMs > slowest.activeDurationMs ? question : slowest
+  ), null);
+  const classifiedQuestionCount = questions.filter(question => question.domain).length;
 
   return {
+    submissionId: submission.id,
     examTitle: submission.test.title,
     subject: submission.test.subject,
+    mode: submission.test.mode,
+    attemptNo: submission.attemptNo,
     date: submission.endTime?.toISOString() || submission.startedAt.toISOString(),
     startedAt: submission.startedAt.toISOString(),
     completedAt: submission.endTime?.toISOString() || null,
     duration: durationString,
-    questions: formattedQuestions,
+    elapsedDurationMs,
+    activeDurationMs: summary.activeDurationMs || null,
+    summary,
+    modules,
+    domains,
+    pacing: {
+      activeDurationMs: summary.activeDurationMs || null,
+      averageActiveDurationMs: summary.timedQuestions ? Math.round(summary.activeDurationMs / summary.timedQuestions) : null,
+      timedQuestions: summary.timedQuestions,
+      totalQuestions: summary.total,
+      timingCoverage: summary.timingCoverage,
+      slowestQuestion: slowestQuestion ? {
+        id: slowestQuestion.id,
+        questionNumber: slowestQuestion.questionNumber,
+        moduleOrder: slowestQuestion.module.order,
+        activeDurationMs: slowestQuestion.activeDurationMs,
+      } : null,
+    },
+    classificationCoverage: {
+      classified: classifiedQuestionCount,
+      total: questions.length,
+      percentage: questions.length
+        ? Number(((classifiedQuestionCount / questions.length) * 100).toFixed(1))
+        : null,
+    },
+    questions,
   };
 };
 

@@ -24,6 +24,7 @@ router.get('/', errorLogController.getErrorLogs);
 router.get('/facets', errorLogController.getErrorLogFacets);
 router.post('/export/google-sheet', googleSheetExportLimiter, errorLogController.exportGoogleSheet);
 router.post('/', errorLogController.createErrorLog);
+router.get('/:id', errorLogController.getErrorLog);
 router.get('/:id/question', errorLogController.getErrorLogQuestion);
 router.patch('/:id', errorLogController.updateErrorLog);
 router.put('/:id', (req, res, next) => {

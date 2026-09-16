@@ -331,7 +331,7 @@ export function Attempts({ range, subject }: { range: AnalyticsRange; subject: A
               <TableCell className="tabular-nums text-muted-foreground" title={item.durationSource === 'ACTIVE' ? 'Active question time' : 'Elapsed attempt time'}>{durationText(item.durationMs)}</TableCell>
               <TableCell>{item.source === 'CLASSROOM' ? 'Classroom' : 'Self-study'}</TableCell>
               <TableCell className="text-muted-foreground">{format(new Date(item.completedAt), 'MMM d, yyyy')}</TableCell>
-              <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => navigate('/dashboard/score-report', { state: { resultId: item.id } })}>View details<ArrowRight /></Button></TableCell>
+              <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/score-report/${item.id}`)}>View details<ArrowRight /></Button></TableCell>
             </TableRow>)}
           </TableBody>
         </Table>

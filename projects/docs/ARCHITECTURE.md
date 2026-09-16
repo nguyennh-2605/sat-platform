@@ -210,7 +210,7 @@ Express Server (index.js → app.js)
 |---|---|---|---|
 | `GET` | `/api/results-analytics` | JWT + STUDENT | Student diagnostic analytics for `range=30|90|all` and `subject=ALL|RW|MATH`: snapshot, rule-based focus areas, attempt accuracy trend, domain/skill performance, Error Log review state, classification coverage, and pacing coverage from completed EXAM submissions only. Legacy bounded `days` remains accepted during rollout |
 | `GET` | `/api/results-analytics/attempts` | JWT + STUDENT | Cursor-paginated completed attempts with range, subject, source, and title filters; in-progress submissions are intentionally excluded |
-| `GET` | `/api/results-analytics/submission/:id` | JWT + STUDENT | Detailed submission with every question/answer |
+| `GET` | `/api/results-analytics/submission/:id` | JWT + STUDENT | Canonical completed-attempt report with correct/incorrect/omitted totals, module/domain/skill breakdowns, pacing, authored explanations, and exact Error Log links |
 
 ### 5.8 Focus Sessions
 
@@ -233,6 +233,7 @@ The database enforces at most one `RUNNING` or `PAUSED` session per student with
 | `GET` | `/api/error-logs` | JWT + STUDENT | Lightweight cursor list (`limit=40`, `cursor`) with stable `createdAt/id` ordering and server-side search/status/category filters. Only the first cursor page includes `total` and `needsReview`; explicit `page/pageSize` remains compatible and uses the same composite ordering |
 | `GET` | `/api/error-logs/facets` | JWT + STUDENT | Owner-scoped review counts and distinct categories for the spreadsheet filter bar. Counts respect search/category while remaining independent of the selected review status |
 | `POST` | `/api/error-logs/export/google-sheet` | JWT + STUDENT + Google OAuth | Create a native Google Sheet containing all owner-scoped Error Log rows, reference-aligned formatting, the complete canonical SAT-skill category dropdown, and source links. The short-lived `drive.file` access token is used for this request only and is not persisted |
+| `GET` | `/api/error-logs/:id` | JWT + STUDENT | Owner-scoped single entry used by exact Score Report deep links |
 | `GET` | `/api/error-logs/:id/question` | JWT + STUDENT | Owner-scoped lazy question context from the immutable snapshot, falling back to the live relation only for legacy rows |
 | `POST` | `/api/error-logs` | JWT + STUDENT | Idempotently create a manual entry with required source name, optional validated http/https `sourceUrl`, and optional `clientMutationId` |
 | `PATCH` | `/api/error-logs/:id` | JWT + STUDENT | Save sanitized reflections or editable source/category/answer fields. New category values are limited to `General` or canonical SAT skills; an unchanged legacy category remains valid while editing an old row. Manual entries may also update their validated external URL; system-question snapshots remain immutable. `reviewedAt` is derived from both reflections; `expectedVersion` enables optimistic concurrency and stale writes return `409` with the current row |
@@ -245,7 +246,6 @@ Dynamic Error Log routes validate UUIDs before service access. During the rollin
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/ai/chat` | JWT | SSE stream — AI tutor explains questions |
 | `POST` | `/api/ai-parser` | JWT | Upload PDF/DOCX → AI parses & formats SAT questions |
 | `POST` | `/api/challenge/generate` | JWT | Generate an AI-created SAT question |
 | `POST` | `/api/challenge/evaluate` | JWT | AI evaluates student's answer reasoning |
@@ -388,7 +388,7 @@ Folder ──1:N── Test
 | `/dashboard/error-log` | ErrorLog | Wrong answer tracking |
 | `/dashboard/results-analytics` | ResultAnalytics | Performance charts & history |
 | `/test/:id` | ExamRoom | Full-screen test taking interface |
-| `/score-report` | ScoreReport | Post-submission score breakdown |
+| `/dashboard/score-report/:resultId` | ScoreReport | Reloadable completed-attempt diagnostic report |
 
 ---
 
@@ -407,7 +407,7 @@ Folder ──1:N── Test
    POST /api/test/:id/submit → grades all answers, stores in Answer table, sets status=COMPLETED
    → Auto-syncs score to any linked Assignment/ClassTest
    → Sends notification to teacher (if class-assigned)
-7. Student views results at /score-report or /dashboard/results-analytics
+7. Student views the canonical report at /dashboard/score-report/:submissionId or opens aggregate history at /dashboard/results-analytics
 ```
 
 ### 8.2 Class Management Flow (Teacher)

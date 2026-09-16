@@ -115,3 +115,117 @@ test('submission detail rejects ambiguous ids before querying the database', asy
   );
   assert.equal(queried, false);
 });
+
+test('submission detail returns deterministic attempt, module, domain, pacing, and explanation data', async () => {
+  const db = {
+    submission: {
+      findFirst: async () => ({
+        id: 42,
+        attemptNo: 2,
+        startedAt: new Date('2026-09-15T08:00:00.000Z'),
+        beganAt: new Date('2026-09-15T08:05:00.000Z'),
+        endTime: new Date('2026-09-15T08:35:00.000Z'),
+        test: { title: 'Math Check', subject: 'MATH', mode: 'EXAM' },
+        answers: [
+          {
+            selectedChoice: 'A',
+            isCorrect: true,
+            question: {
+              id: 1,
+              type: 'MCQ',
+              order: 1,
+              blocks: [],
+              questionText: 'Correct question',
+              choices: ['One', 'Two'],
+              correctAnswer: 'A',
+              explanation: 'Because A is correct.',
+              domainCode: 'MATH_ALGEBRA',
+              skillCode: 'MATH_LINEAR_FUNCTIONS',
+              section: { id: 10, name: 'First Module', order: 1 },
+            },
+          },
+          {
+            selectedChoice: null,
+            isCorrect: false,
+            question: {
+              id: 2,
+              type: 'SPR',
+              order: 1,
+              blocks: [],
+              questionText: 'Omitted question',
+              choices: [],
+              correctAnswer: '12',
+              explanation: null,
+              domainCode: null,
+              skillCode: null,
+              section: { id: 20, name: '', order: 2 },
+            },
+          },
+          {
+            selectedChoice: 'B',
+            isCorrect: false,
+            question: {
+              id: 3,
+              type: 'MCQ',
+              order: 2,
+              blocks: [],
+              questionText: 'Incorrect question',
+              choices: [{ id: 'A', text: 'One' }, { id: 'B', text: 'Two' }],
+              correctAnswer: 'A',
+              explanation: 'Use the slope formula.',
+              domainCode: 'MATH_ALGEBRA',
+              skillCode: 'MATH_LINEAR_FUNCTIONS',
+              section: { id: 10, name: 'First Module', order: 1 },
+            },
+          },
+        ],
+        questionTimings: [
+          { questionId: 1, activeDurationMs: 60_000 },
+          { questionId: 2, activeDurationMs: 120_000 },
+          { questionId: 3, activeDurationMs: 180_000 },
+        ],
+        errorLogs: [
+          { id: '00000000-0000-4000-8000-000000000003', questionId: 3 },
+          { id: '00000000-0000-4000-8000-000000000002', questionId: 2 },
+        ],
+      }),
+    },
+  };
+
+  const report = await getSubmissionDetailWithDb({ db, id: 42, userId: 7 });
+
+  assert.deepEqual(report.summary, {
+    total: 3,
+    correct: 1,
+    incorrect: 1,
+    omitted: 1,
+    activeDurationMs: 360_000,
+    timedQuestions: 3,
+    accuracy: 33.3,
+    timingCoverage: 100,
+  });
+  assert.deepEqual(report.modules.map(module => [module.order, module.total, module.correct, module.omitted]), [
+    [1, 2, 1, 0],
+    [2, 1, 0, 1],
+  ]);
+  assert.deepEqual(report.domains.map(domain => [domain.code, domain.total]), [
+    ['MATH_ALGEBRA', 2],
+    ['MATH_ADVANCED_MATH', 0],
+    ['MATH_PROBLEM_SOLVING_AND_DATA_ANALYSIS', 0],
+    ['MATH_GEOMETRY_AND_TRIGONOMETRY', 0],
+    ['UNCLASSIFIED', 1],
+  ]);
+  assert.equal(report.domains[0].skills[0].name, 'Linear Functions');
+  assert.equal(report.questions[1].errorLogId, '00000000-0000-4000-8000-000000000003');
+  assert.equal(report.questions[1].explanation, 'Use the slope formula.');
+  assert.equal(report.questions[2].isOmitted, true);
+  assert.deepEqual(report.questions[0].choices, [{ id: 'A', text: 'One' }, { id: 'B', text: 'Two' }]);
+  assert.deepEqual(report.pacing.slowestQuestion, {
+    id: 3,
+    questionNumber: 2,
+    moduleOrder: 1,
+    activeDurationMs: 180_000,
+  });
+  assert.equal(report.elapsedDurationMs, 1_800_000);
+  assert.equal(report.duration, '30:00');
+});

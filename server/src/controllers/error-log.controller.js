@@ -56,6 +56,14 @@ exports.getErrorLogs = async (req, res) => {
   }
 };
 
+exports.getErrorLog = async (req, res) => {
+  try {
+    res.json(await errorLogService.getErrorLog({ id: req.params.id, userId: req.user.userId }));
+  } catch (error) {
+    return handleError({ error, req, res, fallbackMessage: 'Unable to load the error log entry.' });
+  }
+};
+
 exports.getErrorLogFacets = async (req, res) => {
   try {
     res.json(await errorLogService.getErrorLogFacets({ userId: req.user.userId, query: req.query }));

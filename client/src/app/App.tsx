@@ -63,6 +63,7 @@ function App() {
                 <Route path="error-log" element={<RequireRole roles={['STUDENT']}><ErrorLog /></RequireRole>} />
                 <Route path="results-analytics" element={<RequireRole roles={['STUDENT']}><ResultAnalytics /></RequireRole>} />
                 <Route path="score-report" element={<ScoreReport />} />
+                <Route path="score-report/:resultId" element={<ScoreReport />} />
                 <Route path="practice-test/create" element={<CreateTestWizard />} />
                 <Route path="class/:classId/assignment/:assignmentId" element={<AssignmentDetail />} />
               </Route>

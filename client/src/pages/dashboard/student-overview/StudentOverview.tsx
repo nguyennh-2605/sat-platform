@@ -79,7 +79,7 @@ export default function StudentOverview() {
           <StudentCalendarPanel markers={tasks.calendar} selectedDate={selectedDate} onSelectDate={setSelectedDate} satDate={satDate} />
           <NextSatCard value={data.preferences.satTestDate} onSaved={value => setData(current => current ? { ...current, preferences: { ...current.preferences, satTestDate: value } } : current)} />
           <ScoreGoalCard currentScore={data.preferences.currentScore} targetScore={data.preferences.targetScore} onSaved={value => setData(current => current ? { ...current, preferences: { ...current.preferences, ...value } } : current)} />
-          <StudentRecentResults items={data.recentResults} onOpenResult={submissionId => navigate('/dashboard/score-report', { state: { resultId: submissionId } })} />
+          <StudentRecentResults items={data.recentResults} onOpenResult={submissionId => navigate(`/dashboard/score-report/${submissionId}`)} />
         </aside>
       </div>
     </main>

@@ -450,6 +450,18 @@ test('question lookup is owner-scoped and prefers the immutable snapshot', async
   );
 });
 
+test('single-entry lookup is owner-scoped for exact Error Log deep links', async t => {
+  const entry = { id: UUID_A, userId: 7, source: 'Practice Test', questionId: 10 };
+  t.mock.method(prisma.errorLog, 'findFirst', async args => {
+    assert.deepEqual(args.where, { id: UUID_A, userId: 7 });
+    assert.equal(args.select.userId, undefined);
+    assert.equal(args.select.questionId, true);
+    return entry;
+  });
+
+  assert.equal(await service.getErrorLog({ id: UUID_A, userId: 7 }), entry);
+});
+
 test('a concurrent disjoint edit retries its CAS and derives Reviewed from the merged row', async t => {
   let entry = {
     id: UUID_A,

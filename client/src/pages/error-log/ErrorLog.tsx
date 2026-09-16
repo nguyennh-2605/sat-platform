@@ -33,6 +33,7 @@ interface TaxonomyDomain { code: string; name: string; subject: 'RW' | 'MATH'; s
 const reflectionFields: EditableField[] = ['whyWrong', 'whyRight'];
 const emptyFacets: ErrorLogFacets = { all: 0, needsReview: 0, reviewed: 0, categories: [] };
 const statusPreferenceKey = 'error-log-review-status';
+const errorLogIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const tableComponents: TableComponents<ErrorEntry> = {
   Table: props => <Table {...props} unwrapped className="w-full table-fixed border-separate border-spacing-0" />,
   TableHead: TableHeader,
@@ -55,12 +56,13 @@ const sameFormats = (left: RichTextFormats, right: RichTextFormats) => left.bold
 
 export default function ErrorLog() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const requestedEntryId = searchParams.get('entry');
   const isMobile = useIsMobile();
   const [compactLayout, setCompactLayout] = useState(false);
   const [logs, setLogs] = useState<ErrorEntry[]>([]);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<ReviewStatus>(() => initialStatus(searchParams.get('status')));
-  const [category, setCategory] = useState(() => searchParams.get('category')?.trim().slice(0, 120) || '');
+  const [status, setStatus] = useState<ReviewStatus>(() => requestedEntryId ? 'ALL' : initialStatus(searchParams.get('status')));
+  const [category, setCategory] = useState(() => requestedEntryId ? '' : searchParams.get('category')?.trim().slice(0, 120) || '');
   const debouncedSearch = useDebounce(search, 250);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [facets, setFacets] = useState<ErrorLogFacets>(emptyFacets);
@@ -87,6 +89,7 @@ export default function ErrorLog() {
   const facetsRequest = useRef<AbortController | null>(null);
   const rowReviewStates = useRef(new Map<string, boolean>());
   const rowVersions = useRef(new Map<string, number>());
+  const loadedDeepLink = useRef<string | null>(null);
 
   const saved = useCallback((entry: ErrorEntry) => {
     const previous = rowReviewStates.current.get(entry.id);
@@ -196,6 +199,24 @@ export default function ErrorLog() {
     if (compactLayout) mobileRef.current?.scrollToIndex({ index: rowIndex, align: 'center', behavior: 'auto' });
     else tableRef.current?.scrollToIndex({ index: rowIndex, align: 'center', behavior: 'auto' });
   }, [compactLayout]);
+
+  useEffect(() => {
+    if (loading || !requestedEntryId || !errorLogIdPattern.test(requestedEntryId) || loadedDeepLink.current === requestedEntryId) return;
+    const controller = new AbortController();
+    void axiosClient.get<ErrorEntry>(`/api/error-logs/${requestedEntryId}`, { signal: controller.signal })
+      .then(entry => {
+        if (controller.signal.aborted) return;
+        loadedDeepLink.current = requestedEntryId;
+        rowReviewStates.current.set(entry.id, Boolean(entry.reviewedAt));
+        if (entry.version !== undefined) rowVersions.current.set(entry.id, entry.version);
+        setLogs(rows => [entry, ...rows.filter(row => row.id !== entry.id)]);
+        requestAnimationFrame(() => scrollToRow(0));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) appToast.error('Unable to open this Error Log entry.');
+      });
+    return () => controller.abort();
+  }, [loading, requestedEntryId, scrollToRow]);
 
   const activate = useCallback((key: string, previewValue: string) => {
     if (active && active !== key) {

@@ -290,6 +290,12 @@ exports.getErrorLogs = async ({ userId, query = {} }) => {
   return { items, pagination: paginationMeta({ ...pagination, total }) };
 };
 
+exports.getErrorLog = async ({ id, userId }) => {
+  const entry = await prisma.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_SELECT });
+  if (!entry) throw new ApiError(404, { message: 'Error log entry not found.' });
+  return entry;
+};
+
 exports.getErrorLogFacets = async ({ userId, query = {} }) => {
   const search = String(query.search || '').trim().slice(0, 100);
   const category = String(query.category || '').trim().slice(0, 120);
