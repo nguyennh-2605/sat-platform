@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
+const { createFollowUpWithDb } = require('./learning-follow-up.service');
 
 const parseUserId = (value) => Number.parseInt(value, 10);
 const validScorePolicies = new Set(['FIRST', 'BEST', 'LATEST']);
@@ -52,7 +53,7 @@ const median = (values) => {
   return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 };
 
-const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lessonId, title, availableAt, dueAt, maxAttempts, scorePolicy, userId, userRole }) => {
+const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lessonId, title, availableAt, dueAt, maxAttempts, scorePolicy, followUp, userId, userRole }) => {
   const normalizedClassIds = [...new Set((Array.isArray(classIds) ? classIds : []).map(String).filter(Boolean))];
   const normalizedTestIds = [...new Set((Array.isArray(testIds) ? testIds : []).map(Number).filter(Number.isInteger))];
   const normalizedStudentIds = [...new Set((Array.isArray(studentIds) ? studentIds : []).map(parseUserId).filter(Number.isInteger))];
@@ -72,6 +73,9 @@ const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lesso
   }
   if (normalizedStudentIds.length && normalizedClassIds.length !== 1) {
     throw new ApiError(400, { error: 'Selected students can only be used when assigning to one class.' });
+  }
+  if (followUp && normalizedClassIds.length !== 1) {
+    throw new ApiError(400, { error: 'A learning follow-up can only be assigned within one class.' });
   }
 
   return db.$transaction(async tx => {
@@ -115,6 +119,14 @@ const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lesso
         throw new ApiError(400, { error: 'One or more selected students do not belong to this class.' });
       }
       if (!assigneeIds.length) throw new ApiError(400, { error: 'Select at least one student.' });
+      const learningFollowUp = await createFollowUpWithDb({
+        db: tx,
+        classroom,
+        assigneeIds,
+        userId,
+        actionType: 'TEST',
+        followUp,
+      });
       for (const test of tests) {
         const classTest = await tx.classTest.upsert({
           where: { classId_testId: { classId: classroom.id, testId: test.id } },
@@ -158,6 +170,7 @@ const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lesso
             completionRule: 'SUBMIT',
             audience: normalizedStudentIds.length ? 'SELECTED' : 'ALL_STUDENTS',
             createdById: parseUserId(userId),
+            followUpId: learningFollowUp?.id || null,
             assignees: { create: assigneeIds.map(studentId => ({ studentId })) },
           },
           select: { id: true },

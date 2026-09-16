@@ -104,6 +104,28 @@ exports.getOutline = async (req, res) => {
   }
 };
 
+exports.getAttendance = async (req, res) => {
+  try {
+    const attendance = await progressService.getAttendance({ lessonId: req.params.lessonId, userId: getUserId(req), userRole: getUserRole(req) });
+    res.json({ success: true, data: attendance });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Get Attendance Error:', error);
+    res.status(500).json({ success: false, error: 'Unable to load attendance.' });
+  }
+};
+
+exports.saveAttendance = async (req, res) => {
+  try {
+    const attendance = await progressService.saveAttendance({ lessonId: req.params.lessonId, records: req.body.records, userId: getUserId(req), userRole: getUserRole(req) });
+    res.json({ success: true, data: attendance });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Save Attendance Error:', error);
+    res.status(500).json({ success: false, error: 'Unable to save attendance.' });
+  }
+};
+
 exports.reorderWeeks = async (req, res) => {
   try {
     const result = await progressService.reorderWeeks({

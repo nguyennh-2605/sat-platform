@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
+const { createFollowUpWithDb } = require('./learning-follow-up.service');
 
 const intId = value => Number.parseInt(value, 10);
 
@@ -183,7 +184,7 @@ const normalizeUrls = (value, fieldName) => {
   });
 };
 
-exports.createAssignmentActivity = async ({ classId, lessonId, title, instructions, availableAt, dueAt, fileUrls, links, studentIds, maxPoints, userId, userRole }) => {
+exports.createAssignmentActivity = async ({ classId, lessonId, title, instructions, availableAt, dueAt, fileUrls, links, studentIds, maxPoints, followUp, userId, userRole }) => {
   const teacherId = intId(userId);
   const normalizedTitle = String(title || '').trim().replace(/\s+/g, ' ');
   if (!classId || !normalizedTitle) throw new ApiError(400, { error: 'Class and assignment title are required.' });
@@ -217,6 +218,15 @@ exports.createAssignmentActivity = async ({ classId, lessonId, title, instructio
     const assigneeIds = requestedIds.length ? requestedIds : [...enrolledIds];
     if (!assigneeIds.length) throw new ApiError(400, { error: 'This class has no students to receive the assignment.' });
 
+    const learningFollowUp = await createFollowUpWithDb({
+      db: tx,
+      classroom,
+      assigneeIds,
+      userId: teacherId,
+      actionType: 'HOMEWORK',
+      followUp,
+    });
+
     const assignment = await tx.assignment.create({ data: {
       classId: classroom.id, title: normalizedTitle, type: 'assignment', content: normalizedInstructions,
       fileUrls: attachmentUrls, links: externalLinks, deadline, maxPoints: normalizedMaxPoints,
@@ -227,6 +237,7 @@ exports.createAssignmentActivity = async ({ classId, lessonId, title, instructio
         title: normalizedTitle, instructions: normalizedInstructions, availableAt: startsAt, dueAt: deadline,
         maxAttempts: 1, scorePolicy: 'FIRST', completionRule: 'SUBMIT',
         audience: requestedIds.length ? 'SELECTED' : 'ALL_STUDENTS', createdById: teacherId,
+        followUpId: learningFollowUp?.id || null,
         homework: { create: { assignmentId: assignment.id } },
         assignees: { create: assigneeIds.map(studentId => ({ studentId })) },
       },

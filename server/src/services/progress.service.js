@@ -6,6 +6,7 @@ const { canManageProgress, canReadProgress } = require('../utils/progress-access
 
 const CONTENT_STATUSES = new Set(['DRAFT', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED']);
 const RESOURCE_KINDS = new Set(['FILE', 'VIDEO', 'LINK', 'EMBED']);
+const ATTENDANCE_STATUSES = new Set(['PRESENT', 'LATE', 'ABSENT', 'EXCUSED']);
 const userIdNumber = value => Number.parseInt(value, 10);
 const dateValue = value => value ? new Date(value) : null;
 
@@ -47,9 +48,12 @@ const assertCompleteOrder = (orderedIds, existingItems) => {
 
 const validateResource = file => {
   const name = String(file?.name || '').trim();
+  const fileAssetId = String(file?.fileAssetId || '').trim() || null;
   const url = String(file?.url || '').trim();
   const kind = String(file?.kind || 'FILE').toUpperCase();
-  if (!name || !url) throw new ApiError(400, { success: false, error: 'Tài liệu cần có tên và đường dẫn.' });
+  if (!name || (!url && !fileAssetId)) throw new ApiError(400, { success: false, error: 'Tài liệu cần có tên và đường dẫn hoặc tệp tải lên.' });
+  if (fileAssetId && kind !== 'FILE') throw new ApiError(400, { success: false, error: 'Tệp tải lên phải dùng loại tài liệu FILE.' });
+  if (fileAssetId) return { name, url: `managed://${fileAssetId}`, kind, fileAssetId };
   try {
     const parsed = new URL(url);
     if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('protocol');
@@ -57,7 +61,7 @@ const validateResource = file => {
     throw new ApiError(400, { success: false, error: 'Đường dẫn tài liệu phải là URL http(s) hợp lệ.' });
   }
   if (!RESOURCE_KINDS.has(kind)) throw new ApiError(400, { success: false, error: 'Loại tài liệu không hợp lệ.' });
-  return { name, url, kind };
+  return { name, url, kind, fileAssetId: null };
 };
 
 const notifyStudents = async (classData, message, link) => {
@@ -90,7 +94,9 @@ exports.getWeeks = async ({ classId, userId, userRole }) => {
           files: {
             where: canManage ? {} : { OR: [{ availableAt: null }, { availableAt: { lte: now } }] },
             orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-            include: { progress: { where: { studentId: currentUserId }, take: 1 } },
+            include: { progress: canManage
+              ? { select: { studentId: true, openedAt: true, completedAt: true } }
+              : { where: { studentId: currentUserId }, select: { studentId: true, openedAt: true, completedAt: true }, take: 1 } },
           },
           assignments: { include: { assignment: { select: { id: true, deadline: true, submissions: { where: { studentId: currentUserId, submittedAt: { not: null } }, select: { status: true, submittedAt: true, score: true }, take: 1 } } } } },
           deliveries: {
@@ -115,6 +121,16 @@ exports.getWeeks = async ({ classId, userId, userRole }) => {
     ...week,
     lessons: week.lessons.map(lesson => ({
       ...lesson,
+      files: lesson.files.map(file => ({
+        ...file,
+        ...(canManage ? {
+          progressSummary: {
+            opened: file.progress.length,
+            completed: file.progress.filter(item => item.completedAt).length,
+          },
+          progress: [],
+        } : {}),
+      })),
       assignments: lesson.assignments.map(item => ({ ...item, id: item.assignmentId || item.id })),
       studentProgress: canManage ? null : lesson.progress[0] || null,
       progressSummary: canManage ? { completed: lesson.progress.filter(item => item.status === 'COMPLETED').length, started: lesson.progress.filter(item => item.status === 'IN_PROGRESS').length } : null,
@@ -144,6 +160,61 @@ exports.getOutline = async ({ classId, userId, userRole }) => {
         select: { id: true, title: true, order: true },
       },
     },
+  });
+};
+
+exports.getAttendance = async ({ lessonId, userId, userRole }) => {
+  const lesson = await getLessonWithClass(String(lessonId));
+  if (!lesson) throw new ApiError(404, { success: false, error: 'Session not found.' });
+  assertCanManage({ classData: lesson.week.class, userId, userRole });
+  const session = await prisma.attendanceSession.findUnique({
+    where: { lessonId: lesson.id },
+    include: { records: { orderBy: { studentId: 'asc' } } },
+  });
+  return {
+    lesson: { id: lesson.id, title: lesson.title, scheduledAt: lesson.scheduledAt },
+    recordedAt: session?.recordedAt || null,
+    records: session?.records || [],
+  };
+};
+
+exports.saveAttendance = async ({ lessonId, records, userId, userRole }) => {
+  if (!Array.isArray(records)) throw new ApiError(400, { success: false, error: 'Attendance records are required.' });
+  const lesson = await getLessonWithClass(String(lessonId));
+  if (!lesson) throw new ApiError(404, { success: false, error: 'Session not found.' });
+  assertCanManage({ classData: lesson.week.class, userId, userRole });
+  const enrolledIds = new Set(lesson.week.class.students.map(student => student.id));
+  if (!enrolledIds.size) throw new ApiError(400, { success: false, error: 'Add students to this class before recording attendance.' });
+  const normalized = records.map(record => {
+    const studentId = userIdNumber(record?.studentId);
+    const status = String(record?.status || '').toUpperCase();
+    const note = String(record?.note || '').trim() || null;
+    if (!enrolledIds.has(studentId)) throw new ApiError(400, { success: false, error: 'Attendance includes a student who is not enrolled in this class.' });
+    if (!ATTENDANCE_STATUSES.has(status)) throw new ApiError(400, { success: false, error: 'Attendance status is invalid.' });
+    if (note && note.length > 300) throw new ApiError(400, { success: false, error: 'Attendance notes must be 300 characters or fewer.' });
+    return { studentId, status, note };
+  });
+  if (new Set(normalized.map(record => record.studentId)).size !== normalized.length) {
+    throw new ApiError(400, { success: false, error: 'Each student can have only one attendance status.' });
+  }
+  if (normalized.length !== enrolledIds.size) {
+    throw new ApiError(400, { success: false, error: 'Record attendance for every currently enrolled student.' });
+  }
+  const now = new Date();
+  return prisma.$transaction(async tx => {
+    const session = await tx.attendanceSession.upsert({
+      where: { lessonId: lesson.id },
+      create: { lessonId: lesson.id, recordedById: userIdNumber(userId), recordedAt: now },
+      update: { recordedById: userIdNumber(userId), recordedAt: now },
+      select: { id: true },
+    });
+    await Promise.all(normalized.map(record => tx.attendanceRecord.upsert({
+      where: { attendanceSessionId_studentId: { attendanceSessionId: session.id, studentId: record.studentId } },
+      create: { attendanceSessionId: session.id, ...record, recordedAt: now },
+      update: { status: record.status, note: record.note, recordedAt: now },
+    })));
+    await tx.attendanceRecord.deleteMany({ where: { attendanceSessionId: session.id, studentId: { notIn: normalized.map(record => record.studentId) } } });
+    return tx.attendanceSession.findUnique({ where: { id: session.id }, include: { records: { orderBy: { studentId: 'asc' } } } });
   });
 };
 
@@ -247,6 +318,15 @@ exports.addFiles = async ({ lessonId, files, userId, userRole }) => {
   assertCanManage({ classData: lesson.week.class, userId, userRole });
   const last = await prisma.lessonFile.findFirst({ where: { lessonId }, orderBy: { order: 'desc' }, select: { order: true } });
   const normalized = files.map(validateResource);
+  const managedAssetIds = normalized.flatMap(file => file.fileAssetId ? [file.fileAssetId] : []);
+  if (new Set(managedAssetIds).size !== managedAssetIds.length) throw new ApiError(400, { success: false, error: 'Each uploaded file can be attached only once.' });
+  if (managedAssetIds.length) {
+    const assets = await prisma.fileAsset.findMany({
+      where: { id: { in: managedAssetIds }, ownerId: userIdNumber(userId), status: 'READY', lessonFiles: { none: {} } },
+      select: { id: true },
+    });
+    if (assets.length !== managedAssetIds.length) throw new ApiError(400, { success: false, error: 'One or more uploaded files are unavailable or already attached.' });
+  }
   return prisma.$transaction(normalized.map((file, index) => prisma.lessonFile.create({ data: { ...file, lessonId, provider: files[index].provider || null, mimeType: files[index].mimeType || null, thumbnailUrl: files[index].thumbnailUrl || null, durationSeconds: files[index].durationSeconds ? Number(files[index].durationSeconds) : null, isRequired: Boolean(files[index].isRequired), availableAt: dateValue(files[index].availableAt), order: (last?.order ?? -1) + index + 1 } })));
 };
 

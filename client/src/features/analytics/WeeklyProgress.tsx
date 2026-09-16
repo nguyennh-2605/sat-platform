@@ -2,7 +2,7 @@ import { Children, useCallback, useEffect, useState } from 'react';
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertCircle, BookA, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight, ChevronsUpDown, CirclePlay, ClipboardCheck, Clock3, ExternalLink, FileText, GripVertical, Link2, ListCollapse, LoaderCircle, MoreHorizontal, MoveDown, MoveUp, Pencil, Plus, RefreshCw, Rocket, Trash2, Video } from 'lucide-react';
+import { AlertCircle, BookA, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight, ChevronsUpDown, CirclePlay, ClipboardCheck, Clock3, ExternalLink, FileText, GripVertical, Link2, ListCollapse, LoaderCircle, MoreHorizontal, MoveDown, MoveUp, Pencil, Plus, RefreshCw, Rocket, Trash2, Users, Video } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -31,7 +31,7 @@ type ResourceKind = 'FILE' | 'VIDEO' | 'LINK' | 'EMBED';
 type SortableData = { type: 'week' | 'lesson'; weekId: string };
 
 interface ResourceProgress { completedAt?: string | null }
-interface Resource { id: string; name: string; url: string; kind: ResourceKind; provider?: string | null; isRequired: boolean; progress: ResourceProgress[] }
+interface Resource { id: string; name: string; url: string; fileAssetId?: string | null; kind: ResourceKind; provider?: string | null; isRequired: boolean; progress: ResourceProgress[]; progressSummary?: { opened: number; completed: number } }
 interface Assignment { id: string; lessonAssignmentId?: string; title: string; content?: string | null; dueDate?: string | null; testIds?: number[]; assignment?: { submissions?: Array<{ status: string; submittedAt: string; score?: number | null }> } }
 interface Delivery { id: string; title: string; status: string; dueAt?: string | null; test: { id: number; title: string; mode: 'EXAM' | 'PRACTICE'; duration: number; subject: string; folderId: number | null; sections?: Array<{ _count: { questions: number } }> } }
 interface Activity { id: string; type: 'VOCABULARY' | 'HOMEWORK' | 'RESOURCE'; title: string; dueAt?: string | null; assignees?: Array<{ status: string }>; homework?: { assignmentId: string; assignment?: { submissions?: Array<{ status: string; submittedAt: string }> } } | null }
@@ -56,7 +56,9 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
   const [form, setForm] = useState<CourseForm>(EMPTY_FORM);
   const [resourceLesson, setResourceLesson] = useState<{ weekId: string; lessonId: string } | null>(null);
   const [resourceForm, setResourceForm] = useState({ name: '', url: '', kind: 'FILE' as ResourceKind, isRequired: false });
+  const [resourceUpload, setResourceUpload] = useState<File | null>(null);
   const [activityComposer, setActivityComposer] = useState<{ kind: 'ASSIGNMENT' | 'TEST'; lessonId: string } | null>(null);
+  const [attendanceLesson, setAttendanceLesson] = useState<Lesson | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ kind: 'week' | 'lesson' | 'resource'; id: string; name: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyItem, setBusyItem] = useState<string | null>(null);
@@ -177,13 +179,27 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
   };
 
   const addResource = async () => {
-    if (!resourceLesson || !resourceForm.name.trim() || !resourceForm.url.trim()) return;
+    if (!resourceLesson || !resourceForm.name.trim() || (!resourceForm.url.trim() && !resourceUpload)) return;
     setSaving(true);
     try {
-      await axiosClient.post(`/api/progress/lessons/${resourceLesson.lessonId}/files`, { files: [{ ...resourceForm, name: resourceForm.name.trim(), url: resourceForm.url.trim() }] });
+      let fileAssetId: string | null = null;
+      if (resourceUpload) {
+        const prepared = await axiosClient.post<{ success: boolean; data: { asset: { id: string }; uploadUrl: string; headers: Record<string, string> } }>(`/api/files/uploads`, {
+          lessonId: resourceLesson.lessonId,
+          originalName: resourceUpload.name,
+          mimeType: resourceUpload.type,
+          sizeBytes: resourceUpload.size,
+        });
+        const uploadResponse = await fetch(prepared.data.uploadUrl, { method: 'PUT', headers: prepared.data.headers, body: resourceUpload });
+        if (!uploadResponse.ok) throw new Error('Object upload failed');
+        await axiosClient.post(`/api/files/${prepared.data.asset.id}/complete`);
+        fileAssetId = prepared.data.asset.id;
+      }
+      await axiosClient.post(`/api/progress/lessons/${resourceLesson.lessonId}/files`, { files: [{ ...resourceForm, name: resourceForm.name.trim(), url: fileAssetId ? null : resourceForm.url.trim(), fileAssetId }] });
       toast.success('Resource added.');
       setResourceLesson(null);
       setResourceForm({ name: '', url: '', kind: 'FILE', isRequired: false });
+      setResourceUpload(null);
       await loadCourse(false);
     } catch (error) { console.error(error); toast.error(requestErrorMessage(error, 'Unable to add this resource. Check the URL.')); }
     finally { setSaving(false); }
@@ -206,7 +222,17 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
     if (!canManage) {
       try { await axiosClient.put(`/api/progress/files/${resource.id}/progress`, { completed: resource.kind !== 'VIDEO' }); } catch (error) { console.error(error); }
     }
-    window.open(resource.url, '_blank', 'noopener,noreferrer');
+    let targetUrl = resource.url;
+    if (resource.fileAssetId) {
+      try {
+        const response = await axiosClient.get<{ success: boolean; data: { url: string } }>(`/api/files/${resource.fileAssetId}/access`);
+        targetUrl = response.data.url;
+      } catch (error) {
+        toast.error(requestErrorMessage(error, 'Unable to open this file.'));
+        return;
+      }
+    }
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
     if (!canManage) await loadCourse(false);
   };
 
@@ -223,7 +249,7 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
 
   const startDelivery = (delivery: Delivery) => {
     if (canManage) {
-      navigate(`/dashboard/class/${classId}?tab=activities&deliveryId=${delivery.id}`);
+      navigate(`/dashboard/class/${classId}?tab=performance&deliveryId=${delivery.id}`);
       return;
     }
     localStorage.setItem('current_exam_info', JSON.stringify({ id: delivery.test.id, title: delivery.title, duration: delivery.test.duration }));
@@ -299,7 +325,7 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
           <SortableContext items={weeks.map(week => `week:${week.id}`)} strategy={verticalListSortingStrategy}>
             {weeks.map((week, weekIndex) => <SortableWeekOutline key={week.id} week={week} index={weekIndex} open={expanded.has(week.id)} compact={compact} canManage={canManage} editing={editing} disabled={reordering} onOpenChange={open => toggleWeek(week.id, open)} onAddLesson={() => openEditor('lesson', undefined, week.id)} onEdit={() => openEditor('week', week)} onPublish={() => void publishItem('week', week)} onDelete={() => setDeleteTarget({ kind: 'week', id: week.id, name: week.title })} onMoveUp={() => void persistWeekOrder(weekIndex, weekIndex - 1)} onMoveDown={() => void persistWeekOrder(weekIndex, weekIndex + 1)} canMoveUp={weekIndex > 0} canMoveDown={weekIndex < weeks.length - 1} busy={busyItem === `week:${week.id}` || reordering}>
               {week.lessons.length === 0 ? <div className="flex flex-col items-start justify-between gap-2 px-4 py-3 sm:flex-row sm:items-center sm:px-5"><div><p className="text-body font-medium text-foreground">No sessions in this week</p><p className="mt-0.5 text-caption text-muted-foreground">{canManage && editing ? 'Add a session to begin structuring this module.' : canManage ? 'Enter edit mode to add the first session.' : 'More sessions are coming soon.'}</p></div>{canManage && editing && <Button size="sm" variant="ghost" onClick={() => openEditor('lesson', undefined, week.id)}><Plus size={14} />Add session</Button>}</div> : <SortableContext items={week.lessons.map(lesson => `lesson:${lesson.id}`)} strategy={verticalListSortingStrategy}>
-                {week.lessons.map((lesson, lessonIndex) => <SortableLessonOutline key={lesson.id} weekId={week.id} weekStatus={week.status} lesson={lesson} number={lessonIndex + 1} compact={compact} canManage={canManage} editing={editing} disabled={reordering} busy={busyItem === `lesson:${lesson.id}` || reordering} onEdit={() => openEditor('lesson', lesson, week.id)} onPublish={() => void publishItem('lesson', lesson)} onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id, name: lesson.title })} onMoveUp={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex - 1)} onMoveDown={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex + 1)} canMoveUp={lessonIndex > 0} canMoveDown={lessonIndex < week.lessons.length - 1} onAddResource={() => setResourceLesson({ weekId: week.id, lessonId: lesson.id })} onAddAssignment={() => setActivityComposer({ kind: 'ASSIGNMENT', lessonId: lesson.id })} onAddTest={() => setActivityComposer({ kind: 'TEST', lessonId: lesson.id })} onResource={resource => void openResource(resource)} onDeleteResource={resource => setDeleteTarget({ kind: 'resource', id: resource.id, name: resource.name })} onAssignment={assignment => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} onDelivery={startDelivery} onActivity={activity => activity.type === 'HOMEWORK' && activity.homework ? navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}`) : activity.type === 'VOCABULARY' ? navigate(`/dashboard/vocabulary?activity=${activity.id}`) : navigate(`/dashboard/class/${classId}?tab=activities`)} onComplete={() => void completeLesson(lesson)} isLast={lessonIndex === week.lessons.length - 1} />)}
+                {week.lessons.map((lesson, lessonIndex) => <SortableLessonOutline key={lesson.id} weekId={week.id} weekStatus={week.status} lesson={lesson} number={lessonIndex + 1} compact={compact} canManage={canManage} editing={editing} disabled={reordering} busy={busyItem === `lesson:${lesson.id}` || reordering} onEdit={() => openEditor('lesson', lesson, week.id)} onPublish={() => void publishItem('lesson', lesson)} onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id, name: lesson.title })} onMoveUp={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex - 1)} onMoveDown={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex + 1)} canMoveUp={lessonIndex > 0} canMoveDown={lessonIndex < week.lessons.length - 1} onAttendance={() => setAttendanceLesson(lesson)} onAddResource={() => setResourceLesson({ weekId: week.id, lessonId: lesson.id })} onAddAssignment={() => setActivityComposer({ kind: 'ASSIGNMENT', lessonId: lesson.id })} onAddTest={() => setActivityComposer({ kind: 'TEST', lessonId: lesson.id })} onResource={resource => void openResource(resource)} onDeleteResource={resource => setDeleteTarget({ kind: 'resource', id: resource.id, name: resource.name })} onAssignment={assignment => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} onDelivery={startDelivery} onActivity={activity => activity.type === 'HOMEWORK' && activity.homework ? navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}`) : activity.type === 'VOCABULARY' ? navigate(`/dashboard/vocabulary?activity=${activity.id}`) : navigate(`/dashboard/class/${classId}?tab=activities`)} onComplete={() => void completeLesson(lesson)} isLast={lessonIndex === week.lessons.length - 1} />)}
               </SortableContext>}
             </SortableWeekOutline>)}
           </SortableContext>
@@ -309,7 +335,8 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
     </div>
 
     <CurriculumEditor editor={editor} form={form} setForm={setForm} saving={saving} onClose={() => setEditor(null)} onSave={() => void saveEditor()} />
-    <ResourceEditor open={Boolean(resourceLesson)} form={resourceForm} setForm={setResourceForm} saving={saving} onClose={() => setResourceLesson(null)} onSave={() => void addResource()} />
+    <ResourceEditor open={Boolean(resourceLesson)} form={resourceForm} setForm={setResourceForm} upload={resourceUpload} onUpload={file => { setResourceUpload(file); if (file && !resourceForm.name.trim()) setResourceForm(current => ({ ...current, name: file.name, kind: 'FILE', url: '' })); }} saving={saving} onClose={() => { setResourceLesson(null); setResourceUpload(null); }} onSave={() => void addResource()} />
+    <AttendanceDialog lesson={attendanceLesson} students={students} onClose={() => setAttendanceLesson(null)} />
     <Modal open={Boolean(deleteTarget)} closeOnBackdrop presentation="content-dialog" onClose={() => setDeleteTarget(null)} title={`Delete ${deleteTarget?.kind || 'item'}?`} subtitle={deleteTarget?.kind === 'resource' ? 'This action cannot be undone. Its viewing progress will also be removed.' : 'The curriculum item will be removed. Published activities stay available in the Activities tab.'} footer={<><DialogButton variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</DialogButton><DialogButton variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>{saving ? 'Deleting…' : 'Delete'}</DialogButton></>}><p className="text-body text-muted-foreground">Remove <strong className="text-foreground">{deleteTarget?.name}</strong> from this course?</p></Modal>
     {classId && <AssignmentComposer open={activityComposer?.kind === 'ASSIGNMENT'} classId={classId} initialLessonId={activityComposer?.lessonId} students={students} onClose={() => setActivityComposer(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
     {classId && <AssignTestsComposer open={activityComposer?.kind === 'TEST'} classId={classId} initialLessonId={activityComposer?.lessonId} students={students} onClose={() => setActivityComposer(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
@@ -347,7 +374,7 @@ function WeekOutline({ week, index, open, compact, canManage, editing, busy, onO
 
 interface LessonOutlineProps {
   weekId: string; lesson: Lesson; weekStatus: ContentStatus; number: number; compact: boolean; canManage: boolean; editing: boolean; disabled: boolean; busy: boolean; isLast: boolean;
-  onEdit: () => void; onPublish: () => void; onDelete: () => void; onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean;
+  onEdit: () => void; onPublish: () => void; onDelete: () => void; onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean; onAttendance: () => void;
   onAddResource: () => void; onAddAssignment: () => void; onAddTest: () => void; onResource: (item: Resource) => void; onDeleteResource: (item: Resource) => void;
   onAssignment: (item: Assignment) => void; onDelivery: (item: Delivery) => void; onActivity: (item: Activity) => void; onComplete: () => void;
 }
@@ -358,7 +385,7 @@ function SortableLessonOutline(props: LessonOutlineProps) {
   return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={isDragging ? 'relative z-10 bg-surface opacity-70' : undefined}><LessonOutline {...props} dragHandle={dragHandle} />{!props.isLast && <Separator />}</div>;
 }
 
-function LessonOutline({ lesson, weekStatus, number, compact, canManage, editing, busy, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onAddResource, onAddAssignment, onAddTest, onResource, onDeleteResource, onAssignment, onDelivery, onActivity, onComplete, dragHandle }: LessonOutlineProps & { dragHandle?: React.ReactNode }) {
+function LessonOutline({ lesson, weekStatus, number, compact, canManage, editing, busy, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onAttendance, onAddResource, onAddAssignment, onAddTest, onResource, onDeleteResource, onAssignment, onDelivery, onActivity, onComplete, dragHandle }: LessonOutlineProps & { dragHandle?: React.ReactNode }) {
   const completed = lesson.studentProgress?.status === 'COMPLETED';
   const { deliveries, activities, assignments } = lessonContent(lesson);
   const itemCount = lesson.files.length + deliveries.length + activities.length + assignments.length;
@@ -371,7 +398,7 @@ function LessonOutline({ lesson, weekStatus, number, compact, canManage, editing
         {!compact && lesson.summary && <p className="mt-0.5 line-clamp-1 text-body text-muted-foreground">{lesson.summary}</p>}
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted-foreground">{lesson.scheduledAt && <span className="inline-flex items-center gap-1.5"><CalendarDays size={13} />{formatDateTime(lesson.scheduledAt)}</span>}{lesson.durationMinutes && <span className="inline-flex items-center gap-1.5"><Clock3 size={13} />{lesson.durationMinutes} min</span>}{itemCount > 0 && <span>{itemCount} item{itemCount === 1 ? '' : 's'}</span>}</div>
       </div>
-      {canManage ? (editing || hiddenByWeek || lesson.status !== 'PUBLISHED') && <div className="flex shrink-0 items-center gap-1">{hiddenByWeek ? <Badge tone="neutral">Hidden by week</Badge> : <StatusBadge status={lesson.status} hidePublished />}{editing && <ActionMenu label={`${lesson.title} actions`} onEdit={onEdit} onPublish={onPublish} onDelete={onDelete} onMoveUp={onMoveUp} onMoveDown={onMoveDown} canMoveUp={canMoveUp} canMoveDown={canMoveDown} published={lesson.status === 'PUBLISHED'} busy={busy} />}</div> : <Button size="sm" variant={completed ? 'outline' : 'primary'} disabled={busy} onClick={onComplete}>{busy && <LoaderCircle size={14} className="animate-spin" />}{completed ? 'Completed' : 'Mark complete'}</Button>}
+      {canManage ? <div className="flex shrink-0 items-center gap-1"><Button size="sm" variant="ghost" onClick={onAttendance}><Users size={14} /><span className="hidden sm:inline">Attendance</span></Button>{(editing || hiddenByWeek || lesson.status !== 'PUBLISHED') && <>{hiddenByWeek ? <Badge tone="neutral">Hidden by week</Badge> : <StatusBadge status={lesson.status} hidePublished />}{editing && <ActionMenu label={`${lesson.title} actions`} onEdit={onEdit} onPublish={onPublish} onDelete={onDelete} onMoveUp={onMoveUp} onMoveDown={onMoveDown} canMoveUp={canMoveUp} canMoveDown={canMoveDown} published={lesson.status === 'PUBLISHED'} busy={busy} />}</>}</div> : <Button size="sm" variant={completed ? 'outline' : 'primary'} disabled={busy} onClick={onComplete}>{busy && <LoaderCircle size={14} className="animate-spin" />}{completed ? 'Completed' : 'Mark complete'}</Button>}
     </header>
 
     <div className={`mt-2 ml-6 ${editing ? 'sm:ml-24' : 'sm:ml-14'}`}>
@@ -408,7 +435,8 @@ function CurriculumRow({ icon, typeLabel, title, meta, onOpen, trailing, action,
 function ResourceRow({ resource, canEdit, compact, onOpen, onDelete }: { resource: Resource; canEdit: boolean; compact: boolean; onOpen: () => void; onDelete: () => void }) {
   const Icon = resource.kind === 'VIDEO' ? Video : resource.kind === 'LINK' ? Link2 : FileText;
   const typeLabel = resource.kind === 'VIDEO' ? 'Video' : resource.kind === 'LINK' ? 'Link' : resource.kind === 'EMBED' ? 'Activity' : 'Material';
-  const metadata = [resource.provider === 'GOOGLE_DRIVE' ? 'Google Drive' : null, resource.progress?.[0]?.completedAt ? 'Viewed' : null].filter(Boolean).join(' · ') || undefined;
+  const engagement = resource.progressSummary ? `${resource.progressSummary.opened} opened · ${resource.progressSummary.completed} completed` : resource.progress?.[0]?.completedAt ? 'Viewed' : null;
+  const metadata = [resource.provider === 'GOOGLE_DRIVE' ? 'Google Drive' : null, engagement].filter(Boolean).join(' · ') || undefined;
   return <CurriculumRow compact={compact} icon={<Icon size={16} />} typeLabel={typeLabel} title={resource.name} meta={metadata} onOpen={onOpen} trailing={resource.isRequired ? <Badge tone="neutral">Required</Badge> : undefined} action={canEdit ? <ResourceMenu name={resource.name} onDelete={onDelete} /> : <ExternalLink size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />} />;
 }
 
@@ -496,7 +524,7 @@ function CurriculumEditor({ editor, form, setForm, saving, onClose, onSave }: { 
   </Modal>;
 }
 
-function ResourceEditor({ open, form, setForm, saving, onClose, onSave }: { open: boolean; form: { name: string; url: string; kind: ResourceKind; isRequired: boolean }; setForm: React.Dispatch<React.SetStateAction<{ name: string; url: string; kind: ResourceKind; isRequired: boolean }>>; saving: boolean; onClose: () => void; onSave: () => void }) {
+function ResourceEditor({ open, form, setForm, upload, onUpload, saving, onClose, onSave }: { open: boolean; form: { name: string; url: string; kind: ResourceKind; isRequired: boolean }; setForm: React.Dispatch<React.SetStateAction<{ name: string; url: string; kind: ResourceKind; isRequired: boolean }>>; upload: File | null; onUpload: (file: File | null) => void; saving: boolean; onClose: () => void; onSave: () => void }) {
   return <Modal
     open={open}
     closeOnBackdrop
@@ -506,12 +534,12 @@ function ResourceEditor({ open, form, setForm, saving, onClose, onSave }: { open
     subtitle="Attach a document, video, website or embeddable activity. Google Drive files must already be shared with the class."
     footer={<>
       <DialogButton variant="outline" onClick={onClose}>Cancel</DialogButton>
-      <DialogButton disabled={saving || !form.name.trim() || !form.url.trim()} onClick={onSave}>{saving ? 'Adding…' : 'Add resource'}</DialogButton>
+      <DialogButton disabled={saving || !form.name.trim() || (!form.url.trim() && !upload)} onClick={onSave}>{saving ? 'Adding…' : 'Add resource'}</DialogButton>
     </>}
   >
     <div className="space-y-4">
       <Field label="Resource type" htmlFor="resource-type">
-        <FormSelect value={form.kind} onValueChange={value => setForm(current => ({ ...current, kind: value as ResourceKind }))}>
+        <FormSelect value={form.kind} onValueChange={value => { const kind = value as ResourceKind; setForm(current => ({ ...current, kind })); if (kind !== 'FILE') onUpload(null); }}>
           <SelectTrigger id="resource-type" className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="FILE">Document / file</SelectItem>
@@ -525,11 +553,55 @@ function ResourceEditor({ open, form, setForm, saving, onClose, onSave }: { open
         <DialogInput id="resource-name" autoFocus value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="SAT Reading strategy guide" />
       </Field>
       <Field label="Secure URL" htmlFor="resource-url">
-        <DialogInput id="resource-url" type="url" value={form.url} onChange={event => setForm(current => ({ ...current, url: event.target.value }))} placeholder="https://…" />
+        <DialogInput id="resource-url" type="url" value={form.url} disabled={Boolean(upload)} onChange={event => setForm(current => ({ ...current, url: event.target.value }))} placeholder="https://…" />
       </Field>
+      {form.kind === 'FILE' && <Field label="Or upload a file" htmlFor="resource-upload"><DialogInput id="resource-upload" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp" disabled={saving || Boolean(form.url.trim())} onChange={event => onUpload(event.target.files?.[0] || null)} /><p className="text-caption text-muted-foreground">Private managed files are limited to 20 MB. {upload ? `Selected: ${upload.name}` : ''}</p></Field>}
       <label className="flex items-center gap-2 text-body text-foreground"><Checkbox checked={form.isRequired} onCheckedChange={checked => setForm(current => ({ ...current, isRequired: Boolean(checked) }))} />Required material</label>
       <p className="rounded-control border border-ui-border bg-surface-subtle p-3 text-caption leading-5 text-muted-foreground">For privacy, the app no longer changes Drive permissions automatically. Share the file only with the class or organization before adding its URL.</p>
     </div>
+  </Modal>;
+}
+
+type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED';
+interface AttendanceEntry { studentId: number; status: AttendanceStatus; note: string }
+
+function AttendanceDialog({ lesson, students, onClose }: { lesson: Lesson | null; students: Array<{ id: number; name: string | null; email: string }>; onClose: () => void }) {
+  const [entries, setEntries] = useState<AttendanceEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!lesson) return;
+    setLoading(true);
+    const defaults = students.map(student => ({ studentId: student.id, status: 'PRESENT' as const, note: '' }));
+    setEntries(defaults);
+    axiosClient.get<{ success: boolean; data: { records: Array<{ studentId: number; status: AttendanceStatus; note?: string | null }> } }>(`/api/progress/lessons/${lesson.id}/attendance`)
+      .then(response => {
+        const existing = new Map(response.data.records.map(record => [record.studentId, record]));
+        setEntries(defaults.map(entry => ({ ...entry, status: existing.get(entry.studentId)?.status || entry.status, note: existing.get(entry.studentId)?.note || '' })));
+      })
+      .catch(error => toast.error(requestErrorMessage(error, 'Unable to load attendance.')))
+      .finally(() => setLoading(false));
+  }, [lesson, students]);
+
+  const update = (studentId: number, patch: Partial<AttendanceEntry>) => setEntries(current => current.map(entry => entry.studentId === studentId ? { ...entry, ...patch } : entry));
+  const save = async () => {
+    if (!lesson) return;
+    setSaving(true);
+    try {
+      await axiosClient.put(`/api/progress/lessons/${lesson.id}/attendance`, { records: entries.map(entry => ({ ...entry, note: entry.note.trim() || null })) });
+      toast.success('Attendance saved.');
+      onClose();
+    } catch (error) {
+      toast.error(requestErrorMessage(error, 'Unable to save attendance.'));
+    } finally { setSaving(false); }
+  };
+
+  return <Modal open={Boolean(lesson)} closeOnBackdrop={!saving} presentation="content-dialog" onClose={() => !saving && onClose()} title={`Attendance · ${lesson?.title || 'Session'}`} subtitle="Record one status for every currently enrolled student." className="max-w-3xl!" footer={<><DialogButton variant="outline" disabled={saving} onClick={onClose}>Cancel</DialogButton><DialogButton disabled={saving || loading || students.length === 0 || entries.length !== students.length} onClick={() => void save()}>{saving ? 'Saving…' : 'Save attendance'}</DialogButton></>}>
+    {loading ? <div className="h-48 animate-pulse rounded-lg bg-muted" /> : students.length === 0 ? <p className="py-12 text-center text-body text-muted-foreground">Add students to this class before taking attendance.</p> : <div className="max-h-[62vh] space-y-2 overflow-y-auto pr-1">{students.map(student => {
+      const entry = entries.find(item => item.studentId === student.id) || { studentId: student.id, status: 'PRESENT' as const, note: '' };
+      return <div key={student.id} className="grid gap-3 rounded-lg border border-ui-border p-3 sm:grid-cols-[minmax(0,1fr)_150px_minmax(180px,1fr)] sm:items-center"><div className="min-w-0"><p className="truncate text-body font-medium text-foreground">{student.name || student.email}</p><p className="truncate text-caption text-muted-foreground">{student.email}</p></div><FormSelect value={entry.status} onValueChange={value => update(student.id, { status: value as AttendanceStatus })}><SelectTrigger className="w-full" aria-label={`Attendance status for ${student.name || student.email}`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PRESENT">Present</SelectItem><SelectItem value="LATE">Late</SelectItem><SelectItem value="ABSENT">Absent</SelectItem><SelectItem value="EXCUSED">Excused</SelectItem></SelectContent></FormSelect><DialogInput value={entry.note} maxLength={300} onChange={event => update(student.id, { note: event.target.value })} placeholder="Optional note" aria-label={`Attendance note for ${student.name || student.email}`} /></div>;
+    })}</div>}
   </Modal>;
 }
 

@@ -44,13 +44,24 @@ const assertStudentAssignmentAccess = async (assignmentId, studentId, { db = pri
   return assignment;
 };
 
-exports.createUpload = async ({ assignmentId, ownerId, originalName, mimeType, sizeBytes }, dependencies = {}) => {
+const assertTeacherLessonAccess = async (lessonId, teacherId, userRole, { db = prisma } = {}) => {
+  const lesson = await db.lesson.findUnique({
+    where: { id: String(lessonId) },
+    select: { id: true, week: { select: { class: { select: { teacherId: true } } } } },
+  });
+  if (!lesson) throw new ApiError(404, { error: 'Session not found.' });
+  if (userRole !== 'ADMIN' && lesson.week.class.teacherId !== teacherId) throw new ApiError(403, { error: 'You cannot upload resources to this session.' });
+  return lesson;
+};
+
+exports.createUpload = async ({ assignmentId, lessonId, ownerId, userRole, originalName, mimeType, sizeBytes }, dependencies = {}) => {
   const db = dependencies.db || prisma;
   const storageFactory = dependencies.storageFactory || getObjectStorage;
   const makeUuid = dependencies.randomUUID || randomUUID;
   const logger = dependencies.logger || console;
   const studentId = currentUserId(ownerId);
-  await assertStudentAssignmentAccess(assignmentId, studentId, { db, now: dependencies.now });
+  if (lessonId) await assertTeacherLessonAccess(lessonId, studentId, userRole, { db });
+  else await assertStudentAssignmentAccess(assignmentId, studentId, { db, now: dependencies.now });
   const name = normalizeName(originalName);
   const size = Number(sizeBytes);
   const type = String(mimeType || '').toLowerCase();
@@ -62,7 +73,7 @@ exports.createUpload = async ({ assignmentId, ownerId, originalName, mimeType, s
   try { storage = storageFactory(); }
   catch { throw new ApiError(503, { error: 'File uploads are not configured yet.' }); }
   const extension = path.extname(name).toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 12);
-  const storageKey = `submissions/${studentId}/${makeUuid()}${extension}`;
+  const storageKey = `${lessonId ? 'lesson-resources' : 'submissions'}/${studentId}/${makeUuid()}${extension}`;
   const asset = await db.fileAsset.create({
     data: { ownerId: studentId, provider: storage.provider, storageKey, originalName: name, mimeType: type, sizeBytes: size },
   });
@@ -112,6 +123,17 @@ exports.getAccessUrl = async ({ fileAssetId, userId, userRole }, dependencies = 
   const asset = await db.fileAsset.findUnique({ where: { id: fileAssetId } });
   if (!asset || asset.status !== 'READY') throw new ApiError(404, { error: 'File not found.' });
   if (asset.ownerId !== requesterId && userRole !== 'ADMIN') {
+    const accessibleLesson = db.lessonFile?.findFirst ? await db.lessonFile.findFirst({
+      where: {
+        fileAssetId,
+        lesson: { week: { class: { OR: [{ teacherId: requesterId }, { students: { some: { id: requesterId } } }] } } },
+      },
+      select: { id: true },
+    }) : null;
+    if (accessibleLesson) {
+      const url = await storageFactory().createReadUrl({ storageKey: asset.storageKey, downloadName: asset.originalName });
+      return { url, expiresInSeconds: 300 };
+    }
     const accessibleItem = await db.homeworkSubmissionItem.findFirst({
       where: { fileAssetId, content: { slot: 'SUBMITTED', submission: { assignment: { class: { teacherId: requesterId } } } } },
       select: { id: true },
@@ -135,7 +157,7 @@ exports.cleanupAssets = async ({
   const assets = await db.fileAsset.findMany({
     where: { OR: [
       { status: 'PENDING_UPLOAD', createdAt: { lt: olderThan } },
-      { status: 'READY', createdAt: { lt: olderThan }, items: { none: {} } },
+      { status: 'READY', createdAt: { lt: olderThan }, items: { none: {} }, lessonFiles: { none: {} } },
       { status: 'PENDING_DELETE' },
     ] },
     take: batchSize,
@@ -186,5 +208,6 @@ exports._fileAssetHelpers = {
   MAX_CLEANUP_CONCURRENCY,
   normalizeName,
   assertStudentAssignmentAccess,
+  assertTeacherLessonAccess,
   storageErrorDetails,
 };

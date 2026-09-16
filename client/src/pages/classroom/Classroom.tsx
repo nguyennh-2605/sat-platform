@@ -21,10 +21,11 @@ import StudentAnalytics from '../../features/analytics/StudentAnalytics';
 import AnnouncementDialog from '../../features/classroom/AnnouncementDialog';
 import WeeklyProgress from '../../features/analytics/WeeklyProgress';
 import ClassroomActivities from '../../features/classroom/ClassroomActivities';
+import ClassPerformance from '../../features/classroom/ClassPerformance';
 import { capitalizeFirstLetter } from '../../utils/text';
 
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-type ClassroomTab = 'LESSONS' | 'ACTIVITIES' | 'MEMBERS' | 'ANNOUNCEMENTS';
+type ClassroomTab = 'LESSONS' | 'ACTIVITIES' | 'PERFORMANCE' | 'MEMBERS' | 'ANNOUNCEMENTS';
 
 interface CurrentUser { id: string; name: string; role: UserRole }
 interface ClassMember { id: number; name: string | null; email: string; createdAt: string }
@@ -53,7 +54,7 @@ export default function Classroom() {
   const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [activeTab, setActiveTab] = useState<ClassroomTab>('ANNOUNCEMENTS');
+  const [activeTab, setActiveTab] = useState<ClassroomTab>(() => ['TEACHER', 'ADMIN'].includes(localStorage.getItem('userRole') || '') ? 'LESSONS' : 'ANNOUNCEMENTS');
   const [announcementOpen, setAnnouncementOpen] = useState(false);
   const [announcementVersion, setAnnouncementVersion] = useState(0);
   const [addStudentOpen, setAddStudentOpen] = useState(false);
@@ -83,28 +84,32 @@ export default function Classroom() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')?.toUpperCase();
-    const aliases: Record<string, ClassroomTab> = { PROGRESS: 'LESSONS', PERFORMANCE: 'ACTIVITIES', RESULTS: 'ACTIVITIES', NOTIFICATIONS: 'ANNOUNCEMENTS' };
+    const aliases: Record<string, ClassroomTab> = { PROGRESS: 'LESSONS', RESULTS: 'PERFORMANCE', NOTIFICATIONS: 'ANNOUNCEMENTS' };
     const resolved = aliases[requestedTab || ''] || requestedTab;
     if (requestedTab && aliases[requestedTab]) {
       const next = new URLSearchParams(searchParams);
       next.set('tab', aliases[requestedTab].toLowerCase());
       setSearchParams(next, { replace: true });
     }
-    if (resolved === 'LESSONS' || resolved === 'ACTIVITIES' || resolved === 'MEMBERS' || resolved === 'ANNOUNCEMENTS') setActiveTab(resolved);
-  }, [searchParams, setSearchParams]);
+    if (resolved === 'PERFORMANCE' && !canManage) {
+      setActiveTab('ANNOUNCEMENTS');
+      return;
+    }
+    if (resolved === 'LESSONS' || resolved === 'ACTIVITIES' || resolved === 'PERFORMANCE' || resolved === 'MEMBERS' || resolved === 'ANNOUNCEMENTS') setActiveTab(resolved);
+  }, [canManage, searchParams, setSearchParams]);
 
   const selectTab = (tab: ClassroomTab) => {
     setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
     next.set('tab', tab.toLowerCase());
-    if (tab !== 'ACTIVITIES') next.delete('deliveryId');
+    if (tab !== 'PERFORMANCE') next.delete('deliveryId');
     setSearchParams(next, { replace: true });
   };
 
   const openTestPerformance = (deliveryId: string) => {
-    setActiveTab('ACTIVITIES');
+    setActiveTab('PERFORMANCE');
     const next = new URLSearchParams(searchParams);
-    next.set('tab', 'activities');
+    next.set('tab', 'performance');
     next.set('deliveryId', deliveryId);
     setSearchParams(next, { replace: true });
   };
@@ -126,10 +131,11 @@ export default function Classroom() {
   if (!classDetail || loadError) return <ClassroomError message={loadError} onRetry={() => void fetchClassDetail()} />;
 
   const tabs: Array<TabItem<ClassroomTab>> = [
-    { value: 'ANNOUNCEMENTS', label: 'Announcements', panelId: 'classroom-announcements-panel' },
     { value: 'LESSONS', label: 'Lessons', panelId: 'classroom-lessons-panel' },
     { value: 'ACTIVITIES', label: 'Activities', panelId: 'classroom-activities-panel' },
+    ...(canManage ? [{ value: 'PERFORMANCE' as const, label: 'Performance', panelId: 'classroom-performance-panel' }] : []),
     { value: 'MEMBERS', label: 'Members', panelId: 'classroom-members-panel' },
+    { value: 'ANNOUNCEMENTS', label: 'Announcements', panelId: 'classroom-announcements-panel' },
   ];
 
   return <div className="h-full overflow-y-auto">
@@ -143,9 +149,10 @@ export default function Classroom() {
 
       <div>
       {activeTab === 'LESSONS' && <div id="classroom-lessons-panel" role="tabpanel" className="py-2"><WeeklyProgress canManage={canManage} students={classDetail.students} /></div>}
-      {activeTab === 'ACTIVITIES' && <div id="classroom-activities-panel" role="tabpanel">{canManage && searchParams.get('deliveryId')
+      {activeTab === 'ACTIVITIES' && <div id="classroom-activities-panel" role="tabpanel"><ClassroomActivities classId={classId || ''} students={classDetail.students} canManage={canManage} onOpenPerformance={openTestPerformance} /></div>}
+      {activeTab === 'PERFORMANCE' && canManage && <div id="classroom-performance-panel" role="tabpanel">{searchParams.get('deliveryId')
         ? <StudentAnalytics key={searchParams.get('deliveryId')} initialDeliveryId={searchParams.get('deliveryId') as string} />
-        : <ClassroomActivities classId={classId || ''} students={classDetail.students} canManage={canManage} onOpenPerformance={openTestPerformance} />}
+        : <ClassPerformance classId={classDetail.id} students={classDetail.students} onOpenAssessment={openTestPerformance} />}
       </div>}
       {activeTab === 'MEMBERS' && <div id="classroom-members-panel" role="tabpanel"><MembersTab classroom={classDetail} canManage={canManage} onInvite={() => setAddStudentOpen(true)} onRemove={setStudentToRemove} /></div>}
       {activeTab === 'ANNOUNCEMENTS' && <div id="classroom-announcements-panel" role="tabpanel"><AnnouncementsTab classId={classDetail.id} selectedAnnouncementId={searchParams.get('announcementId')} refreshKey={announcementVersion} canManage={canManage} onNewAnnouncement={() => setAnnouncementOpen(true)} /></div>}

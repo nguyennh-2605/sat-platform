@@ -11,7 +11,7 @@ const handle = (fallback, action) => async (req, res) => {
 };
 
 exports.createUpload = handle('Unable to prepare the file upload.', async (req, res) => {
-  const data = await fileAssetService.createUpload({ ...req.body, ownerId: req.user.userId || req.user.id });
+  const data = await fileAssetService.createUpload({ ...req.body, ownerId: req.user.userId || req.user.id, userRole: req.user.role });
   return res.status(201).json({ success: true, data });
 });
 

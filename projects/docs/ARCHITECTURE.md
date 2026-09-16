@@ -127,6 +127,8 @@ Express Server (index.js → app.js)
 |---|---|---|---|
 | `GET` | `/api/classes` | JWT | Get user's classes (teacher → taught, student → enrolled) |
 | `GET` | `/api/classes/:id` | JWT | Get class detail (teacher, students, assignments, submissions) |
+| `GET` | `/api/classes/:classId/performance?range=7\|30\|90` | JWT + TEACHER/ADMIN | Class-level completion, assessed accuracy, taxonomy evidence, attendance summary, assessments, student signals, and persisted learning follow-ups |
+| `PATCH` | `/api/classes/:classId/follow-ups/:followUpId` | JWT + owning TEACHER/ADMIN | Resolve, dismiss, or continue an evidence-backed learning follow-up with an optional outcome note |
 | `GET` | `/api/classes/list` | JWT | Get exam tests for a class (query: `classId`) |
 | `GET` | `/api/classes/:id/score-report` | JWT + TEACHER/ADMIN | Score report assignments for a class |
 | `GET` | `/api/classes/:testId/report` | JWT + TEACHER/ADMIN | Test analytics (leaderboard, question stats) |
@@ -199,6 +201,7 @@ Express Server (index.js → app.js)
 | `PUT` | `/api/progress/weeks/:weekId/lessons/reorder` | JWT | Persist the complete lesson order within one week (owning teacher/admin only) |
 | `PUT` | `/api/progress/lessons/:lessonId` | JWT | Update lesson details, schedule, and visibility (owning teacher/admin only) |
 | `DELETE` | `/api/progress/lessons/:lessonId` | JWT | Delete lesson and unlink its published activities (teacher only) |
+| `GET/PUT` | `/api/progress/lessons/:lessonId/attendance` | JWT + owning TEACHER/ADMIN | Read or batch-upsert one attendance record per currently enrolled student for a session |
 | `POST` | `/api/progress/lessons/:lessonId/files` | JWT | Add files to lesson (teacher only) |
 | `DELETE` | `/api/progress/files/:fileId` | JWT | Delete file (teacher only) |
 | `POST` | `/api/progress/lessons/:lessonId/assignment` | JWT | Create/update lesson assignment (teacher only) |
@@ -293,9 +296,9 @@ Teacher Overview only exposes classes owned by the authenticated teacher. Core w
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
-| `POST` | `/api/files/uploads` | JWT + assigned STUDENT | Create a pending private file asset and a short-lived S3-compatible upload URL |
+| `POST` | `/api/files/uploads` | JWT + authorized owner | Create a pending private file asset and a short-lived S3-compatible upload URL for assigned student work or an owned lesson resource |
 | `POST` | `/api/files/:fileAssetId/complete` | JWT + owner | Verify object metadata and mark an upload ready |
-| `GET` | `/api/files/:fileAssetId/access` | JWT + authorized owner/staff | Create a short-lived read URL after checking assignment access |
+| `GET` | `/api/files/:fileAssetId/access` | JWT + authorized owner/staff/student | Create a short-lived read URL after checking assignment or classroom membership access |
 
 Managed file records store object keys, never signed URLs. `HomeworkSubmissionContent` separates the student's private `DRAFT` from the official `SUBMITTED` snapshot; teachers only read the latter. External links remain `HomeworkSubmissionItem(kind=LINK)` and do not become managed files.
 

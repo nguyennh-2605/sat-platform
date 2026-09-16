@@ -17,6 +17,8 @@ router.put('/weeks/:weekId/lessons/reorder', authenticateToken, progressControll
 router.put('/lessons/:lessonId', authenticateToken, progressController.updateLesson);
 router.delete('/lessons/:lessonId', authenticateToken, progressController.deleteLesson);
 router.put('/lessons/:lessonId/progress', authenticateToken, progressController.completeLesson);
+router.get('/lessons/:lessonId/attendance', authenticateToken, progressController.getAttendance);
+router.put('/lessons/:lessonId/attendance', authenticateToken, progressController.saveAttendance);
 
 // File routes
 router.post('/lessons/:lessonId/files', authenticateToken, progressController.addFiles);

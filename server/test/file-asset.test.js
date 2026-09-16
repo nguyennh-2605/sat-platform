@@ -13,6 +13,8 @@ const silentLogger = { error() {} };
 const expectStatus = statusCode => error => error?.statusCode === statusCode;
 const createDb = (overrides = {}) => ({
   assignment: { findUnique: async () => eligibleAssignment },
+  lesson: { findUnique: async () => null },
+  lessonFile: { findFirst: async () => null },
   fileAsset: {
     create: async ({ data }) => ({ id: 'asset-1', status: 'PENDING_UPLOAD', ...data }),
     findUnique: async () => null,
@@ -59,6 +61,22 @@ test('create upload rejects oversized and unsupported files before storage is ca
   const dependencies = { db: createDb(), storageFactory: () => { throw new Error('must not be called'); } };
   await assert.rejects(fileAssetService.createUpload({ ...uploadInput, sizeBytes: 20 * 1024 * 1024 + 1 }, dependencies), expectStatus(400));
   await assert.rejects(fileAssetService.createUpload({ ...uploadInput, mimeType: 'application/x-msdownload' }, dependencies), expectStatus(400));
+});
+
+test('the owning teacher can prepare a private lesson resource upload', async () => {
+  let persisted;
+  const db = createDb({ lesson: { findUnique: async () => ({ id: 'lesson-1', week: { class: { teacherId: 20 } } }) } });
+  db.fileAsset.create = async ({ data }) => {
+    persisted = data;
+    return { id: 'asset-1', status: 'PENDING_UPLOAD', ...data };
+  };
+  await fileAssetService.createUpload({ ...uploadInput, assignmentId: undefined, lessonId: 'lesson-1', ownerId: 20, userRole: 'TEACHER' }, {
+    db,
+    randomUUID: () => 'lesson-uuid',
+    storageFactory: () => ({ provider: 'R2', createUploadUrl: async () => 'https://signed.example/upload' }),
+    logger: silentLogger,
+  });
+  assert.equal(persisted.storageKey, 'lesson-resources/20/lesson-uuid.pdf');
 });
 
 test('a student cannot create an upload for work they were not assigned', async () => {
@@ -109,6 +127,18 @@ test('owners and the teacher of submitted work can get access, unrelated teacher
     fileAssetService.getAccessUrl({ fileAssetId: 'asset-1', userId: 30, userRole: 'TEACHER' }, { db: unrelatedDb, storageFactory }),
     expectStatus(403),
   );
+});
+
+test('an enrolled student can open a managed lesson resource', async () => {
+  const asset = { id: 'asset-1', ownerId: 20, status: 'READY', storageKey: 'lesson-key', originalName: 'guide.pdf' };
+  const db = createDb();
+  db.fileAsset.findUnique = async () => asset;
+  db.lessonFile.findFirst = async () => ({ id: 'lesson-file-1' });
+  const result = await fileAssetService.getAccessUrl(
+    { fileAssetId: asset.id, userId: 7, userRole: 'STUDENT' },
+    { db, storageFactory: () => ({ createReadUrl: async () => 'https://signed.example/lesson' }) },
+  );
+  assert.equal(result.url, 'https://signed.example/lesson');
 });
 
 test('cleanup deletes orphan assets and keeps failures pending for a retry', async () => {

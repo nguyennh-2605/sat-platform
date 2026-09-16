@@ -9,43 +9,47 @@ datasource db {
 }
 
 model User {
-  id                    Int                      @id @default(autoincrement())
-  email                 String                   @unique
-  googleSubject         String?                  @unique
-  password              String?
-  createdAt             DateTime                 @default(now())
-  name                  String?
-  role                  Role                     @default(STUDENT)
-  avatar                String?
-  satTestDate           DateTime?
-  currentSatScore       Int?
-  targetSatScore        Int?
-  dashboardBackground   String?
-  taughtClasses         Class[]                  @relation("TeacherClasses")
-  errorLogs             ErrorLog[]
-  homeworkSubmissions   HomeworkSubmission[]
-  submissions           Submission[]
-  createdTests          Test[]
-  studyingClasses       Class[]                  @relation("StudentClasses")
-  notifications         Notification[]
-  SubFolders            Folder[]
-  createdDeliveries     TestDelivery[]           @relation("DeliveryCreator")
-  deliveryAssignments   DeliveryAssignee[]
-  todoStates            UserTodoState[]
-  studentTasks          StudentTask[]
-  refreshSessions       RefreshSession[]
-  ownedVocabularySets   VocabularySet[]          @relation("VocabularySetOwner")
-  createdVocabularySets VocabularySet[]          @relation("VocabularySetCreator")
-  vocabularyProgress    VocabularyTermProgress[]
-  vocabularySessions    VocabularyStudySession[]
-  createdActivities     ClassActivity[]          @relation("ActivityCreator")
-  createdAnnouncements  ClassAnnouncement[]      @relation("AnnouncementAuthor")
-  activityAssignments   ActivityAssignee[]
-  lessonProgress        LessonProgress[]
-  resourceProgress      ResourceProgress[]
-  auditEvents           AuditEvent[]             @relation("AuditEventActor")
-  fileAssets            FileAsset[]              @relation("FileAssetOwner")
-  studySessions         StudySession[]
+  id                         Int                      @id @default(autoincrement())
+  email                      String                   @unique
+  googleSubject              String?                  @unique
+  password                   String?
+  createdAt                  DateTime                 @default(now())
+  name                       String?
+  role                       Role                     @default(STUDENT)
+  avatar                     String?
+  satTestDate                DateTime?
+  currentSatScore            Int?
+  targetSatScore             Int?
+  dashboardBackground        String?
+  taughtClasses              Class[]                  @relation("TeacherClasses")
+  errorLogs                  ErrorLog[]
+  homeworkSubmissions        HomeworkSubmission[]
+  submissions                Submission[]
+  createdTests               Test[]
+  studyingClasses            Class[]                  @relation("StudentClasses")
+  notifications              Notification[]
+  SubFolders                 Folder[]
+  createdDeliveries          TestDelivery[]           @relation("DeliveryCreator")
+  deliveryAssignments        DeliveryAssignee[]
+  todoStates                 UserTodoState[]
+  studentTasks               StudentTask[]
+  refreshSessions            RefreshSession[]
+  ownedVocabularySets        VocabularySet[]          @relation("VocabularySetOwner")
+  createdVocabularySets      VocabularySet[]          @relation("VocabularySetCreator")
+  vocabularyProgress         VocabularyTermProgress[]
+  vocabularySessions         VocabularyStudySession[]
+  createdActivities          ClassActivity[]          @relation("ActivityCreator")
+  createdAnnouncements       ClassAnnouncement[]      @relation("AnnouncementAuthor")
+  activityAssignments        ActivityAssignee[]
+  lessonProgress             LessonProgress[]
+  resourceProgress           ResourceProgress[]
+  auditEvents                AuditEvent[]             @relation("AuditEventActor")
+  fileAssets                 FileAsset[]              @relation("FileAssetOwner")
+  studySessions              StudySession[]
+  createdLearningFollowUps   LearningFollowUp[]       @relation("LearningFollowUpCreator")
+  learningFollowUpTargets    LearningFollowUpTarget[] @relation("LearningFollowUpTargetStudent")
+  recordedAttendanceSessions AttendanceSession[]      @relation("AttendanceRecorder")
+  attendanceRecords          AttendanceRecord[]       @relation("AttendanceStudent")
 }
 
 model RefreshSession {
@@ -62,19 +66,20 @@ model RefreshSession {
 }
 
 model Class {
-  id            String              @id @default(uuid())
-  name          String
-  color         String              @default("#1B7A5A")
-  createdAt     DateTime            @default(now())
-  teacherId     Int
-  assignments   Assignment[]
-  teacher       User                @relation("TeacherClasses", fields: [teacherId], references: [id])
-  classTests    ClassTest[]
-  students      User[]              @relation("StudentClasses")
-  weeks         Week[]
-  deliveries    TestDelivery[]
-  activities    ClassActivity[]
-  announcements ClassAnnouncement[]
+  id                String              @id @default(uuid())
+  name              String
+  color             String              @default("#1B7A5A")
+  createdAt         DateTime            @default(now())
+  teacherId         Int
+  assignments       Assignment[]
+  teacher           User                @relation("TeacherClasses", fields: [teacherId], references: [id])
+  classTests        ClassTest[]
+  students          User[]              @relation("StudentClasses")
+  weeks             Week[]
+  deliveries        TestDelivery[]
+  activities        ClassActivity[]
+  announcements     ClassAnnouncement[]
+  learningFollowUps LearningFollowUp[]
 
   @@index([teacherId, createdAt])
 }
@@ -184,6 +189,7 @@ model FileAsset {
   updatedAt    DateTime                 @updatedAt
   owner        User                     @relation("FileAssetOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   items        HomeworkSubmissionItem[]
+  lessonFile   LessonFile?
 
   @@index([ownerId, status, createdAt])
   @@index([status, createdAt])
@@ -620,6 +626,36 @@ enum ActivityAssigneeStatus {
   EXCUSED
 }
 
+enum LearningFollowUpSource {
+  SKILL_SIGNAL
+  STUDENT_CHECK_IN
+  ASSESSMENT
+  MANUAL
+}
+
+enum LearningFollowUpAction {
+  TEST
+  HOMEWORK
+  CHECK_IN
+}
+
+enum LearningFollowUpStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  READY_TO_EVALUATE
+  RESOLVED
+  NEEDS_FOLLOW_UP
+  DISMISSED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  EXCUSED
+}
+
 enum CourseContentStatus {
   DRAFT
   SCHEDULED
@@ -677,8 +713,35 @@ model Lesson {
   deliveries      TestDelivery[]
   activities      ClassActivity[]
   progress        LessonProgress[]
+  attendance      AttendanceSession?
 
   @@index([weekId, status, order])
+}
+
+model AttendanceSession {
+  id           String             @id @default(uuid())
+  lessonId     String             @unique
+  recordedById Int
+  recordedAt   DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  lesson       Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  recordedBy   User               @relation("AttendanceRecorder", fields: [recordedById], references: [id])
+  records      AttendanceRecord[]
+
+  @@index([recordedById, recordedAt])
+}
+
+model AttendanceRecord {
+  attendanceSessionId String
+  studentId           Int
+  status              AttendanceStatus
+  note                String?
+  recordedAt          DateTime          @default(now())
+  attendanceSession   AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
+  student             User              @relation("AttendanceStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([attendanceSessionId, studentId])
+  @@index([studentId, status])
 }
 
 model TestDelivery {
@@ -751,7 +814,9 @@ model LessonFile {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   lessonId        String
+  fileAssetId     String?            @unique
   lesson          Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  fileAsset       FileAsset?         @relation(fields: [fileAssetId], references: [id], onDelete: Restrict)
   progress        ResourceProgress[]
 
   @@index([lessonId, order])
@@ -921,10 +986,61 @@ model ClassActivity {
   test               TestActivity?
   homework           HomeworkActivity?
   vocabularySessions VocabularyStudySession[]
+  followUpId         String?
+  followUp           LearningFollowUp?        @relation(fields: [followUpId], references: [id], onDelete: SetNull)
 
   @@index([classId, status, dueAt])
   @@index([classId, createdAt])
   @@index([lessonId])
+  @@index([followUpId])
+}
+
+model LearningFollowUp {
+  id                     String                   @id @default(uuid())
+  classId                String
+  createdById            Int
+  sourceType             LearningFollowUpSource
+  actionType             LearningFollowUpAction
+  status                 LearningFollowUpStatus   @default(OPEN)
+  subject                TestSubject?
+  domainCode             String?
+  domainName             String?
+  skillCode              String?
+  skillName              String?
+  sourceDeliveryId       String?
+  sourceStudentId        Int?
+  reason                 String?
+  baselineAccuracy       Int?
+  baselineCorrect        Int?
+  baselineAnswerCount    Int?
+  baselineStudentCount   Int?
+  classificationCoverage Int?
+  resolutionNote         String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  resolvedAt             DateTime?
+  class                  Class                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdBy              User                     @relation("LearningFollowUpCreator", fields: [createdById], references: [id])
+  targets                LearningFollowUpTarget[]
+  activities             ClassActivity[]
+
+  @@index([classId, status, createdAt])
+  @@index([createdById, createdAt])
+  @@index([skillCode])
+  @@index([sourceDeliveryId])
+}
+
+model LearningFollowUpTarget {
+  followUpId          String
+  studentId           Int
+  baselineAccuracy    Int?
+  baselineCorrect     Int?
+  baselineAnswerCount Int?
+  followUp            LearningFollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  student             User             @relation("LearningFollowUpTargetStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([followUpId, studentId])
+  @@index([studentId])
 }
 
 model TestActivity {

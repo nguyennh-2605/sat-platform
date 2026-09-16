@@ -199,7 +199,7 @@ const buildCheckIns = ({ classes, activities, submissions, now = new Date() }) =
           reasonLabel: `${overdue} overdue ${overdue === 1 ? 'activity' : 'activities'}`,
           priority: 0,
           magnitude: overdue,
-          href: `/dashboard/class/${classroom.id}?tab=activities`,
+          href: `/dashboard/class/${classroom.id}?tab=performance`,
         });
         continue;
       }
@@ -220,7 +220,7 @@ const buildCheckIns = ({ classes, activities, submissions, now = new Date() }) =
           reasonLabel: `No classroom activity started in ${INACTIVITY_DAYS} days`,
           priority: 1,
           magnitude: outstanding.length,
-          href: `/dashboard/class/${classroom.id}?tab=activities`,
+          href: `/dashboard/class/${classroom.id}?tab=performance`,
         });
         continue;
       }
@@ -244,7 +244,7 @@ const buildCheckIns = ({ classes, activities, submissions, now = new Date() }) =
             reasonLabel: `Score dropped ${decline} points across the last 3 tests`,
             priority: 2,
             magnitude: decline,
-            href: `/dashboard/class/${classroom.id}?tab=activities&deliveryId=${latest.deliveryId}`,
+            href: `/dashboard/class/${classroom.id}?tab=performance`,
           });
         }
       }

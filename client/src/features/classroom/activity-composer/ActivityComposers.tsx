@@ -15,6 +15,23 @@ import { capitalizeFirstLetter } from '@/utils/text';
 
 export interface ActivityStudent { id: number; name: string | null; email: string }
 export interface ComposerTest { id: number; title: string; duration: number; subject: 'RW' | 'MATH'; mode: 'PRACTICE' | 'EXAM'; questionCount: number }
+export interface LearningFollowUpDraft {
+  sourceType: 'SKILL_SIGNAL' | 'STUDENT_CHECK_IN' | 'ASSESSMENT' | 'MANUAL';
+  subject?: 'RW' | 'MATH' | null;
+  domainCode?: string | null;
+  domainName?: string | null;
+  skillCode?: string | null;
+  skillName?: string | null;
+  sourceDeliveryId?: string | null;
+  sourceStudentId?: number | null;
+  reason?: string | null;
+  baselineAccuracy?: number | null;
+  baselineCorrect?: number | null;
+  baselineAnswerCount?: number | null;
+  baselineStudentCount?: number | null;
+  classificationCoverage?: number | null;
+  studentIds: number[];
+}
 interface ClassOption { id: string; name: string; _count?: { students: number } }
 interface OutlineWeek { id: string; title: string; order: number; lessons: Array<{ id: string; title: string; order: number }> }
 interface TestPage { items: ComposerTest[] }
@@ -22,6 +39,7 @@ interface OutlineResponse { success: boolean; data: OutlineWeek[] }
 interface ClassDetail { id: string; students: ActivityStudent[] }
 type TestSource = 'MY' | 'SYSTEM';
 const EMPTY_TESTS: ComposerTest[] = [];
+const EMPTY_STUDENT_IDS: number[] = [];
 const NO_SESSION = 'NO_SESSION';
 
 interface BaseComposerProps {
@@ -30,7 +48,9 @@ interface BaseComposerProps {
   classId: string;
   students: ActivityStudent[];
   initialLessonId?: string;
-  onCreated: () => Promise<void> | void;
+  initialStudentIds?: number[];
+  followUp?: LearningFollowUpDraft;
+  onCreated: (result?: unknown) => Promise<void> | void;
   assignment?: {
     id: string;
     title: string;
@@ -43,7 +63,7 @@ interface BaseComposerProps {
   };
 }
 
-export function AssignmentComposer({ open, onClose, classId, students, initialLessonId, onCreated, assignment }: BaseComposerProps) {
+export function AssignmentComposer({ open, onClose, classId, students, initialLessonId, initialStudentIds = EMPTY_STUDENT_IDS, followUp, onCreated, assignment }: BaseComposerProps) {
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [availableAt, setAvailableAt] = useState('');
@@ -70,8 +90,10 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
     setLessonId(assignment?.activity?.lesson?.id || initialLessonId || '');
     setGradingMode(assignment?.maxPoints ? 'POINTS' : 'FEEDBACK');
     setMaxPoints(assignment?.maxPoints || 10);
+    setAllStudents(initialStudentIds.length === 0);
+    setStudentIds(initialStudentIds);
     void loadOutline(classId, setOutline);
-  }, [assignment, classId, initialLessonId, open]);
+  }, [assignment, classId, initialLessonId, initialStudentIds, open]);
 
   useEffect(() => {
     if (open) return;
@@ -107,11 +129,13 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
         links: urlLines(links),
         maxPoints: gradingMode === 'POINTS' ? maxPoints : null,
         ...(!allStudents ? { studentIds } : {}),
+        ...(!assignment && followUp ? { followUp: { ...followUp, studentIds: !allStudents ? studentIds : students.map(student => student.id) } } : {}),
       };
-      if (assignment) await axiosClient.put(`/api/assignments/${assignment.id}`, { title: payload.title, content: payload.instructions, deadline: payload.dueAt, fileUrls: payload.fileUrls, links: payload.links, maxPoints: payload.maxPoints });
-      else await axiosClient.post('/api/class-activities/assignments', payload);
+      const result = assignment
+        ? await axiosClient.put(`/api/assignments/${assignment.id}`, { title: payload.title, content: payload.instructions, deadline: payload.dueAt, fileUrls: payload.fileUrls, links: payload.links, maxPoints: payload.maxPoints })
+        : await axiosClient.post('/api/class-activities/assignments', payload);
       toast.success(assignment ? 'Assignment updated' : 'Assignment published');
-      await onCreated();
+      await onCreated(result);
       onClose();
     } catch (error) {
       toast.error(errorMessage(error, 'Unable to publish this assignment.'));
@@ -181,10 +205,12 @@ interface AssignTestsComposerProps {
   initialLessonId?: string;
   initialTests?: ComposerTest[];
   initialSource?: TestSource;
-  onCreated: () => Promise<void> | void;
+  initialStudentIds?: number[];
+  followUp?: LearningFollowUpDraft;
+  onCreated: (result?: unknown) => Promise<void> | void;
 }
 
-export function AssignTestsComposer({ open, onClose, classId, students: fixedStudents, initialLessonId, initialTests = EMPTY_TESTS, initialSource = 'MY', onCreated }: AssignTestsComposerProps) {
+export function AssignTestsComposer({ open, onClose, classId, students: fixedStudents, initialLessonId, initialTests = EMPTY_TESTS, initialSource = 'MY', initialStudentIds = EMPTY_STUDENT_IDS, followUp, onCreated }: AssignTestsComposerProps) {
   const [source, setSource] = useState<TestSource>(initialSource);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState(classId || '');
@@ -238,7 +264,9 @@ export function AssignTestsComposer({ open, onClose, classId, students: fixedStu
     setStudents(fixedStudents || []);
     setLessonId(initialLessonId || '');
     setSelectedIds(initialTests.map(test => test.id));
-  }, [classId, fixedStudents, initialLessonId, initialSource, initialTests, open]);
+    setAllStudents(initialStudentIds.length === 0);
+    setStudentIds(initialStudentIds);
+  }, [classId, fixedStudents, initialLessonId, initialSource, initialStudentIds, initialTests, open]);
 
   useEffect(() => {
     if (!open || !selectedClassId) {
@@ -276,7 +304,7 @@ export function AssignTestsComposer({ open, onClose, classId, students: fixedStu
     if (!validDates(availableAt, dueAt)) return toast.error('Due date must be after availability');
     setSaving(true);
     try {
-      await axiosClient.post('/api/test-deliveries', {
+      const result = await axiosClient.post('/api/test-deliveries', {
         classIds: [selectedClassId],
         testIds: selectedIds,
         lessonId: lessonId || null,
@@ -285,9 +313,10 @@ export function AssignTestsComposer({ open, onClose, classId, students: fixedStu
         maxAttempts,
         scorePolicy,
         ...(!allStudents ? { studentIds } : {}),
+        ...(followUp ? { followUp: { ...followUp, studentIds: !allStudents ? studentIds : students.map(student => student.id) } } : {}),
       });
       toast.success(`${selectedIds.length} test${selectedIds.length === 1 ? '' : 's'} assigned`);
-      await onCreated();
+      await onCreated(result);
       onClose();
     } catch (error) {
       toast.error(errorMessage(error, 'Unable to assign the selected tests.'));
