@@ -58,6 +58,8 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@emnapi/core": "1.11.3",
+    "@emnapi/runtime": "1.11.3",
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/typography": "^0.5.19",
