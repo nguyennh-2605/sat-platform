@@ -15,13 +15,15 @@ const Ripple = memo(function Ripple({
 
   // Tự động dọn rác cực kỳ an toàn
   useLayoutEffect(() => {
-    let timeout: any;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     if (ripples.length > 0) {
       timeout = setTimeout(() => {
         setRipples([]); 
       }, duration * 2);
     }
-    return () => clearTimeout(timeout);
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
   }, [ripples.length, duration]);
 
   const addRipple = (e: MouseEvent<HTMLDivElement>) => {

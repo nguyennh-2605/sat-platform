@@ -105,6 +105,10 @@ Express Server (index.js → app.js)
 - **Error handling**: Services throw `ApiError(statusCode, { message })`. Controllers catch and return `{ success: false, error }`.
 - **Authorization**: Every protected service function verifies the requesting user owns the resource or has the correct role.
 - **Request correlation**: Every request receives a validated client-supplied or server-generated `x-request-id`, which is echoed in the response. Error Log failures emit structured JSON with that ID, route, status, duration, error name, and Prisma code when available.
+- **Operational logging**: Pino HTTP logs record request ID, method, URL, status, duration, environment, and release while redacting credentials and omitting request bodies. Legacy controller diagnostics are being migrated to request-scoped logging incrementally.
+- **Error monitoring**: Optional Sentry clients on the React and Express runtimes activate only when their DSNs are configured. Request bodies, cookies, and authorization headers are excluded from Sentry events.
+- **Security headers**: Helmet applies API-safe security headers. Content Security Policy remains a frontend-host concern because the Express service returns APIs rather than the Vite document.
+- **Health probes**: `GET /health` reports only process liveness; `GET /ready` performs a bounded PostgreSQL query and never calls Gemini, Google APIs, or object storage.
 - **Abuse protection**: Credential, registration, Google OAuth, refresh, account-upgrade, and managed-upload endpoints use bounded in-memory rate limiters. Production trusts one reverse-proxy hop by default so limits use the client IP on Render.
 - **Process lifecycle**: `SIGTERM` and `SIGINT` stop accepting new requests, drain active HTTP work for up to 10 seconds, and disconnect Prisma before exit.
 - **SSE Notifications**: In-memory `Map<userId, Set<Response>>` maintains active connections; events are pushed in real-time and persisted to DB.
@@ -112,6 +116,13 @@ Express Server (index.js → app.js)
 ---
 
 ## 5. Complete API Endpoint Reference
+
+### 5.0 Operations (outside `/api`)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/health` | None | Process liveness probe; does not query dependencies |
+| `GET` | `/ready` | None | Readiness probe; returns `200` only when PostgreSQL responds |
 
 ### 5.1 Authentication (public)
 

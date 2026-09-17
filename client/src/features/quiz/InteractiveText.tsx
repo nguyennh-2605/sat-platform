@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import parse from 'html-react-parser';
-import { useQuizTool } from '../../context/QuizToolContext';
+import { useQuizTool } from '../../context/quiz-tool-context';
 import toast from 'react-hot-toast';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
 

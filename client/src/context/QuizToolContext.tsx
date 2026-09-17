@@ -1,13 +1,5 @@
-import React, { createContext, useContext, useState, type ReactNode, useMemo, useCallback } from 'react';
-
-interface QuizToolContextType {
-  isHighlightMode: boolean;
-  toggleHighlightMode: () => void;
-  isCalculatorOpen: boolean;
-  toggleCalculator: () => void;
-}
-
-const QuizToolContext = createContext<QuizToolContextType | undefined>(undefined);
+import React, { useState, type ReactNode, useMemo, useCallback } from 'react';
+import { QuizToolContext } from './quiz-tool-context';
 
 export const QuizToolProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isHighlightMode, setIsHighlightMode] = useState(false);
@@ -40,12 +32,4 @@ export const QuizToolProvider: React.FC<{ children: ReactNode }> = ({ children }
       {children}
     </QuizToolContext.Provider>
   );
-};
-
-export const useQuizTool = () => {
-  const context = useContext(QuizToolContext);
-  if (!context) {
-    throw new Error('useQuizTool must be used within a QuizToolProvider');
-  }
-  return context;
 };

@@ -1,22 +1,24 @@
+require('./instrument');
 const app = require('./src/app');
 const prisma = require('./src/config/prisma');
+const logger = require('./src/config/logger');
 
 const PORT = process.env.PORT || 5000;
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 // --- KHỞI ĐỘNG SERVER ---
 const server = app.listen(PORT, () => {
-  console.log(`Server đang chạy tại http://localhost:${PORT}`);
+  logger.info({ event: 'server.started', port: Number(PORT) }, 'Server started');
 });
 
 let isShuttingDown = false;
 const shutdown = signal => {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  console.log(JSON.stringify({ event: 'server.shutdown.started', signal }));
+  logger.info({ event: 'server.shutdown.started', signal }, 'Server shutdown started');
 
   const forceShutdown = setTimeout(() => {
-    console.error(JSON.stringify({ event: 'server.shutdown.forced', timeoutMs: SHUTDOWN_TIMEOUT_MS }));
+    logger.fatal({ event: 'server.shutdown.forced', timeoutMs: SHUTDOWN_TIMEOUT_MS }, 'Server shutdown forced');
     process.exit(1);
   }, SHUTDOWN_TIMEOUT_MS);
   forceShutdown.unref();
@@ -25,13 +27,13 @@ const shutdown = signal => {
     clearTimeout(forceShutdown);
     try {
       await prisma.$disconnect();
-      console.log(JSON.stringify({ event: 'server.shutdown.completed', signal }));
+      logger.info({ event: 'server.shutdown.completed', signal }, 'Server shutdown completed');
     } catch (disconnectError) {
-      console.error(JSON.stringify({ event: 'server.shutdown.failed', errorName: disconnectError?.name }));
+      logger.error({ event: 'server.shutdown.failed', err: disconnectError }, 'Prisma disconnect failed');
       process.exitCode = 1;
     }
     if (error) {
-      console.error(JSON.stringify({ event: 'server.shutdown.failed', errorName: error?.name }));
+      logger.error({ event: 'server.shutdown.failed', err: error }, 'HTTP server shutdown failed');
       process.exitCode = 1;
     }
   });

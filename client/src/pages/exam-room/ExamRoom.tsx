@@ -16,7 +16,7 @@ import FormattedTextRenderer from '../../components/content/TextRenderer';
 import ResizableSplitLayout from '../../components/layouts/ResizableSplitLayout';
 import SingleColumnLayout from '../../components/layouts/SingleColumnLayout';
 import SPRInstructions from '../../features/quiz/SPRInstructions';
-import { useQuizTool } from '../../context/QuizToolContext';
+import { useQuizTool } from '../../context/quiz-tool-context';
 import Calculator from '../../components/ui/Calculator';
 
 type QuestionTiming = { activeDurationMs: number; visitCount: number };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuizTool } from '../../context/QuizToolContext';
+import { useQuizTool } from '../../context/quiz-tool-context';
 
 interface ToolsHeaderProps {
   onSaveAction: () => Promise<void>;

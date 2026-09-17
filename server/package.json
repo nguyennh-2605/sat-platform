@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "nodemon --watch index.js --watch src --ext js,json index.js",
     "test": "node --test test/*.test.js",
@@ -29,6 +32,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1126.0",
     "@google/genai": "^1.44.0",
     "@prisma/client": "^5.22.0",
+    "@sentry/node": "^10.75.0",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
@@ -36,10 +40,13 @@
     "express": "^5.2.1",
     "google-auth-library": "^10.5.0",
     "googleapis": "^171.4.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "mammoth": "^1.11.0",
     "multer": "^2.1.1",
     "pdf-extraction": "^1.0.2",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
     "prisma": "^5.22.0",
     "sanitize-html": "^2.17.7",
     "stream": "^0.0.3"

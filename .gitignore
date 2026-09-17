@@ -8,6 +8,10 @@ node_modules/
 # Bỏ qua file build của frontend
 dist/
 build/
+coverage/
+playwright-report/
+test-results/
+blob-report/
 
 # Bỏ qua file database SQLite (nếu bạn dùng sqlite cục bộ)
 *.db

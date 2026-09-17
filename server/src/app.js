@@ -1,11 +1,16 @@
-require('dotenv').config();
+const { Sentry, sentryEnabled } = require('../instrument');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { corsOptions } = require('./config/cors');
 const apiRoutes = require('./routes');
+const healthRoutes = require('./routes/health.routes');
 const { authenticateToken } = require('./middleware/auth.middleware');
 const { createRateLimiter } = require('./middleware/rate-limit.middleware');
 const { attachRequestContext } = require('./middleware/request-context.middleware');
+const { httpLogger } = require('./middleware/http-logger.middleware');
+const { monitorServerResponses } = require('./middleware/response-monitor.middleware');
+const ApiError = require('./utils/ApiError');
 
 // Login controllers (kept at root level since not part of REST API)
 const { register, login, googleLogin, upgrade, refresh, logout } = require('./controllers/auth.controller');
@@ -45,9 +50,18 @@ if (Number.isInteger(configuredProxyHops) && configuredProxyHops >= 0) {
 }
 
 // --- MIDDLEWARE ---
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors(corsOptions));
 app.use(attachRequestContext);
+app.use(httpLogger);
+app.use(monitorServerResponses);
 app.use(express.json({ limit: '2mb' }));
+
+// Platform probes stay outside /api and never call external services.
+app.use(healthRoutes);
 
 // --- AUTH ROUTES (Direct authentication endpoints) ---
 app.post('/api/register', registrationRateLimit, register);
@@ -59,5 +73,18 @@ app.post('/api/auth/logout', logout);
 
 // --- API ROUTES (RESTful routes) ---
 app.use('/api', apiRoutes);
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found.', requestId: req.requestId });
+});
+
+if (sentryEnabled) Sentry.setupExpressErrorHandler(app);
+
+app.use((error, req, res, _next) => {
+  res.locals.errorCaptured = true;
+  if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+  req.log?.error({ err: error, requestId: req.requestId }, 'Unhandled request error');
+  return res.status(500).json({ error: 'Internal server error.', requestId: req.requestId });
+});
 
 module.exports = app;

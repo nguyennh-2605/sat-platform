@@ -148,7 +148,7 @@ export default function AuthPage() {
 
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle className="text-2xl">{isLoginMode ? 'Welcome back' : 'Create your account'}</CardTitle>
+              <CardTitle role="heading" aria-level={1} className="text-2xl">{isLoginMode ? 'Welcome back' : 'Create your account'}</CardTitle>
               <CardDescription>
                 {isLoginMode ? 'Sign in to continue your SAT learning plan.' : 'Choose your role and create a Sonder SAT account.'}
               </CardDescription>
@@ -163,8 +163,8 @@ export default function AuthPage() {
               <form className="space-y-4" onSubmit={handleSubmit}>
                 {!isLoginMode && (
                   <>
-                    <AuthField label="Full name" icon={<User aria-hidden="true" />}>
-                      <Input type="text" autoComplete="name" required className="pl-9" placeholder="Enter your name" value={name} onChange={event => setName(event.target.value)} />
+                    <AuthField id="auth-name" label="Full name" icon={<User aria-hidden="true" />}>
+                      <Input id="auth-name" type="text" autoComplete="name" required className="pl-9" placeholder="Enter your name" value={name} onChange={event => setName(event.target.value)} />
                     </AuthField>
                     <fieldset>
                       <legend className="mb-2 text-sm font-medium">I am a</legend>
@@ -176,12 +176,13 @@ export default function AuthPage() {
                   </>
                 )}
 
-                <AuthField label="Email" icon={<Mail aria-hidden="true" />}>
-                  <Input type="email" autoComplete="email" required className="pl-9" placeholder="you@example.com" value={email} onChange={event => setEmail(event.target.value)} />
+                <AuthField id="auth-email" label="Email" icon={<Mail aria-hidden="true" />}>
+                  <Input id="auth-email" type="email" autoComplete="email" required className="pl-9" placeholder="you@example.com" value={email} onChange={event => setEmail(event.target.value)} />
                 </AuthField>
 
-                <AuthField label="Password" icon={<Lock aria-hidden="true" />}>
+                <AuthField id="auth-password" label="Password" icon={<Lock aria-hidden="true" />}>
                   <Input
+                    id="auth-password"
                     type={showPassword ? 'text' : 'password'}
                     autoComplete={isLoginMode ? 'current-password' : 'new-password'}
                     required
@@ -232,10 +233,10 @@ export default function AuthPage() {
   );
 }
 
-function AuthField({ label, icon, children }: { label: string; icon: ReactNode; children: ReactNode }) {
+function AuthField({ id, label, icon, children }: { id: string; label: string; icon: ReactNode; children: ReactNode }) {
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label htmlFor={id}>{label}</Label>
       <div className="relative">
         <span className="pointer-events-none absolute inset-y-0 left-0 flex w-9 items-center justify-center text-muted-foreground [&_svg]:size-4">{icon}</span>
         {children}
