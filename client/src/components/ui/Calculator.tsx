@@ -1,6 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Draggable from 'react-draggable';
 
+interface DesmosCalculatorInstance { resize: () => void; destroy: () => void }
+interface DesmosApi { GraphingCalculator: (element: HTMLDivElement, options: Record<string, boolean>) => DesmosCalculatorInstance }
+
+declare global {
+  interface Window { Desmos?: DesmosApi }
+}
+
 interface CalculatorProps {
   isOpen: boolean;
   onClose: () => void;
@@ -9,49 +16,58 @@ interface CalculatorProps {
 const Calculator: React.FC<CalculatorProps> = ({ isOpen, onClose }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const calcRef = useRef<HTMLDivElement>(null);
-  const calculatorInstance = useRef<any>(null);
+  const calculatorInstance = useRef<DesmosCalculatorInstance | null>(null);
   
   const [isMaximized, setIsMaximized] = useState(false);
-  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  // 1. BƯỚC 1: Chỉ tải script ngầm, tuyệt đối chưa khởi tạo Desmos
+  // Load and initialize Desmos only when the student opens the calculator.
   useEffect(() => {
-    if ((window as any).Desmos) {
-      setIsScriptLoaded(true);
+    if (!isOpen) return;
+
+    const initialize = () => {
+      if (!window.Desmos || !calcRef.current || calculatorInstance.current) return;
+      calculatorInstance.current = window.Desmos.GraphingCalculator(calcRef.current, {
+        keypad: true,
+        expressions: true,
+        settingsMenu: false,
+        zoomButtons: true,
+      });
+      window.setTimeout(() => calculatorInstance.current?.resize(), 50);
+    };
+
+    if (window.Desmos) {
+      initialize();
       return;
     }
 
     const scriptId = 'desmos-api-script';
-    if (!document.getElementById(scriptId)) {
+    const script = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!script) {
       const script = document.createElement('script');
       script.id = scriptId;
       script.src = `https://www.desmos.com/api/v1.9/calculator.js?apiKey=${import.meta.env.VITE_DESMOS_API}`;
       script.async = true;
-      script.onload = () => setIsScriptLoaded(true); // Đánh dấu là đã tải xong
       document.body.appendChild(script);
+      script.addEventListener('load', initialize, { once: true });
+      script.addEventListener('error', () => setLoadError(true), { once: true });
+      return;
     }
-  }, []);
+    script.addEventListener('load', initialize, { once: true });
+    script.addEventListener('error', () => setLoadError(true), { once: true });
+  }, [isOpen]);
 
-  // 2. BƯỚC 2: Chỉ khởi tạo khi Cửa sổ được MỞ LẦN ĐẦU TIÊN
   useEffect(() => {
-    // Nếu script đã tải + cửa sổ ĐANG MỞ + chưa khởi tạo lần nào
-    if (isOpen && isScriptLoaded && calcRef.current && !calculatorInstance.current) {
-      calculatorInstance.current = (window as any).Desmos.GraphingCalculator(calcRef.current, {
-        keypad: true,
-        expressions: true,
-        settingsMenu: false, // Tắt menu cài đặt thừa
-        zoomButtons: true,   // Nút + - của đồ thị
-      });
-    }
+    if (!isOpen || !calculatorInstance.current) return;
+    const timeout = window.setTimeout(() => calculatorInstance.current?.resize(), 50);
+    return () => window.clearTimeout(timeout);
+  }, [isMaximized, isOpen]);
 
-    // Nếu đã khởi tạo rồi, mỗi lần Mở lại hoặc Phóng to/Thu nhỏ -> Ép resize lại để tránh lỗi trắng màn
-    if (isOpen && calculatorInstance.current) {
-      setTimeout(() => {
-        calculatorInstance.current.resize();
-      }, 50); // Chờ 50ms cho CSS bung ra hết rồi mới resize
-    }
-  }, [isOpen, isScriptLoaded, isMaximized]); // Bắt sự kiện Mở và Phóng to
+  useEffect(() => () => {
+    calculatorInstance.current?.destroy();
+    calculatorInstance.current = null;
+  }, []);
 
   // 3. KHUNG GIAO DIỆN MÁY TÍNH
   const calculatorWindow = (
@@ -90,7 +106,9 @@ const Calculator: React.FC<CalculatorProps> = ({ isOpen, onClose }) => {
         <div className="flex items-center gap-4">
           {/* Nút Phóng to / Thu nhỏ */}
           <button 
+            type="button"
             onClick={() => setIsMaximized(!isMaximized)}
+            aria-label={isMaximized ? 'Restore calculator size' : 'Maximize calculator'}
             className="hover:text-blue-300 transition-colors"
           >
             {isMaximized ? (
@@ -101,7 +119,7 @@ const Calculator: React.FC<CalculatorProps> = ({ isOpen, onClose }) => {
           </button>
           
           {/* Nút Đóng */}
-          <button onClick={onClose} className="hover:text-red-400 transition-colors font-bold text-lg leading-none cursor-pointer">
+          <button type="button" onClick={onClose} aria-label="Close calculator" className="hover:text-red-400 transition-colors font-bold text-lg leading-none cursor-pointer">
             ✕
           </button>
         </div>
@@ -111,7 +129,7 @@ const Calculator: React.FC<CalculatorProps> = ({ isOpen, onClose }) => {
       <div 
         ref={calcRef} 
         className={`flex-1 w-full h-full bg-white ${isDragging ? 'pointer-events-none' : ''}`} 
-      />
+      >{loadError && <div className="flex h-full items-center justify-center p-6 text-center text-sm text-gray-600">Calculator could not be loaded. Check your connection and try again.</div>}</div>
     </div>
   );
 

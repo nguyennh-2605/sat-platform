@@ -398,7 +398,13 @@ const CreateTestWizard = () => {
     setIsSaving(true);
     try {
       const values = detailsForm.getValues();
-      const moduleDuration = Math.max(1, Math.floor(values.duration / Math.max(1, preview.modules.length)));
+      const moduleCount = Math.max(1, preview.modules.length);
+      const baseModuleDuration = Math.floor(values.duration / moduleCount);
+      const moduleDurations = preview.modules.map((_, index) => (
+        index === moduleCount - 1
+          ? values.duration - (baseModuleDuration * (moduleCount - 1))
+          : baseModuleDuration
+      ));
       const payload = {
         title: values.title.trim(),
         subject: values.subject,
@@ -408,10 +414,10 @@ const CreateTestWizard = () => {
         category: isAdmin ? values.category : 'CLASS',
         testDate: isAdmin && values.category === 'REAL' ? values.testDate || undefined : undefined,
         folderId: folderId ?? editFolderId ?? undefined,
-        sections: preview.modules.map(module => ({
+        sections: preview.modules.map((module, index) => ({
           name: module.name,
           order: module.order,
-          duration: moduleDuration,
+          duration: moduleDurations[index],
           questions: module.questions.map(question => ({
             type: question.type,
             blocks: question.blocks,

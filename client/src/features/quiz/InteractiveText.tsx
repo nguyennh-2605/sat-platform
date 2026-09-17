@@ -9,28 +9,50 @@ interface Props {
   isMath?: boolean;
   readOnly?: boolean;
   inheritTypography?: boolean;
+  annotationKey?: string;
 }
 
-const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = false, inheritTypography = false }) => {
+const contentHash = (value: string) => {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+};
+
+const annotationStorageKey = (content: string, key?: string) => (
+  `exam-annotation:${window.location.pathname}${window.location.search}:${key || contentHash(content)}`
+);
+
+const readAnnotation = (content: string, key?: string) => {
+  try {
+    const stored = sessionStorage.getItem(annotationStorageKey(content, key));
+    if (!stored) return { htmlContent: content, notes: {} as Record<string, string> };
+    const parsed = JSON.parse(stored) as { htmlContent?: string; notes?: Record<string, string> };
+    return { htmlContent: parsed.htmlContent || content, notes: parsed.notes || {} };
+  } catch {
+    return { htmlContent: content, notes: {} as Record<string, string> };
+  }
+};
+
+const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, readOnly = false, inheritTypography = false, annotationKey }) => {
   const { isHighlightMode } = useQuizTool();
   const contentRef = useRef<HTMLDivElement>(null);
+  const initialAnnotation = readAnnotation(content, annotationKey);
 
   // 1. STATE QUẢN LÝ
-  const [htmlContent, setHtmlContent] = useState(content);
-  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [htmlContent, setHtmlContent] = useState(initialAnnotation.htmlContent);
+  const [notes, setNotes] = useState<Record<string, string>>(initialAnnotation.notes);
   const [renderKey, setRenderKey] = useState(0);
   
   // UI States
   const [toolbar, setToolbar] = useState<{ x: number; y: number; show: boolean } | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
 
-  // 2. RESET KHI CHUYỂN CÂU HỎI
-  useEffect(() => {
-    setHtmlContent(content);
-    setNotes({});
-    setToolbar(null);
-    setActiveNoteId(null);
-  }, [content]);
+  const persistAnnotation = (nextHtml: string, nextNotes: Record<string, string>) => {
+    sessionStorage.setItem(annotationStorageKey(content, annotationKey), JSON.stringify({ htmlContent: nextHtml, notes: nextNotes }));
+  };
 
   // --- FIX LỖI "NHIỀU MODAL": Tự động ẩn toolbar nếu mất vùng chọn hoặc chọn chỗ khác ---
   useEffect(() => {
@@ -52,6 +74,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
       const newHtml = contentRef.current.innerHTML;
       setHtmlContent(newHtml);
       setRenderKey(prev => prev + 1);
+      persistAnnotation(newHtml, notes);
     }
   };
 
@@ -147,7 +170,11 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
       syncDomToState();
 
       if (type === 'note') {
-        setNotes(prev => ({ ...prev, [noteId]: '' }));
+        setNotes(prev => {
+          const next = { ...prev, [noteId]: '' };
+          persistAnnotation(contentRef.current?.innerHTML || htmlContent, next);
+          return next;
+        });
         setActiveNoteId(noteId);
       }
     } catch (e) {
@@ -221,6 +248,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
       const newNotes = { ...notes };
       delete newNotes[activeNoteId];
       setNotes(newNotes);
+      persistAnnotation(tempDiv.innerHTML, newNotes);
     }
     setActiveNoteId(null);
   };
@@ -267,19 +295,22 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
           <button 
             onClick={() => applyFormat('highlight', 'bg-[rgba(253,224,71,0.6)]')} // Vàng
             className="w-6 h-6 rounded-full bg-[#fce074] border-2 border-gray-800 hover:scale-110 transition-transform shadow-xs shrink-0"
-            title="Highlight Vàng"
+            title="Highlight yellow"
+            aria-label="Highlight yellow"
           />
           {/* Nút Xanh */}
           <button 
             onClick={() => applyFormat('highlight', 'bg-[rgba(147,197,253,0.6)]')} // Xanh blue
             className="w-6 h-6 rounded-full bg-[#bde0fe] border border-transparent hover:border-gray-400 hover:scale-110 transition-all shadow-xs shrink-0"
-            title="Highlight Xanh"
+            title="Highlight blue"
+            aria-label="Highlight blue"
           />
           {/* Nút Hồng */}
           <button 
             onClick={() => applyFormat('highlight', 'bg-[rgba(249,168,212,0.6)]')} // Hồng pink
             className="w-6 h-6 rounded-full bg-[#ffc8dd] border border-transparent hover:border-gray-400 hover:scale-110 transition-all shadow-xs shrink-0"
-            title="Highlight Hồng"
+            title="Highlight pink"
+            aria-label="Highlight pink"
           />
 
           <div className="w-px h-5 bg-gray-300 mx-0.5"></div>
@@ -288,7 +319,8 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
           <button 
             onClick={() => applyFormat('underline')} 
             className="w-7 h-7 rounded-full flex items-center border-2 border-slate-200 justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
-            title="Gạch chân"
+            title="Underline"
+            aria-label="Underline"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 4v6a6 6 0 0 0 12 0V4"></path>
@@ -301,6 +333,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
             onClick={() => applyFormat('note')} 
             className="w-7 h-7 rounded-full flex items-center border-2 border-slate-200 justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
             title="Add note"
+            aria-label="Add note"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
@@ -314,6 +347,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
             onClick={handleRemoveHighlight} 
             className="w-7 h-7 rounded-full flex items-center justify-center border-2 border-slate-200 text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
             title="Remove formatting"
+            aria-label="Remove formatting"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18"></path>
@@ -344,7 +378,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
                   <polyline points="14 2 14 8 20 8"></polyline>
                 </svg>
                 <h3 className="font-semibold text-[16px] tracking-tight">
-                  Ghi chú
+                  Note
                 </h3>
               </div>
               
@@ -353,6 +387,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
                 onClick={deleteActiveNote} 
                 className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-all duration-200"
                 title="Delete note"
+                aria-label="Delete note"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 6h18"></path>
@@ -366,9 +401,13 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
             <textarea
               className="w-full border border-gray-300 rounded-lg p-3.5 text-[15px] text-gray-800 leading-relaxed focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none bg-gray-50/50 hover:bg-white transition-all placeholder:text-gray-400"
               rows={4}
-              placeholder="Nhập nội dung ghi chú..."
+              placeholder="Write a note…"
               value={notes[activeNoteId] || ''}
-              onChange={(e) => setNotes(prev => ({ ...prev, [activeNoteId]: e.target.value }))}
+              onChange={(e) => setNotes(prev => {
+                const next = { ...prev, [activeNoteId]: e.target.value };
+                persistAnnotation(htmlContent, next);
+                return next;
+              })}
               autoFocus
             />
 
@@ -384,7 +423,7 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
                 onClick={() => setActiveNoteId(null)}
                 className="px-5 py-2 text-[14px] font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-xs transition-colors"
               >
-                Lưu lại
+                Save
               </button>
             </div>
           </div>
@@ -393,5 +432,9 @@ const InteractiveText: React.FC<Props> = ({ content, isMath = false, readOnly = 
     </div>
   );
 };
+
+const InteractiveText: React.FC<Props> = props => (
+  <InteractiveTextContent key={`${props.annotationKey || contentHash(props.content)}-${props.isMath ? 'math' : 'text'}`} {...props} />
+);
 
 export default InteractiveText;

@@ -5,6 +5,67 @@ const { gradeQuestions } = require('../utils/grading');
 const testDeliveryService = require('./test-delivery.service');
 const errorLogService = require('./error-log.service');
 const { normalizeQuestionTimingSnapshot, timingRowsFromSnapshot } = require('../utils/question-timing');
+const { allocateModuleDurations, moduleTiming } = require('../utils/module-timing');
+
+const orderedSections = sections => [...(sections || [])].sort((a, b) => a.order - b.order);
+
+const examTimingPayload = ({ submission, test, serverTime = new Date() }) => {
+  const sections = orderedSections(test.sections);
+  const durations = allocateModuleDurations(test.duration, sections.length);
+  const currentModule = Math.min(Math.max(Number(submission.currentModule) || 1, 1), sections.length);
+  const moduleExpiresAt = submission.moduleExpiresAt || null;
+  return {
+    serverTime,
+    currentModule,
+    totalModules: sections.length,
+    moduleDuration: durations[currentModule - 1],
+    moduleStartedAt: submission.moduleStartedAt || null,
+    moduleExpiresAt,
+    timeLeft: test.mode === 'EXAM' && moduleExpiresAt
+      ? Math.max(0, Math.ceil((new Date(moduleExpiresAt).getTime() - serverTime.getTime()) / 1000))
+      : submission.timeRemaining,
+  };
+};
+
+const reconcileExamModule = async ({ submission, test, now = new Date(), db = prisma }) => {
+  if (test.mode !== 'EXAM' || !submission.beganAt) return submission;
+  const sections = orderedSections(test.sections);
+  const durations = allocateModuleDurations(test.duration, sections.length);
+  let currentModule = Math.min(Math.max(Number(submission.currentModule) || 1, 1), sections.length);
+  let moduleStartedAt = submission.moduleStartedAt ? new Date(submission.moduleStartedAt) : null;
+  let moduleExpiresAt = submission.moduleExpiresAt ? new Date(submission.moduleExpiresAt) : null;
+
+  if (!moduleStartedAt || !moduleExpiresAt) {
+    if (currentModule === 1) {
+      moduleStartedAt = new Date(submission.beganAt);
+      moduleExpiresAt = new Date(moduleStartedAt.getTime() + durations[0] * 60 * 1000);
+    } else {
+      moduleStartedAt = new Date(new Date(submission.beganAt).getTime() + durations[0] * 60 * 1000);
+      moduleExpiresAt = new Date(moduleStartedAt.getTime() + durations[1] * 60 * 1000);
+    }
+  }
+
+  let currentQuestionIndex = submission.currentQuestionIndex;
+  if (currentModule === 1 && sections.length > 1 && now >= moduleExpiresAt) {
+    currentModule = 2;
+    moduleStartedAt = moduleExpiresAt;
+    moduleExpiresAt = new Date(moduleStartedAt.getTime() + durations[1] * 60 * 1000);
+    currentQuestionIndex = sections[0].questions?.length || 0;
+  }
+
+  const timeRemaining = Math.max(0, Math.ceil((moduleExpiresAt.getTime() - now.getTime()) / 1000));
+  const changed = currentModule !== submission.currentModule
+    || currentQuestionIndex !== submission.currentQuestionIndex
+    || !submission.moduleStartedAt
+    || !submission.moduleExpiresAt
+    || submission.timeRemaining !== timeRemaining;
+  if (!changed) return submission;
+
+  return db.submission.update({
+    where: { id: submission.id },
+    data: { currentModule, currentQuestionIndex, moduleStartedAt, moduleExpiresAt, timeRemaining },
+  });
+};
 
 exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, classId, deliveryId }) => {
   if (!userId || isNaN(userId)) {
@@ -132,15 +193,22 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
     if (deliveryId) {
       const priorAttempts = await tx.submission.findMany({
         where: { userId, deliveryId: String(deliveryId) },
-        select: { attemptNo: true, status: true },
+        orderBy: { attemptNo: 'desc' },
+        select: { id: true, attemptNo: true, status: true },
       });
       const completedAttempts = priorAttempts.filter(item => item.status === 'COMPLETED').length;
       if (completedAttempts >= selectedDelivery.maxAttempts) {
-        throw new ApiError(409, { error: 'You have used all attempts for this assignment.' });
+        const latestCompleted = priorAttempts.find(item => item.status === 'COMPLETED');
+        throw new ApiError(409, {
+          code: 'ATTEMPT_LIMIT_REACHED',
+          error: 'You have used all attempts for this assignment.',
+          submissionId: latestCompleted?.id || null,
+        });
       }
       attemptNo = priorAttempts.reduce((highest, item) => Math.max(highest, item.attemptNo), 0) + 1;
     }
 
+    const firstModuleDuration = allocateModuleDurations(test.duration, test.sections.length)[0];
     return tx.submission.create({
       data: {
         userId,
@@ -151,34 +219,44 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
         attemptNo,
         status: "DOING",
         startedAt: new Date(),
-        timeRemaining: test.duration * 60,
+        timeRemaining: firstModuleDuration * 60,
+        currentModule: 1,
         currentQuestionIndex: 0,
         savedAnswers: {}
       }
     });
   });
 
+  const serverTime = new Date();
+  const reconciledSubmission = await reconcileExamModule({ submission, test, now: serverTime });
+  const timing = examTimingPayload({ submission: reconciledSubmission, test, serverTime });
+
   // Trả về đề thi + Thông tin phiên làm bài
   return {
     ...test,
     session: {
-      submissionId: submission.id,
-      startedAt: submission.startedAt,
-      status: submission.status,
-      savedAnswers: submission.savedAnswers,
-      timeLeft: submission.timeRemaining,
-      currentQuestionIndex: submission.currentQuestionIndex,
-      questionTimingSnapshot: submission.questionTimingSnapshot || {},
-      violationCount: submission.violationCount,
+      submissionId: reconciledSubmission.id,
+      startedAt: reconciledSubmission.startedAt,
+      status: reconciledSubmission.status,
+      savedAnswers: reconciledSubmission.savedAnswers,
+      timeLeft: timing.timeLeft,
+      currentModule: timing.currentModule,
+      totalModules: timing.totalModules,
+      moduleDuration: timing.moduleDuration,
+      moduleStartedAt: timing.moduleStartedAt,
+      moduleExpiresAt: timing.moduleExpiresAt,
+      currentQuestionIndex: reconciledSubmission.currentQuestionIndex,
+      questionTimingSnapshot: reconciledSubmission.questionTimingSnapshot || {},
+      violationCount: reconciledSubmission.violationCount,
       // ISO timestamps are timezone-independent. Returning the server clock lets
       // the browser compensate when a student's device clock is fast or slow.
-      serverTime: new Date(),
-      beganAt: submission.beganAt,
-      module1ExpiresAt: test.mode === 'EXAM' && submission.beganAt
-        ? new Date(new Date(submission.beganAt).getTime() + test.sections[0].duration * 60 * 1000)
+      serverTime,
+      beganAt: reconciledSubmission.beganAt,
+      module1ExpiresAt: test.mode === 'EXAM' && reconciledSubmission.beganAt
+        ? new Date(new Date(reconciledSubmission.beganAt).getTime() + allocateModuleDurations(test.duration, test.sections.length)[0] * 60 * 1000)
         : null,
-      expiresAt: test.mode === 'EXAM' && submission.beganAt
-        ? new Date(new Date(submission.beganAt).getTime() + test.duration * 60 * 1000)
+      expiresAt: test.mode === 'EXAM' && reconciledSubmission.beganAt
+        ? new Date(new Date(reconciledSubmission.beganAt).getTime() + test.duration * 60 * 1000)
         : null,
       delivery: selectedDelivery ? {
         id: selectedDelivery.id,
@@ -198,7 +276,7 @@ exports.beginTest = async ({ userId, submissionId, testId }) => {
         select: {
           mode: true,
           duration: true,
-          sections: { orderBy: { order: 'asc' }, select: { duration: true } }
+          sections: { orderBy: { order: 'asc' }, select: { order: true, duration: true, questions: { select: { id: true } } } }
         }
       }
     }
@@ -209,31 +287,81 @@ exports.beginTest = async ({ userId, submissionId, testId }) => {
   let beganAt = submission.beganAt;
   if (submission.test.mode === 'EXAM' && !beganAt) {
     const now = new Date();
+    const firstDuration = allocateModuleDurations(submission.test.duration, submission.test.sections.length)[0];
     // updateMany makes this one-shot even when the start button/request is retried.
     await prisma.submission.updateMany({
       where: { id: submission.id, beganAt: null, status: 'DOING' },
       data: {
         beganAt: now,
         startedAt: now,
-        timeRemaining: submission.test.duration * 60
+        currentModule: 1,
+        moduleStartedAt: now,
+        moduleExpiresAt: new Date(now.getTime() + firstDuration * 60 * 1000),
+        timeRemaining: firstDuration * 60
       }
     });
-    const current = await prisma.submission.findUnique({
-      where: { id: submission.id }, select: { beganAt: true }
-    });
+    const current = await prisma.submission.findUnique({ where: { id: submission.id } });
     beganAt = current.beganAt;
+    Object.assign(submission, current);
   }
 
   const serverTime = new Date();
+  const reconciled = await reconcileExamModule({ submission, test: submission.test, now: serverTime });
+  return { ...examTimingPayload({ submission: reconciled, test: submission.test, serverTime }), beganAt };
+};
+
+exports.advanceModule = async ({ userId, submissionId, testId }) => {
+  const submission = await prisma.submission.findFirst({
+    where: { id: Number(submissionId), userId, testId, status: 'DOING' },
+    include: {
+      test: {
+        select: {
+          mode: true,
+          duration: true,
+          sections: { orderBy: { order: 'asc' }, select: { order: true, questions: { select: { id: true } } } },
+        },
+      },
+    },
+  });
+  if (!submission) throw new ApiError(404, { error: 'Active test session not found.' });
+  const sections = orderedSections(submission.test.sections);
+  if (sections.length < 2) throw new ApiError(409, { error: 'This test has no second module.' });
+
+  const now = new Date();
+  const reconciled = await reconcileExamModule({ submission, test: submission.test, now });
+  if (reconciled.currentModule === 2) {
+    return {
+      ...examTimingPayload({ submission: reconciled, test: submission.test, serverTime: now }),
+      currentQuestionIndex: reconciled.currentQuestionIndex,
+    };
+  }
+  if (submission.test.mode === 'EXAM' && reconciled.moduleExpiresAt && now < new Date(reconciled.moduleExpiresAt)) {
+    throw new ApiError(409, {
+      error: 'Module 1 is still in progress.',
+      timeLeft: Math.max(1, Math.ceil((new Date(reconciled.moduleExpiresAt).getTime() - now.getTime()) / 1000)),
+    });
+  }
+
+  const next = moduleTiming({ totalDuration: submission.test.duration, sections, moduleNumber: 2 });
+  const moduleStartedAt = submission.test.mode === 'EXAM' && reconciled.moduleExpiresAt
+    ? new Date(reconciled.moduleExpiresAt)
+    : now;
+  const moduleExpiresAt = submission.test.mode === 'EXAM'
+    ? new Date(moduleStartedAt.getTime() + next.durationMinutes * 60 * 1000)
+    : null;
+  const updated = await prisma.submission.update({
+    where: { id: submission.id },
+    data: {
+      currentModule: 2,
+      currentQuestionIndex: next.firstQuestionIndex,
+      moduleStartedAt,
+      moduleExpiresAt,
+      timeRemaining: next.durationMinutes * 60,
+    },
+  });
   return {
-    serverTime,
-    beganAt,
-    module1ExpiresAt: beganAt
-      ? new Date(new Date(beganAt).getTime() + (submission.test.sections[0]?.duration || 0) * 60 * 1000)
-      : null,
-    expiresAt: beganAt
-      ? new Date(new Date(beganAt).getTime() + submission.test.duration * 60 * 1000)
-      : null
+    ...examTimingPayload({ submission: updated, test: submission.test, serverTime: now }),
+    currentQuestionIndex: updated.currentQuestionIndex,
   };
 };
 
@@ -246,7 +374,7 @@ exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, current
         select: {
           mode: true,
           duration: true,
-          sections: { select: { questions: { select: { id: true } } } },
+          sections: { orderBy: { order: 'asc' }, select: { order: true, questions: { select: { id: true } } } },
         },
       },
     }
@@ -256,10 +384,8 @@ exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, current
   if (submission.status === 'COMPLETED') throw new ApiError(400, { message: "Bài đã nộp rồi" });
 
   const clientTimeLeft = Number(timeLeft);
-  const authoritativeTimeLeft = submission.test.mode === 'EXAM' && submission.beganAt
-    ? Math.max(0, Math.ceil(
-        (new Date(submission.beganAt).getTime() + submission.test.duration * 60 * 1000 - Date.now()) / 1000
-      ))
+  const authoritativeTimeLeft = submission.test.mode === 'EXAM' && submission.moduleExpiresAt
+    ? Math.max(0, Math.ceil((new Date(submission.moduleExpiresAt).getTime() - Date.now()) / 1000))
     : (Number.isFinite(clientTimeLeft) ? Math.max(0, Math.floor(clientTimeLeft)) : submission.timeRemaining);
   const questionTimingSnapshot = submission.test.mode === 'EXAM'
     ? normalizeQuestionTimingSnapshot({
@@ -277,10 +403,17 @@ exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, current
       savedAnswers: answers && typeof answers === 'object' && !Array.isArray(answers) ? answers : {},
       timeRemaining: authoritativeTimeLeft,
       currentQuestionIndex: Number.isInteger(Number(currentQuestionIndex))
-        ? Math.max(0, Number(currentQuestionIndex))
+        ? Math.min(
+            Math.max(
+              moduleTiming({ totalDuration: submission.test.duration, sections: submission.test.sections, moduleNumber: submission.currentModule }).firstQuestionIndex,
+              Number(currentQuestionIndex),
+            ),
+            moduleTiming({ totalDuration: submission.test.duration, sections: submission.test.sections, moduleNumber: submission.currentModule }).firstQuestionIndex
+              + submission.test.sections[submission.currentModule - 1].questions.length - 1,
+          )
         : submission.currentQuestionIndex,
       violationCount: Number.isFinite(Number(violationCount))
-        ? Math.max(0, Number(violationCount))
+        ? Math.max(submission.violationCount, Number(violationCount))
         : submission.violationCount,
       ...(submission.test.mode === 'EXAM' ? { questionTimingSnapshot } : {}),
     }

@@ -9,6 +9,9 @@ export const createTestDetailsSchema = (isAdmin: boolean) => z.object({
   category: z.enum(['PRACTICE', 'REAL']),
   testDate: z.string(),
 }).superRefine((values, context) => {
+  if (values.duration < values.moduleCount) {
+    context.addIssue({ code: 'custom', path: ['duration'], message: 'Allow at least 1 minute for each module.' });
+  }
   if (isAdmin && values.category === 'REAL' && !values.testDate) {
     context.addIssue({ code: 'custom', path: ['testDate'], message: 'Choose the official test date.' });
   }

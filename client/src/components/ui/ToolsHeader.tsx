@@ -27,10 +27,12 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
     <div className="flex items-center gap-1">
       {currentSubject != 'MATH' && (
         <button 
+          type="button"
           onClick={toggleHighlightMode}
+          aria-pressed={isHighlightMode}
           className={`
-            relative top-[3px]
-            group flex flex-col items-center gap-1 focus:outline-hidden
+            group flex min-h-11 flex-col items-center justify-center gap-1
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700
             transition-colors duration-200 
             rounded-lg px-2 py-1 -my-1
             hover:bg-green-50      
@@ -40,7 +42,7 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
           {/* 1. ICON CUSTOM (Thấp hơn & Rộng hơn) */}
           <div className={`
               w-5 h-5 transition-colors duration-200 
-              text-slate-700'
+              text-slate-700
             `}>
               <svg 
                 viewBox="0 0 24 24" 
@@ -86,10 +88,12 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
       )}
       {currentSubject === 'MATH' && (
         <button 
+          type="button"
           onClick={toggleCalculator}
+          aria-pressed={isCalculatorOpen}
           className={`
-            relative top-[3px]
-            group flex flex-col items-center gap-1 focus:outline-hidden
+            group flex min-h-11 flex-col items-center justify-center gap-1
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700
             transition-colors duration-200 
             rounded-lg px-2 py-1 -my-1 
             hover:bg-green-50      
@@ -141,11 +145,12 @@ const ToolsHeader: React.FC<ToolsHeaderProps> = ({ onSaveAction, currentMode, cu
       )}
       {currentMode != 'EXAM' && (
         <button 
+          type="button"
           onClick={handleSaveAndExit}
           disabled={isSaving}
           className={`
-            relative top-[3px]
-            group flex flex-col items-center gap-1 focus:outline-hidden
+            group flex min-h-11 flex-col items-center justify-center gap-1
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700
             transition-colors duration-200 
             rounded-lg px-2 py-1 -my-1
             hover:bg-green-50

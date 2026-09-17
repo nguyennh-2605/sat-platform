@@ -173,7 +173,9 @@ Express Server (index.js → app.js)
 | `POST` | `/api/class-activities/homework` | JWT + TEACHER/ADMIN | Compatibility alias for Assignment creation; new clients must use `/assignments` |
 | `POST` | `/api/test-deliveries` | JWT + TEACHER/ADMIN | Bulk-publish one or more tests; one request creates one independent TestDelivery and ClassActivity per selected test |
 | `GET` | `/api/test/:id` | JWT | Start or resume a test session |
-| `POST` | `/api/test/:id/save-progress` | JWT | Auto-save answers, time, current question |
+| `POST` | `/api/test/:id/begin` | JWT | Start the server-authoritative Exam clock for Module 1 |
+| `POST` | `/api/test/:id/advance-module` | JWT | Move an active attempt to Module 2; Exam attempts cannot advance before the Module 1 deadline |
+| `POST` | `/api/test/:id/save-progress` | JWT | Auto-save answers, current module, server-bounded time, and current question |
 | `POST` | `/api/test/:id/submit` | JWT | Submit test → auto-grade → store results → notify teacher |
 
 ### 5.5 Test Bank (Folders)
@@ -410,14 +412,16 @@ Folder ──1:N── Test
 1. Student navigates to /dashboard/practice-test
 2. GET /api/tests → lists all available tests (public, class-assigned, own)
 3. Student clicks "Start" → navigates to /test/:testId
-4. GET /api/test/:id → creates/finds Submission (status=DOING), returns test data + saved progress
-5. Student answers questions; auto-save triggers periodically:
+4. GET /api/test/:id → creates/finds Submission (status=DOING), returns test data + saved module progress
+5. In Exam mode, POST /api/test/:id/begin starts Module 1. The configured total duration is allocated across one or two modules (for example, 70 minutes becomes 35 + 35), and each module has an independent server deadline.
+6. Student answers questions; auto-save triggers periodically:
    POST /api/test/:id/save-progress → updates savedAnswers, currentQuestionIndex, timeRemaining
-6. Student clicks "Submit":
+7. For a two-module test, POST /api/test/:id/advance-module starts Module 2 at its first question. Exam mode rejects early advancement; Practice mode permits it.
+8. Student clicks "Submit":
    POST /api/test/:id/submit → grades all answers, stores in Answer table, sets status=COMPLETED
    → Auto-syncs score to any linked Assignment/ClassTest
    → Sends notification to teacher (if class-assigned)
-7. Student views the canonical report at /dashboard/score-report/:submissionId or opens aggregate history at /dashboard/results-analytics
+9. Student views the canonical report at /dashboard/score-report/:submissionId or opens aggregate history at /dashboard/results-analytics
 ```
 
 ### 8.2 Class Management Flow (Teacher)

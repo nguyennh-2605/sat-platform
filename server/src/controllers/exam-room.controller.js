@@ -54,6 +54,21 @@ exports.beginTest = async (req, res) => {
   }
 };
 
+exports.advanceModule = async (req, res) => {
+  try {
+    const result = await examRoomService.advanceModule({
+      userId: req.user.userId,
+      submissionId: req.body.submissionId,
+      testId: parseInt(req.params.id),
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error(error);
+    res.status(500).json({ error: 'Unable to advance the test module.' });
+  }
+};
+
 exports.submitTest = async (req, res) => {
   try {
     const result = await examRoomService.submitTest({

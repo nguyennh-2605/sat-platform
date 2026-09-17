@@ -327,6 +327,9 @@ model Submission {
   violationCount         Int              @default(0)
   startedAt              DateTime         @default(now())
   beganAt                DateTime?
+  currentModule          Int              @default(1)
+  moduleStartedAt        DateTime?
+  moduleExpiresAt        DateTime?
   currentQuestionIndex   Int              @default(0)
   savedAnswers           Json?
   timeRemaining          Int?

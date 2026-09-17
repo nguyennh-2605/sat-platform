@@ -5,6 +5,7 @@ const { authenticateToken } = require('../middleware/auth.middleware');
 
 router.get('/:id', authenticateToken, examRoomController.startOrResumeTest);
 router.post('/:id/begin', authenticateToken, examRoomController.beginTest);
+router.post('/:id/advance-module', authenticateToken, examRoomController.advanceModule);
 router.post('/:id/save-progress', authenticateToken, examRoomController.saveProgress);
 router.post('/:id/submit', authenticateToken, examRoomController.submitTest);
 

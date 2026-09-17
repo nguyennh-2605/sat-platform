@@ -29,7 +29,7 @@ const StrikethroughIcon = () => (
     {/* Tạo đường gạch chéo bằng thẻ div tuyệt đối */}
     <div className="
         absolute w-[150%] h-px bg-gray-600 
-        rotate-150              /* Xoay chéo */
+        -rotate-12
         top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
     "></div>
   </div>
@@ -61,8 +61,10 @@ const QuestionHeader: React.FC<Props> = ({
 
         {/* 2. NÚT MARK FOR REVIEW */}
         <button 
+          type="button"
           onClick={onToggleMark}
-          className="flex items-center gap-1 px-3 h-full hover:bg-gray-200 transition-colors text-gray-800 font-medium focus:outline-hidden"
+          aria-pressed={isMarked}
+          className="flex h-full items-center gap-1 px-3 font-medium text-gray-800 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-700"
         >
           <BookmarkIcon filled={isMarked} />
           <span className={`text-sm transition-all ${
@@ -78,10 +80,13 @@ const QuestionHeader: React.FC<Props> = ({
         {currentType === 'MCQ' && (
           <div className="ml-auto flex items-center px-3 gap-3">
             <button 
+              type="button"
               onClick={onToggleStrikeMode}
-              title="Gạch bỏ đáp án"
+              title="Option eliminator"
+              aria-label="Option eliminator"
+              aria-pressed={isStrikeMode}
               className={`
-                transition-all duration-200 rounded p-0.5
+                rounded p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700
                 ${isStrikeMode 
                   ? 'ring-1 ring-indigo-600 bg-[#C2DDD4]' // Bỏ scale lớn để trông gọn hơn
                   : 'opacity-70 hover:opacity-100 hover:bg-gray-200'

@@ -17,6 +17,20 @@ interface ClassInfo {
   _count?: { students: number };
 }
 
+interface DeliverySummary {
+  id: string;
+  title: string;
+  classId: string;
+  availableAt: string | null;
+  dueAt: string | null;
+  maxAttempts: number;
+  scorePolicy: 'FIRST' | 'BEST' | 'LATEST';
+  class: { name: string };
+  attemptsUsed: number;
+  canStart: boolean;
+  latestSubmission: { id: number; status: 'DOING' | 'COMPLETED'; attemptNo: number } | null;
+}
+
 interface TestItem {
   id: number;
   title: string;
@@ -33,7 +47,7 @@ interface TestItem {
   lastScore?: number | null;
   author?: { id: number; name?: string; role: 'ADMIN' | 'TEACHER' | 'STUDENT' } | null;
   classTests?: Array<{ classId: string; class?: { name: string } }>;
-  deliveries?: Array<{ id: string; title: string; classId: string; availableAt: string | null; dueAt: string | null; maxAttempts: number; scorePolicy: 'FIRST' | 'BEST' | 'LATEST'; class: { name: string } }>;
+  deliveries?: DeliverySummary[];
 }
 
 type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT';
@@ -66,6 +80,9 @@ const formatLastAttempt = (value?: string | null) => {
 };
 
 const clampProgress = (value: number | null | undefined) => Math.min(100, Math.max(0, value ?? 0));
+const isDeliveryExhausted = (delivery: DeliverySummary | undefined) => Boolean(
+  delivery && !delivery.canStart && delivery.latestSubmission?.status === 'COMPLETED'
+);
 
 const PracticeTest = () => {
   const role = (localStorage.getItem('userRole') || 'STUDENT') as UserRole;
@@ -141,6 +158,14 @@ function PracticeCenter() {
     navigate(`/test/${test.id}${params.toString() ? `?${params}` : ''}`);
   }, [navigate]);
 
+  const openDelivery = useCallback((test: TestItem, delivery: DeliverySummary) => {
+    if (isDeliveryExhausted(delivery) && delivery.latestSubmission) {
+      navigate(`/dashboard/score-report/${delivery.latestSubmission.id}`);
+      return;
+    }
+    openTest(test, { deliveryId: delivery.id });
+  }, [navigate, openTest]);
+
   const handleStart = useCallback((test: TestItem) => {
     const deliveries = test.deliveries || [];
     if (deliveries.length > 1) {
@@ -148,7 +173,7 @@ function PracticeCenter() {
       return;
     }
     if (deliveries.length === 1) {
-      openTest(test, { deliveryId: deliveries[0].id });
+      openDelivery(test, deliveries[0]);
       return;
     }
     const assignedClassIds = [...new Set((test.classTests || []).map(item => item.classId))];
@@ -157,7 +182,7 @@ function PracticeCenter() {
       return;
     }
     openTest(test, assignedClassIds[0] ? { classId: assignedClassIds[0] } : undefined);
-  }, [openTest]);
+  }, [openDelivery, openTest]);
 
   const resetFilters = () => {
     setSubject('ALL');
@@ -210,7 +235,7 @@ function PracticeCenter() {
         </DataSurface>
       </main>
 
-      <Modal open={Boolean(startClassTest)} onClose={() => setStartClassTest(null)} closeOnBackdrop presentation="content-dialog" title="Choose a class" subtitle={startClassTest?.title} className="max-w-md!">{startClassTest && <div className="space-y-2">{(startClassTest.deliveries || []).length > 0 ? startClassTest.deliveries?.map(delivery => <Button key={delivery.id} variant="outline" onClick={() => openTest(startClassTest, { deliveryId: delivery.id })} className="h-auto w-full justify-between p-4 text-left"><span><span className="block">{capitalizeFirstLetter(delivery.class.name)}</span><span className="mt-1 block text-xs font-normal text-muted-foreground">{delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleString()}` : 'No deadline'}</span></span><ChevronRight size={17} /></Button>) : [...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <Button key={classId} variant="outline" onClick={() => openTest(startClassTest, { classId })} className="h-auto w-full justify-between p-4 text-left">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></Button>)}</div>}</Modal>
+      <Modal open={Boolean(startClassTest)} onClose={() => setStartClassTest(null)} closeOnBackdrop presentation="content-dialog" title="Choose a class" subtitle={startClassTest?.title} className="max-w-md!">{startClassTest && <div className="space-y-2">{(startClassTest.deliveries || []).length > 0 ? startClassTest.deliveries?.map(delivery => <Button key={delivery.id} variant="outline" onClick={() => openDelivery(startClassTest, delivery)} className="h-auto w-full justify-between p-4 text-left"><span><span className="block">{capitalizeFirstLetter(delivery.class.name)}</span><span className="mt-1 block text-xs font-normal text-muted-foreground">{isDeliveryExhausted(delivery) ? 'Attempt limit reached · View score' : delivery.dueAt ? `Due ${new Date(delivery.dueAt).toLocaleString()}` : 'No deadline'}</span></span><ChevronRight size={17} /></Button>) : [...new Set((startClassTest.classTests || []).map(item => item.classId))].map(classId => <Button key={classId} variant="outline" onClick={() => openTest(startClassTest, { classId })} className="h-auto w-full justify-between p-4 text-left">{classes.find(item => item.id === classId)?.name || 'Class'}<ChevronRight size={17} /></Button>)}</div>}</Modal>
     </div>
   );
 }
@@ -252,7 +277,8 @@ function TestProgress({ test, compact = false }: { test: TestItem; compact?: boo
 function StartButton({ test, onStart, className }: { test: TestItem; onStart: () => void; className?: string }) {
   const inProgress = test.attemptStatus === 'DOING' || test.isDoing || (test.progress > 0 && test.progress < 100);
   const completed = test.attemptStatus === 'COMPLETED';
-  return <Button size="sm" variant={inProgress ? 'primary' : 'outline'} className={className} onClick={onStart}><Play size={14} />{inProgress ? 'Continue' : completed ? 'Retake' : 'Start test'}</Button>;
+  const exhausted = test.deliveries?.length === 1 && isDeliveryExhausted(test.deliveries[0]);
+  return <Button size="sm" variant={inProgress ? 'primary' : 'outline'} className={className} onClick={onStart}>{exhausted ? <CheckCircle2 size={14} /> : <Play size={14} />}{exhausted ? 'View score' : inProgress ? 'Continue' : completed ? 'Retake' : 'Start test'}</Button>;
 }
 
 interface TestCardProps { test: TestItem; onStart: () => void }

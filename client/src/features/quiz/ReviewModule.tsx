@@ -3,19 +3,18 @@ import React from 'react';
 // 1. Định nghĩa kiểu dữ liệu cho một Question hỏi (cơ bản)
 interface Question {
   id: number | string;
-  // Bạn có thể thêm các trường khác nếu cần, ví dụ: questionText: string;
-  [key: string]: any; // Cho phép các trường khác tùy ý để đỡ bị lỗi
 }
 
 // 2. Định nghĩa kiểu dữ liệu cho toàn bộ Props của component này
 interface ReviewScreenProps {
   phase: 'REVIEW_1' | 'REVIEW_2'; // Chỉ cho phép 2 giá trị này (giúp autocomplete cực sướng)
   questions: Question[];          // Mảng các câu hỏi
-  answers: Record<string, any>;   // Object chứa đáp án: { "1": "A", "2": "B" }
+  answers: Record<string, string>;
   markedQuestions: (number | string)[]; // Mảng chứa ID các câu đã bookmark
   splitIndex: number;             // number nguyên
   onQuestionClick: (index: number) => void; // Hàm nhận vào số, không trả về gì
-  description: string
+  description: string;
+  subject: 'RW' | 'MATH';
 }
 
 // 3. Gán kiểu ReviewScreenProps vào component
@@ -26,13 +25,16 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({
   markedQuestions,   
   splitIndex,        
   onQuestionClick,   
-  description
+  description,
+  subject,
 }) => {
 
   const isMod1 = phase === 'REVIEW_1';
   const startIndex = isMod1 ? 0 : splitIndex;
   const endIndex = isMod1 ? splitIndex : questions.length;
-  const moduleTitle = `Section 1, ${isMod1 ? 'Module 1' : 'Module 2'}: ${description}`;
+  const sectionNumber = subject === 'RW' ? 1 : 2;
+  const sectionLabel = description || (subject === 'RW' ? 'Reading and Writing' : 'Math');
+  const moduleTitle = `Section ${sectionNumber}, ${isMod1 ? 'Module 1' : 'Module 2'}: ${sectionLabel}`;
   const currentModuleQuestions = questions.slice(startIndex, endIndex);
 
   return (
@@ -72,7 +74,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({
         {/* Thay đổi grid-cols để phù hợp với chiều rộng hẹp hơn 
            md:grid-cols-5 (5 ô 1 hàng) sẽ đẹp hơn 8 ô khi khung nhỏ
         */}
-        <div className="grid grid-cols-10 gap-7">
+        <div className="grid grid-cols-5 gap-4 sm:grid-cols-8 md:grid-cols-10 md:gap-7">
           {currentModuleQuestions.map((q, idx) => {
             const realIndex = startIndex + idx;
             const answerVal = answers[q.id];
@@ -84,7 +86,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({
                 key={q.id}
                 onClick={() => onQuestionClick(realIndex)}
                 className={
-                  `w-full aspect-square flex items-center justify-center text-2xl font-semibold transition-all rounded-xs
+                  `relative w-full aspect-square flex items-center justify-center text-2xl font-semibold transition-all rounded-xs
                   ${hasAnswer
                     ? 'text-white font-bold hover:border-gray-600 bg-blue-700 hover:bg-blue-800'
                     : 'border border-dashed border-gray-600 text-blue-700 font-bold hover:bg-gray-100'

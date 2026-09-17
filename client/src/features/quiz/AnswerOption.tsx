@@ -11,10 +11,11 @@ interface AnswerProps {
   onSelect: () => void;  // Hàm khi bấm chọn đáp án
   onEliminate: (e: React.MouseEvent) => void; // Hàm khi bấm nút gạch
   currentSubject: string;
+  annotationKey?: string;
 }
 
 const AnswerOption: React.FC<AnswerProps> = ({ 
-  label, content, isSelected, isEliminated, isStrikeMode, onSelect, onEliminate, currentSubject
+  label, content, isSelected, isEliminated, isStrikeMode, onSelect, onEliminate, currentSubject, annotationKey
 }) => {
 
   // Logic: Hiển thị cột bên phải khi đang bật chế độ Strike HOẶC đáp án này đã bị gạch (để hiện nút Undo)
@@ -22,14 +23,17 @@ const AnswerOption: React.FC<AnswerProps> = ({
 
   return (
     <div className="flex items-start gap-4 w-full group">
-      <div 
-      // Nếu bị gạch thì disable click, ngược lại thì cho chọn
-      onClick={!isEliminated ? onSelect : undefined} 
+      <button
+      type="button"
+      disabled={isEliminated}
+      onClick={onSelect}
+      aria-pressed={isSelected}
       className={`
-        relative flex-1 flex items-start gap-5 p-2 border rounded-xl bg-white overflow-hidden
+        relative flex-1 flex items-start gap-5 overflow-hidden rounded-xl border bg-white p-2 text-left
         ${isEliminated ? 'cursor-default border-gray-200 bg-white' : 'cursor-pointer hover:shadow-md'}
         ${isSelected && !isEliminated ? 'border-blue-700 border-2' : 'border-gray-600'}
         ${isEliminated ? 'opacity-50 grayscale' : ''}
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2
       `}
     >
       
@@ -46,7 +50,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
       {/* 2. NỘI DUNG ĐÁP ÁN */}
       <span className="exam-content min-w-0 font-normal text-[#1a1a1a]">
         {currentSubject === 'RW' 
-          ? <InteractiveText content={content} inheritTypography />
+          ? <InteractiveText content={content} inheritTypography annotationKey={annotationKey} />
           : <FormattedTextRenderer text={content} inheritTypography latexOnly />
         }
       </span>
@@ -64,10 +68,11 @@ const AnswerOption: React.FC<AnswerProps> = ({
         `}></div>
       </div>
       
-    </div>
+    </button>
 
       {/* 4. NÚT HÀNH ĐỘNG (Undo / Strike) */}
-      <div 
+      <button
+        type="button"
         onClick={onEliminate}
         className={`
           flex items-start justify-end shrink-0 cursor-pointer overflow-hidden mt-1
@@ -77,7 +82,8 @@ const AnswerOption: React.FC<AnswerProps> = ({
             : 'w-0 opacity-0 ml-0'
           }
         `}
-        title={isEliminated ? "Bỏ gạch (Undo)" : "Gạch bỏ đáp án này"}
+        title={isEliminated ? "Undo elimination" : "Eliminate this option"}
+        aria-label={isEliminated ? `Undo elimination for option ${label}` : `Eliminate option ${label}`}
       >
         {/* Dùng div con để cố định kích thước nội dung, tránh bị méo khi div cha co lại */}
         <div className="w-[50px] flex justify-center">
@@ -101,7 +107,7 @@ const AnswerOption: React.FC<AnswerProps> = ({
             </div>
           )}
         </div>
-      </div>
+      </button>
     </div>
   );
 };

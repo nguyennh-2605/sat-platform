@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const { MAX_TEST_MODULES, allocateModuleDurations } = require('../utils/module-timing');
 const { buildAttemptSummary } = require('../utils/practice-test-progress');
 const { getTaxonomy, validateClassification } = require('../utils/question-taxonomy');
 const { parsePagination, paginationMeta } = require('../utils/pagination');
@@ -183,7 +184,13 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
             dueAt: true,
             maxAttempts: true,
             scorePolicy: true,
-            class: { select: { name: true } }
+            class: { select: { name: true } },
+            submissions: {
+              where: { userId },
+              orderBy: { attemptNo: 'desc' },
+              take: 1,
+              select: { id: true, status: true, attemptNo: true },
+            },
           }
         }
       }),
@@ -223,7 +230,7 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
 
   // Map dữ liệu để trả về format gọn gàng cho Frontend
   const items = tests.map(test => {
-    const { submissions, sections, _count, ...rest } = test;
+    const { submissions, sections, deliveries, _count, ...rest } = test;
     const questionCount = sections.reduce(
       (total, section) => total + section._count.questions,
       0
@@ -235,6 +242,18 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
 
     return {
       ...rest,
+      ...(userRole === 'STUDENT' ? {
+        deliveries: (deliveries || []).map(({ submissions: deliverySubmissions, ...delivery }) => {
+          const latestSubmission = deliverySubmissions?.[0] || null;
+          const attemptsUsed = latestSubmission?.attemptNo || 0;
+          return {
+            ...delivery,
+            latestSubmission,
+            attemptsUsed,
+            canStart: latestSubmission?.status === 'DOING' || attemptsUsed < delivery.maxAttempts,
+          };
+        }),
+      } : {}),
       questionCount,
       usage: {
         attempts: _count.submissions,
@@ -269,6 +288,9 @@ const normalizeChoices = (choices) => (Array.isArray(choices) ? choices : [])
 const validateSections = ({ sections, subject }) => {
   if (!Array.isArray(sections) || sections.length === 0) {
     throw new ApiError(400, { error: 'Add at least one module with questions.' });
+  }
+  if (sections.length > MAX_TEST_MODULES) {
+    throw new ApiError(422, { error: `A test can contain at most ${MAX_TEST_MODULES} modules.` });
   }
 
   const seenOrders = new Set();
@@ -347,7 +369,14 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
     throw new ApiError(400, { error: 'Enter a valid test duration.' });
   }
 
-  const normalizedSections = validateSections({ sections, subject });
+  const validatedSections = validateSections({ sections, subject });
+  let normalizedSections;
+  try {
+    const durations = allocateModuleDurations(normalizedDuration, validatedSections.length);
+    normalizedSections = validatedSections.map((section, index) => ({ ...section, duration: durations[index] }));
+  } catch (error) {
+    throw new ApiError(400, { error: error.message });
+  }
   const finalStatus = status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
   const scope = userRole === 'ADMIN' ? 'SYSTEM' : 'PERSONAL';
   const isPublic = scope === 'SYSTEM' && finalStatus === 'PUBLISHED';
@@ -566,7 +595,14 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
   if (!['RW', 'MATH'].includes(subject)) throw new ApiError(400, { error: 'Choose Reading & Writing or Math.' });
   const normalizedDuration = Number.parseInt(duration, 10);
   if (!Number.isInteger(normalizedDuration) || normalizedDuration < 1) throw new ApiError(400, { error: 'Enter a valid test duration.' });
-  const normalizedSections = validateSections({ sections, subject });
+  const validatedSections = validateSections({ sections, subject });
+  let normalizedSections;
+  try {
+    const durations = allocateModuleDurations(normalizedDuration, validatedSections.length);
+    normalizedSections = validatedSections.map((section, index) => ({ ...section, duration: durations[index] }));
+  } catch (error) {
+    throw new ApiError(400, { error: error.message });
+  }
   const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
   const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' && testDate ? String(testDate) : null;
 
@@ -654,6 +690,7 @@ exports.duplicateTest = async ({ testId, userId, userRole }) => {
     userRole,
     include: { sections: { orderBy: { order: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } } },
   });
+  const moduleDurations = allocateModuleDurations(source.duration, source.sections.length);
   return prisma.$transaction(async tx => {
     const duplicate = await tx.test.create({
       data: {
@@ -668,10 +705,10 @@ exports.duplicateTest = async ({ testId, userId, userRole }) => {
       isPublic: false,
       authorId: Number(userId),
       sections: {
-        create: source.sections.map(section => ({
+        create: source.sections.map((section, index) => ({
           name: section.name,
           order: section.order,
-          duration: section.duration,
+          duration: moduleDurations[index],
           questions: {
             create: section.questions.map(question => ({
               order: question.order,
@@ -712,6 +749,7 @@ exports.copyTestToSystem = async ({ testId, userId, userRole }) => {
     include: { sections: { orderBy: { order: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } } },
   });
   if (!source) throw new ApiError(404, { error: 'Teacher test not found.' });
+  const moduleDurations = allocateModuleDurations(source.duration, source.sections.length);
   return prisma.$transaction(async tx => {
     const copy = await tx.test.create({
       data: {
@@ -726,10 +764,10 @@ exports.copyTestToSystem = async ({ testId, userId, userRole }) => {
       isPublic: false,
       authorId: Number(userId),
       sections: {
-        create: source.sections.map(section => ({
+        create: source.sections.map((section, index) => ({
           name: section.name,
           order: section.order,
-          duration: section.duration,
+          duration: moduleDurations[index],
           questions: {
             create: section.questions.map(question => ({
               order: question.order,
