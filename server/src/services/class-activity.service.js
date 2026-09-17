@@ -2,6 +2,7 @@ const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
 const { createFollowUpWithDb } = require('./learning-follow-up.service');
+const { createActivityBlockWithDb } = require('./lesson-block.service');
 
 const intId = value => Number.parseInt(value, 10);
 
@@ -184,7 +185,7 @@ const normalizeUrls = (value, fieldName) => {
   });
 };
 
-exports.createAssignmentActivity = async ({ classId, lessonId, title, instructions, availableAt, dueAt, fileUrls, links, studentIds, maxPoints, followUp, userId, userRole }) => {
+exports.createAssignmentActivity = async ({ classId, lessonId, lessonPhase, title, instructions, availableAt, dueAt, fileUrls, links, studentIds, maxPoints, followUp, userId, userRole }) => {
   const teacherId = intId(userId);
   const normalizedTitle = String(title || '').trim().replace(/\s+/g, ' ');
   if (!classId || !normalizedTitle) throw new ApiError(400, { error: 'Class and assignment title are required.' });
@@ -243,6 +244,9 @@ exports.createAssignmentActivity = async ({ classId, lessonId, title, instructio
       },
       include: { homework: true, assignees: { select: { studentId: true, status: true } } },
     });
+    if (lessonId) {
+      await createActivityBlockWithDb({ db: tx, lessonId, activityId: activity.id, title: activity.title, phase: lessonPhase });
+    }
     return { classroom, assignment, activity, assigneeIds };
   });
 

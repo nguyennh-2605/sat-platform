@@ -50,6 +50,7 @@ model User {
   learningFollowUpTargets    LearningFollowUpTarget[] @relation("LearningFollowUpTargetStudent")
   recordedAttendanceSessions AttendanceSession[]      @relation("AttendanceRecorder")
   attendanceRecords          AttendanceRecord[]       @relation("AttendanceStudent")
+  lessonBlockProgress        LessonBlockProgress[]    @relation("LessonBlockProgressStudent")
 }
 
 model RefreshSession {
@@ -676,6 +677,18 @@ enum LessonProgressStatus {
   COMPLETED
 }
 
+enum LessonBlockKind {
+  TEXT
+  RESOURCE
+  ACTIVITY
+}
+
+enum LessonBlockPhase {
+  BEFORE_CLASS
+  DURING_CLASS
+  AFTER_CLASS
+}
+
 model Week {
   id          String              @id @default(uuid())
   title       String
@@ -714,8 +727,43 @@ model Lesson {
   activities      ClassActivity[]
   progress        LessonProgress[]
   attendance      AttendanceSession?
+  blocks          LessonBlock[]
 
   @@index([weekId, status, order])
+}
+
+model LessonBlock {
+  id         String                @id @default(uuid())
+  lessonId   String
+  kind       LessonBlockKind
+  phase      LessonBlockPhase      @default(DURING_CLASS)
+  order      Int                   @default(0)
+  title      String?
+  body       String?
+  isRequired Boolean               @default(true)
+  resourceId String?               @unique
+  activityId String?               @unique
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  lesson     Lesson                @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  resource   LessonFile?           @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  activity   ClassActivity?        @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  progress   LessonBlockProgress[]
+
+  @@index([lessonId, phase, order])
+}
+
+model LessonBlockProgress {
+  blockId      String
+  studentId    Int
+  openedAt     DateTime    @default(now())
+  lastOpenedAt DateTime    @default(now()) @updatedAt
+  completedAt  DateTime?
+  block        LessonBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  student      User        @relation("LessonBlockProgressStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([blockId, studentId])
+  @@index([studentId, completedAt])
 }
 
 model AttendanceSession {
@@ -818,6 +866,7 @@ model LessonFile {
   lesson          Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   fileAsset       FileAsset?         @relation(fields: [fileAssetId], references: [id], onDelete: Restrict)
   progress        ResourceProgress[]
+  block           LessonBlock?
 
   @@index([lessonId, order])
 }
@@ -988,6 +1037,7 @@ model ClassActivity {
   vocabularySessions VocabularyStudySession[]
   followUpId         String?
   followUp           LearningFollowUp?        @relation(fields: [followUpId], references: [id], onDelete: SetNull)
+  lessonBlock        LessonBlock?
 
   @@index([classId, status, dueAt])
   @@index([classId, createdAt])

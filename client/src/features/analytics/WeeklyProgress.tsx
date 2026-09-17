@@ -2,11 +2,10 @@ import { Children, useCallback, useEffect, useState } from 'react';
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertCircle, BookA, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight, ChevronsUpDown, CirclePlay, ClipboardCheck, Clock3, ExternalLink, FileText, GripVertical, Link2, ListCollapse, LoaderCircle, MoreHorizontal, MoveDown, MoveUp, Pencil, Plus, RefreshCw, Rocket, Trash2, Users, Video } from 'lucide-react';
+import { AlertCircle, BookA, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight, ChevronsUpDown, CirclePlay, ClipboardCheck, Clock3, ExternalLink, FileText, GripVertical, Link2, LoaderCircle, MoreHorizontal, MoveDown, MoveUp, Pencil, Plus, RefreshCw, Rocket, Trash2, Video } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import { AssignmentComposer, AssignTestsComposer } from '../classroom/activity-composer/ActivityComposers';
 import { Badge, Button, Card, EmptyState, Modal } from '../../components/ui/AppUI';
 import { Button as DialogButton } from '../../components/ui/button';
 import { DateTimePicker } from '../../components/ui/DateTimePicker';
@@ -16,55 +15,48 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import { Separator } from '../../components/ui/separator';
-import { Checkbox } from '../../components/ui/checkbox';
 import { Select as FormSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
 import axiosClient from '../../lib/axios';
 
 type ContentStatus = 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED';
 type ResourceKind = 'FILE' | 'VIDEO' | 'LINK' | 'EMBED';
+type LessonPhase = 'BEFORE_CLASS' | 'DURING_CLASS' | 'AFTER_CLASS';
 type SortableData = { type: 'week' | 'lesson'; weekId: string };
 
 interface ResourceProgress { completedAt?: string | null }
 interface Resource { id: string; name: string; url: string; fileAssetId?: string | null; kind: ResourceKind; provider?: string | null; isRequired: boolean; progress: ResourceProgress[]; progressSummary?: { opened: number; completed: number } }
 interface Assignment { id: string; lessonAssignmentId?: string; title: string; content?: string | null; dueDate?: string | null; testIds?: number[]; assignment?: { submissions?: Array<{ status: string; submittedAt: string; score?: number | null }> } }
-interface Delivery { id: string; title: string; status: string; dueAt?: string | null; test: { id: number; title: string; mode: 'EXAM' | 'PRACTICE'; duration: number; subject: string; folderId: number | null; sections?: Array<{ _count: { questions: number } }> } }
+interface Delivery { id: string; title: string; status: string; dueAt?: string | null; activity?: { activityId: string } | null; test: { id: number; title: string; mode: 'EXAM' | 'PRACTICE'; duration: number; subject: string; folderId: number | null; sections?: Array<{ _count: { questions: number } }> } }
 interface Activity { id: string; type: 'VOCABULARY' | 'HOMEWORK' | 'RESOURCE'; title: string; dueAt?: string | null; assignees?: Array<{ status: string }>; homework?: { assignmentId: string; assignment?: { submissions?: Array<{ status: string; submittedAt: string }> } } | null }
+interface LessonOutlineBlock { id: string; kind: 'TEXT' | 'RESOURCE' | 'ACTIVITY'; phase: LessonPhase; order: number; title?: string | null; isRequired: boolean; resourceId?: string | null; activityId?: string | null }
 interface LessonProgress { status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED'; progress: number }
-interface Lesson { id: string; order: number; title: string; summary?: string | null; status: ContentStatus; scheduledAt?: string | null; durationMinutes?: number | null; files: Resource[]; assignments: Assignment[]; deliveries: Delivery[]; activities: Activity[]; studentProgress?: LessonProgress | null; progressSummary?: { completed: number; started: number } | null }
+interface Lesson { id: string; order: number; title: string; summary?: string | null; status: ContentStatus; scheduledAt?: string | null; durationMinutes?: number | null; files: Resource[]; assignments: Assignment[]; deliveries: Delivery[]; activities: Activity[]; blocks: LessonOutlineBlock[]; studentProgress?: LessonProgress | null; progressSummary?: { completed: number; started: number } | null }
 interface Week { id: string; order: number; title: string; description?: string | null; status: ContentStatus; availableAt?: string | null; lessons: Lesson[] }
-interface CourseForm { title: string; description: string; summary: string; status: ContentStatus; scheduledAt: string; durationMinutes: string }
+interface CourseForm { title: string; description: string; status: ContentStatus; scheduledAt: string; durationMinutes: string }
 
-const EMPTY_FORM: CourseForm = { title: '', description: '', summary: '', status: 'DRAFT', scheduledAt: '', durationMinutes: '' };
+const EMPTY_FORM: CourseForm = { title: '', description: '', status: 'DRAFT', scheduledAt: '', durationMinutes: '' };
 
-const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boolean; students?: Array<{ id: number; name: string | null; email: string }> }) => {
+const WeeklyProgress = ({ canManage = true }: { canManage?: boolean; students?: Array<{ id: number; name: string | null; email: string }> }) => {
   const { classId } = useParams();
   const navigate = useNavigate();
   const [weeks, setWeeks] = useState<Week[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [compact, setCompact] = useState(false);
   const [editing, setEditing] = useState(false);
   const [activeWeekId, setActiveWeekId] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ kind: 'week' | 'lesson'; weekId?: string; item?: Week | Lesson } | null>(null);
   const [form, setForm] = useState<CourseForm>(EMPTY_FORM);
-  const [resourceLesson, setResourceLesson] = useState<{ weekId: string; lessonId: string } | null>(null);
-  const [resourceForm, setResourceForm] = useState({ name: '', url: '', kind: 'FILE' as ResourceKind, isRequired: false });
-  const [resourceUpload, setResourceUpload] = useState<File | null>(null);
-  const [activityComposer, setActivityComposer] = useState<{ kind: 'ASSIGNMENT' | 'TEST'; lessonId: string } | null>(null);
-  const [attendanceLesson, setAttendanceLesson] = useState<Lesson | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ kind: 'week' | 'lesson' | 'resource'; id: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ kind: 'week' | 'lesson'; id: string; name: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyItem, setBusyItem] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const expandedStorageKey = classId ? `classroom-lessons:${classId}:expanded` : '';
-  const compactStorageKey = classId ? `classroom-lessons:${classId}:compact` : '';
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -88,10 +80,6 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
   }, [classId]);
 
   useEffect(() => { void loadCourse(); }, [loadCourse]);
-  useEffect(() => {
-    if (!compactStorageKey) return;
-    setCompact(localStorage.getItem(compactStorageKey) === 'true');
-  }, [compactStorageKey]);
   useEffect(() => {
     if (!expandedStorageKey || loading) return;
     localStorage.setItem(expandedStorageKey, JSON.stringify([...expanded]));
@@ -127,11 +115,6 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
     return next;
   });
 
-  const toggleCompact = () => setCompact(current => {
-    const next = !current;
-    if (compactStorageKey) localStorage.setItem(compactStorageKey, String(next));
-    return next;
-  });
 
   const toggleAll = () => {
     const allOpen = weeks.length > 0 && weeks.every(week => expanded.has(week.id));
@@ -147,7 +130,7 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
 
   const openEditor = (kind: 'week' | 'lesson', item?: Week | Lesson, weekId?: string) => {
     setEditor({ kind, item, weekId });
-    setForm({ title: item?.title || '', description: kind === 'week' ? ((item as Week | undefined)?.description || '') : '', summary: kind === 'lesson' ? ((item as Lesson | undefined)?.summary || '') : '', status: item?.status || 'DRAFT', scheduledAt: kind === 'lesson' && (item as Lesson | undefined)?.scheduledAt ? String((item as Lesson).scheduledAt) : '', durationMinutes: kind === 'lesson' ? String((item as Lesson | undefined)?.durationMinutes || '') : '' });
+    setForm({ title: item?.title || '', description: kind === 'week' ? ((item as Week | undefined)?.description || '') : '', status: item?.status || 'DRAFT', scheduledAt: kind === 'lesson' && (item as Lesson | undefined)?.scheduledAt ? String((item as Lesson).scheduledAt) : '', durationMinutes: kind === 'lesson' ? String((item as Lesson | undefined)?.durationMinutes || '') : '' });
   };
 
   const saveEditor = async () => {
@@ -155,7 +138,7 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
     setSaving(true);
     const payload = editor.kind === 'week'
       ? { title: form.title.trim(), description: form.description.trim() || null, status: form.status }
-      : { title: form.title.trim(), summary: form.summary.trim() || null, status: form.status, scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : null, durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : null };
+      : { title: form.title.trim(), summary: null, status: form.status, scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : null, durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : null };
     try {
       if (editor.item) await axiosClient.put(`/api/progress/${editor.kind === 'week' ? 'weeks' : 'lessons'}/${editor.item.id}`, payload);
       else if (editor.kind === 'week') await axiosClient.post(`/api/progress/class/${classId}/weeks`, payload);
@@ -178,38 +161,11 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
     finally { setBusyItem(null); }
   };
 
-  const addResource = async () => {
-    if (!resourceLesson || !resourceForm.name.trim() || (!resourceForm.url.trim() && !resourceUpload)) return;
-    setSaving(true);
-    try {
-      let fileAssetId: string | null = null;
-      if (resourceUpload) {
-        const prepared = await axiosClient.post<{ success: boolean; data: { asset: { id: string }; uploadUrl: string; headers: Record<string, string> } }>(`/api/files/uploads`, {
-          lessonId: resourceLesson.lessonId,
-          originalName: resourceUpload.name,
-          mimeType: resourceUpload.type,
-          sizeBytes: resourceUpload.size,
-        });
-        const uploadResponse = await fetch(prepared.data.uploadUrl, { method: 'PUT', headers: prepared.data.headers, body: resourceUpload });
-        if (!uploadResponse.ok) throw new Error('Object upload failed');
-        await axiosClient.post(`/api/files/${prepared.data.asset.id}/complete`);
-        fileAssetId = prepared.data.asset.id;
-      }
-      await axiosClient.post(`/api/progress/lessons/${resourceLesson.lessonId}/files`, { files: [{ ...resourceForm, name: resourceForm.name.trim(), url: fileAssetId ? null : resourceForm.url.trim(), fileAssetId }] });
-      toast.success('Resource added.');
-      setResourceLesson(null);
-      setResourceForm({ name: '', url: '', kind: 'FILE', isRequired: false });
-      setResourceUpload(null);
-      await loadCourse(false);
-    } catch (error) { console.error(error); toast.error(requestErrorMessage(error, 'Unable to add this resource. Check the URL.')); }
-    finally { setSaving(false); }
-  };
-
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     setSaving(true);
     try {
-      const endpoint = deleteTarget.kind === 'week' ? `/api/progress/weeks/${deleteTarget.id}` : deleteTarget.kind === 'lesson' ? `/api/progress/lessons/${deleteTarget.id}` : `/api/progress/files/${deleteTarget.id}`;
+      const endpoint = deleteTarget.kind === 'week' ? `/api/progress/weeks/${deleteTarget.id}` : `/api/progress/lessons/${deleteTarget.id}`;
       await axiosClient.delete(endpoint);
       toast.success('Removed from the curriculum.');
       setDeleteTarget(null);
@@ -234,17 +190,6 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
     }
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
     if (!canManage) await loadCourse(false);
-  };
-
-  const completeLesson = async (lesson: Lesson) => {
-    const key = `lesson:${lesson.id}`;
-    setBusyItem(key);
-    try {
-      await axiosClient.put(`/api/progress/lessons/${lesson.id}/progress`, { completed: lesson.studentProgress?.status !== 'COMPLETED' });
-      toast.success(lesson.studentProgress?.status === 'COMPLETED' ? 'Session marked in progress.' : 'Session completed.');
-      await loadCourse(false);
-    } catch (error) { console.error(error); toast.error(requestErrorMessage(error, 'Unable to update your progress.')); }
-    finally { setBusyItem(null); }
   };
 
   const startDelivery = (delivery: Delivery) => {
@@ -313,7 +258,6 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         {weeks.length >= 3 && <Button size="sm" variant="ghost" onClick={toggleAll} title={allExpanded ? 'Collapse all weeks' : 'Expand all weeks'}><ChevronsUpDown size={14} /><span className="hidden sm:inline">{allExpanded ? 'Collapse all' : 'Expand all'}</span></Button>}
-        {weeks.length > 0 && <Button size="sm" variant={compact ? 'accent' : 'ghost'} onClick={toggleCompact} aria-pressed={compact} title="Toggle compact curriculum view"><ListCollapse size={14} /><span className="hidden sm:inline">Compact</span></Button>}
         {canManage && <Button size="sm" variant={editing ? 'accent' : 'outline'} onClick={() => setEditing(current => !current)} aria-pressed={editing}>{editing ? <Check size={15} /> : <Pencil size={15} />}{editing ? 'Done' : 'Edit curriculum'}</Button>}
         {canManage && editing && <Button size="sm" onClick={() => openEditor('week')}><Plus size={15} />Add week</Button>}
       </div>
@@ -323,9 +267,9 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
       {loadError ? <CourseLoadError message={loadError} onRetry={() => void loadCourse()} /> : <section className="min-w-0 space-y-3" aria-label="Course curriculum">
         {weeks.length === 0 ? <EmptyState icon={<BookOpen size={20} />} title={canManage ? 'No weeks yet' : 'No lessons yet'} description={canManage ? editing ? 'Create the first week to start building the class curriculum.' : 'Enter edit mode to start building the class curriculum.' : 'Published weeks and sessions from your teacher will appear here.'} action={canManage && editing ? <Button size="sm" onClick={() => openEditor('week')}><Plus size={15} />Create first week</Button> : undefined} /> : <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={event => void handleDragEnd(event)}>
           <SortableContext items={weeks.map(week => `week:${week.id}`)} strategy={verticalListSortingStrategy}>
-            {weeks.map((week, weekIndex) => <SortableWeekOutline key={week.id} week={week} index={weekIndex} open={expanded.has(week.id)} compact={compact} canManage={canManage} editing={editing} disabled={reordering} onOpenChange={open => toggleWeek(week.id, open)} onAddLesson={() => openEditor('lesson', undefined, week.id)} onEdit={() => openEditor('week', week)} onPublish={() => void publishItem('week', week)} onDelete={() => setDeleteTarget({ kind: 'week', id: week.id, name: week.title })} onMoveUp={() => void persistWeekOrder(weekIndex, weekIndex - 1)} onMoveDown={() => void persistWeekOrder(weekIndex, weekIndex + 1)} canMoveUp={weekIndex > 0} canMoveDown={weekIndex < weeks.length - 1} busy={busyItem === `week:${week.id}` || reordering}>
+            {weeks.map((week, weekIndex) => <SortableWeekOutline key={week.id} week={week} index={weekIndex} open={expanded.has(week.id)} compact={false} canManage={canManage} editing={editing} disabled={reordering} onOpenChange={open => toggleWeek(week.id, open)} onAddLesson={() => openEditor('lesson', undefined, week.id)} onEdit={() => openEditor('week', week)} onPublish={() => void publishItem('week', week)} onDelete={() => setDeleteTarget({ kind: 'week', id: week.id, name: week.title })} onMoveUp={() => void persistWeekOrder(weekIndex, weekIndex - 1)} onMoveDown={() => void persistWeekOrder(weekIndex, weekIndex + 1)} canMoveUp={weekIndex > 0} canMoveDown={weekIndex < weeks.length - 1} busy={busyItem === `week:${week.id}` || reordering}>
               {week.lessons.length === 0 ? <div className="flex flex-col items-start justify-between gap-2 px-4 py-3 sm:flex-row sm:items-center sm:px-5"><div><p className="text-body font-medium text-foreground">No sessions in this week</p><p className="mt-0.5 text-caption text-muted-foreground">{canManage && editing ? 'Add a session to begin structuring this module.' : canManage ? 'Enter edit mode to add the first session.' : 'More sessions are coming soon.'}</p></div>{canManage && editing && <Button size="sm" variant="ghost" onClick={() => openEditor('lesson', undefined, week.id)}><Plus size={14} />Add session</Button>}</div> : <SortableContext items={week.lessons.map(lesson => `lesson:${lesson.id}`)} strategy={verticalListSortingStrategy}>
-                {week.lessons.map((lesson, lessonIndex) => <SortableLessonOutline key={lesson.id} weekId={week.id} weekStatus={week.status} lesson={lesson} number={lessonIndex + 1} compact={compact} canManage={canManage} editing={editing} disabled={reordering} busy={busyItem === `lesson:${lesson.id}` || reordering} onEdit={() => openEditor('lesson', lesson, week.id)} onPublish={() => void publishItem('lesson', lesson)} onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id, name: lesson.title })} onMoveUp={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex - 1)} onMoveDown={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex + 1)} canMoveUp={lessonIndex > 0} canMoveDown={lessonIndex < week.lessons.length - 1} onAttendance={() => setAttendanceLesson(lesson)} onAddResource={() => setResourceLesson({ weekId: week.id, lessonId: lesson.id })} onAddAssignment={() => setActivityComposer({ kind: 'ASSIGNMENT', lessonId: lesson.id })} onAddTest={() => setActivityComposer({ kind: 'TEST', lessonId: lesson.id })} onResource={resource => void openResource(resource)} onDeleteResource={resource => setDeleteTarget({ kind: 'resource', id: resource.id, name: resource.name })} onAssignment={assignment => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} onDelivery={startDelivery} onActivity={activity => activity.type === 'HOMEWORK' && activity.homework ? navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}`) : activity.type === 'VOCABULARY' ? navigate(`/dashboard/vocabulary?activity=${activity.id}`) : navigate(`/dashboard/class/${classId}?tab=activities`)} onComplete={() => void completeLesson(lesson)} isLast={lessonIndex === week.lessons.length - 1} />)}
+                {week.lessons.map((lesson, lessonIndex) => <SortableLessonOutline key={lesson.id} weekId={week.id} weekStatus={week.status} lesson={lesson} number={lessonIndex + 1} compact={false} canManage={canManage} editing={editing} disabled={reordering} busy={busyItem === `lesson:${lesson.id}` || reordering} onOpen={() => navigate(`/dashboard/class/${classId}/lesson/${lesson.id}`)} onEdit={() => openEditor('lesson', lesson, week.id)} onPublish={() => void publishItem('lesson', lesson)} onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id, name: lesson.title })} onMoveUp={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex - 1)} onMoveDown={() => void persistLessonOrder(week.id, lessonIndex, lessonIndex + 1)} canMoveUp={lessonIndex > 0} canMoveDown={lessonIndex < week.lessons.length - 1} onResource={resource => void openResource(resource)} onAssignment={assignment => navigate(`/dashboard/class/${classId}/assignment/${assignment.id}`)} onDelivery={startDelivery} onActivity={activity => activity.type === 'HOMEWORK' && activity.homework ? navigate(`/dashboard/class/${classId}/assignment/${activity.homework.assignmentId}`) : activity.type === 'VOCABULARY' ? navigate(`/dashboard/vocabulary?activity=${activity.id}`) : navigate(`/dashboard/class/${classId}?tab=activities`)} isLast={lessonIndex === week.lessons.length - 1} />)}
               </SortableContext>}
             </SortableWeekOutline>)}
           </SortableContext>
@@ -335,11 +279,7 @@ const WeeklyProgress = ({ canManage = true, students = [] }: { canManage?: boole
     </div>
 
     <CurriculumEditor editor={editor} form={form} setForm={setForm} saving={saving} onClose={() => setEditor(null)} onSave={() => void saveEditor()} />
-    <ResourceEditor open={Boolean(resourceLesson)} form={resourceForm} setForm={setResourceForm} upload={resourceUpload} onUpload={file => { setResourceUpload(file); if (file && !resourceForm.name.trim()) setResourceForm(current => ({ ...current, name: file.name, kind: 'FILE', url: '' })); }} saving={saving} onClose={() => { setResourceLesson(null); setResourceUpload(null); }} onSave={() => void addResource()} />
-    <AttendanceDialog lesson={attendanceLesson} students={students} onClose={() => setAttendanceLesson(null)} />
-    <Modal open={Boolean(deleteTarget)} closeOnBackdrop presentation="content-dialog" onClose={() => setDeleteTarget(null)} title={`Delete ${deleteTarget?.kind || 'item'}?`} subtitle={deleteTarget?.kind === 'resource' ? 'This action cannot be undone. Its viewing progress will also be removed.' : 'The curriculum item will be removed. Published activities stay available in the Activities tab.'} footer={<><DialogButton variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</DialogButton><DialogButton variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>{saving ? 'Deleting…' : 'Delete'}</DialogButton></>}><p className="text-body text-muted-foreground">Remove <strong className="text-foreground">{deleteTarget?.name}</strong> from this course?</p></Modal>
-    {classId && <AssignmentComposer open={activityComposer?.kind === 'ASSIGNMENT'} classId={classId} initialLessonId={activityComposer?.lessonId} students={students} onClose={() => setActivityComposer(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
-    {classId && <AssignTestsComposer open={activityComposer?.kind === 'TEST'} classId={classId} initialLessonId={activityComposer?.lessonId} students={students} onClose={() => setActivityComposer(null)} onCreated={async () => { window.dispatchEvent(new Event('classroom-todos:refresh')); await loadCourse(false); }} />}
+    <Modal open={Boolean(deleteTarget)} closeOnBackdrop presentation="content-dialog" onClose={() => setDeleteTarget(null)} title={`Delete ${deleteTarget?.kind || 'item'}?`} subtitle="The curriculum item will be removed. Published activities stay available in the Activities tab." footer={<><DialogButton variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</DialogButton><DialogButton variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>{saving ? 'Deleting…' : 'Delete'}</DialogButton></>}><p className="text-body text-muted-foreground">Remove <strong className="text-foreground">{deleteTarget?.name}</strong> from this course?</p></Modal>
   </div>;
 };
 
@@ -374,9 +314,9 @@ function WeekOutline({ week, index, open, compact, canManage, editing, busy, onO
 
 interface LessonOutlineProps {
   weekId: string; lesson: Lesson; weekStatus: ContentStatus; number: number; compact: boolean; canManage: boolean; editing: boolean; disabled: boolean; busy: boolean; isLast: boolean;
-  onEdit: () => void; onPublish: () => void; onDelete: () => void; onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean; onAttendance: () => void;
-  onAddResource: () => void; onAddAssignment: () => void; onAddTest: () => void; onResource: (item: Resource) => void; onDeleteResource: (item: Resource) => void;
-  onAssignment: (item: Assignment) => void; onDelivery: (item: Delivery) => void; onActivity: (item: Activity) => void; onComplete: () => void;
+  onOpen: () => void; onEdit: () => void; onPublish: () => void; onDelete: () => void; onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean;
+  onResource: (item: Resource) => void;
+  onAssignment: (item: Assignment) => void; onDelivery: (item: Delivery) => void; onActivity: (item: Activity) => void;
 }
 
 function SortableLessonOutline(props: LessonOutlineProps) {
@@ -385,30 +325,30 @@ function SortableLessonOutline(props: LessonOutlineProps) {
   return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={isDragging ? 'relative z-10 bg-surface opacity-70' : undefined}><LessonOutline {...props} dragHandle={dragHandle} />{!props.isLast && <Separator />}</div>;
 }
 
-function LessonOutline({ lesson, weekStatus, number, compact, canManage, editing, busy, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onAttendance, onAddResource, onAddAssignment, onAddTest, onResource, onDeleteResource, onAssignment, onDelivery, onActivity, onComplete, dragHandle }: LessonOutlineProps & { dragHandle?: React.ReactNode }) {
+function LessonOutline({ lesson, weekStatus, number, compact, canManage, editing, busy, onOpen, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onResource, onAssignment, onDelivery, onActivity, dragHandle }: LessonOutlineProps & { dragHandle?: React.ReactNode }) {
   const completed = lesson.studentProgress?.status === 'COMPLETED';
   const { deliveries, activities, assignments } = lessonContent(lesson);
-  const itemCount = lesson.files.length + deliveries.length + activities.length + assignments.length;
+  const itemCount = lesson.blocks.length || lesson.files.length + deliveries.length + activities.length + assignments.length;
   const hiddenByWeek = canManage && lesson.status === 'PUBLISHED' && weekStatus !== 'PUBLISHED';
   return <article className={`group/session px-3 sm:px-4 ${compact ? 'py-2.5' : 'py-4'}`}>
     <header className="flex items-start gap-1 sm:gap-2">
       {dragHandle}
       <div className="min-w-0 flex-1">
-        <h3 className="flex min-w-0 items-center gap-2 text-title text-foreground">{completed && <Check size={15} className="shrink-0 text-success" aria-label="Completed" />}<span className="shrink-0 font-semibold">Session {String(number).padStart(2, '0')}</span><span className="text-muted-foreground" aria-hidden="true">·</span><span className="truncate font-medium">{lesson.title}</span></h3>
-        {!compact && lesson.summary && <p className="mt-0.5 line-clamp-1 text-body text-muted-foreground">{lesson.summary}</p>}
+        <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-2 rounded-sm text-left text-title text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">{completed && <Check size={15} className="shrink-0 text-success" aria-label="Completed" />}<span className="shrink-0 font-semibold">Session {String(number).padStart(2, '0')}</span><span className="text-muted-foreground" aria-hidden="true">·</span><span className="truncate font-medium">{lesson.title}</span></button>
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted-foreground">{lesson.scheduledAt && <span className="inline-flex items-center gap-1.5"><CalendarDays size={13} />{formatDateTime(lesson.scheduledAt)}</span>}{lesson.durationMinutes && <span className="inline-flex items-center gap-1.5"><Clock3 size={13} />{lesson.durationMinutes} min</span>}{itemCount > 0 && <span>{itemCount} item{itemCount === 1 ? '' : 's'}</span>}</div>
       </div>
-      {canManage ? <div className="flex shrink-0 items-center gap-1"><Button size="sm" variant="ghost" onClick={onAttendance}><Users size={14} /><span className="hidden sm:inline">Attendance</span></Button>{(editing || hiddenByWeek || lesson.status !== 'PUBLISHED') && <>{hiddenByWeek ? <Badge tone="neutral">Hidden by week</Badge> : <StatusBadge status={lesson.status} hidePublished />}{editing && <ActionMenu label={`${lesson.title} actions`} onEdit={onEdit} onPublish={onPublish} onDelete={onDelete} onMoveUp={onMoveUp} onMoveDown={onMoveDown} canMoveUp={canMoveUp} canMoveDown={canMoveDown} published={lesson.status === 'PUBLISHED'} busy={busy} />}</>}</div> : <Button size="sm" variant={completed ? 'outline' : 'primary'} disabled={busy} onClick={onComplete}>{busy && <LoaderCircle size={14} className="animate-spin" />}{completed ? 'Completed' : 'Mark complete'}</Button>}
+      {canManage ? <div className="flex shrink-0 items-center gap-1"><Button size="sm" variant="outline" onClick={onOpen}>Open session</Button>{(editing || hiddenByWeek || lesson.status !== 'PUBLISHED') && <>{hiddenByWeek ? <Badge tone="neutral">Hidden by week</Badge> : <StatusBadge status={lesson.status} hidePublished />}{editing && <ActionMenu label={`${lesson.title} actions`} onEdit={onEdit} onPublish={onPublish} onDelete={onDelete} onMoveUp={onMoveUp} onMoveDown={onMoveDown} canMoveUp={canMoveUp} canMoveDown={canMoveDown} published={lesson.status === 'PUBLISHED'} busy={busy} />}</>}</div> : <Button size="sm" variant={completed ? 'outline' : 'primary'} disabled={busy} onClick={onOpen}>{busy && <LoaderCircle size={14} className="animate-spin" />}{completed ? 'Review' : 'Open lesson'}</Button>}
     </header>
 
     <div className={`mt-2 ml-6 ${editing ? 'sm:ml-24' : 'sm:ml-14'}`}>
       <CurriculumTree>
-        {lesson.files.map(resource => <ResourceRow key={resource.id} resource={resource} canEdit={canManage && editing} compact={compact} onOpen={() => onResource(resource)} onDelete={() => onDeleteResource(resource)} />)}
-        {deliveries.map(delivery => <CurriculumRow key={delivery.id} compact={compact} icon={<CirclePlay size={16} />} typeLabel={delivery.test.mode === 'EXAM' ? 'Test' : 'Quiz'} title={delivery.title} meta={`${delivery.test.duration} min${delivery.dueAt ? ` · Due ${formatDate(delivery.dueAt)}` : ''}`} onOpen={() => onDelivery(delivery)} />)}
-        {activities.map(activity => <CurriculumRow key={activity.id} compact={compact} icon={activity.type === 'VOCABULARY' ? <BookA size={16} /> : activity.type === 'HOMEWORK' ? <ClipboardCheck size={16} /> : <Link2 size={16} />} typeLabel={activity.type === 'VOCABULARY' ? 'Vocabulary' : activity.type === 'HOMEWORK' ? 'Assignment' : 'Material'} title={activity.title} meta={activity.dueAt ? `Due ${formatDate(activity.dueAt)}` : undefined} onOpen={() => onActivity(activity)} />)}
-        {assignments.map(assignment => <CurriculumRow key={assignment.id} compact={compact} icon={<ClipboardCheck size={16} />} typeLabel="Assignment" title={assignment.title} meta={assignment.assignment?.submissions?.length ? 'Submitted' : assignment.dueDate ? `Due ${formatDateTime(assignment.dueDate)}` : undefined} onOpen={() => onAssignment(assignment)} />)}
-        {canManage && editing && <AddContentMenu onAddResource={onAddResource} onAddAssignment={onAddAssignment} onAddTest={onAddTest} />}
-        {itemCount === 0 && (!canManage || !editing) && <p className="px-2 py-1 text-caption text-muted-foreground">No materials in this session yet.</p>}
+        {lesson.blocks.length > 0 ? lesson.blocks.map(block => <OutlineBlockRow key={block.id} block={block} lesson={lesson} compact={compact} onSession={onOpen} onResource={onResource} onAssignment={onAssignment} onDelivery={onDelivery} onActivity={onActivity} />) : <>
+          {lesson.files.map(resource => <ResourceRow key={resource.id} resource={resource} compact={compact} onOpen={() => onResource(resource)} />)}
+          {deliveries.map(delivery => <CurriculumRow key={delivery.id} compact={compact} icon={<CirclePlay size={16} />} typeLabel={delivery.test.mode === 'EXAM' ? 'Test' : 'Quiz'} title={delivery.title} meta={`${delivery.test.duration} min${delivery.dueAt ? ` · Due ${formatDate(delivery.dueAt)}` : ''}`} onOpen={() => onDelivery(delivery)} />)}
+          {activities.map(activity => <CurriculumRow key={activity.id} compact={compact} icon={activity.type === 'VOCABULARY' ? <BookA size={16} /> : activity.type === 'HOMEWORK' ? <ClipboardCheck size={16} /> : <Link2 size={16} />} typeLabel={activity.type === 'VOCABULARY' ? 'Vocabulary' : activity.type === 'HOMEWORK' ? 'Assignment' : 'Material'} title={activity.title} meta={activity.dueAt ? `Due ${formatDate(activity.dueAt)}` : undefined} onOpen={() => onActivity(activity)} />)}
+          {assignments.map(assignment => <CurriculumRow key={assignment.id} compact={compact} icon={<ClipboardCheck size={16} />} typeLabel="Assignment" title={assignment.title} meta={assignment.assignment?.submissions?.length ? 'Submitted' : assignment.dueDate ? `Due ${formatDateTime(assignment.dueDate)}` : undefined} onOpen={() => onAssignment(assignment)} />)}
+        </>}
+        {itemCount === 0 && <p className="px-2 py-1 text-caption text-muted-foreground">Open this session to add learning materials.</p>}
       </CurriculumTree>
     </div>
   </article>;
@@ -432,20 +372,29 @@ function CurriculumRow({ icon, typeLabel, title, meta, onOpen, trailing, action,
   </div>;
 }
 
-function ResourceRow({ resource, canEdit, compact, onOpen, onDelete }: { resource: Resource; canEdit: boolean; compact: boolean; onOpen: () => void; onDelete: () => void }) {
+function OutlineBlockRow({ block, lesson, compact, onSession, onResource, onAssignment, onDelivery, onActivity }: { block: LessonOutlineBlock; lesson: Lesson; compact: boolean; onSession: () => void; onResource: (item: Resource) => void; onAssignment: (item: Assignment) => void; onDelivery: (item: Delivery) => void; onActivity: (item: Activity) => void }) {
+  const phase = block.phase === 'BEFORE_CLASS' ? 'Before class' : block.phase === 'AFTER_CLASS' ? 'After class' : 'During class';
+  if (block.kind === 'TEXT') return <CurriculumRow compact={compact} icon={<FileText size={16} />} typeLabel="Note" title={block.title || 'Lesson note'} meta={phase} onOpen={onSession} trailing={block.isRequired ? <Badge tone="neutral">Required</Badge> : undefined} />;
+  if (block.kind === 'RESOURCE') {
+    const resource = lesson.files.find(item => item.id === block.resourceId);
+    if (!resource) return null;
+    return <ResourceRow resource={resource} phase={phase} compact={compact} onOpen={() => onResource(resource)} />;
+  }
+  const activity = lesson.activities.find(item => item.id === block.activityId);
+  if (activity) return <CurriculumRow compact={compact} icon={activity.type === 'VOCABULARY' ? <BookA size={16} /> : activity.type === 'HOMEWORK' ? <ClipboardCheck size={16} /> : <Link2 size={16} />} typeLabel={activity.type === 'VOCABULARY' ? 'Vocabulary' : activity.type === 'HOMEWORK' ? 'Assignment' : 'Material'} title={activity.title} meta={[phase, activity.dueAt ? `Due ${formatDate(activity.dueAt)}` : null].filter(Boolean).join(' · ')} onOpen={() => onActivity(activity)} />;
+  const delivery = lesson.deliveries.find(item => item.activity?.activityId === block.activityId);
+  if (delivery) return <CurriculumRow compact={compact} icon={<CirclePlay size={16} />} typeLabel={delivery.test.mode === 'EXAM' ? 'Test' : 'Quiz'} title={delivery.title} meta={[phase, `${delivery.test.duration} min`, delivery.dueAt ? `Due ${formatDate(delivery.dueAt)}` : null].filter(Boolean).join(' · ')} onOpen={() => onDelivery(delivery)} />;
+  const assignment = lesson.assignments.find(item => item.id === block.activityId);
+  if (assignment) return <CurriculumRow compact={compact} icon={<ClipboardCheck size={16} />} typeLabel="Assignment" title={assignment.title} meta={phase} onOpen={() => onAssignment(assignment)} />;
+  return <CurriculumRow compact={compact} icon={<FileText size={16} />} typeLabel="Content" title={block.title || 'Lesson content'} meta={phase} onOpen={onSession} />;
+}
+
+function ResourceRow({ resource, phase, compact, onOpen }: { resource: Resource; phase?: string; compact: boolean; onOpen: () => void }) {
   const Icon = resource.kind === 'VIDEO' ? Video : resource.kind === 'LINK' ? Link2 : FileText;
   const typeLabel = resource.kind === 'VIDEO' ? 'Video' : resource.kind === 'LINK' ? 'Link' : resource.kind === 'EMBED' ? 'Activity' : 'Material';
   const engagement = resource.progressSummary ? `${resource.progressSummary.opened} opened · ${resource.progressSummary.completed} completed` : resource.progress?.[0]?.completedAt ? 'Viewed' : null;
-  const metadata = [resource.provider === 'GOOGLE_DRIVE' ? 'Google Drive' : null, engagement].filter(Boolean).join(' · ') || undefined;
-  return <CurriculumRow compact={compact} icon={<Icon size={16} />} typeLabel={typeLabel} title={resource.name} meta={metadata} onOpen={onOpen} trailing={resource.isRequired ? <Badge tone="neutral">Required</Badge> : undefined} action={canEdit ? <ResourceMenu name={resource.name} onDelete={onDelete} /> : <ExternalLink size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />} />;
-}
-
-function AddContentMenu({ onAddResource, onAddAssignment, onAddTest }: { onAddResource: () => void; onAddAssignment: () => void; onAddTest: () => void }) {
-  return <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm" variant="ghost"><Plus size={14} />Add content</Button></DropdownMenuTrigger><DropdownMenuContent align="start" className="w-60"><DropdownMenuLabel>Student work</DropdownMenuLabel><DropdownMenuItem onSelect={onAddAssignment}><ClipboardCheck />Assignment</DropdownMenuItem><DropdownMenuItem onSelect={onAddTest}><CirclePlay />Test</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuLabel>Learning material</DropdownMenuLabel><DropdownMenuItem onSelect={onAddResource}><FileText />File, link, or video</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
-}
-
-function ResourceMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
-  return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8" aria-label={`${name} actions`}><MoreHorizontal size={16} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem variant="destructive" onSelect={onDelete}><Trash2 />Delete material</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
+  const metadata = [phase, resource.provider === 'GOOGLE_DRIVE' ? 'Google Drive' : null, engagement].filter(Boolean).join(' · ') || undefined;
+  return <CurriculumRow compact={compact} icon={<Icon size={16} />} typeLabel={typeLabel} title={resource.name} meta={metadata} onOpen={onOpen} trailing={resource.isRequired ? <Badge tone="neutral">Required</Badge> : undefined} action={<ExternalLink size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />} />;
 }
 
 function ActionMenu({ label, onEdit, onPublish, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, published, busy }: { label: string; onEdit: () => void; onPublish: () => void; onDelete: () => void; onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean; published: boolean; busy: boolean }) {
@@ -489,7 +438,7 @@ function CurriculumEditor({ editor, form, setForm, saving, onClose, onSave }: { 
     presentation="content-dialog"
     onClose={onClose}
     title={`${editor?.item ? 'Edit' : 'Add'} ${lesson ? 'session' : 'week'}`}
-    subtitle={lesson ? 'Set the session overview, timing and visibility.' : 'Create a clear module in the curriculum.'}
+    subtitle={lesson ? 'Set the session timing and visibility.' : 'Create a clear module in the curriculum.'}
     footer={<>
       <DialogButton variant="outline" onClick={onClose}>Cancel</DialogButton>
       <DialogButton disabled={saving || !form.title.trim()} onClick={onSave}>{saving ? 'Saving…' : 'Save'}</DialogButton>
@@ -499,9 +448,9 @@ function CurriculumEditor({ editor, form, setForm, saving, onClose, onSave }: { 
       <Field label="Title" htmlFor="curriculum-title">
         <DialogInput id="curriculum-title" autoFocus value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={lesson ? 'Session 1: Reading foundations' : 'Week 1: Foundations'} />
       </Field>
-      <Field label={lesson ? 'Session overview' : 'Week description'} htmlFor="curriculum-description">
-        <Textarea id="curriculum-description" className="min-h-24" value={lesson ? form.summary : form.description} onChange={event => setForm(current => ({ ...current, [lesson ? 'summary' : 'description']: event.target.value }))} placeholder="What will students learn?" />
-      </Field>
+      {!lesson && <Field label="Week description" htmlFor="curriculum-description">
+        <Textarea id="curriculum-description" className="min-h-24" value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} placeholder="What will students learn?" />
+      </Field>}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Visibility" htmlFor="curriculum-visibility">
           <FormSelect value={form.status} onValueChange={value => setForm(current => ({ ...current, status: value as ContentStatus }))}>
@@ -524,87 +473,6 @@ function CurriculumEditor({ editor, form, setForm, saving, onClose, onSave }: { 
   </Modal>;
 }
 
-function ResourceEditor({ open, form, setForm, upload, onUpload, saving, onClose, onSave }: { open: boolean; form: { name: string; url: string; kind: ResourceKind; isRequired: boolean }; setForm: React.Dispatch<React.SetStateAction<{ name: string; url: string; kind: ResourceKind; isRequired: boolean }>>; upload: File | null; onUpload: (file: File | null) => void; saving: boolean; onClose: () => void; onSave: () => void }) {
-  return <Modal
-    open={open}
-    closeOnBackdrop
-    presentation="content-dialog"
-    onClose={onClose}
-    title="Add learning resource"
-    subtitle="Attach a document, video, website or embeddable activity. Google Drive files must already be shared with the class."
-    footer={<>
-      <DialogButton variant="outline" onClick={onClose}>Cancel</DialogButton>
-      <DialogButton disabled={saving || !form.name.trim() || (!form.url.trim() && !upload)} onClick={onSave}>{saving ? 'Adding…' : 'Add resource'}</DialogButton>
-    </>}
-  >
-    <div className="space-y-4">
-      <Field label="Resource type" htmlFor="resource-type">
-        <FormSelect value={form.kind} onValueChange={value => { const kind = value as ResourceKind; setForm(current => ({ ...current, kind })); if (kind !== 'FILE') onUpload(null); }}>
-          <SelectTrigger id="resource-type" className="w-full"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="FILE">Document / file</SelectItem>
-            <SelectItem value="VIDEO">Video</SelectItem>
-            <SelectItem value="LINK">Website link</SelectItem>
-            <SelectItem value="EMBED">Embedded activity</SelectItem>
-          </SelectContent>
-        </FormSelect>
-      </Field>
-      <Field label="Display name" htmlFor="resource-name">
-        <DialogInput id="resource-name" autoFocus value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="SAT Reading strategy guide" />
-      </Field>
-      <Field label="Secure URL" htmlFor="resource-url">
-        <DialogInput id="resource-url" type="url" value={form.url} disabled={Boolean(upload)} onChange={event => setForm(current => ({ ...current, url: event.target.value }))} placeholder="https://…" />
-      </Field>
-      {form.kind === 'FILE' && <Field label="Or upload a file" htmlFor="resource-upload"><DialogInput id="resource-upload" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp" disabled={saving || Boolean(form.url.trim())} onChange={event => onUpload(event.target.files?.[0] || null)} /><p className="text-caption text-muted-foreground">Private managed files are limited to 20 MB. {upload ? `Selected: ${upload.name}` : ''}</p></Field>}
-      <label className="flex items-center gap-2 text-body text-foreground"><Checkbox checked={form.isRequired} onCheckedChange={checked => setForm(current => ({ ...current, isRequired: Boolean(checked) }))} />Required material</label>
-      <p className="rounded-control border border-ui-border bg-surface-subtle p-3 text-caption leading-5 text-muted-foreground">For privacy, the app no longer changes Drive permissions automatically. Share the file only with the class or organization before adding its URL.</p>
-    </div>
-  </Modal>;
-}
-
-type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED';
-interface AttendanceEntry { studentId: number; status: AttendanceStatus; note: string }
-
-function AttendanceDialog({ lesson, students, onClose }: { lesson: Lesson | null; students: Array<{ id: number; name: string | null; email: string }>; onClose: () => void }) {
-  const [entries, setEntries] = useState<AttendanceEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!lesson) return;
-    setLoading(true);
-    const defaults = students.map(student => ({ studentId: student.id, status: 'PRESENT' as const, note: '' }));
-    setEntries(defaults);
-    axiosClient.get<{ success: boolean; data: { records: Array<{ studentId: number; status: AttendanceStatus; note?: string | null }> } }>(`/api/progress/lessons/${lesson.id}/attendance`)
-      .then(response => {
-        const existing = new Map(response.data.records.map(record => [record.studentId, record]));
-        setEntries(defaults.map(entry => ({ ...entry, status: existing.get(entry.studentId)?.status || entry.status, note: existing.get(entry.studentId)?.note || '' })));
-      })
-      .catch(error => toast.error(requestErrorMessage(error, 'Unable to load attendance.')))
-      .finally(() => setLoading(false));
-  }, [lesson, students]);
-
-  const update = (studentId: number, patch: Partial<AttendanceEntry>) => setEntries(current => current.map(entry => entry.studentId === studentId ? { ...entry, ...patch } : entry));
-  const save = async () => {
-    if (!lesson) return;
-    setSaving(true);
-    try {
-      await axiosClient.put(`/api/progress/lessons/${lesson.id}/attendance`, { records: entries.map(entry => ({ ...entry, note: entry.note.trim() || null })) });
-      toast.success('Attendance saved.');
-      onClose();
-    } catch (error) {
-      toast.error(requestErrorMessage(error, 'Unable to save attendance.'));
-    } finally { setSaving(false); }
-  };
-
-  return <Modal open={Boolean(lesson)} closeOnBackdrop={!saving} presentation="content-dialog" onClose={() => !saving && onClose()} title={`Attendance · ${lesson?.title || 'Session'}`} subtitle="Record one status for every currently enrolled student." className="max-w-3xl!" footer={<><DialogButton variant="outline" disabled={saving} onClick={onClose}>Cancel</DialogButton><DialogButton disabled={saving || loading || students.length === 0 || entries.length !== students.length} onClick={() => void save()}>{saving ? 'Saving…' : 'Save attendance'}</DialogButton></>}>
-    {loading ? <div className="h-48 animate-pulse rounded-lg bg-muted" /> : students.length === 0 ? <p className="py-12 text-center text-body text-muted-foreground">Add students to this class before taking attendance.</p> : <div className="max-h-[62vh] space-y-2 overflow-y-auto pr-1">{students.map(student => {
-      const entry = entries.find(item => item.studentId === student.id) || { studentId: student.id, status: 'PRESENT' as const, note: '' };
-      return <div key={student.id} className="grid gap-3 rounded-lg border border-ui-border p-3 sm:grid-cols-[minmax(0,1fr)_150px_minmax(180px,1fr)] sm:items-center"><div className="min-w-0"><p className="truncate text-body font-medium text-foreground">{student.name || student.email}</p><p className="truncate text-caption text-muted-foreground">{student.email}</p></div><FormSelect value={entry.status} onValueChange={value => update(student.id, { status: value as AttendanceStatus })}><SelectTrigger className="w-full" aria-label={`Attendance status for ${student.name || student.email}`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PRESENT">Present</SelectItem><SelectItem value="LATE">Late</SelectItem><SelectItem value="ABSENT">Absent</SelectItem><SelectItem value="EXCUSED">Excused</SelectItem></SelectContent></FormSelect><DialogInput value={entry.note} maxLength={300} onChange={event => update(student.id, { note: event.target.value })} placeholder="Optional note" aria-label={`Attendance note for ${student.name || student.email}`} /></div>;
-    })}</div>}
-  </Modal>;
-}
-
 function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) { return <div className="space-y-2"><label htmlFor={htmlFor} className="block text-caption font-medium text-foreground">{label}</label>{children}</div>; }
 function CourseSkeleton() { return <div className="space-y-4" aria-label="Loading lessons"><div className="flex items-center justify-between"><div className="space-y-2"><span className="block h-5 w-24 animate-pulse rounded-sm bg-muted" /><span className="block h-4 w-72 max-w-full animate-pulse rounded-sm bg-muted" /></div><span className="h-8 w-24 animate-pulse rounded-control bg-muted" /></div>{[1, 2, 3].map(item => <div key={item} className="h-16 animate-pulse rounded-card border border-ui-border bg-surface" />)}</div>; }
 function CourseLoadError({ message, onRetry }: { message: string; onRetry: () => void }) { return <Card className="flex items-start gap-3 p-4 shadow-none" role="alert"><span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-danger-soft text-danger"><AlertCircle size={17} /></span><div className="min-w-0 flex-1"><p className="text-body font-semibold text-foreground">Unable to load lessons</p><p className="mt-0.5 text-caption text-muted-foreground">{message}</p></div><Button size="sm" variant="outline" onClick={onRetry}><RefreshCw size={14} />Retry</Button></Card>; }
@@ -616,7 +484,7 @@ function lessonContent(lesson: Lesson) {
   return { deliveries, activities: lesson.activities, assignments };
 }
 
-function lessonItemCount(lesson: Lesson) { const content = lessonContent(lesson); return lesson.files.length + content.deliveries.length + content.activities.length + content.assignments.length; }
+function lessonItemCount(lesson: Lesson) { if (lesson.blocks.length) return lesson.blocks.length; const content = lessonContent(lesson); return lesson.files.length + content.deliveries.length + content.activities.length + content.assignments.length; }
 function weekAnchorId(weekId: string) { return `curriculum-week-${weekId}`; }
 function requestErrorMessage(error: unknown, fallback: string) { const body = (error as { response?: { data?: { error?: string; message?: string } } })?.response?.data; return body?.error || body?.message || fallback; }
 function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Date unavailable' : format(date, 'MMM d'); }
@@ -644,10 +512,16 @@ function normalizeWeeks(value: unknown): Week[] {
         const resource = rawResource as Partial<Resource>;
         return { ...resource, id: String(resource.id || ''), name: String(resource.name || 'Untitled resource'), url: String(resource.url || ''), kind: resource.kind || 'FILE', isRequired: Boolean(resource.isRequired), progress: Array.isArray(resource.progress) ? resource.progress : [] } as Resource;
       }) : [];
-      return { ...lesson, id: String(lesson.id || ''), order: Number(lesson.order) || 0, title: String(lesson.title || 'Untitled session'), status: lesson.status || 'PUBLISHED', files, assignments: Array.isArray(lesson.assignments) ? lesson.assignments : [], deliveries: Array.isArray(lesson.deliveries) ? lesson.deliveries : [], activities: Array.isArray(lesson.activities) ? lesson.activities : [] } as Lesson;
+      const blocks = Array.isArray(lesson.blocks) ? lesson.blocks.map(rawBlock => {
+        const block = rawBlock as Partial<LessonOutlineBlock>;
+        return { ...block, id: String(block.id || ''), kind: block.kind || 'TEXT', phase: block.phase || 'DURING_CLASS', order: Number(block.order) || 0, isRequired: Boolean(block.isRequired) } as LessonOutlineBlock;
+      }).sort((left, right) => phaseOrder(left.phase) - phaseOrder(right.phase) || left.order - right.order) : [];
+      return { ...lesson, id: String(lesson.id || ''), order: Number(lesson.order) || 0, title: String(lesson.title || 'Untitled session'), status: lesson.status || 'PUBLISHED', files, assignments: Array.isArray(lesson.assignments) ? lesson.assignments : [], deliveries: Array.isArray(lesson.deliveries) ? lesson.deliveries : [], activities: Array.isArray(lesson.activities) ? lesson.activities : [], blocks } as Lesson;
     }) : [];
     return { ...week, id: String(week.id || ''), order: Number(week.order) || 0, title: String(week.title || 'Untitled week'), status: week.status || 'PUBLISHED', lessons } as Week;
   });
 }
+
+function phaseOrder(phase: LessonPhase) { return phase === 'BEFORE_CLASS' ? 0 : phase === 'DURING_CLASS' ? 1 : 2; }
 
 export default WeeklyProgress;

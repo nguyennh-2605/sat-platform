@@ -2,6 +2,7 @@ const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
 const { createFollowUpWithDb } = require('./learning-follow-up.service');
+const { createActivityBlockWithDb } = require('./lesson-block.service');
 
 const parseUserId = (value) => Number.parseInt(value, 10);
 const validScorePolicies = new Set(['FIRST', 'BEST', 'LATEST']);
@@ -53,7 +54,7 @@ const median = (values) => {
   return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 };
 
-const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lessonId, title, availableAt, dueAt, maxAttempts, scorePolicy, followUp, userId, userRole }) => {
+const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lessonId, lessonPhase, title, availableAt, dueAt, maxAttempts, scorePolicy, followUp, userId, userRole }) => {
   const normalizedClassIds = [...new Set((Array.isArray(classIds) ? classIds : []).map(String).filter(Boolean))];
   const normalizedTestIds = [...new Set((Array.isArray(testIds) ? testIds : []).map(Number).filter(Number.isInteger))];
   const normalizedStudentIds = [...new Set((Array.isArray(studentIds) ? studentIds : []).map(parseUserId).filter(Number.isInteger))];
@@ -175,6 +176,9 @@ const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lesso
           },
           select: { id: true },
         });
+        if (lessonId) {
+          await createActivityBlockWithDb({ db: tx, lessonId, activityId: canonicalActivity.id, title: delivery.title, phase: lessonPhase });
+        }
         await tx.$executeRaw`INSERT INTO "TestActivity" ("activityId", "testDeliveryId") VALUES (${canonicalActivity.id}, ${delivery.id}) ON CONFLICT ("activityId") DO NOTHING`;
         await tx.notification.createMany({
           data: assigneeIds.map(studentId => ({

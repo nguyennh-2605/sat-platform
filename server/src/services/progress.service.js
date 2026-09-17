@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const testDeliveryService = require('./test-delivery.service');
 const { sendNotificationToUser } = require('./notification.service');
 const { canManageProgress, canReadProgress } = require('../utils/progress-access');
+const { createResourceBlockWithDb, createActivityBlockWithDb } = require('./lesson-block.service');
 
 const CONTENT_STATUSES = new Set(['DRAFT', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED']);
 const RESOURCE_KINDS = new Set(['FILE', 'VIDEO', 'LINK', 'EMBED']);
@@ -102,7 +103,10 @@ exports.getWeeks = async ({ classId, userId, userRole }) => {
           deliveries: {
             where: canManage ? {} : { status: 'PUBLISHED', assignees: { some: { studentId: currentUserId, excusedAt: null } } },
             orderBy: { createdAt: 'desc' },
-            include: { test: { select: { id: true, title: true, mode: true, duration: true, subject: true, folderId: true, sections: { select: { _count: { select: { questions: true } } } } } } },
+            include: {
+              activity: { select: { activityId: true } },
+              test: { select: { id: true, title: true, mode: true, duration: true, subject: true, folderId: true, sections: { select: { _count: { select: { questions: true } } } } } },
+            },
           },
           activities: {
             where: canManage ? { type: { in: ['VOCABULARY', 'HOMEWORK', 'RESOURCE'] } } : { type: { in: ['VOCABULARY', 'HOMEWORK', 'RESOURCE'] }, status: 'PUBLISHED', assignees: { some: { studentId: currentUserId, status: { not: 'EXCUSED' } } } },
@@ -112,6 +116,17 @@ exports.getWeeks = async ({ classId, userId, userRole }) => {
             },
           },
           progress: canManage ? true : { where: { studentId: currentUserId }, take: 1 },
+          blocks: {
+            where: canManage ? {} : {
+              OR: [
+                { kind: 'TEXT' },
+                { kind: 'RESOURCE', resource: { is: { OR: [{ availableAt: null }, { availableAt: { lte: now } }] } } },
+                { kind: 'ACTIVITY', activity: { is: { status: 'PUBLISHED', OR: [{ availableAt: null }, { availableAt: { lte: now } }], assignees: { some: { studentId: currentUserId, excusedAt: null } } } } },
+              ],
+            },
+            orderBy: [{ phase: 'asc' }, { order: 'asc' }, { createdAt: 'asc' }],
+            select: { id: true, kind: true, phase: true, order: true, title: true, isRequired: true, resourceId: true, activityId: true },
+          },
         },
       },
     },
@@ -311,7 +326,7 @@ exports.deleteLesson = async ({ lessonId, userId, userRole }) => {
   await prisma.lesson.delete({ where: { id: lessonId } });
 };
 
-exports.addFiles = async ({ lessonId, files, userId, userRole }) => {
+exports.addFiles = async ({ lessonId, files, phase, userId, userRole }) => {
   if (!Array.isArray(files) || !files.length) throw new ApiError(400, { success: false, error: 'Danh sách tài liệu không hợp lệ.' });
   const lesson = await getLessonWithClass(lessonId);
   if (!lesson) throw new ApiError(404, { success: false, error: 'Không tìm thấy buổi học.' });
@@ -320,14 +335,24 @@ exports.addFiles = async ({ lessonId, files, userId, userRole }) => {
   const normalized = files.map(validateResource);
   const managedAssetIds = normalized.flatMap(file => file.fileAssetId ? [file.fileAssetId] : []);
   if (new Set(managedAssetIds).size !== managedAssetIds.length) throw new ApiError(400, { success: false, error: 'Each uploaded file can be attached only once.' });
+  let managedAssets = [];
   if (managedAssetIds.length) {
-    const assets = await prisma.fileAsset.findMany({
-      where: { id: { in: managedAssetIds }, ownerId: userIdNumber(userId), status: 'READY', lessonFiles: { none: {} } },
-      select: { id: true },
+    managedAssets = await prisma.fileAsset.findMany({
+      where: { id: { in: managedAssetIds }, ownerId: userIdNumber(userId), status: 'READY', lessonFile: null },
+      select: { id: true, mimeType: true },
     });
-    if (assets.length !== managedAssetIds.length) throw new ApiError(400, { success: false, error: 'One or more uploaded files are unavailable or already attached.' });
+    if (managedAssets.length !== managedAssetIds.length) throw new ApiError(400, { success: false, error: 'One or more uploaded files are unavailable or already attached.' });
   }
-  return prisma.$transaction(normalized.map((file, index) => prisma.lessonFile.create({ data: { ...file, lessonId, provider: files[index].provider || null, mimeType: files[index].mimeType || null, thumbnailUrl: files[index].thumbnailUrl || null, durationSeconds: files[index].durationSeconds ? Number(files[index].durationSeconds) : null, isRequired: Boolean(files[index].isRequired), availableAt: dateValue(files[index].availableAt), order: (last?.order ?? -1) + index + 1 } })));
+  const managedAssetById = new Map(managedAssets.map(asset => [asset.id, asset]));
+  return prisma.$transaction(async tx => {
+    const created = [];
+    for (const [index, file] of normalized.entries()) {
+      const resource = await tx.lessonFile.create({ data: { ...file, lessonId, provider: files[index].provider || null, mimeType: file.fileAssetId ? managedAssetById.get(file.fileAssetId)?.mimeType || null : files[index].mimeType || null, thumbnailUrl: files[index].thumbnailUrl || null, durationSeconds: files[index].durationSeconds ? Number(files[index].durationSeconds) : null, isRequired: Boolean(files[index].isRequired), availableAt: dateValue(files[index].availableAt), order: (last?.order ?? -1) + index + 1 } });
+      await createResourceBlockWithDb({ db: tx, lessonId, resourceId: resource.id, title: resource.name, isRequired: resource.isRequired, phase });
+      created.push(resource);
+    }
+    return created;
+  });
 };
 
 exports.deleteFile = async ({ fileId, userId, userRole }) => {
@@ -372,7 +397,8 @@ exports.createOrUpdateAssignment = async ({ lessonId, title, content, dueDate, t
     if (existing.assignment.activity) await prisma.classActivity.update({ where: { id: existing.assignment.activity.activityId }, data: { title: canonical.title, instructions: canonical.content, dueAt: canonical.deadline, lessonId, status: 'PUBLISHED' } });
   } else {
     canonical = await prisma.assignment.create({ data: { title: title.trim(), type: 'assignment', content: content || null, deadline, testIds: normalizedTestIds, fileUrls: [], links: [], classId: lesson.week.classId } });
-    await prisma.classActivity.create({ data: { type: 'HOMEWORK', status: 'PUBLISHED', classId: lesson.week.classId, lessonId, title: canonical.title, instructions: canonical.content, dueAt: canonical.deadline, completionRule: 'SUBMIT', audience: 'ALL_STUDENTS', createdById: userIdNumber(userId), homework: { create: { assignmentId: canonical.id } }, assignees: { create: lesson.week.class.students.map(student => ({ studentId: student.id })) } } });
+    const activity = await prisma.classActivity.create({ data: { type: 'HOMEWORK', status: 'PUBLISHED', classId: lesson.week.classId, lessonId, title: canonical.title, instructions: canonical.content, dueAt: canonical.deadline, completionRule: 'SUBMIT', audience: 'ALL_STUDENTS', createdById: userIdNumber(userId), homework: { create: { assignmentId: canonical.id } }, assignees: { create: lesson.week.class.students.map(student => ({ studentId: student.id })) } } });
+    await createActivityBlockWithDb({ db: prisma, lessonId, activityId: activity.id, title: activity.title });
   }
   const assignment = await prisma.lessonAssignment.upsert({ where: { lessonId }, update: { title: canonical.title, content: canonical.content, dueDate: canonical.deadline, testIds: normalizedTestIds, assignmentId: canonical.id }, create: { title: canonical.title, content: canonical.content, dueDate: canonical.deadline, testIds: normalizedTestIds, lessonId, assignmentId: canonical.id } });
   await testDeliveryService.syncClassAssignmentDeliveries({ assignment: canonical, userId, userRole });

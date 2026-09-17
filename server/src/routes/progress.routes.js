@@ -17,6 +17,12 @@ router.put('/weeks/:weekId/lessons/reorder', authenticateToken, progressControll
 router.put('/lessons/:lessonId', authenticateToken, progressController.updateLesson);
 router.delete('/lessons/:lessonId', authenticateToken, progressController.deleteLesson);
 router.put('/lessons/:lessonId/progress', authenticateToken, progressController.completeLesson);
+router.get('/lessons/:lessonId/workspace', authenticateToken, progressController.getLessonWorkspace);
+router.post('/lessons/:lessonId/blocks', authenticateToken, progressController.createLessonBlock);
+router.put('/lessons/:lessonId/blocks/reorder', authenticateToken, progressController.reorderLessonBlocks);
+router.patch('/lessons/:lessonId/blocks/:blockId', authenticateToken, progressController.updateLessonBlock);
+router.delete('/lessons/:lessonId/blocks/:blockId', authenticateToken, progressController.deleteLessonBlock);
+router.put('/lessons/:lessonId/blocks/:blockId/progress', authenticateToken, progressController.updateLessonBlockProgress);
 router.get('/lessons/:lessonId/attendance', authenticateToken, progressController.getAttendance);
 router.put('/lessons/:lessonId/attendance', authenticateToken, progressController.saveAttendance);
 

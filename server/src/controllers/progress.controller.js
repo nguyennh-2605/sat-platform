@@ -1,8 +1,60 @@
 const ApiError = require('../utils/ApiError');
 const progressService = require('../services/progress.service');
+const lessonWorkspaceService = require('../services/lesson-workspace.service');
 
 const getUserId = (req) => req.user?.userId || req.user?.id;
 const getUserRole = (req) => req.user?.role;
+
+const workspaceHandler = (operation, errorLabel, fallbackMessage, successStatus = 200) => async (req, res) => {
+  try {
+    const data = await operation(req);
+    res.status(successStatus).json({ success: true, data });
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error(errorLabel, error);
+    res.status(500).json({ success: false, error: fallbackMessage });
+  }
+};
+
+exports.getLessonWorkspace = workspaceHandler(
+  req => lessonWorkspaceService.getWorkspace({ lessonId: req.params.lessonId, userId: getUserId(req), userRole: getUserRole(req) }),
+  'Get Lesson Workspace Error:',
+  'Unable to load this lesson.',
+);
+
+exports.createLessonBlock = workspaceHandler(
+  req => lessonWorkspaceService.createTextBlock({ lessonId: req.params.lessonId, ...req.body, userId: getUserId(req), userRole: getUserRole(req) }),
+  'Create Lesson Block Error:',
+  'Unable to create this lesson block.',
+  201,
+);
+
+exports.updateLessonBlock = workspaceHandler(
+  req => lessonWorkspaceService.updateBlock({ lessonId: req.params.lessonId, blockId: req.params.blockId, ...req.body, userId: getUserId(req), userRole: getUserRole(req) }),
+  'Update Lesson Block Error:',
+  'Unable to update this lesson block.',
+);
+
+exports.deleteLessonBlock = workspaceHandler(
+  async req => {
+    await lessonWorkspaceService.deleteTextBlock({ lessonId: req.params.lessonId, blockId: req.params.blockId, userId: getUserId(req), userRole: getUserRole(req) });
+    return null;
+  },
+  'Delete Lesson Block Error:',
+  'Unable to delete this lesson block.',
+);
+
+exports.reorderLessonBlocks = workspaceHandler(
+  req => lessonWorkspaceService.reorderBlocks({ lessonId: req.params.lessonId, orderedIds: req.body.orderedIds, userId: getUserId(req), userRole: getUserRole(req) }),
+  'Reorder Lesson Blocks Error:',
+  'Unable to reorder lesson blocks.',
+);
+
+exports.updateLessonBlockProgress = workspaceHandler(
+  req => lessonWorkspaceService.updateBlockProgress({ lessonId: req.params.lessonId, blockId: req.params.blockId, ...req.body, userId: getUserId(req), userRole: getUserRole(req) }),
+  'Update Lesson Block Progress Error:',
+  'Unable to update lesson progress.',
+);
 
 // ==========================================
 // WEEK MANAGEMENT
@@ -199,6 +251,7 @@ exports.addFiles = async (req, res) => {
     const newFiles = await progressService.addFiles({
       lessonId: req.params.lessonId,
       files: req.body.files,
+      phase: req.body.phase,
       userId: getUserId(req),
       userRole: getUserRole(req),
     });

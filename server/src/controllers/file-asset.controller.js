@@ -21,6 +21,6 @@ exports.completeUpload = handle('Unable to complete the file upload.', async (re
 });
 
 exports.getAccessUrl = handle('Unable to open the file.', async (req, res) => {
-  const data = await fileAssetService.getAccessUrl({ fileAssetId: req.params.fileAssetId, userId: req.user.userId || req.user.id, userRole: req.user.role });
+  const data = await fileAssetService.getAccessUrl({ fileAssetId: req.params.fileAssetId, userId: req.user.userId || req.user.id, userRole: req.user.role, download: req.query.download === '1' });
   return res.json({ success: true, data });
 });

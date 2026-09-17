@@ -286,14 +286,14 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Anatomy bắt buộc là `Week = bordered surface`, `Session = section row`, `Content = compact interactive row`; không bọc mỗi Session, resource, quiz hoặc homework trong Card riêng.
 - Teacher/Admin mặc định xem curriculum ở read mode. Nút `Edit curriculum` mới bật contextual Add/Edit/Publish/Delete/Reorder; `Done` phải đưa màn hình về read mode và ẩn toàn bộ mutation controls. Student chỉ thấy published outline, content actions và completion phù hợp.
 - `Published` là trạng thái mặc định và không cần lặp badge trên mọi row. Chỉ nhấn `Draft`, `Scheduled`, `Archived` hoặc effective visibility như `Hidden by week`.
-- Week rỗng và Session rỗng dùng content-driven height; không reserve empty panel cao. `Add session` và `Add content` phải xuất hiện tại đúng parent context.
-- Syllabus dài hỗ trợ Compact, Expand All và Collapse All. Đây là client preference theo class, không phải shared curriculum data.
+- Week rỗng và Session rỗng dùng content-driven height; không reserve empty panel cao. `Add session` xuất hiện trong Week khi edit curriculum; `Add content` chỉ xuất hiện bên trong Session Workspace, không xuất hiện ở Lessons outline.
+- Syllabus dài hỗ trợ Expand All và Collapse All. Không có Compact mode; outline dùng một mật độ ổn định để tránh layout thay đổi giữa các lần truy cập.
 - Drag handle chỉ xuất hiện khi backend persist được order. Reorder phải có keyboard sensor và `Move up`/`Move down` fallback; không giả lập reorder chỉ ở client.
 - Week và Session có canonical `order` riêng. Không cho drag xen kẽ Resource, TestDelivery, ClassActivity và LessonAssignment cho tới khi các loại content có chung ordering contract.
 - Vùng Lessons tập trung ở `max-w-[1320px]`. Từ viewport `1400px`, dùng grid `minmax(0, 1fr) 280px` với gap `24px`; dưới ngưỡng này curriculum trở lại full-column.
 - Right rail duy nhất được phép là `Course outline` sticky phục vụ navigation Week. Sticky phải đặt trên chính rail/grid item để nó bám viewport trong toàn bộ chiều cao curriculum. Nó có thể hiển thị số Session và trạng thái publication ngoại lệ, nhưng không được lặp KPI, performance, todo, announcement, chart hoặc nội dung của tab khác. Click Week phải scroll tới đúng Week và rail phải phản ánh Week hiện tại.
 - Chỉ Week header dùng muted surface đủ rõ (`bg-section-header`); Week body vẫn là surface trắng. `Week NN` và `Session NN` là structural label `font-semibold`, đặt inline trước title bằng dấu `·` và không dùng muted text.
-- Content phải thụt ít nhất 28px so với Session title và dùng connector cây cong, mảnh bằng semantic border token. `Add content` nằm trên cùng tree branch với các content item.
+- Content phải thụt ít nhất 28px so với Session title và dùng connector cây cong, mảnh bằng semantic border token.
 - Content row ưu tiên mật độ gọn: khoảng 36px cho một dòng và 44px khi có metadata; khoảng cách từ Session metadata tới content tree khoảng 8px.
 - Content primary label dùng một dòng `Type: Title`; metadata chỉ mở dòng phụ khi có thông tin thật như duration, deadline, provider hoặc completion. Icon là glyph thuần `size-4`, không có box, border hoặc background riêng.
 
@@ -304,7 +304,12 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - `AssignmentComposer` và `AssignTestsComposer` là shared feature components dùng chung từ Activities và Lessons. Shared Delivery gồm availability, due date, audience và optional Week/Session placement.
 - Assign Tests hỗ trợ multi-select. Một bulk action tạo N Test activities độc lập; không tạo một activity bundle và không ghi `Assignment.testIds[]` trong flow mới.
 - Activity list hiển thị type, Week/Session placement, deadline, audience/completion summary và mở đúng destination: Test Performance hoặc Assignment Detail.
-- Lessons → Add content chia `Student work` (Assignment, Test) và `Learning material` (File, Link, Video). Composer mở tại chỗ với Session được prefill, không điều hướng giáo viên sang tab khác.
+- Session Workspace là một màn hình duy nhất, không tách Build/Monitor tabs. Desktop dùng hai cột co giãn theo content viewport: bên trái là ba stage cố định `Before class → During class → After class`, bên phải là attendance management table sticky chỉ gồm học sinh và status; tablet/mobile xếp attendance xuống dưới. Mỗi attendance status phải có màu semantic riêng nhưng không phụ thuộc duy nhất vào màu để truyền đạt ý nghĩa.
+- Session Workspace header hiển thị session title và một subtitle ngắn xác định đây là learning workspace; không lặp class/week metadata, Session overview hoặc Learning objective. Session create/edit không có overview field.
+- Mỗi stage dùng compact interactive rows theo anatomy `Type: Title`. Click resource mở internal viewer, click Assignment/Test mở owning destination, còn Note mở nội dung theo progressive disclosure. Không render lại title/type trong nested card; PDF, image, text và allowlisted video chỉ render trong viewer, không bung trực tiếp dưới row.
+- Session Workspace → Add content nằm trong đúng stage và chia `Learning material` thành các action rõ `Add note`, `Upload file`, `Add video`, `Add link`; `Student work` gồm Assignment và Test. Upload file hỗ trợ drag-and-drop, validate type/20 MB limit và progress; Composer mở tại chỗ với Session và stage được prefill.
+- Internal resource viewer dùng short-lived authorized URL. PDF, image, text/CSV và YouTube/Vimeo/Loom được preview trong app; Office/unknown file fallback sang Download/Open original; arbitrary external links không được iframe.
+- Lessons outline chỉ đọc content theo thứ tự stage/order đã lưu trong Session Workspace. Giáo viên phải mở Session để thêm, xóa, chuyển stage hoặc reorder content.
 - Archive test trong Test Library không được làm mất quyền truy cập vào delivery đã Published; archive chỉ ảnh hưởng content library và việc tạo assignment mới.
 
 ### Classroom Announcements

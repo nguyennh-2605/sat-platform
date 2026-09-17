@@ -201,6 +201,10 @@ Express Server (index.js → app.js)
 | `PUT` | `/api/progress/weeks/:weekId/lessons/reorder` | JWT | Persist the complete lesson order within one week (owning teacher/admin only) |
 | `PUT` | `/api/progress/lessons/:lessonId` | JWT | Update lesson details, schedule, and visibility (owning teacher/admin only) |
 | `DELETE` | `/api/progress/lessons/:lessonId` | JWT | Delete lesson and unlink its published activities (teacher only) |
+| `GET` | `/api/progress/lessons/:lessonId/workspace` | JWT | Load the role-scoped Lesson Workspace: ordered content for students, derived completion/resume state, or teacher completion funnel and per-student monitoring |
+| `POST/PATCH/DELETE` | `/api/progress/lessons/:lessonId/blocks[/:blockId]` | JWT + owning TEACHER/ADMIN | Create and manage staged text blocks or update phase/required state; linked resources and activities retain their canonical owners |
+| `PUT` | `/api/progress/lessons/:lessonId/blocks/reorder` | JWT + owning TEACHER/ADMIN | Persist a complete cross-type lesson block order |
+| `PUT` | `/api/progress/lessons/:lessonId/blocks/:blockId/progress` | JWT + enrolled STUDENT | Record text/resource engagement and reconcile automatic lesson completion |
 | `GET/PUT` | `/api/progress/lessons/:lessonId/attendance` | JWT + owning TEACHER/ADMIN | Read or batch-upsert one attendance record per currently enrolled student for a session |
 | `POST` | `/api/progress/lessons/:lessonId/files` | JWT | Add files to lesson (teacher only) |
 | `DELETE` | `/api/progress/files/:fileId` | JWT | Delete file (teacher only) |
@@ -298,7 +302,7 @@ Teacher Overview only exposes classes owned by the authenticated teacher. Core w
 | --- | --- | --- | --- |
 | `POST` | `/api/files/uploads` | JWT + authorized owner | Create a pending private file asset and a short-lived S3-compatible upload URL for assigned student work or an owned lesson resource |
 | `POST` | `/api/files/:fileAssetId/complete` | JWT + owner | Verify object metadata and mark an upload ready |
-| `GET` | `/api/files/:fileAssetId/access` | JWT + authorized owner/staff/student | Create a short-lived read URL after checking assignment or classroom membership access |
+| `GET` | `/api/files/:fileAssetId/access` | JWT + authorized owner/staff/student | Create a short-lived inline viewer URL plus canonical file metadata after access checks; `?download=1` returns an attachment URL |
 
 Managed file records store object keys, never signed URLs. `HomeworkSubmissionContent` separates the student's private `DRAFT` from the official `SUBMITTED` snapshot; teachers only read the latter. External links remain `HomeworkSubmissionItem(kind=LINK)` and do not become managed files.
 
@@ -342,6 +346,9 @@ Section ──1:N── Question
 Question ──1:N── Answer
 
 Week ──1:N── Lesson
+Lesson ──1:N── LessonBlock
+LessonBlock ──1:N── LessonBlockProgress
+LessonBlock ──0:1── LessonFile / ClassActivity
 Lesson ──1:N── LessonFile
 Lesson ──1:1── LessonAssignment
 

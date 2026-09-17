@@ -29,11 +29,11 @@ const getObjectStorage = () => {
       const command = new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: mimeType });
       return getSignedUrl(client, command, { expiresIn: 15 * 60 });
     },
-    async createReadUrl({ storageKey, downloadName }) {
+    async createReadUrl({ storageKey, downloadName, disposition = 'inline' }) {
       const command = new GetObjectCommand({
         Bucket: bucket,
         Key: storageKey,
-        ResponseContentDisposition: `inline; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
+        ResponseContentDisposition: `${disposition}; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
       });
       return getSignedUrl(client, command, { expiresIn: 5 * 60 });
     },

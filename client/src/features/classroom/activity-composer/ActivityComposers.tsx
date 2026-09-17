@@ -38,6 +38,7 @@ interface TestPage { items: ComposerTest[] }
 interface OutlineResponse { success: boolean; data: OutlineWeek[] }
 interface ClassDetail { id: string; students: ActivityStudent[] }
 type TestSource = 'MY' | 'SYSTEM';
+export type LessonPhase = 'BEFORE_CLASS' | 'DURING_CLASS' | 'AFTER_CLASS';
 const EMPTY_TESTS: ComposerTest[] = [];
 const EMPTY_STUDENT_IDS: number[] = [];
 const NO_SESSION = 'NO_SESSION';
@@ -48,6 +49,7 @@ interface BaseComposerProps {
   classId: string;
   students: ActivityStudent[];
   initialLessonId?: string;
+  initialLessonPhase?: LessonPhase;
   initialStudentIds?: number[];
   followUp?: LearningFollowUpDraft;
   onCreated: (result?: unknown) => Promise<void> | void;
@@ -63,7 +65,7 @@ interface BaseComposerProps {
   };
 }
 
-export function AssignmentComposer({ open, onClose, classId, students, initialLessonId, initialStudentIds = EMPTY_STUDENT_IDS, followUp, onCreated, assignment }: BaseComposerProps) {
+export function AssignmentComposer({ open, onClose, classId, students, initialLessonId, initialLessonPhase, initialStudentIds = EMPTY_STUDENT_IDS, followUp, onCreated, assignment }: BaseComposerProps) {
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [availableAt, setAvailableAt] = useState('');
@@ -121,6 +123,7 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
       const payload = {
         classId,
         lessonId: lessonId || null,
+        ...(lessonId && initialLessonPhase ? { lessonPhase: initialLessonPhase } : {}),
         title: title.trim(),
         instructions: instructions.trim() || null,
         availableAt: isoOrNull(availableAt),
@@ -203,6 +206,7 @@ interface AssignTestsComposerProps {
   classId?: string;
   students?: ActivityStudent[];
   initialLessonId?: string;
+  initialLessonPhase?: LessonPhase;
   initialTests?: ComposerTest[];
   initialSource?: TestSource;
   initialStudentIds?: number[];
@@ -210,7 +214,7 @@ interface AssignTestsComposerProps {
   onCreated: (result?: unknown) => Promise<void> | void;
 }
 
-export function AssignTestsComposer({ open, onClose, classId, students: fixedStudents, initialLessonId, initialTests = EMPTY_TESTS, initialSource = 'MY', initialStudentIds = EMPTY_STUDENT_IDS, followUp, onCreated }: AssignTestsComposerProps) {
+export function AssignTestsComposer({ open, onClose, classId, students: fixedStudents, initialLessonId, initialLessonPhase, initialTests = EMPTY_TESTS, initialSource = 'MY', initialStudentIds = EMPTY_STUDENT_IDS, followUp, onCreated }: AssignTestsComposerProps) {
   const [source, setSource] = useState<TestSource>(initialSource);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState(classId || '');
@@ -308,6 +312,7 @@ export function AssignTestsComposer({ open, onClose, classId, students: fixedStu
         classIds: [selectedClassId],
         testIds: selectedIds,
         lessonId: lessonId || null,
+        ...(lessonId && initialLessonPhase ? { lessonPhase: initialLessonPhase } : {}),
         availableAt: isoOrNull(availableAt),
         dueAt: isoOrNull(dueAt),
         maxAttempts,

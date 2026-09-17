@@ -108,12 +108,18 @@ test('owner completion verifies metadata before marking an upload ready', async 
 });
 
 test('owners and the teacher of submitted work can get access, unrelated teachers cannot', async () => {
-  const asset = { id: 'asset-1', ownerId: 7, status: 'READY', storageKey: 'private-key', originalName: 'answer.pdf' };
-  const storageFactory = () => ({ createReadUrl: async () => 'https://signed.example/read' });
+  const asset = { id: 'asset-1', ownerId: 7, status: 'READY', storageKey: 'private-key', originalName: 'answer.pdf', mimeType: 'application/pdf', sizeBytes: 1024 };
+  let readRequest;
+  const storageFactory = () => ({ createReadUrl: async input => { readRequest = input; return 'https://signed.example/read'; } });
   const ownerDb = createDb();
   ownerDb.fileAsset.findUnique = async () => asset;
   const owner = await fileAssetService.getAccessUrl({ fileAssetId: 'asset-1', userId: 7, userRole: 'STUDENT' }, { db: ownerDb, storageFactory });
   assert.equal(owner.url, 'https://signed.example/read');
+  assert.deepEqual(owner.asset, { id: 'asset-1', name: 'answer.pdf', mimeType: 'application/pdf', sizeBytes: 1024, status: 'READY' });
+  assert.equal(readRequest.disposition, 'inline');
+
+  await fileAssetService.getAccessUrl({ fileAssetId: 'asset-1', userId: 7, userRole: 'STUDENT', download: true }, { db: ownerDb, storageFactory });
+  assert.equal(readRequest.disposition, 'attachment');
 
   const teacherDb = createDb();
   teacherDb.fileAsset.findUnique = async () => asset;

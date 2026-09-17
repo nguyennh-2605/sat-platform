@@ -19,6 +19,7 @@ const TestDetail = lazy(() => import('../pages/practice-test/TestDetail'));
 const ErrorLog = lazy(() => import('../pages/error-log/ErrorLog'));
 const Classroom = lazy(() => import('../pages/classroom/Classroom'));
 const ClassroomList = lazy(() => import('../pages/classroom/ClassroomList'));
+const LessonWorkspace = lazy(() => import('../pages/classroom/LessonWorkspace'));
 const ResultAnalytics = lazy(() => import('../pages/result-analytics/ResultAnalytics'));
 const ScoreReport = lazy(() => import('../pages/score-report/ScoreReport'));
 const CreateTestWizard = lazy(() => import('../features/test-creation/CreateTestWizard'));
@@ -60,6 +61,7 @@ function App() {
                 <Route path="classes" element={<ClassroomList />} />
                 <Route path="vocabulary" element={<Vocabulary />} />
                 <Route path="class/:classId" element={<Classroom />} />
+                <Route path="class/:classId/lesson/:lessonId" element={<LessonWorkspace />} />
                 <Route path="error-log" element={<RequireRole roles={['STUDENT']}><ErrorLog /></RequireRole>} />
                 <Route path="results-analytics" element={<RequireRole roles={['STUDENT']}><ResultAnalytics /></RequireRole>} />
                 <Route path="score-report" element={<ScoreReport />} />

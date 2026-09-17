@@ -116,7 +116,7 @@ exports.completeUpload = async ({ fileAssetId, ownerId }, dependencies = {}) => 
   return serializeAsset(ready);
 };
 
-exports.getAccessUrl = async ({ fileAssetId, userId, userRole }, dependencies = {}) => {
+exports.getAccessUrl = async ({ fileAssetId, userId, userRole, download = false }, dependencies = {}) => {
   const db = dependencies.db || prisma;
   const storageFactory = dependencies.storageFactory || getObjectStorage;
   const requesterId = currentUserId(userId);
@@ -131,8 +131,8 @@ exports.getAccessUrl = async ({ fileAssetId, userId, userRole }, dependencies = 
       select: { id: true },
     }) : null;
     if (accessibleLesson) {
-      const url = await storageFactory().createReadUrl({ storageKey: asset.storageKey, downloadName: asset.originalName });
-      return { url, expiresInSeconds: 300 };
+      const url = await storageFactory().createReadUrl({ storageKey: asset.storageKey, downloadName: asset.originalName, disposition: download ? 'attachment' : 'inline' });
+      return { url, expiresInSeconds: 300, asset: serializeAsset(asset) };
     }
     const accessibleItem = await db.homeworkSubmissionItem.findFirst({
       where: { fileAssetId, content: { slot: 'SUBMITTED', submission: { assignment: { class: { teacherId: requesterId } } } } },
@@ -140,8 +140,8 @@ exports.getAccessUrl = async ({ fileAssetId, userId, userRole }, dependencies = 
     });
     if (!accessibleItem) throw new ApiError(403, { error: 'You cannot access this file.' });
   }
-  const url = await storageFactory().createReadUrl({ storageKey: asset.storageKey, downloadName: asset.originalName });
-  return { url, expiresInSeconds: 300 };
+  const url = await storageFactory().createReadUrl({ storageKey: asset.storageKey, downloadName: asset.originalName, disposition: download ? 'attachment' : 'inline' });
+  return { url, expiresInSeconds: 300, asset: serializeAsset(asset) };
 };
 
 exports.cleanupAssets = async ({
@@ -157,7 +157,7 @@ exports.cleanupAssets = async ({
   const assets = await db.fileAsset.findMany({
     where: { OR: [
       { status: 'PENDING_UPLOAD', createdAt: { lt: olderThan } },
-      { status: 'READY', createdAt: { lt: olderThan }, items: { none: {} }, lessonFiles: { none: {} } },
+      { status: 'READY', createdAt: { lt: olderThan }, items: { none: {} }, lessonFile: null },
       { status: 'PENDING_DELETE' },
     ] },
     take: batchSize,
