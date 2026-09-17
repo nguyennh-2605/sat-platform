@@ -116,7 +116,7 @@ if (!testDatabaseUrl) {
           clientMutationId,
           source: 'External practice set',
           sourceUrl: 'https://example.com/practice',
-          category: 'Craft and Structure',
+          category: 'Words in Context',
           userAnswer: 'C',
           correctAnswer: 'A',
         },
