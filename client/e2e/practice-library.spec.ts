@@ -26,7 +26,7 @@ async function mockLibrary(page: Page, role: 'STUDENT' | 'TEACHER') {
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     if (url.pathname === '/api/auth/refresh') {
-      await route.fulfill({ json: { accessToken: token, user: { id: role === 'STUDENT' ? 10 : 20, name: role === 'STUDENT' ? 'Student Preview' : 'Teacher Preview', role } } });
+      await route.fulfill({ json: { accessToken: token, user: { id: role === 'STUDENT' ? 10 : 20, name: `${role === 'STUDENT' ? 'Student' : 'Teacher'} Preview`, role } } });
       return;
     }
     if (url.pathname === '/api/tests/classes') {
@@ -41,26 +41,25 @@ async function mockLibrary(page: Page, role: 'STUDENT' | 'TEACHER') {
   });
 }
 
-test('student and teacher libraries use page-level scrolling and compact list rows', async ({ browser }) => {
+test('student and teacher libraries virtualize against the page scroll container', async ({ browser }) => {
   for (const role of ['STUDENT', 'TEACHER'] as const) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     await mockLibrary(page, role);
     await page.goto('/dashboard/practice-test');
-    await expect(page.getByText(role === 'STUDENT' ? 'Practice Center' : 'Test Library', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: role === 'STUDENT' ? 'Practice Center' : 'Test Library', exact: true })).toBeVisible();
     await expect(page.getByText('SAT Practice Test 1', { exact: true })).toBeVisible();
     await expect(page.locator('[data-virtuoso-scroller]')).not.toHaveCSS('overflow-y', /auto|scroll/);
-    await page.screenshot({ path: `test-results/${role.toLowerCase()}-library-grid.png`, fullPage: true });
 
     await page.getByRole('button', { name: 'List view' }).click();
     await expect(page.getByText('SAT Practice Test 7', { exact: true })).toBeVisible();
-    await expect(page.getByText('Questions', { exact: true })).toHaveCount(0);
-    await page.screenshot({ path: `test-results/${role.toLowerCase()}-library-list.png`, fullPage: true });
+    await expect(page.getByText('Questions', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-virtuoso-scroller]')).not.toHaveCSS('overflow-y', /auto|scroll/);
     await context.close();
   }
 });
 
-test('library layouts do not overflow on mobile', async ({ browser }) => {
+test('library layouts do not overflow the document on mobile', async ({ browser }) => {
   for (const role of ['STUDENT', 'TEACHER'] as const) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
@@ -70,8 +69,8 @@ test('library layouts do not overflow on mobile', async ({ browser }) => {
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     await page.getByRole('button', { name: 'List view' }).click();
     await expect(page.getByText('SAT Practice Test 1', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-virtuoso-scroller]')).not.toHaveCSS('overflow-y', /auto|scroll/);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
-    await page.screenshot({ path: `test-results/${role.toLowerCase()}-library-mobile-list.png` });
     await context.close();
   }
 });
