@@ -862,6 +862,14 @@ describe('formatDate', () => {
 - [ ] Test authentication/authorization
 - [ ] Manual testing cho UI changes
 
+#### 10.3 Regression and journey gates
+
+- Every feature with significant business logic must add or update a server/unit test in the same PR.
+- Every feature that creates an important user journey must add at least one Playwright happy path in the same PR.
+- Every serious bug must receive a regression test before or alongside the fix.
+- Keep the full-stack Playwright suite focused on critical cross-boundary journeys. It must run against a disposable PostgreSQL database whose URL visibly contains `test`; never point it at development or production data.
+- The protected golden paths are: student test save/resume/submit/result, teacher assignment creation through student submission, and teacher test import/preview/draft/publish.
+
 ---
 
 ## 11. SECURITY GUIDELINES

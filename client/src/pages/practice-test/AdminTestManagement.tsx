@@ -5,6 +5,7 @@ import {
   Archive,
   ArrowUpDown,
   BookOpen,
+  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -49,6 +50,7 @@ import axiosClient from '@/lib/axios';
 import { cachedGet, invalidateQueryCache } from '@/lib/queryCache';
 import { cn } from '@/lib/utils';
 import { capitalizeFirstLetter } from '@/utils/text';
+import { SAT_TEST_MONTHS, satTestMonthLabel, type SatTestMonthFilter } from '@/lib/satTestMonths';
 
 type AdminSource = 'SYSTEM' | 'TEACHER';
 type TestStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
@@ -77,6 +79,8 @@ interface AdminTest {
   mode: 'PRACTICE' | 'EXAM';
   status: TestStatus;
   scope: 'SYSTEM' | 'PERSONAL';
+  category: string;
+  testDate?: string | null;
   questionCount: number;
   updatedAt: string;
   author?: { id: number; name?: string | null; role: string } | null;
@@ -115,6 +119,7 @@ export default function AdminTestManagement() {
   const subject = enumParam(searchParams.get('subject')?.toUpperCase() || null, ['ALL', 'RW', 'MATH'] as const, 'ALL');
   const mode = enumParam(searchParams.get('mode')?.toUpperCase() || null, ['ALL', 'PRACTICE', 'EXAM'] as const, 'ALL');
   const status = enumParam(searchParams.get('status')?.toUpperCase() || null, ['ALL', 'DRAFT', 'PUBLISHED', 'ARCHIVED'] as const, 'ALL');
+  const month: SatTestMonthFilter = source === 'SYSTEM' ? enumParam(searchParams.get('month'), ['ALL', ...SAT_TEST_MONTHS.map(item => item.value)] as const, 'ALL') : 'ALL';
   const integrity = source === 'SYSTEM'
     ? enumParam(searchParams.get('integrity')?.toUpperCase() || null, ['ALL', 'NO_SECTIONS', 'NO_QUESTIONS', 'EMPTY_SECTION'] as const, 'ALL')
     : 'ALL';
@@ -150,6 +155,7 @@ export default function AdminTestManagement() {
       if (mode !== 'ALL') params.set('mode', mode);
       if (status !== 'ALL') params.set('status', status);
       if (integrity !== 'ALL') params.set('integrity', integrity);
+      if (month !== 'ALL') params.set('month', month);
       const data = await cachedGet<AdminTestPage>(`/api/tests?${params}`, { ttlMs: 20_000, force });
       setTests(data.items.map(item => ({ ...item, title: capitalizeFirstLetter(item.title) })));
       setPagination(data.pagination);
@@ -160,7 +166,7 @@ export default function AdminTestManagement() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, integrity, mode, page, sort, source, status, subject]);
+  }, [debouncedSearch, integrity, mode, month, page, sort, source, status, subject]);
 
   useEffect(() => { void loadTests(); }, [loadTests]);
 
@@ -170,7 +176,7 @@ export default function AdminTestManagement() {
   };
 
   const changeSource = (nextSource: string) => {
-    updateQuery({ source: nextSource === 'SYSTEM' ? null : nextSource, status: null, integrity: null });
+    updateQuery({ source: nextSource === 'SYSTEM' ? null : nextSource, status: null, integrity: null, month: null });
   };
 
   const changeView = (nextView: ViewMode) => {
@@ -244,10 +250,10 @@ export default function AdminTestManagement() {
   };
 
   const resetFilters = () => {
-    updateQuery({ search: null, subject: null, mode: null, status: null, integrity: null });
+    updateQuery({ search: null, subject: null, mode: null, status: null, integrity: null, month: null });
   };
 
-  const activeFilterCount = [subject !== 'ALL', mode !== 'ALL', status !== 'ALL', integrity !== 'ALL'].filter(Boolean).length;
+  const activeFilterCount = [subject !== 'ALL', mode !== 'ALL', status !== 'ALL', integrity !== 'ALL', month !== 'ALL'].filter(Boolean).length;
   const resultSummary = useMemo(() => {
     if (!pagination.total) return 'No tests';
     return `${(pagination.page - 1) * pagination.pageSize + 1}–${Math.min(pagination.page * pagination.pageSize, pagination.total)} of ${pagination.total}`;
@@ -280,6 +286,8 @@ export default function AdminTestManagement() {
           onStatus={value => updateQuery({ status: value })}
           integrity={integrity}
           onIntegrity={value => updateQuery({ integrity: value })}
+          month={month}
+          onMonth={value => updateQuery({ month: value })}
           sort={sort}
           onSort={value => updateQuery({ sort: value })}
           view={view}
@@ -345,6 +353,8 @@ interface ToolbarProps {
   onStatus: (value: StatusFilter) => void;
   integrity: IntegrityFilter;
   onIntegrity: (value: IntegrityFilter) => void;
+  month: SatTestMonthFilter;
+  onMonth: (value: SatTestMonthFilter) => void;
   sort: SortOrder;
   onSort: (value: SortOrder) => void;
   view: ViewMode;
@@ -356,7 +366,7 @@ interface ToolbarProps {
   onCreate: () => void;
 }
 
-function AdminToolbar({ source, search, onSearch, subject, onSubject, mode, onMode, status, onStatus, integrity, onIntegrity, sort, onSort, view, onView, activeFilterCount, onReset, loading, onRefresh, onCreate }: ToolbarProps) {
+function AdminToolbar({ source, search, onSearch, subject, onSubject, mode, onMode, status, onStatus, integrity, onIntegrity, month, onMonth, sort, onSort, view, onView, activeFilterCount, onReset, loading, onRefresh, onCreate }: ToolbarProps) {
   return <DataToolbar>
     <DataToolbarGroup>
       <DataToolbarSearch value={search} onChange={event => onSearch(event.target.value)} placeholder={source === 'TEACHER' ? 'Search tests or teachers…' : 'Search system tests…'} label="Search tests" />
@@ -364,6 +374,7 @@ function AdminToolbar({ source, search, onSearch, subject, onSubject, mode, onMo
       <FilterMenu label="Type" value={mode} onChange={value => onMode(value as ModeFilter)} options={[['ALL', 'All types'], ['PRACTICE', 'Practice'], ['EXAM', 'Exam']]} />
       <FilterMenu label="Status" value={status} onChange={value => onStatus(value as StatusFilter)} options={[['ALL', 'Published & draft'], ['PUBLISHED', 'Published'], ['DRAFT', 'Draft'], ['ARCHIVED', 'Archived']]} />
       {source === 'SYSTEM' && <FilterMenu label={integrity === 'ALL' ? 'Integrity' : integrityLabel[integrity]} value={integrity} onChange={value => onIntegrity(value as IntegrityFilter)} options={[['ALL', 'All integrity states'], ['NO_SECTIONS', 'No sections'], ['NO_QUESTIONS', 'No questions'], ['EMPTY_SECTION', 'Empty section']]} />}
+      {source === 'SYSTEM' && <FilterMenu icon={<CalendarDays />} label={month === 'ALL' ? 'Official month' : satTestMonthLabel(month) || 'Official month'} value={month} onChange={value => onMonth(value as SatTestMonthFilter)} options={[['ALL', 'All months'], ...SAT_TEST_MONTHS.map(item => [item.value, item.label] as [string, string])]} />}
       {activeFilterCount > 0 && <Button variant="destructive" size="sm" onClick={onReset}><X data-icon="inline-start" />Reset</Button>}
     </DataToolbarGroup>
     <DataToolbarActions>
@@ -393,7 +404,7 @@ function FilterMenu({ icon, label, value, onChange, options, align = 'start' }: 
 function AdminTestTable({ tests, source, workingId, actions }: { tests: AdminTest[]; source: AdminSource; workingId: number | null; actions: TestActions }) {
   return <Table className="min-w-240">
     <TableHeader><TableRow className="hover:bg-transparent"><TableHead className="h-11 px-4 text-muted-foreground">Test</TableHead>{source === 'TEACHER' && <TableHead className="h-11 px-4 text-muted-foreground">Teacher</TableHead>}<TableHead className="h-11 px-4 text-muted-foreground">Status</TableHead><TableHead className="h-11 px-4 text-muted-foreground">Subject</TableHead><TableHead className="h-11 px-4 text-muted-foreground">Type</TableHead><TableHead className="h-11 px-4 text-muted-foreground">Questions</TableHead><TableHead className="h-11 px-4 text-muted-foreground">Usage</TableHead><TableHead className="h-11 px-4 text-muted-foreground">Updated</TableHead><TableHead className="h-11 px-4 text-right text-muted-foreground">Actions</TableHead></TableRow></TableHeader>
-    <TableBody>{tests.map(test => <TableRow key={test.id} className="border-ui-border/60 hover:bg-muted/20"><TableCell className="max-w-88 px-4 py-3"><Button variant="ghost" className="h-auto max-w-full justify-start p-0 text-left hover:bg-transparent" onClick={() => actions.preview(test)}><span className="truncate font-medium" title={test.title}>{test.title}</span></Button></TableCell>{source === 'TEACHER' && <TableCell className="px-4 py-3 text-muted-foreground"><span className="inline-flex max-w-48 items-center gap-2"><UserRound className="size-4 shrink-0" /><span className="truncate">{test.author?.name || 'Unknown teacher'}</span></span></TableCell>}<TableCell className="px-4 py-3"><StatusBadge status={test.status} /></TableCell><TableCell className="px-4 py-3 text-muted-foreground">{subjectLabel[test.subject]}</TableCell><TableCell className="px-4 py-3 text-muted-foreground">{modeLabel[test.mode]}</TableCell><TableCell className="px-4 py-3 text-muted-foreground">{test.questionCount}</TableCell><TableCell className="px-4 py-3 text-muted-foreground">{usageLabel(test)}</TableCell><TableCell className="px-4 py-3 text-muted-foreground">{relativeTime(test.updatedAt)}</TableCell><TableCell className="px-4 py-3 text-right"><TestActionMenu test={test} source={source} working={workingId === test.id} actions={actions} /></TableCell></TableRow>)}</TableBody>
+    <TableBody>{tests.map(test => <TableRow key={test.id} className="border-ui-border/60 hover:bg-muted/20"><TableCell className="max-w-88 px-4 py-3"><Button variant="ghost" className="h-auto max-w-full justify-start gap-2 p-0 text-left hover:bg-transparent" onClick={() => actions.preview(test)}><span className="truncate font-medium" title={test.title}>{test.title}</span>{test.category === 'REAL' && <Badge className="shrink-0 bg-primary text-primary-foreground">Official{satTestMonthLabel(test.testDate) ? ` · ${satTestMonthLabel(test.testDate)}` : ''}</Badge>}</Button></TableCell>{source === 'TEACHER' && <TableCell className="px-4 py-3 text-muted-foreground"><span className="inline-flex max-w-48 items-center gap-2"><UserRound className="size-4 shrink-0" /><span className="truncate">{test.author?.name || 'Unknown teacher'}</span></span></TableCell>}<TableCell className="px-4 py-3"><StatusBadge status={test.status} /></TableCell><TableCell className="px-4 py-3 text-muted-foreground">{subjectLabel[test.subject]}</TableCell><TableCell className="px-4 py-3 text-muted-foreground">{modeLabel[test.mode]}</TableCell><TableCell className="px-4 py-3 text-muted-foreground">{test.questionCount}</TableCell><TableCell className="px-4 py-3 text-muted-foreground">{usageLabel(test)}</TableCell><TableCell className="px-4 py-3 text-muted-foreground">{relativeTime(test.updatedAt)}</TableCell><TableCell className="px-4 py-3 text-right"><TestActionMenu test={test} source={source} working={workingId === test.id} actions={actions} /></TableCell></TableRow>)}</TableBody>
   </Table>;
 }
 
@@ -403,8 +414,9 @@ function AdminTestCard({ test, source, working, actions }: { test: AdminTest; so
     : test.capabilities.canEdit
       ? <Button className="w-full" disabled={working} onClick={() => actions.edit(test)}><Pencil />Edit test</Button>
       : <Button className="w-full" variant="outline" disabled={working} onClick={() => actions.preview(test)}><Play />Preview</Button>;
-  return <Card className="flex h-full flex-col gap-0 py-0 shadow-none">
-    <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 px-4 pb-0 pt-4"><div className="min-w-0"><CardTitle className="line-clamp-2 text-sm font-medium">{test.title}</CardTitle><p className="mt-1 text-xs text-muted-foreground">{subjectLabel[test.subject]} · {modeLabel[test.mode]}</p></div><TestActionMenu test={test} source={source} working={working} actions={actions} /></CardHeader>
+  return <Card className="relative flex h-full flex-col gap-0 py-0 shadow-none">
+    {test.category === 'REAL' && <Badge className="absolute right-12 top-3 z-10 bg-primary text-primary-foreground">Official{satTestMonthLabel(test.testDate) ? ` · ${satTestMonthLabel(test.testDate)}` : ''}</Badge>}
+    <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 px-4 pb-0 pt-4"><div className="min-w-0"><CardTitle className={`line-clamp-2 text-sm font-medium ${test.category === 'REAL' ? 'pr-28' : ''}`}>{test.title}</CardTitle><p className="mt-1 text-xs text-muted-foreground">{subjectLabel[test.subject]} · {modeLabel[test.mode]}</p></div><TestActionMenu test={test} source={source} working={working} actions={actions} /></CardHeader>
     <CardContent className="px-4 py-4"><div className="mb-3 flex flex-wrap items-center gap-2"><StatusBadge status={test.status} />{source === 'TEACHER' && <Badge variant="outline" className="rounded-sm font-medium"><UserRound />{test.author?.name || 'Unknown teacher'}</Badge>}</div><ul className="space-y-2 text-sm text-muted-foreground"><li className="flex items-center gap-2"><BookOpen className="size-4" />{test.questionCount} questions</li><li className="flex items-center gap-2"><Clock3 className="size-4" />{test.duration} minutes</li><li className="flex items-center gap-2"><History className="size-4" />{usageLabel(test)}</li></ul></CardContent>
     <CardFooter className="mt-auto grid gap-2 border-t border-ui-border bg-muted/20 p-3">{primary}{!(source === 'SYSTEM' && !test.capabilities.canEdit) && <Button variant="outline" className="w-full" disabled={working} onClick={() => actions.preview(test)}><Play />Preview</Button>}</CardFooter>
   </Card>;

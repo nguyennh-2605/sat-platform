@@ -4,6 +4,7 @@ const useExternalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === 'true';
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: ['**/full-stack/**'],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,

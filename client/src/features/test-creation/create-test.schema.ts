@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeSatTestMonth } from '@/lib/satTestMonths';
 
 export const createTestDetailsSchema = (isAdmin: boolean) => z.object({
   title: z.string().trim().min(1, 'Enter a test name.'),
@@ -13,6 +14,8 @@ export const createTestDetailsSchema = (isAdmin: boolean) => z.object({
     context.addIssue({ code: 'custom', path: ['duration'], message: 'Allow at least 1 minute for each module.' });
   }
   if (isAdmin && values.category === 'REAL' && !values.testDate) {
-    context.addIssue({ code: 'custom', path: ['testDate'], message: 'Choose the official test date.' });
+    context.addIssue({ code: 'custom', path: ['testDate'], message: 'Choose the official test month.' });
+  } else if (isAdmin && values.category === 'REAL' && !normalizeSatTestMonth(values.testDate)) {
+    context.addIssue({ code: 'custom', path: ['testDate'], message: 'Choose a valid SAT testing month.' });
   }
 });

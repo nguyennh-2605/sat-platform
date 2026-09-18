@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { normalizeSatTestMonth } from '@/lib/satTestMonths';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -298,7 +299,7 @@ const CreateTestWizard = () => {
           moduleCount: Math.max(1, detail.moduleCount),
           mode: detail.mode,
           category: detail.category,
-          testDate: detail.testDate || '',
+          testDate: normalizeSatTestMonth(detail.testDate),
         });
         setEditFolderId(detail.folderId ?? null);
         setTestStatus(detail.status);

@@ -1,8 +1,8 @@
 import { Controller, type UseFormReturn } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
-import { DateTimePicker } from '@/components/ui/DateTimePicker';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SAT_TEST_MONTHS } from '@/lib/satTestMonths';
 import type { TestDetailsValues } from './create-test.types';
 
 interface TestDetailsStepProps {
@@ -85,13 +85,18 @@ export function TestDetailsStep({ form, isAdmin }: TestDetailsStepProps) {
                     <SelectItem value="REAL">Official test</SelectItem>
                   </SelectContent>
                 </Select>
-                <FieldDescription>Official tests require a scheduled date.</FieldDescription>
+                <FieldDescription>Official tests are grouped by the fixed SAT testing months.</FieldDescription>
               </Field>
             )} />
             {category === 'REAL' && <Controller control={control} name="testDate" render={({ field }) => (
               <Field data-invalid={Boolean(errors.testDate)}>
-                <FieldLabel>Official test date</FieldLabel>
-                <DateTimePicker mode="date" value={field.value} onChange={field.onChange} placeholder="Choose a date" ariaLabel="Official test date" className="w-full" />
+                <FieldLabel htmlFor="official-test-month">Official test month</FieldLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="official-test-month" className="w-full" aria-invalid={Boolean(errors.testDate)}><SelectValue placeholder="Choose a month" /></SelectTrigger>
+                  <SelectContent position="popper" align="start">
+                    {SAT_TEST_MONTHS.map(month => <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <FieldError errors={[errors.testDate]} />
               </Field>
             )} />}

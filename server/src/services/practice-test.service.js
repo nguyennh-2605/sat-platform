@@ -6,8 +6,38 @@ const { getTaxonomy, validateClassification } = require('../utils/question-taxon
 const { parsePagination, paginationMeta } = require('../utils/pagination');
 const { INTEGRITY_FILTERS, normalizeIntegrityFilter } = require('../utils/test-integrity');
 const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
+const { normalizeSatTestMonth, testMonthWhere } = require('../utils/sat-test-months');
 
 const activeStatuses = { in: ['DRAFT', 'PUBLISHED'] };
+
+const encodeTestCursor = ({ id, value }) => Buffer.from(JSON.stringify({ id, value })).toString('base64url');
+
+const decodeTestCursor = value => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(String(value), 'base64url').toString());
+    if (!Number.isInteger(parsed.id) || typeof parsed.value !== 'string' || !parsed.value) throw new Error();
+    return parsed;
+  } catch {
+    throw new ApiError(400, { error: 'Test library cursor is invalid.' });
+  }
+};
+
+const testCursorBoundaryWhere = ({ cursor, cursorField, oldestFirst }) => {
+  if (!cursor) return null;
+  const comparison = oldestFirst ? 'gt' : 'lt';
+  if (cursorField === 'id') {
+    const cursorId = Number(cursor.value);
+    if (!Number.isInteger(cursorId) || cursorId !== cursor.id) throw new ApiError(400, { error: 'Test library cursor is invalid.' });
+    return { id: { [comparison]: cursorId } };
+  }
+  const cursorDate = new Date(cursor.value);
+  if (Number.isNaN(cursorDate.getTime())) throw new ApiError(400, { error: 'Test library cursor is invalid.' });
+  return { OR: [
+    { updatedAt: { [comparison]: cursorDate } },
+    { updatedAt: cursorDate, id: { [comparison]: cursor.id } },
+  ] };
+};
 
 const lifecycleWhere = requestedStatus => requestedStatus === 'ARCHIVED'
   ? { status: 'ARCHIVED' }
@@ -114,6 +144,8 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
   const search = String(query.search || '').trim().slice(0, 100);
   const requestedSubject = String(query.subject || '').toUpperCase();
   const requestedMode = String(query.mode || '').toUpperCase();
+  const requestedMonth = normalizeSatTestMonth(query.month);
+  if (query.month && !requestedMonth) throw new ApiError(400, { error: 'Choose a valid SAT testing month.' });
   const requestedIntegrity = userRole === 'ADMIN' && access.source === 'SYSTEM'
     ? normalizeIntegrityFilter(query.integrity)
     : '';
@@ -128,18 +160,33 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
   ] });
   if (['RW', 'MATH'].includes(requestedSubject)) filters.push({ subject: requestedSubject });
   if (['PRACTICE', 'EXAM'].includes(requestedMode)) filters.push({ mode: requestedMode });
+  if (requestedMonth) filters.push(testMonthWhere(requestedMonth));
+  if (userRole === 'STUDENT' && query.classId) filters.push({ OR: [
+    { classTests: { some: { classId: String(query.classId), isHidden: false } } },
+    { deliveries: { some: { classId: String(query.classId), status: 'PUBLISHED', assignees: { some: { studentId: Number(userId), excusedAt: null } } } } },
+  ] });
   if (requestedIntegrity) filters.push(INTEGRITY_FILTERS[requestedIntegrity]);
+  const totalWhere = { AND: [...filters] };
+  const cursorMode = query.limit !== undefined || query.cursor !== undefined;
+  const cursor = cursorMode ? decodeTestCursor(query.cursor) : null;
+  const limit = Math.min(Math.max(Number.parseInt(query.limit, 10) || 30, 1), 50);
+  const oldestFirst = String(query.sort || '').toUpperCase() === 'OLDEST';
+  const cursorField = userRole === 'STUDENT' ? 'id' : 'updatedAt';
+  const cursorBoundary = testCursorBoundaryWhere({ cursor, cursorField, oldestFirst });
+  if (cursorBoundary) filters.push(cursorBoundary);
   const pagedWhere = { AND: filters };
+  const orderDirection = oldestFirst ? 'asc' : 'desc';
+  const orderBy = cursorField === 'id'
+    ? [{ id: orderDirection }]
+    : [{ updatedAt: orderDirection }, { id: orderDirection }];
 
   const operations = [
-    prisma.test.count({ where: pagedWhere }),
+    prisma.test.count({ where: totalWhere }),
     prisma.test.findMany({
     where: pagedWhere,
-    orderBy: userRole === 'STUDENT'
-      ? { id: String(query.sort || '').toUpperCase() === 'OLDEST' ? 'asc' : 'desc' }
-      : { updatedAt: String(query.sort || '').toUpperCase() === 'OLDEST' ? 'asc' : 'desc' },
-    skip: pagination.skip,
-    take: pagination.pageSize,
+    orderBy,
+    skip: cursorMode ? 0 : pagination.skip,
+    take: cursorMode ? limit + 1 : pagination.pageSize,
     select: {
       id: true,
       title: true,
@@ -226,7 +273,9 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
       prisma.test.count({ where: { scope: 'PERSONAL', author: { role: 'TEACHER' }, status: activeStatuses } }),
     );
   }
-  const [total, tests, firstSourceCount, secondSourceCount] = await prisma.$transaction(operations);
+  const [total, fetchedTests, firstSourceCount, secondSourceCount] = await prisma.$transaction(operations);
+  const hasMore = cursorMode && fetchedTests.length > limit;
+  const tests = cursorMode ? fetchedTests.slice(0, limit) : fetchedTests;
 
   // Map dữ liệu để trả về format gọn gàng cho Frontend
   const items = tests.map(test => {
@@ -265,9 +314,15 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
     };
   });
 
+  const lastTest = tests.at(-1);
   return {
     items,
-    pagination: paginationMeta({ ...pagination, total }),
+    ...(cursorMode ? {
+      total,
+      nextCursor: hasMore && lastTest
+        ? encodeTestCursor({ id: lastTest.id, value: cursorField === 'id' ? String(lastTest.id) : lastTest.updatedAt.toISOString() })
+        : null,
+    } : { pagination: paginationMeta({ ...pagination, total }) }),
     source: access.source,
     ...(userRole === 'TEACHER' ? { sourceCounts: { my: firstSourceCount, system: secondSourceCount } } : {}),
     ...(userRole === 'ADMIN' ? { sourceCounts: { system: firstSourceCount, teacher: secondSourceCount } } : {}),
@@ -381,7 +436,8 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
   const scope = userRole === 'ADMIN' ? 'SYSTEM' : 'PERSONAL';
   const isPublic = scope === 'SYSTEM' && finalStatus === 'PUBLISHED';
   const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
-  const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' && testDate ? String(testDate) : null;
+  const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' ? normalizeSatTestMonth(testDate) : null;
+  if (finalCategory === 'REAL' && !finalTestDate) throw new ApiError(400, { error: 'Choose a valid SAT testing month.' });
 
   console.log(`Creating test: ${normalizedTitle} (${normalizedSections.length} modules)`);
 
@@ -535,7 +591,7 @@ exports.getTestForEdit = async ({ testId, userId, userRole }) => {
     category: test.category,
     status: test.status,
     scope: test.scope,
-    testDate: test.testDate,
+    testDate: normalizeSatTestMonth(test.testDate),
     folderId: test.folderId,
     moduleCount: test.sections.length,
     hasAttempts: test._count.submissions > 0,
@@ -604,7 +660,8 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
     throw new ApiError(400, { error: error.message });
   }
   const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
-  const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' && testDate ? String(testDate) : null;
+  const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' ? normalizeSatTestMonth(testDate) : null;
+  if (finalCategory === 'REAL' && !finalTestDate) throw new ApiError(400, { error: 'Choose a valid SAT testing month.' });
 
   return prisma.$transaction(async tx => {
     await tx.section.deleteMany({ where: { testId: existing.id } });
@@ -700,6 +757,7 @@ exports.duplicateTest = async ({ testId, userId, userRole }) => {
       subject: source.subject,
       mode: source.mode,
       category: userRole === 'ADMIN' ? source.category : 'CLASS',
+      testDate: userRole === 'ADMIN' && source.category === 'REAL' ? normalizeSatTestMonth(source.testDate) || null : null,
       status: 'DRAFT',
       scope: userRole === 'ADMIN' ? 'SYSTEM' : 'PERSONAL',
       isPublic: false,
@@ -824,3 +882,4 @@ exports.deleteTest = async ({ testId, userId, userRole }) => {
 };
 
 exports.serializeTest = serializeTest;
+exports._testListPaginationHelpers = { encodeTestCursor, decodeTestCursor, testCursorBoundaryWhere };
