@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const databaseUrl = process.env.E2E_DATABASE_URL || process.env.DATABASE_URL || '';
 const apiUrl = process.env.E2E_API_URL || 'http://127.0.0.1:5000';
 const appUrl = process.env.E2E_APP_URL || 'http://127.0.0.1:4173';
+const appPort = new URL(appUrl).port || '4173';
 
 const assertTestDatabase = (value: string) => {
   if (!value) throw new Error('E2E_DATABASE_URL is required for full-stack browser tests.');
@@ -52,7 +53,7 @@ export default defineConfig({
       },
     },
     {
-      command: 'node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4173',
+      command: `node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${appPort}`,
       url: `${appUrl}/auth`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

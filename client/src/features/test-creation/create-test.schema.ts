@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { normalizeSatTestMonth } from '@/lib/satTestMonths';
 
+export const normalizeTestCategoryForForm = (category: 'PRACTICE' | 'REAL' | 'CLASS') => (
+  category === 'REAL' ? 'REAL' : 'PRACTICE'
+);
+
 export const createTestDetailsSchema = (isAdmin: boolean) => z.object({
   title: z.string().trim().min(1, 'Enter a test name.'),
   subject: z.enum(['RW', 'MATH']),

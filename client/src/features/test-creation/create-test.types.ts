@@ -47,7 +47,7 @@ export interface EditTestPayload {
   duration: number;
   subject: Subject;
   mode: TestMode;
-  category: 'PRACTICE' | 'REAL';
+  category: 'PRACTICE' | 'REAL' | 'CLASS';
   status: TestStatus;
   testDate?: string | null;
   folderId?: number | null;

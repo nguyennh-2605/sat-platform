@@ -48,6 +48,7 @@ test('teacher imports and previews a test, saves a draft, then publishes it', as
   await expect(page.getByRole('heading', { name: 'Edit Test' })).toBeVisible();
   await expect(page.getByLabel('Structured test content')).toHaveValue(/Which conclusion is best supported/);
   await page.getByRole('button', { name: /Continue to review/ }).click();
+  await expect(page.getByRole('button', { name: 'Publish test' })).toBeVisible();
   const publishResponsePromise = page.waitForResponse(response => response.url().endsWith(`/api/tests/${created.id}`) && response.request().method() === 'PUT');
   await page.getByRole('button', { name: 'Publish test' }).click();
   expect((await publishResponsePromise).ok()).toBeTruthy();

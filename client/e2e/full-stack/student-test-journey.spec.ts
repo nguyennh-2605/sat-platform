@@ -16,7 +16,7 @@ test('student takes a test, saves, resumes, submits, and sees the result', async
 
   await loginThroughUi(page, student);
   await page.goto(attemptUrl);
-  const correctAnswer = page.getByRole('button', { pressed: false }).filter({ hasText: 'Option B' });
+  const correctAnswer = page.locator('button[aria-pressed]').filter({ hasText: 'Option B' });
   await expect(correctAnswer).toBeVisible();
   await correctAnswer.click();
   await expect(correctAnswer).toHaveAttribute('aria-pressed', 'true');
@@ -33,8 +33,8 @@ test('student takes a test, saves, resumes, submits, and sees the result', async
       .forEach(key => localStorage.removeItem(key));
   });
   await page.goto(attemptUrl);
-  const restoredAnswer = page.getByRole('button', { pressed: true }).filter({ hasText: 'Option B' });
-  await expect(restoredAnswer).toBeVisible();
+  const restoredAnswer = page.locator('button[aria-pressed]').filter({ hasText: 'Option B' });
+  await expect(restoredAnswer).toHaveAttribute('aria-pressed', 'true');
 
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: 'Submit', exact: true }).click();

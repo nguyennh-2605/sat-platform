@@ -30,7 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { ui } from '../../components/ui/styles';
 import { useDashboardBack } from '../navigation/DashboardBackContext';
-import { createTestDetailsSchema } from './create-test.schema';
+import { createTestDetailsSchema, normalizeTestCategoryForForm } from './create-test.schema';
 import type { EditTestPayload, ExtractedDocument, ImportIssue, ImportPreview, ImportQuestion, IssueSeverity, Subject, TaxonomyDomain, TestDetailsValues, TestStatus } from './create-test.types';
 import { TestDetailsStep } from './TestDetailsStep';
 
@@ -298,7 +298,7 @@ const CreateTestWizard = () => {
           duration: detail.duration,
           moduleCount: Math.max(1, detail.moduleCount),
           mode: detail.mode,
-          category: detail.category,
+          category: normalizeTestCategoryForForm(detail.category),
           testDate: normalizeSatTestMonth(detail.testDate),
         });
         setEditFolderId(detail.folderId ?? null);
