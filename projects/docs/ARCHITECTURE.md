@@ -171,7 +171,7 @@ Express Server (index.js → app.js)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/tests` | JWT | List available tests (public, class-assigned, own) |
+| `GET` | `/api/tests` | JWT | Role-scoped test library with server-side search/filters. Student and Teacher discovery views use stable cursor pagination (`limit`, `cursor`) while Admin management retains numbered pagination; official tests can be filtered by fixed SAT month (`month`) |
 | `GET` | `/api/tests/classes` | JWT | Get classes for test assignment dropdown |
 | `POST` | `/api/tests/create` | JWT + TEACHER/ADMIN | Create a Draft or Published test with sections and questions |
 | `GET` | `/api/tests/:id/content` | JWT + TEACHER/ADMIN | Read owned or published system test content without creating an attempt |
