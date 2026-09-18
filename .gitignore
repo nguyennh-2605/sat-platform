@@ -1,6 +1,9 @@
 # Bỏ qua các thư viện nặng (Git không cần lưu cái này, tải lại được bằng npm install)
 node_modules/
 */node_modules/
+# Recoverable local backups created when a Windows process locks node_modules.
+.node_modules-incomplete-*/
+*/node_modules.incomplete-*/
 
 # Bỏ qua file môi trường chứa mật khẩu DB (BẢO MẬT)
 .env
