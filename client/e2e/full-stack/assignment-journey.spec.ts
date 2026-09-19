@@ -12,7 +12,8 @@ test('teacher publishes an assignment and the student sees and submits it', asyn
   const teacherPage = await teacherContext.newPage();
   await loginThroughUi(teacherPage, teacher);
   await teacherPage.goto(`/dashboard/class/${classroom.id}?tab=activities`);
-  // A brand-new class renders the empty-state shortcut in addition to the toolbar menu.
+  // Wait for the empty state so the last "Add activity" is the shortcut, not the toolbar menu.
+  await expect(teacherPage.getByRole('heading', { name: 'No activities yet' })).toBeVisible();
   await teacherPage.getByRole('button', { name: 'Add activity' }).last().click();
   await expect(teacherPage.getByRole('heading', { name: 'Add assignment' })).toBeVisible();
   await teacherPage.getByLabel('Title').fill(assignmentTitle);
