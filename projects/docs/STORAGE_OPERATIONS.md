@@ -2,6 +2,8 @@
 
 SAT Platform stores assignment files in a private S3-compatible bucket. The API stores object keys in PostgreSQL and issues short-lived presigned URLs; credentials and signed URLs must never be logged or sent to the client except for the requested operation.
 
+Test question images use the same private bucket under `test-images/`. Their upload and access endpoints are separate from assignment and lesson files. The browser stores only a managed asset ID in question content and obtains a fresh read URL when rendering. The upload endpoint accepts PNG, JPEG, and WebP images up to 5 MB; the server checks the stored bytes before accepting the image.
+
 ## Environment isolation
 
 Use separate buckets and credentials for development and production. Scope each R2 token to one bucket with Object Read & Write permission.
@@ -45,6 +47,7 @@ Cleanup processes at most 200 candidates per run using five concurrent workers. 
 
 - `PENDING_UPLOAD` older than 24 hours;
 - unattached `READY` assets older than 24 hours;
+- unattached `READY` test images older than 24 hours; images used by any test copy remain referenced;
 - all `PENDING_DELETE` assets.
 
 For every candidate it deletes the object first and then its database record. Failed deletions remain `PENDING_DELETE` for the next run. Structured logs report `started`, `candidates`, `processed`, `failed`, and `durationMs` without object keys or credentials.
@@ -54,6 +57,19 @@ If daily volume can exceed 200 stale assets, increase the schedule frequency rat
 ## Development lifecycle
 
 The development bucket may use an R2 lifecycle rule that deletes objects after 30 days because development data is disposable. Do not apply a blanket expiration rule to the production bucket; production retention is controlled by application state and cleanup.
+
+## Legacy Cloudinary question images
+
+The Create Test uploader now writes new images to R2. Existing image blocks with public Cloudinary URLs continue to render. After deploying the schema migration and the new upload flow, run the backfill against the correct environment:
+
+```text
+npm run storage:backfill-test-images
+npm run storage:backfill-test-images -- --apply
+```
+
+The first command reports a dry-run count. `--apply` copies eligible `res.cloudinary.com/.../image/upload/...` assets, verifies them, rewrites question blocks and Error Log snapshots, and adds test references. The job is idempotent; rerun after investigating any reported failures or skipped snapshots. Keep the Cloudinary account and legacy URL rendering available until the dry run reports zero remaining eligible URLs and representative old tests, duplicates, Exam Room attempts, and Error Log snapshots render from R2. Do not delete Cloudinary originals during this migration.
+
+After production verification, disable the old unsigned Cloudinary upload preset. Keep legacy URL rendering until every remaining external image reference has been reviewed, including unsupported or oversized images reported by the backfill.
 
 ## Real storage smoke test
 

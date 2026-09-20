@@ -316,8 +316,13 @@ Teacher Overview only exposes classes owned by the authenticated teacher. Core w
 | `POST` | `/api/files/uploads` | JWT + authorized owner | Create a pending private file asset and a short-lived S3-compatible upload URL for assigned student work or an owned lesson resource |
 | `POST` | `/api/files/:fileAssetId/complete` | JWT + owner | Verify object metadata and mark an upload ready |
 | `GET` | `/api/files/:fileAssetId/access` | JWT + authorized owner/staff/student | Create a short-lived inline viewer URL plus canonical file metadata after access checks; `?download=1` returns an attachment URL |
+| `POST` | `/api/test-images/uploads` | JWT + TEACHER/ADMIN | Create a pending private question-image asset and a short-lived R2 upload URL |
+| `POST` | `/api/test-images/:fileAssetId/complete` | JWT + image owner | Verify image bytes, MIME type, size, and dimensions before marking it ready |
+| `GET` | `/api/test-images/:fileAssetId/access` | JWT + authorized test reader | Create a short-lived URL for an owned preview, accessible test, or owned attempt |
 
 Managed file records store object keys, never signed URLs. `HomeworkSubmissionContent` separates the student's private `DRAFT` from the official `SUBMITTED` snapshot; teachers only read the latter. External links remain `HomeworkSubmissionItem(kind=LINK)` and do not become managed files.
+
+Question image blocks store a managed `assetId`; the shared renderer resolves short-lived read URLs on demand. `TestImageUsage` retains assets used by tests, including duplicates and copies. Legacy external `src` image blocks remain readable during Cloudinary migration. Unattached test images are removed by the existing storage cleanup job.
 
 Storage maintenance uses `npm run storage:cleanup`; real bucket verification uses the explicitly gated `npm run storage:smoke`. Environment separation, Render Cron setup, R2 lifecycle guidance, and operational response are documented in `projects/docs/STORAGE_OPERATIONS.md`.
 

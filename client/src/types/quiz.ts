@@ -5,7 +5,8 @@ export interface TextBlock {
 
 export interface ImageBlock {
   type: 'image';
-  src: string;      // Đường dẫn ảnh
+  src?: string;      // Legacy external image URL
+  assetId?: string;  // Managed test image in private object storage
   alt?: string;     // Text thay thế (optional)
   caption?: string; // Chú thích ảnh (optional)
 }

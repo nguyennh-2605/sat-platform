@@ -7,6 +7,7 @@ const { parsePagination, paginationMeta } = require('../utils/pagination');
 const { INTEGRITY_FILTERS, normalizeIntegrityFilter } = require('../utils/test-integrity');
 const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
 const { normalizeSatTestMonth, testMonthWhere } = require('../utils/sat-test-months');
+const { assertUsableImages, imageAssetIds, syncTestImages } = require('./test-image.service');
 
 const activeStatuses = { in: ['DRAFT', 'PUBLISHED'] };
 
@@ -425,6 +426,7 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
   }
 
   const validatedSections = validateSections({ sections, subject });
+  const imageIds = await assertUsableImages({ sections: validatedSections, userId });
   let normalizedSections;
   try {
     const durations = allocateModuleDurations(normalizedDuration, validatedSections.length);
@@ -495,6 +497,7 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
     });
 
     console.log(`Created test ID: ${newTest.id}`);
+    await syncTestImages({ db: tx, testId: newTest.id, assetIds: imageIds });
     return newTest;
   });
 };
@@ -510,7 +513,7 @@ const serializeBlock = (block) => {
   }
   if (block.type === 'poem') return `[POEM]\n${(block.lines || []).join('\n')}`;
   if (block.type === 'note') return `[NOTE]\n${(block.lines || []).map(line => `- ${line}`).join('\n')}`;
-  if (block.type === 'image') return `[IMG]\n${String(block.src || '').trim()}`;
+  if (block.type === 'image') return `[IMG]\n${block.assetId ? `asset:${block.assetId}` : String(block.src || '').trim()}`;
   return '';
 };
 
@@ -520,6 +523,7 @@ const serializeQuestion = (question) => {
     `Domain: ${question.domainCode || ''}`,
     `Skill: ${question.skillCode || ''}`,
     ...(Array.isArray(question.blocks) ? question.blocks.map(serializeBlock).filter(Boolean) : []),
+    '[QUESTION]',
     question.questionText,
     ...(question.type === 'MCQ' && Array.isArray(question.choices)
       ? question.choices.map((choice, index) => `${String(choice.id || String.fromCharCode(65 + index)).toUpperCase()}. ${choice.text}`)
@@ -652,6 +656,7 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
   const normalizedDuration = Number.parseInt(duration, 10);
   if (!Number.isInteger(normalizedDuration) || normalizedDuration < 1) throw new ApiError(400, { error: 'Enter a valid test duration.' });
   const validatedSections = validateSections({ sections, subject });
+  const imageIds = await assertUsableImages({ sections: validatedSections, userId, existingTestId: existing.id });
   let normalizedSections;
   try {
     const durations = allocateModuleDurations(normalizedDuration, validatedSections.length);
@@ -687,6 +692,7 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
         },
       },
     });
+    await syncTestImages({ db: tx, testId: updated.id, assetIds: imageIds });
     if (updated.status !== existing.status) {
       const statusActions = {
         PUBLISHED: AUDIT_ACTIONS.TEST_PUBLISHED,
@@ -785,6 +791,7 @@ exports.duplicateTest = async ({ testId, userId, userRole }) => {
     },
       select: { id: true, title: true, status: true, scope: true },
     });
+    await syncTestImages({ db: tx, testId: duplicate.id, assetIds: imageAssetIds(source.sections) });
     await recordAuditEvent(tx, {
       action: AUDIT_ACTIONS.TEST_CREATED,
       actorUserId: userId,
@@ -844,6 +851,7 @@ exports.copyTestToSystem = async ({ testId, userId, userRole }) => {
     },
       select: { id: true, title: true, status: true, scope: true },
     });
+    await syncTestImages({ db: tx, testId: copy.id, assetIds: imageAssetIds(source.sections) });
     await recordAuditEvent(tx, {
       action: AUDIT_ACTIONS.TEST_COPIED_TO_SYSTEM,
       actorUserId: userId,

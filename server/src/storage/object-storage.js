@@ -41,6 +41,27 @@ const getObjectStorage = () => {
       const result = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: storageKey }));
       return { sizeBytes: Number(result.ContentLength), mimeType: result.ContentType || null };
     },
+    async readObject({ storageKey, maxBytes = 20 * 1024 * 1024 }) {
+      const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: storageKey }));
+      if (Number(result.ContentLength) > maxBytes) {
+        result.Body.destroy?.();
+        throw new Error('Object exceeds the allowed size.');
+      }
+      const chunks = [];
+      let length = 0;
+      for await (const chunk of result.Body) {
+        length += chunk.length;
+        if (length > maxBytes) {
+          result.Body.destroy?.();
+          throw new Error('Object exceeds the allowed size.');
+        }
+        chunks.push(chunk);
+      }
+      return Buffer.concat(chunks);
+    },
+    async putObject({ storageKey, mimeType, bytes }) {
+      await client.send(new PutObjectCommand({ Bucket: bucket, Key: storageKey, ContentType: mimeType, Body: bytes }));
+    },
     async deleteObject({ storageKey }) {
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: storageKey }));
     },

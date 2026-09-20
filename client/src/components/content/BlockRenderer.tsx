@@ -1,7 +1,40 @@
 // src/components/BlockRenderer.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { ContentBlock, TableBlock, PoemBlock } from '../../types/quiz';
 import InteractiveText from '../../features/quiz/InteractiveText';
+import axiosClient from '../../lib/axios';
+import { Button } from '../ui/button';
+import { splitReadingParagraphs } from './readingTextFormat';
+
+const getManagedImageUrl = async (assetId: string) => {
+  const response = await axiosClient.get<{ success: boolean; data: { url: string; expiresInSeconds: number } }>(`/api/test-images/${encodeURIComponent(assetId)}/access`);
+  return response.data.url;
+};
+
+function ManagedImage({ assetId, alt }: { assetId: string; alt: string }) {
+  const [result, setResult] = useState<{ key: string; url?: string; failed?: boolean } | null>(null);
+  const [retry, setRetry] = useState(0);
+  const key = `${assetId}:${retry}`;
+
+  useEffect(() => {
+    let active = true;
+    void getManagedImageUrl(assetId).then(nextUrl => {
+      if (active) setResult({ key, url: nextUrl });
+    }).catch(() => {
+      if (active) setResult({ key, failed: true });
+    });
+    return () => { active = false; };
+  }, [assetId, key, retry]);
+
+  const url = result?.key === key ? result.url : '';
+  const failed = result?.key === key && result.failed;
+  if (failed) return <div role="alert" className="rounded-lg border border-border p-3 text-sm text-muted-foreground">Image unavailable. <Button type="button" variant="outline" size="sm" onClick={() => setRetry(value => value + 1)}>Retry</Button></div>;
+  if (!url) return <div role="status" className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">Loading image…</div>;
+  return <img src={url} alt={alt} onError={() => {
+    if (retry % 2 === 0) setRetry(value => value + 1);
+    else setResult({ key, failed: true });
+  }} className="max-w-lg max-h-80 w-auto h-auto object-contain rounded-md shadow-xs border border-gray-200" />;
+}
 
 interface Props {
   blocks: ContentBlock[];
@@ -158,19 +191,19 @@ const BlockRenderer: React.FC<Props> = ({ blocks, subject, readOnly = false, var
         switch (block.type) {
           case 'text':
             return (
-              <div key={index} className="leading-relaxed">
-                <InteractiveText content={block.content} isMath={isMath} readOnly={readOnly} inheritTypography={preview || exam}/>
+              <div key={index} className="space-y-4 leading-relaxed">
+                {(isMath ? [block.content] : splitReadingParagraphs(block.content)).map((paragraph, paragraphIndex) => (
+                  <InteractiveText key={paragraphIndex} content={paragraph} isMath={isMath} readOnly={readOnly} inheritTypography={preview || exam} />
+                ))}
               </div>
             );
           
           case 'image':
             return (
               <div key={index} className="flex flex-col items-center justify-center my-4">
-                <img 
-                  src={block.src} 
-                  alt={block.alt || 'Question image'} 
-                  className="max-w-lg max-h-80 w-auto h-auto object-contain rounded-md shadow-xs border border-gray-200"
-                />
+                {block.assetId
+                  ? <ManagedImage assetId={block.assetId} alt={block.alt || 'Question image'} />
+                  : block.src ? <img src={block.src} alt={block.alt || 'Question image'} className="max-w-lg max-h-80 w-auto h-auto object-contain rounded-md shadow-xs border border-gray-200" /> : null}
                 {block.caption && <div className="mt-2 max-w-lg text-center text-sm text-gray-500">{isMath ? <InteractiveText content={block.caption} isMath readOnly={readOnly} inheritTypography /> : block.caption}</div>}
               </div>
             );
