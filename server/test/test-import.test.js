@@ -65,3 +65,45 @@ test('document extraction returns editable text for TXT uploads', async () => {
   assert.equal(result.fileName, 'practice-test.txt');
   assert.equal(result.text, source);
 });
+
+test('explicit question marker preserves two passage paragraphs and ignores choice-like passage lines', () => {
+  const text = `QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[TEXT]
+The author wrote an answer: perhaps — but not certainly.
+
+A. historical note appears in the passage.
+
+[QUESTION]
+What does the passage suggest?
+A. Certainty
+B. Caution
+Answer: B`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+  assert.equal(question.blocks.length, 1);
+  assert.equal(question.blocks[0].content, 'The author wrote an answer: perhaps — but not certainly.\n\nA. historical note appears in the passage.');
+  assert.equal(question.questionText, 'What does the passage suggest?');
+  assert.deepEqual(question.choices.map(choice => choice.id), ['A', 'B']);
+  assert.equal(question.correctAnswer, 'B');
+});
+
+test('import reports malformed reading markers without discarding the question', () => {
+  const text = `QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[TEYT]
+One ==unfinished underline.
+
+[QUESTION]
+What is implied?
+A. One
+B. Two
+Answer: A`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+  assert.ok(question.issues.some(item => item.code === 'UNMATCHED_UNDERLINE'));
+  assert.ok(question.issues.some(item => item.code === 'UNKNOWN_CONTENT_TAG'));
+  assert.equal(question.questionText, 'What is implied?');
+});

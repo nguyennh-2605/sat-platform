@@ -29,3 +29,21 @@ test('an existing test can be serialized back into editable structured text', ()
   assert.equal(question.correctAnswer, 'B');
   assert.deepEqual(question.blocks[0].rows, [['2', '6']]);
 });
+
+test('reading passages with multiple paragraphs survive edit serialization', () => {
+  const structuredText = serializeTest({ sections: [{ order: 1, questions: [{
+    order: 1,
+    type: 'MCQ',
+    domainCode: 'RW_INFORMATION_AND_IDEAS',
+    skillCode: 'RW_INFERENCES',
+    blocks: [{ type: 'text', content: 'First paragraph.\n\nSecond paragraph.' }],
+    questionText: 'Which inference follows?',
+    choices: [{ id: 'A', text: 'One' }, { id: 'B', text: 'Two' }],
+    correctAnswer: 'A',
+  }] }] });
+  assert.match(structuredText, /\[QUESTION\]/);
+  const question = previewText({ text: structuredText, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+  assert.equal(question.blocks[0].content, 'First paragraph.\n\nSecond paragraph.');
+  assert.equal(question.questionText, 'Which inference follows?');
+  assert.equal(question.issues.length, 0);
+});

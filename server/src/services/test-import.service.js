@@ -8,7 +8,6 @@ const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const normalizeText = (value) => String(value || '')
   .replace(/\r\n?/g, '\n')
   .replace(/\u00a0/g, ' ')
-  .replace(/[–—]/g, '-')
   .replace(/\n{3,}/g, '\n\n')
   .trim();
 
@@ -45,7 +44,8 @@ const parseBlocks = (rawPassage) => {
     } else if (tag === 'NOTE') {
       blocks.push({ type: 'note', lines: content.split('\n').map(line => line.replace(/^[-*•]\s*/, '').trim()).filter(Boolean) });
     } else if (tag === 'IMG') {
-      blocks.push({ type: 'image', src: content });
+      const managed = content.match(/^asset:([0-9a-f-]{36})$/i);
+      blocks.push(managed ? { type: 'image', assetId: managed[1] } : { type: 'image', src: content });
     } else if (content) {
       blocks.push({ type: 'text', content });
     }
@@ -99,18 +99,32 @@ const parseChoices = (text) => {
 const parseQuestion = ({ text, moduleOrder, questionOrder, subject }) => {
   let workingText = normalizeText(text);
   const issues = [];
+  const explicitMarkers = [...workingText.matchAll(/^[ \t]*\[QUESTION\][ \t]*$/gim)];
+  if (explicitMarkers.length > 1) {
+    issues.push(issue('error', 'MULTIPLE_QUESTION_MARKERS', 'Use [QUESTION] once per question.'));
+  }
+
+  const domain = extractLineField(workingText, 'Domain');
+  workingText = domain.text;
+  const skill = extractLineField(workingText, 'Skill');
+  workingText = skill.text;
+
+  let passage = '';
+  if (explicitMarkers.length) {
+    const marker = workingText.match(/^[ \t]*\[QUESTION\][ \t]*$/im);
+    passage = workingText.slice(0, marker.index).trim();
+    workingText = workingText.slice(marker.index + marker[0].length).trim();
+  }
 
   const explanation = extractTailField(workingText, 'Explanation');
   workingText = explanation.text;
   const answer = extractLineField(workingText, 'Answer');
   workingText = answer.text;
-  const skill = extractLineField(workingText, 'Skill');
-  workingText = skill.text;
-  const domain = extractLineField(workingText, 'Domain');
-  workingText = domain.text;
 
   const parsedChoices = parseChoices(workingText);
-  const content = splitPassageAndQuestion(parsedChoices.content);
+  const content = explicitMarkers.length
+    ? { blocks: parseBlocks(passage), questionText: parsedChoices.content }
+    : splitPassageAndQuestion(parsedChoices.content);
   const type = parsedChoices.choices.length ? 'MCQ' : 'SPR';
   const domainMatch = findDomain(domain.value, subject);
   const skillMatch = domainMatch && findSkill(skill.value, domainMatch.code);
@@ -124,8 +138,19 @@ const parseQuestion = ({ text, moduleOrder, questionOrder, subject }) => {
   if (type === 'MCQ' && correctAnswer && !parsedChoices.choices.some(choice => choice.id === correctAnswer)) {
     issues.push(issue('error', 'ANSWER_NOT_IN_CHOICES', 'Correct answer does not match any answer choice.'));
   }
-  if (content.blocks.some(block => block.type === 'image' && !block.src)) {
+  if (content.blocks.some(block => block.type === 'image' && !block.src && !block.assetId)) {
     issues.push(issue('warning', 'IMAGE_REQUIRED', 'This question contains an image placeholder that still needs an image.'));
+  }
+  const unknownTags = passage.match(/^[ \t]*\[([A-Z][A-Z0-9_-]*)\][ \t]*$/gm) || [];
+  if (unknownTags.some(tag => !/^\[(?:TEXT|TABLE|POEM|NOTE|IMG)\]$/.test(tag.trim()))) {
+    issues.push(issue('warning', 'UNKNOWN_CONTENT_TAG', 'A content tag is not recognized. Check its spelling.'));
+  }
+  const readingFields = [content.questionText, ...parsedChoices.choices.map(choice => choice.text), explanation.value,
+    ...content.blocks.filter(block => block.type === 'text').map(block => block.content)];
+  if (subject === 'RW' && readingFields.some(value => String(value || '').split('\n').some(line =>
+    ([...line.matchAll(/(?<!\\)==/g)].length % 2) !== 0,
+  ))) {
+    issues.push(issue('warning', 'UNMATCHED_UNDERLINE', 'An underline marker == is missing its closing pair.'));
   }
 
   return {

@@ -3,6 +3,8 @@ import parse from 'html-react-parser';
 import { useQuizTool } from '../../context/quiz-tool-context';
 import toast from 'react-hot-toast';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
+import ReadingText from '../../components/content/ReadingText';
+import { readingTextToHtml } from '../../components/content/readingTextFormat';
 
 interface Props {
   content: string;
@@ -28,11 +30,11 @@ const annotationStorageKey = (content: string, key?: string) => (
 const readAnnotation = (content: string, key?: string) => {
   try {
     const stored = sessionStorage.getItem(annotationStorageKey(content, key));
-    if (!stored) return { htmlContent: content, notes: {} as Record<string, string> };
+    if (!stored) return { htmlContent: readingTextToHtml(content), notes: {} as Record<string, string> };
     const parsed = JSON.parse(stored) as { htmlContent?: string; notes?: Record<string, string> };
-    return { htmlContent: parsed.htmlContent || content, notes: parsed.notes || {} };
+    return { htmlContent: parsed.htmlContent || readingTextToHtml(content), notes: parsed.notes || {} };
   } catch {
-    return { htmlContent: content, notes: {} as Record<string, string> };
+    return { htmlContent: readingTextToHtml(content), notes: {} as Record<string, string> };
   }
 };
 
@@ -253,18 +255,12 @@ const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, read
     setActiveNoteId(null);
   };
 
-  // 9. XỬ LÝ CÚ PHÁP ==gạch chân== TỪ DỮ LIỆU ĐỀ BÀI
-  const processUnderline = (text: string) => {
-    if (!text) return "";
-    return text.replace(/==([^=]+)==/g, '<u>$1</u>');
-  };
-
   if (isMath) return <FormattedTextRenderer text={content} inheritTypography={inheritTypography} latexOnly />;
   
   if (readOnly) {
     return (
-      <div className={`text-gray-800 ${inheritTypography ? '' : 'text-[16px] leading-relaxed'}`}>
-        {parse(processUnderline(content))}
+      <div className={`whitespace-pre-wrap text-gray-800 ${inheritTypography ? '' : 'text-[16px] leading-relaxed'}`}>
+        <ReadingText content={content} />
       </div>
     );
   }
@@ -279,9 +275,9 @@ const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, read
         ref={contentRef}
         onMouseUp={handleMouseUp}
         onClick={handleContainerClick}
-        className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} select-text text-gray-800 ${cursorClass}`}
+        className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} whitespace-pre-wrap select-text text-gray-800 ${cursorClass}`}
       >
-        {parse(processUnderline(htmlContent))}
+        {parse(htmlContent)}
       </div>
 
       {/* --- TOOLBAR MỚI (THIẾT KẾ DẠNG PILL THEO ẢNH 2) --- */}

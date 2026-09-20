@@ -90,6 +90,14 @@ test('only the owner can complete a pending upload', async () => {
   await assert.rejects(fileAssetService.completeUpload({ fileAssetId: 'asset-1', ownerId: 7 }, { db }), expectStatus(403));
 });
 
+test('generic file endpoints cannot complete or read a test image', async () => {
+  const db = createDb();
+  db.fileAsset.findUnique = async () => ({ id: 'asset-1', ownerId: 7, purpose: 'TEST_IMAGE', status: 'PENDING_UPLOAD' });
+  await assert.rejects(fileAssetService.completeUpload({ fileAssetId: 'asset-1', ownerId: 7 }, { db }), expectStatus(404));
+  db.fileAsset.findUnique = async () => ({ id: 'asset-1', ownerId: 7, purpose: 'TEST_IMAGE', status: 'READY' });
+  await assert.rejects(fileAssetService.getAccessUrl({ fileAssetId: 'asset-1', userId: 7, userRole: 'TEACHER' }, { db }), expectStatus(404));
+});
+
 test('owner completion verifies metadata before marking an upload ready', async () => {
   let update;
   const asset = { id: 'asset-1', ownerId: 7, status: 'PENDING_UPLOAD', sizeBytes: 1024, mimeType: 'application/pdf' };
@@ -169,6 +177,14 @@ test('cleanup deletes orphan assets and keeps failures pending for a retry', asy
   assert.deepEqual(result, { candidates: 2, processed: 1, failed: 1, durationMs: 25 });
   assert.deepEqual(deleted, ['asset-ok']);
   assert.deepEqual(pending, [{ id: 'asset-failed', status: 'PENDING_DELETE' }]);
+});
+
+test('cleanup excludes managed images referenced by a test', async () => {
+  let where;
+  const db = createDb();
+  db.fileAsset.findMany = async input => { where = input.where; return []; };
+  await fileAssetService.cleanupAssets({ db, clock: () => 0 });
+  assert.deepEqual(where.OR[1].testImages, { none: {} });
 });
 
 test('cleanup uses bounded concurrency instead of deleting the whole batch at once', async () => {

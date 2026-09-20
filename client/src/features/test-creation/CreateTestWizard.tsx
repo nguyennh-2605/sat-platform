@@ -22,6 +22,7 @@ import katex from 'katex';
 import axiosClient from '../../lib/axios';
 import BlockRenderer from '../../components/content/BlockRenderer';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
+import ReadingText from '../../components/content/ReadingText';
 import { Badge, Card, Input, Modal } from '../../components/ui/AppUI';
 import { Button } from '../../components/ui/button';
 import { Textarea } from '../../components/ui/textarea';
@@ -47,13 +48,16 @@ Domain: Information and Ideas
 Skill: Inferences
 
 [TEXT]
-Paste the passage or stimulus here.
+Paste the first passage paragraph here.
+
+Paste the second passage paragraph here.
 
 [TABLE]
 Year\tGroup A\tGroup B
 2023\t42\t51
 2024\t48\t57
 
+[QUESTION]
 Write the question here.
 A. First choice
 B. Second choice
@@ -106,6 +110,24 @@ const requestErrorMessage = (error: unknown, fallback: string) => {
   const response = (error as { response?: { data?: { error?: string } } })?.response;
   return response?.data?.error || fallback;
 };
+
+const uploadToSignedUrl = (url: string, file: File, headers: Record<string, string>, signal: AbortSignal, onProgress: (value: number) => void) => new Promise<void>((resolve, reject) => {
+  const request = new XMLHttpRequest();
+  const abort = () => request.abort();
+  signal.addEventListener('abort', abort, { once: true });
+  request.open('PUT', url);
+  Object.entries(headers).forEach(([name, value]) => request.setRequestHeader(name, value));
+  request.upload.onprogress = event => { if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100)); };
+  request.onload = () => {
+    signal.removeEventListener('abort', abort);
+    if (request.status >= 200 && request.status < 300) resolve();
+    else reject(new Error('Image upload failed'));
+  };
+  request.onerror = () => { signal.removeEventListener('abort', abort); reject(new Error('Image upload failed')); };
+  request.onabort = () => { signal.removeEventListener('abort', abort); reject(new DOMException('Upload cancelled', 'AbortError')); };
+  if (signal.aborted) abort();
+  else request.send(file);
+});
 
 const mathLatexValues = (question: ImportQuestion) => {
   const values = [question.questionText, ...question.choices.map(choice => choice.text), question.explanation || ''];
@@ -176,6 +198,7 @@ const CreateTestWizard = () => {
   const editTestId = editParam && /^\d+$/.test(editParam) ? Number(editParam) : null;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const imageUploadAbortRef = useRef<AbortController | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const loadedEditIdRef = useRef<number | null>(null);
   const userRole = localStorage.getItem('userRole') || 'TEACHER';
@@ -205,6 +228,7 @@ const CreateTestWizard = () => {
   const [guideOpen, setGuideOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingEdit, setIsLoadingEdit] = useState(Boolean(editTestId));
   const [editFolderId, setEditFolderId] = useState<number | null>(null);
@@ -355,43 +379,51 @@ const CreateTestWizard = () => {
 
   const insertAtCursor = (text: string) => {
     const editor = editorRef.current;
-    const start = editor?.selectionStart ?? rawText.length;
-    const end = editor?.selectionEnd ?? rawText.length;
-    const separator = start > 0 && rawText[start - 1] !== '\n' ? '\n\n' : '';
-    const insertion = `${separator}[IMG]\n${text}\n`;
-    setRawText(current => `${current.slice(0, start)}${insertion}${current.slice(end)}`);
+    const start = editor?.selectionStart;
+    const end = editor?.selectionEnd;
+    let cursor = 0;
+    setRawText(current => {
+      const from = start ?? current.length;
+      const to = end ?? current.length;
+      const separator = from > 0 && current[from - 1] !== '\n' ? '\n\n' : '';
+      const insertion = `${separator}[IMG]\n${text}\n`;
+      cursor = from + insertion.length;
+      return `${current.slice(0, from)}${insertion}${current.slice(to)}`;
+    });
     setContentDirty(true);
     requestAnimationFrame(() => {
       editor?.focus();
-      const cursor = start + insertion.length;
       editor?.setSelectionRange(cursor, cursor);
     });
   };
 
   const uploadImage = async (file: File) => {
-    if (file.size > 5 * 1024 * 1024) return toast.error('Choose an image smaller than 5 MB');
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_PRESET;
-    if (!cloudName || !uploadPreset) return toast.error('Cloudinary upload is not configured');
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size < 1 || file.size > 5 * 1024 * 1024) return toast.error('Choose a PNG, JPEG, or WebP image up to 5 MB');
+    const abortController = new AbortController();
+    imageUploadAbortRef.current = abortController;
     setIsUploadingImage(true);
+    setImageUploadProgress(0);
     try {
-      const body = new FormData();
-      body.append('file', file);
-      body.append('upload_preset', uploadPreset);
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body });
-      if (!response.ok) throw new Error('Image upload failed');
-      const data = await response.json() as { secure_url?: string };
-      if (!data.secure_url) throw new Error('Image URL is missing');
-      insertAtCursor(data.secure_url);
-      toast.success('Image URL inserted');
-    } catch (error) {
-      console.error(error);
-      toast.error('Unable to upload this image');
+      const prepared = await axiosClient.post<{ success: boolean; data: { asset: { id: string }; uploadUrl: string; headers: Record<string, string> } }>('/api/test-images/uploads', {
+        originalName: file.name, mimeType: file.type, sizeBytes: file.size,
+      });
+      if (abortController.signal.aborted) return;
+      await uploadToSignedUrl(prepared.data.uploadUrl, file, prepared.data.headers, abortController.signal, setImageUploadProgress);
+      await axiosClient.post(`/api/test-images/${prepared.data.asset.id}/complete`);
+      if (abortController.signal.aborted) return;
+      insertAtCursor(`asset:${prepared.data.asset.id}`);
+      toast.success('Image added to the editor');
+    } catch (error: unknown) {
+      if ((error as Error)?.name !== 'AbortError') toast.error(requestErrorMessage(error, 'Unable to upload this image'));
     } finally {
+      imageUploadAbortRef.current = null;
       setIsUploadingImage(false);
+      setImageUploadProgress(null);
       if (imageInputRef.current) imageInputRef.current.value = '';
     }
   };
+
+  useEffect(() => () => imageUploadAbortRef.current?.abort(), []);
 
   const saveTest = async (nextStatus: Exclude<TestStatus, 'ARCHIVED'>) => {
     if (editLocked) return toast.error('This test is already used by a classroom. Duplicate it to create a new editable version');
@@ -529,10 +561,11 @@ const CreateTestWizard = () => {
                         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
                           {/* Native file inputs are required because the shared text Input does not expose the browser file-picker contract. */}
                           <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void parseFile(file); }} />
-                          <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadImage(file); }} />
+                          <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadImage(file); }} />
                           <Button type="button" variant="ghost" size="sm" onClick={() => setGuideOpen(true)}><CircleHelp data-icon="inline-start" />Formatting guide</Button>
                           <Button type="button" variant="outline" size="sm" disabled={isParsing || editLocked} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <UploadCloud data-icon="inline-start" />}Upload file</Button>
-                          <Button type="button" variant="outline" size="sm" disabled={isUploadingImage || editLocked} onClick={() => imageInputRef.current?.click()}>{isUploadingImage ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <ImagePlus data-icon="inline-start" />}Upload image</Button>
+                          <Button type="button" variant="outline" size="sm" disabled={isUploadingImage || editLocked} onClick={() => imageInputRef.current?.click()}>{isUploadingImage ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <ImagePlus data-icon="inline-start" />}{isUploadingImage ? `Uploading ${imageUploadProgress ?? 0}%` : 'Upload image'}</Button>
+                          {isUploadingImage && <Button type="button" variant="ghost" size="sm" onClick={() => imageUploadAbortRef.current?.abort()}>Cancel upload</Button>}
                           <Button type="button" size="sm" disabled={isParsing || !rawText.trim() || editLocked} onClick={() => void previewText()}>{isParsing ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Eye data-icon="inline-start" />}Update preview</Button>
                         </div>
                       </div>
@@ -594,11 +627,13 @@ function FormattingGuide({ subject, template }: { subject: Subject; template: st
       {subject === 'MATH' && <div className="mt-4 rounded-lg border border-ui-border bg-muted px-3 py-2.5 text-xs leading-5 text-foreground"><strong className="font-semibold text-primary">Math uses strict LaTeX:</strong> write every question, choice, table cell and explanation as raw LaTeX without <code className="rounded-sm bg-surface px-1 py-0.5">$</code> delimiters. Use <code className="rounded-sm bg-surface px-1 py-0.5">\\text{'{'}...{'}'}</code> for words. Module markers, Domain, Skill and Answer lines remain plain structured metadata.</div>}
       <h3 className="mt-5 text-xs font-semibold uppercase tracking-[0.08em] text-foreground">Optional content blocks</h3>
       <div className="mt-3 space-y-2 text-xs leading-5 text-muted-foreground">
-        <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[TEXT]</code> A passage or stimulus. Plain untagged passage text is also accepted.</p>
+        <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[TEXT]</code> A passage or stimulus. Leave one blank line between paragraphs; a single line break wraps as part of the same paragraph.</p>
+        <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[QUESTION]</code> Put this before the question prompt to separate it clearly from a multi-paragraph passage. Older imports without it remain supported.</p>
+        {subject === 'RW' && <p>Wrap words with <code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">==double equals==</code> to underline them. Keep each pair on one line.</p>}
         <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[TABLE]</code> Put each row on a new line, separate cells with the <strong className="font-semibold text-foreground">Tab key</strong>, and use the first row as the header.</p>
         <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[POEM]</code> Put each verse line on its own line.</p>
         <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[NOTE]</code> Put each supporting fact on a new line, optionally beginning with <code>-</code> or <code>•</code>.</p>
-        <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[IMG]</code> Put a publicly accessible image URL on the following line. The Upload image button inserts this block automatically.</p>
+        <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[IMG]</code> Use Upload image to store a private image and insert its reference. Existing public image URLs remain supported.</p>
       </div>
       <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900"><strong className="font-semibold">Uploaded documents:</strong> use selectable text in PDF, DOCX, or TXT format. Scanned image-only PDFs cannot be read.</div>
     </div>
@@ -623,8 +658,8 @@ function StatusIcon({ issues }: { issues: ImportIssue[] }) {
 }
 
 function QuestionPreview({ question, subject }: { question: ImportQuestion; subject: Subject }) {
-  const usableBlocks = question.blocks.filter(block => block.type !== 'image' || block.src);
-  return <div className="font-sans text-[15px] leading-6"><div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-xs font-medium text-muted-foreground">Module {question.module} · Question {question.order}</p><h2 className="mt-1 text-lg font-semibold text-foreground">Question preview</h2></div><Badge tone={question.type === 'SPR' ? 'gold' : 'green'}>{question.type === 'SPR' ? 'Student-produced response' : 'Multiple choice'}</Badge></div>{usableBlocks.length > 0 && <div className="mb-5"><BlockRenderer blocks={usableBlocks} subject={subject} readOnly variant="preview" /></div>}{subject === 'MATH' ? <FormattedTextRenderer text={question.questionText || '\\text{Question text is missing.}'} inheritTypography latexOnly /> : <p className="whitespace-pre-wrap text-[15px] leading-6 text-foreground">{question.questionText || 'Question text is missing.'}</p>}{question.type === 'MCQ' && <div className="mt-6 space-y-2">{question.choices.map(choice => <div key={choice.id} className="flex gap-3 rounded-control border border-ui-border bg-surface px-3 py-2.5 text-[15px] leading-6 text-foreground"><span className="font-semibold text-primary">{choice.id}</span><span className="min-w-0">{subject === 'MATH' ? <FormattedTextRenderer text={choice.text} inheritTypography latexOnly /> : <span className="whitespace-pre-wrap">{choice.text}</span>}</span></div>)}</div>}{question.type === 'SPR' && <div className="mt-6 rounded-control border border-dashed border-ui-border bg-muted p-3 text-[15px] leading-6 text-muted-foreground">Student-produced response</div>}</div>;
+  const usableBlocks = question.blocks.filter(block => block.type !== 'image' || block.src || block.assetId);
+  return <div className="font-sans text-[15px] leading-6"><div className="mb-5 flex items-center justify-between gap-3"><div><p className="text-xs font-medium text-muted-foreground">Module {question.module} · Question {question.order}</p><h2 className="mt-1 text-lg font-semibold text-foreground">Question preview</h2></div><Badge tone={question.type === 'SPR' ? 'gold' : 'green'}>{question.type === 'SPR' ? 'Student-produced response' : 'Multiple choice'}</Badge></div>{usableBlocks.length > 0 && <div className="mb-5"><BlockRenderer blocks={usableBlocks} subject={subject} readOnly variant="preview" /></div>}{subject === 'MATH' ? <FormattedTextRenderer text={question.questionText || '\\text{Question text is missing.}'} inheritTypography latexOnly /> : <p className="whitespace-pre-wrap text-[15px] leading-6 text-foreground"><ReadingText content={question.questionText || 'Question text is missing.'} /></p>}{question.type === 'MCQ' && <div className="mt-6 space-y-2">{question.choices.map(choice => <div key={choice.id} className="flex gap-3 rounded-control border border-ui-border bg-surface px-3 py-2.5 text-[15px] leading-6 text-foreground"><span className="font-semibold text-primary">{choice.id}</span><span className="min-w-0">{subject === 'MATH' ? <FormattedTextRenderer text={choice.text} inheritTypography latexOnly /> : <span className="whitespace-pre-wrap"><ReadingText content={choice.text} /></span>}</span></div>)}</div>}{question.type === 'SPR' && <div className="mt-6 rounded-control border border-dashed border-ui-border bg-muted p-3 text-[15px] leading-6 text-muted-foreground">Student-produced response</div>}</div>;
 }
 
 function QuestionEditor({ question, domain, taxonomy, onChange }: { question: ImportQuestion; domain?: TaxonomyDomain; taxonomy: TaxonomyDomain[]; onChange: (id: string, updater: (question: ImportQuestion) => ImportQuestion) => void }) {
