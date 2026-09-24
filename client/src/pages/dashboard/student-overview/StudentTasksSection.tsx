@@ -38,9 +38,10 @@ function filteredTasks(items: StudentTaskItem[], view: TaskView, selectedDate?: 
   });
 }
 
-export function StudentTasksSection({ data, selectedDate, onClearDate, onOpen, onReload }: {
+export function StudentTasksSection({ data, selectedDate, showTodayRequest = 0, onClearDate, onOpen, onReload }: {
   data: StudentTasksResponse;
   selectedDate?: Date;
+  showTodayRequest?: number;
   onClearDate: () => void;
   onOpen: (item: StudentTaskItem) => void;
   onReload: () => Promise<void>;
@@ -52,6 +53,7 @@ export function StudentTasksSection({ data, selectedDate, onClearDate, onOpen, o
   const [workingKey, setWorkingKey] = useState<string | null>(null);
   useEffect(() => setItems(data.items), [data.items]);
   useEffect(() => { if (selectedDate) setView('DATE'); }, [selectedDate]);
+  useEffect(() => { if (showTodayRequest > 0) setView('TODAY'); }, [showTodayRequest]);
   const visible = useMemo(() => filteredTasks(items, view, selectedDate), [items, selectedDate, view]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 

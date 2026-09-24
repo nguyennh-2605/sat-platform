@@ -86,6 +86,17 @@ export const storeAuthSession = (token: string, user: AuthSessionUser, fallbackR
   applyAuthResponse({ accessToken: token, user }, fallbackRole);
 };
 
+export const updateStoredAuthUser = (patch: Partial<AuthSessionUser>) => {
+  const current: AuthSessionUser = {
+    id: localStorage.getItem('userId') || '',
+    name: localStorage.getItem('userName'),
+    avatar: localStorage.getItem('userAvatar'),
+    role: localStorage.getItem('userRole'),
+  };
+  persistUser({ ...current, ...patch }, current.role || 'STUDENT');
+  notify();
+};
+
 export const clearAuthSession = () => {
   accessToken = null;
   AUTH_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));

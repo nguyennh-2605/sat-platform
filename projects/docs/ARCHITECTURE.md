@@ -132,6 +132,13 @@ Express Server (index.js → app.js)
 | `POST` | `/api/login` | None | Login with email + password, returns JWT |
 | `POST` | `/api/auth/google-login` | None | Login with Google OAuth token, returns JWT |
 
+### 5.1.1 Account profile
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/account/profile` | JWT | Read the authenticated user's display-safe profile and sign-in method |
+| `PATCH` | `/api/account/profile` | JWT | Update the authenticated user's display name |
+
 ### 5.2 Classes
 
 | Method | Path | Auth | Description |

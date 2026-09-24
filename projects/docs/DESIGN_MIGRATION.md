@@ -53,7 +53,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | Vocabulary | `dashboard/tasks` | Quizlet/Knowt set-first workflow, rich-list patterns | Implemented as a set-first workspace with coverage/mastery progress, dynamic new/learning review CTA, searchable word rich list, word detail Sheet, range/mastery setup, persisted resumable sessions, reversible Shuffle, flashcard completion loop, and desktop study shortcuts |
 | Score Report | `dashboard/analytics` | invoice/print composition | Implemented while preserving score and Math rendering rules |
 | Notifications | dashboard header menus | mail list patterns | Implemented for the global menu and classroom post workflow |
-| Profile/preferences | `dashboard/profile` | layout controls/theme switcher | Pending |
+| Profile/preferences | `dashboard/profile` | layout controls/theme switcher | Implemented with display-name editing, role-aware Student study preferences, account context, and light/dark/system appearance controls; visual QA pending |
 | Exam Room | SAT product requirements | shared form/content primitives only | Preserve specialized UI |
 
 ## Migration phases
