@@ -8,11 +8,12 @@ test('student overview surfaces saved goals and profile settings stay in sync', 
   await apiJson(request, student, 'put', '/api/user-preferences/sat-score-goal', { currentScore: 1210, targetScore: 1450 });
 
   await loginThroughUi(page, student);
-  await expect(page.getByText('Today', { exact: true })).toBeVisible();
-  await expect(page.getByText('Next SAT', { exact: true })).toBeVisible();
-  await expect(page.getByText('Score Goal', { exact: true })).toBeVisible();
-  await expect(page.getByText('1210', { exact: true })).toBeVisible();
-  await expect(page.getByText('1450', { exact: true })).toBeVisible();
+  const studySummary = page.getByRole('region', { name: 'Study summary' });
+  await expect(studySummary.getByText('Today', { exact: true })).toBeVisible();
+  await expect(studySummary.getByText('Next SAT', { exact: true })).toBeVisible();
+  await expect(studySummary.getByText('Score Goal', { exact: true })).toBeVisible();
+  await expect(studySummary.getByText('1210', { exact: true })).toBeVisible();
+  await expect(studySummary.getByText('1450', { exact: true })).toBeVisible();
   await expect(page.getByText('This Week', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Next Step', { exact: true })).toHaveCount(0);
 
