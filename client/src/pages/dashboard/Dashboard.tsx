@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ElementType } from 'react';
+import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ElementType } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -12,6 +12,7 @@ import {
   LogOut,
   Moon,
   Search,
+  Settings,
   Sun,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -47,9 +48,10 @@ import {
 } from '@/components/ui/sidebar';
 import { DashboardRouteViewport } from '../../features/navigation/DashboardRouteViewport';
 import { DashboardBackProvider, useDashboardBackAction } from '../../features/navigation/DashboardBackContext';
-import NotificationBell from '../../features/notifications/NotificationBell';
 import { logoutAuthSession } from '../../lib/authSession';
 import { FocusClock } from '../../features/focus-timer/FocusClock';
+import { subscribeAuthSession } from '../../lib/authSession';
+import { useDashboardTheme } from '../../features/theme/dashboardTheme';
 
 const navigation = [
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -211,6 +213,12 @@ function DashboardSearch() {
 }
 
 function SidebarAccountMenu({ onLogout }: { onLogout: () => void }) {
+  const navigate = useNavigate();
+  useSyncExternalStore(
+    subscribeAuthSession,
+    () => [localStorage.getItem('userName'), localStorage.getItem('userAvatar'), localStorage.getItem('userRole')].join('|'),
+    () => '',
+  );
   const userName = localStorage.getItem('userName') || 'Student';
   const userAvatar = localStorage.getItem('userAvatar') || '';
   const role = localStorage.getItem('userRole') || 'STUDENT';
@@ -229,6 +237,8 @@ function SidebarAccountMenu({ onLogout }: { onLogout: () => void }) {
         <DropdownMenuContent side={isMobile ? 'bottom' : 'right'} align="end" sideOffset={4} className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg">
           <DropdownMenuLabel className="p-0 font-normal"><div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm"><Avatar className="size-8 rounded-lg"><AvatarImage src={userAvatar || undefined} alt={userName} /><AvatarFallback className="rounded-lg">{initials}</AvatarFallback></Avatar><div className="grid min-w-0 flex-1 text-left text-sm leading-tight"><span className="truncate font-medium">{userName}</span><span className="truncate text-xs capitalize text-muted-foreground">{role.toLowerCase()}</span></div></div></DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => navigate('/dashboard/profile')}><Settings aria-hidden="true" />Profile & settings</DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onSelect={onLogout}><LogOut aria-hidden="true" />Log out</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu></SidebarMenuItem></SidebarMenu>
@@ -236,23 +246,17 @@ function SidebarAccountMenu({ onLogout }: { onLogout: () => void }) {
 }
 
 function ThemeToggle() {
-  const [dark, setDark] = useState(() => localStorage.getItem('dashboardTheme') === 'dark');
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark);
-    localStorage.setItem('dashboardTheme', dark ? 'dark' : 'light');
-  }, [dark]);
+  const { isDark, setTheme } = useDashboardTheme();
 
   return (
-    <Button variant="ghost" size="icon" onClick={() => setDark(value => !value)} aria-label={dark ? 'Use light theme' : 'Use dark theme'}>
-      {dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+    <Button variant="ghost" size="icon" onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Use light theme' : 'Use dark theme'}>
+      {isDark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
     </Button>
   );
 }
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const userId = localStorage.getItem('userId') || 'guest';
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
@@ -285,7 +289,6 @@ export default function Dashboard() {
             <div className="flex items-center gap-1">
               {localStorage.getItem('userRole') === 'STUDENT' && <FocusClock />}
               <ThemeToggle />
-              <NotificationBell currentUserId={userId} />
             </div>
           </header>
 

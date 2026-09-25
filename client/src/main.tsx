@@ -6,8 +6,9 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import './index.css'
 import App from './app/App.tsx'
 import { AppCrashFallback } from './app/AppCrashFallback.tsx'
+import { initializeDashboardTheme } from './features/theme/dashboardTheme.ts'
 
-document.documentElement.classList.toggle('dark', localStorage.getItem('dashboardTheme') === 'dark')
+initializeDashboardTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

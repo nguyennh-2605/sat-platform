@@ -13,6 +13,7 @@ interface SatDateDialogProps {
   customDate: string;
   saving: boolean;
   now: number;
+  hasSavedDate?: boolean;
   onOfficialDateChange: (value: string) => void;
   onCustomDateChange: (value: string) => void;
   onClose: () => void;
@@ -26,6 +27,7 @@ export function SatDateDialog({
   customDate,
   saving,
   now,
+  hasSavedDate = true,
   onOfficialDateChange,
   onCustomDateChange,
   onClose,
@@ -41,7 +43,7 @@ export function SatDateDialog({
     closeOnBackdrop={!saving}
     presentation="content-dialog"
     title="Choose your SAT date"
-    subtitle={`Your countdown is currently set for ${format(effectiveDate, 'MMMM d, yyyy')}.`}
+    subtitle={hasSavedDate ? `Your countdown is currently set for ${format(effectiveDate, 'MMMM d, yyyy')}.` : `Choose a date to start your personal countdown. The next official option is ${format(effectiveDate, 'MMMM d, yyyy')}.`}
     className="!max-w-2xl"
     footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving} onClick={onSave}>{saving ? 'Saving…' : 'Save date'}</Button></>}
   >

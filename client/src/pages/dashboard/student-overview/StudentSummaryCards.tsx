@@ -1,23 +1,22 @@
-import { ArrowRight, Clock3, Focus, TrendingUp } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { StudentFocus, StudentTasksResponse } from './student-overview.types';
+import { NextSatCard, ScoreGoalCard } from './StudentProductivitySidebar';
+import type { StudentOverviewResponse, StudentTasksResponse } from './student-overview.types';
 
-export function StudentSummaryCards({ summary, focus, onOpenFocus }: {
+export function StudentSummaryCards({ summary, preferences, onShowToday, onSatDateSaved, onScoreGoalSaved }: {
   summary: StudentTasksResponse['summary'];
-  focus: StudentFocus | null;
-  onOpenFocus: (focus: StudentFocus) => void;
+  preferences: StudentOverviewResponse['preferences'];
+  onShowToday: () => void;
+  onSatDateSaved: (value: string) => void;
+  onScoreGoalSaved: (value: Pick<StudentOverviewResponse['preferences'], 'currentScore' | 'targetScore'>) => void;
 }) {
-  const cards = [
-    { title: 'Today', value: String(summary.todayRemaining), description: 'tasks remaining', icon: Clock3 },
-    { title: 'This Week', value: `${summary.weekPercentage}%`, description: `${summary.weekCompleted} of ${summary.weekTotal} completed`, icon: TrendingUp },
-    { title: 'Next Step', value: focus?.title || 'Choose practice', description: focus?.description || 'Build your study momentum', icon: Focus, focus },
-  ];
-
   return <section className="grid gap-4 md:grid-cols-3" aria-label="Study summary">
-    {cards.map(item => <Card key={item.title} className="shadow-xs">
-      <CardHeader><CardTitle><div className="flex items-center gap-2 text-sm text-muted-foreground"><span className="grid size-7 place-items-center rounded-lg border bg-muted"><item.icon className="size-4" /></span>{item.title}</div></CardTitle></CardHeader>
-      <CardContent><div className="flex flex-col gap-2"><div className="truncate text-2xl leading-none tracking-tight text-foreground" title={item.value}>{item.value}</div><div className="flex min-w-0 items-center justify-between gap-2"><p className="truncate leading-none tabular-nums text-muted-foreground">{item.description}</p>{item.focus ? <Button variant="ghost" size="icon-xs" onClick={() => { if (item.focus) onOpenFocus(item.focus); }} aria-label={`Open ${item.focus.title}`}><ArrowRight /></Button> : <ArrowRight className="size-4 shrink-0 text-muted-foreground" />}</div></div></CardContent>
-    </Card>)}
+    <Card className="h-full shadow-xs">
+      <CardHeader><CardTitle><div className="flex items-center gap-2 text-sm text-muted-foreground"><span className="grid size-7 place-items-center rounded-lg border bg-muted">{summary.todayRemaining === 0 ? <CheckCircle2 className="size-4" /> : <Clock3 className="size-4" />}</span>Today</div></CardTitle></CardHeader>
+      <CardContent><div className="flex flex-col gap-2"><div className="truncate text-2xl leading-none tracking-tight text-foreground">{summary.todayRemaining === 0 ? 'All caught up' : summary.todayRemaining}</div><div className="flex min-w-0 items-center justify-between gap-2"><p className="truncate leading-none tabular-nums text-muted-foreground">{summary.todayRemaining === 0 ? 'No tasks remaining' : summary.todayRemaining === 1 ? 'task remaining' : 'tasks remaining'}</p><Button variant="ghost" size="icon-xs" onClick={onShowToday} aria-label="Show today’s tasks"><ArrowRight /></Button></div></div></CardContent>
+    </Card>
+    <NextSatCard value={preferences.satTestDate} onSaved={onSatDateSaved} />
+    <ScoreGoalCard currentScore={preferences.currentScore} targetScore={preferences.targetScore} onSaved={onScoreGoalSaved} />
   </section>;
 }

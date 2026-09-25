@@ -22,6 +22,7 @@ const teacherRoutes = require('./teacher.routes');
 const fileAssetRoutes = require('./file-asset.routes');
 const testImageRoutes = require('./test-image.routes');
 const studySessionRoutes = require('./study-session.routes');
+const accountRoutes = require('./account.routes');
 
 // Mount routes
 router.use('/classes', classRoutes);
@@ -44,5 +45,6 @@ router.use('/teacher', teacherRoutes);
 router.use('/files', fileAssetRoutes);
 router.use('/test-images', testImageRoutes);
 router.use('/study-sessions', studySessionRoutes);
+router.use('/account', accountRoutes);
 
 module.exports = router;
