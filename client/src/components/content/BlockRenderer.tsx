@@ -151,22 +151,23 @@ const NotesRenderer = ({ lines, isMath, readOnly, preview, exam }: { lines: stri
     );
   }
 
-  // TÁCH DỮ LIỆU:
-  // introLine: Lấy phần tử đầu tiên
-  // bulletLines: Lấy toàn bộ các phần tử còn lại
-  const [introLine, ...bulletLines] = lines;
+  const hasIntro = /(?:notes|sentences):$/i.test(lines[0]) || /researching a topic/i.test(lines[0]);
+  const introLine = hasIntro ? lines[0] : '';
+  const bulletLines = hasIntro ? lines.slice(1) : lines;
 
   return (
     <div className={`${preview ? 'font-sans text-[15px] leading-6' : exam ? 'exam-content' : "font-['Source_Serif_4','Georgia',serif] text-[16px] leading-relaxed"} lining-nums tabular-nums font-normal text-[#1a1a1a] tracking-normal`}>
       
-      <div className="mb-3 leading-relaxed">
-        <InteractiveText content={introLine} isMath={isMath} readOnly={readOnly} inheritTypography={preview || exam} />
-      </div>
+      {introLine && (
+        <div className="mb-3 leading-relaxed">
+          <InteractiveText content={introLine} isMath={isMath} readOnly={readOnly} inheritTypography={preview || exam} />
+        </div>
+      )}
 
       {/* 2. HIỂN THỊ BULLET POINTS (Các dòng còn lại) */}
       {bulletLines.length > 0 && (
         <div className="pl-2"> {/* Thêm chút padding trái nếu muốn list thụt vào so với câu dẫn */}
-          <ul className="list-disc pl-6 space-y-2 text-slate-800">
+          <ul className="list-disc space-y-2 pl-6 text-foreground">
             {bulletLines.map((line, idx) => (
               <li key={idx} className="pl-1 leading-normal">
                 <InteractiveText content={line} isMath={isMath} readOnly={readOnly} inheritTypography={preview || exam}/>
@@ -192,9 +193,16 @@ const BlockRenderer: React.FC<Props> = ({ blocks, subject, readOnly = false, var
           case 'text':
             return (
               <div key={index} className="space-y-4 leading-relaxed">
-                {(isMath ? [block.content] : splitReadingParagraphs(block.content)).map((paragraph, paragraphIndex) => (
-                  <InteractiveText key={paragraphIndex} content={paragraph} isMath={isMath} readOnly={readOnly} inheritTypography={preview || exam} />
-                ))}
+                {(isMath ? [block.content] : splitReadingParagraphs(block.content)).map((paragraph, paragraphIndex) => {
+                  const isCrossTextLabel = /^Text [12]$/i.test(paragraph);
+                  return isCrossTextLabel ? (
+                    <div key={paragraphIndex} className="font-semibold text-foreground">
+                      {paragraph}
+                    </div>
+                  ) : (
+                    <InteractiveText key={paragraphIndex} content={paragraph} isMath={isMath} readOnly={readOnly} inheritTypography={preview || exam} />
+                  );
+                })}
               </div>
             );
           

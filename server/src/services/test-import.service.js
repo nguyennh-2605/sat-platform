@@ -37,6 +37,75 @@ const normalizeProse = (value) => normalizeText(value)
   }, [])
   .join('\n\n');
 
+const crossTextLabelPattern = /^\s*Text\s+([12])\s*:?\s*$/i;
+
+const normalizeReadingProse = (value) => {
+  const lines = normalizeText(value).split('\n');
+  const labels = lines.reduce((count, line) => count + (crossTextLabelPattern.test(line) ? 1 : 0), 0);
+  if (labels < 2) return normalizeProse(value);
+
+  const sections = [];
+  let current = [];
+  const flush = () => {
+    const content = normalizeProse(current.join('\n'));
+    if (content) sections.push(content);
+    current = [];
+  };
+
+  for (const line of lines) {
+    const label = line.match(crossTextLabelPattern);
+    if (!label) {
+      current.push(line);
+      continue;
+    }
+    flush();
+    sections.push(`Text ${label[1]}`);
+  }
+  flush();
+  return sections.join('\n\n');
+};
+
+const noteBulletPattern = /^\s*(?:[-*•—–]\s*)+/;
+const romanNotePattern = /^\s*(?:\\text\{\s*)?\(?(?:VIII|VII|VI|IV|III|II|IX|V|X|I)\)?[.)](?:\s|\\|})/i;
+const notePreamblePattern = /^(?:While researching a topic, a student (?:has )?(?:taken|took) the following notes:|Notes:)/i;
+
+const looksLikeNoteContent = (content) => {
+  const normalized = content.trim();
+  if (notePreamblePattern.test(normalized)) return true;
+  return (normalized.match(/(?:^|\n|\s)[•]\s+/g) || []).length >= 2
+    || (normalized.match(/(?:^|\n)\s*[-—–]\s+/g) || []).length >= 2;
+};
+
+const parseNoteLines = (content) => {
+  const expanded = content
+    .replace(/[^\S\r\n]+•\s*/g, '\n• ')
+    .replace(/[^\S\r\n]+-\s+(?=[A-Z])/g, '\n- ');
+  const sourceLines = expanded.split('\n').map(line => line.trim()).filter(Boolean);
+  const lines = [];
+
+  for (const sourceLine of sourceLines) {
+    const hasBullet = noteBulletPattern.test(sourceLine);
+    const isRomanItem = romanNotePattern.test(sourceLine);
+    const line = sourceLine.replace(noteBulletPattern, '').trim();
+    if (!line) continue;
+    if (lines.length === 0 || hasBullet || isRomanItem) {
+      lines.push(line);
+      continue;
+    }
+
+    const previous = lines.at(-1);
+    const previousIsPreamble = notePreamblePattern.test(previous);
+    const previousSentenceIsOpen = !/[.!?]["'’”\)\]]*$/.test(previous);
+    const continuesWithLowercase = /^[^A-Za-z]*[a-z]/.test(line);
+    if (!previousIsPreamble && (previousSentenceIsOpen || continuesWithLowercase)) {
+      lines[lines.length - 1] = `${previous}${previous.endsWith('-') ? '' : ' '}${line}`;
+    } else {
+      lines.push(line);
+    }
+  }
+  return lines;
+};
+
 const issue = (severity, code, message) => ({ severity, code, message });
 
 const parseBlockMetadata = (content) => {
@@ -107,8 +176,8 @@ const parseBlocks = (rawPassage) => {
         lines: content.split('\n').map(line => line.trim()).filter(Boolean),
         ...(stringMetadata(metadata, 'author') ? { author: stringMetadata(metadata, 'author') } : {}),
       });
-    } else if (tag === 'NOTE') {
-      blocks.push({ type: 'note', lines: content.split('\n').map(line => line.replace(/^[-*•]\s*/, '').trim()).filter(Boolean) });
+    } else if (tag === 'NOTE' || (tag === 'TEXT' && looksLikeNoteContent(content))) {
+      blocks.push({ type: 'note', lines: parseNoteLines(content) });
     } else if (tag === 'IMG') {
       const [source = ''] = content.split('\n').map(line => line.trim()).filter(Boolean);
       const managed = source.match(/^asset:([0-9a-f-]{36})$/i);
@@ -119,7 +188,7 @@ const parseBlocks = (rawPassage) => {
         ...(stringMetadata(metadata, 'caption') ? { caption: stringMetadata(metadata, 'caption') } : {}),
       });
     } else if (content) {
-      blocks.push({ type: 'text', content: normalizeProse(content) });
+      blocks.push({ type: 'text', content: normalizeReadingProse(content) });
     }
   }
 
@@ -228,6 +297,15 @@ const parseQuestion = ({ text, moduleOrder, questionOrder, moduleIndex, question
   }
   if (content.blocks.some(block => block.type === 'image' && block.src && !block.assetId)) {
     issues.push(issue('error', 'MANAGED_IMAGE_REQUIRED', 'Upload this image to the platform before publishing instead of using an external URL.'));
+  }
+  const passageText = content.blocks
+    .filter(block => block.type === 'text')
+    .map(block => block.content)
+    .join('\n');
+  if (subject === 'RW'
+    && /\bcompletes? the text\b/i.test(content.questionText)
+    && !/_{3,}/.test(passageText)) {
+    issues.push(issue('error', 'MISSING_COMPLETION_BLANK', 'This completion question is missing its blank in the passage.'));
   }
   const unknownTags = passage.match(/^[ \t]*\[([A-Z][A-Z0-9_-]*)\][ \t]*$/gm) || [];
   if (unknownTags.some(tag => !/^\[(?:TEXT|TABLE|POEM|NOTE|IMG)\]$/.test(tag.trim()))) {
