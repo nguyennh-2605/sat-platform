@@ -11,6 +11,16 @@ const normalizeText = (value) => String(value || '')
   .replace(/\n{3,}/g, '\n\n')
   .trim();
 
+const normalizeProse = (value) => normalizeText(value)
+  .split(/\n\s*\n/)
+  .map(paragraph => paragraph
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .reduce((result, line) => `${result}${result && !result.endsWith('-') ? ' ' : ''}${line}`, ''))
+  .filter(Boolean)
+  .join('\n\n');
+
 const issue = (severity, code, message) => ({ severity, code, message });
 
 const splitUsingMarkers = (text, expression) => {
@@ -47,7 +57,7 @@ const parseBlocks = (rawPassage) => {
       const managed = content.match(/^asset:([0-9a-f-]{36})$/i);
       blocks.push(managed ? { type: 'image', assetId: managed[1] } : { type: 'image', src: content });
     } else if (content) {
-      blocks.push({ type: 'text', content });
+      blocks.push({ type: 'text', content: normalizeProse(content) });
     }
   }
 
@@ -56,8 +66,8 @@ const parseBlocks = (rawPassage) => {
 
 const splitPassageAndQuestion = (content) => {
   const paragraphs = normalizeText(content).split(/\n\s*\n/).map(part => part.trim()).filter(Boolean);
-  if (paragraphs.length <= 1) return { blocks: [], questionText: paragraphs[0] || '' };
-  const questionText = paragraphs.pop();
+  if (paragraphs.length <= 1) return { blocks: [], questionText: normalizeProse(paragraphs[0]) };
+  const questionText = normalizeProse(paragraphs.pop());
   return { blocks: parseBlocks(paragraphs.join('\n\n')), questionText };
 };
 
@@ -93,7 +103,12 @@ const parseChoices = (text) => {
     }
   }
 
-  return { choices: choices.filter(choice => choice.text), content: remaining.join('\n').trim() };
+  return {
+    choices: choices
+      .map(choice => ({ ...choice, text: normalizeProse(choice.text) }))
+      .filter(choice => choice.text),
+    content: remaining.join('\n').trim(),
+  };
 };
 
 const parseQuestion = ({ text, moduleOrder, questionOrder, subject }) => {
@@ -123,7 +138,7 @@ const parseQuestion = ({ text, moduleOrder, questionOrder, subject }) => {
 
   const parsedChoices = parseChoices(workingText);
   const content = explicitMarkers.length
-    ? { blocks: parseBlocks(passage), questionText: parsedChoices.content }
+    ? { blocks: parseBlocks(passage), questionText: normalizeProse(parsedChoices.content) }
     : splitPassageAndQuestion(parsedChoices.content);
   const type = parsedChoices.choices.length ? 'MCQ' : 'SPR';
   const domainMatch = findDomain(domain.value, subject);
@@ -162,7 +177,7 @@ const parseQuestion = ({ text, moduleOrder, questionOrder, subject }) => {
     questionText: content.questionText,
     choices: parsedChoices.choices,
     correctAnswer,
-    explanation: explanation.value,
+    explanation: normalizeProse(explanation.value),
     domainCode: domainMatch?.code || '',
     skillCode: skillMatch?.code || '',
     issues,

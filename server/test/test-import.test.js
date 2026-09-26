@@ -89,6 +89,76 @@ Answer: B`;
   assert.equal(question.correctAnswer, 'B');
 });
 
+test('import unwraps source line wrapping in prose while preserving paragraph breaks', () => {
+  const text = `QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[TEXT]
+The first paragraph was wrapped by the source
+document and includes a pressure-
+treated material.
+
+The second paragraph is also
+wrapped across lines.
+
+[QUESTION]
+Which conclusion is best
+supported by the text?
+
+A. The first answer was wrapped
+across source lines.
+B. The second answer stays on one
+display line when space allows.
+Answer: B
+Explanation: The source line break is a soft
+wrap, not a paragraph boundary.`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+
+  assert.equal(
+    question.blocks[0].content,
+    'The first paragraph was wrapped by the source document and includes a pressure-treated material.\n\nThe second paragraph is also wrapped across lines.',
+  );
+  assert.equal(question.questionText, 'Which conclusion is best supported by the text?');
+  assert.equal(question.choices[0].text, 'The first answer was wrapped across source lines.');
+  assert.equal(question.choices[1].text, 'The second answer stays on one display line when space allows.');
+  assert.equal(question.explanation, 'The source line break is a soft wrap, not a paragraph boundary.');
+});
+
+test('import preserves line-based content in poem, note, and table blocks', () => {
+  const text = `QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[POEM]
+First line
+Second line
+
+[NOTE]
+- First note
+- Second note
+
+[TABLE]
+Label\tValue
+Alpha\t1
+Beta\t2
+
+[QUESTION]
+What is implied?
+A. One
+B. Two
+Answer: A`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+
+  assert.deepEqual(question.blocks[0], { type: 'poem', lines: ['First line', 'Second line'] });
+  assert.deepEqual(question.blocks[1], { type: 'note', lines: ['First note', 'Second note'] });
+  assert.deepEqual(question.blocks[2], {
+    type: 'table',
+    headers: ['Label', 'Value'],
+    rows: [['Alpha', '1'], ['Beta', '2']],
+  });
+});
+
 test('import reports malformed reading markers without discarding the question', () => {
   const text = `QUESTION 1
 Domain: Information and Ideas
