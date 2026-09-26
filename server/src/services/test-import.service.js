@@ -3,6 +3,7 @@ const mammoth = require('mammoth');
 const ApiError = require('../utils/ApiError');
 const { findDomain, findSkill } = require('../utils/question-taxonomy');
 const { firstMathContentError, isValidSprAnswer } = require('../utils/math-content-validation');
+const { renderPdfPageWithBlankLines, restorePdfBlankCandidates } = require('../utils/pdf-layout-text');
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const MAX_EXTRACTED_TEXT_SIZE = 1536 * 1024;
@@ -416,8 +417,11 @@ const extractText = async (file) => {
   if (file.size > MAX_FILE_SIZE) throw new ApiError(413, { error: 'Files must be 15 MB or smaller.' });
 
   if (file.mimetype === 'application/pdf' || originalName.endsWith('.pdf')) {
-    const result = await pdfExtract(file.buffer);
-    return result.text;
+    const result = await pdfExtract(file.buffer, {
+      pagerender: renderPdfPageWithBlankLines,
+      version: 'v2.0.550',
+    });
+    return restorePdfBlankCandidates(result.text);
   }
   if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || originalName.endsWith('.docx')) {
     const result = await mammoth.extractRawText({ buffer: file.buffer });
