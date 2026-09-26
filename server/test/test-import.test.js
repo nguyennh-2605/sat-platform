@@ -160,6 +160,139 @@ Answer: A`;
   });
 });
 
+test('import keeps cross-text passages separate and normalizes source wrapping', () => {
+  const text = `QUESTION 1
+Domain: Craft and Structure
+Skill: Cross-Text Connections
+
+[TEXT]
+Text 1
+The first passage was wrapped by the
+source document.
+Text 2:
+The second passage remains visually
+separate from the first.
+
+[QUESTION]
+How do the texts differ?
+A. One
+B. Two
+C. Three
+D. Four
+Answer: A`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+
+  assert.equal(question.blocks[0].content,
+    'Text 1\n\nThe first passage was wrapped by the source document.\n\nText 2\n\nThe second passage remains visually separate from the first.',
+  );
+});
+
+test('import joins wrapped note lines without merging separate notes', () => {
+  const text = `QUESTION 1
+Domain: Expression of Ideas
+Skill: Rhetorical Synthesis
+
+[NOTE]
+While researching a topic, a student took the following notes:
+The first note wraps onto the
+next source line.
+The second note lost its bullet during extraction.
+— The third note keeps an alternate bullet marker.
+
+[QUESTION]
+Which choice best uses the notes?
+A. One
+B. Two
+C. Three
+D. Four
+Answer: A`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+
+  assert.deepEqual(question.blocks[0].lines, [
+    'While researching a topic, a student took the following notes:',
+    'The first note wraps onto the next source line.',
+    'The second note lost its bullet during extraction.',
+    'The third note keeps an alternate bullet marker.',
+  ]);
+});
+
+test('import discards empty and duplicated note bullet markers', () => {
+  const text = `QUESTION 1
+Domain: Expression of Ideas
+Skill: Rhetorical Synthesis
+
+[NOTE]
+While researching a topic, a student has taken the following notes:
+•
+•
+• • A fact that follows duplicated extraction markers.
+• A second fact.
+
+[QUESTION]
+Which choice best uses the notes?
+A. One
+B. Two
+C. Three
+D. Four
+Answer: A`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+
+  assert.deepEqual(question.blocks[0].lines, [
+    'While researching a topic, a student has taken the following notes:',
+    'A fact that follows duplicated extraction markers.',
+    'A second fact.',
+  ]);
+});
+
+test('import recognizes note content extracted under a text tag', () => {
+  const text = `QUESTION 1
+Domain: Expression of Ideas
+Skill: Rhetorical Synthesis
+
+[TEXT]
+While researching a topic, a student took the following notes: • First fact. • Second fact wraps
+onto another source line. • Third fact.
+
+[QUESTION]
+Which choice best uses the notes?
+A. One
+B. Two
+C. Three
+D. Four
+Answer: A`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+
+  assert.deepEqual(question.blocks[0], {
+    type: 'note',
+    lines: [
+      'While researching a topic, a student took the following notes:',
+      'First fact.',
+      'Second fact wraps onto another source line.',
+      'Third fact.',
+    ],
+  });
+});
+
+test('import rejects a completion question when OCR dropped the passage blank', () => {
+  const text = `QUESTION 1
+Domain: Craft and Structure
+Skill: Words in Context
+
+[TEXT]
+The source text lost the intended position for the answer.
+
+[QUESTION]
+Which choice completes the text with the most logical and precise word or phrase?
+A. One
+B. Two
+C. Three
+D. Four
+Answer: A`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+
+  assert.ok(question.issues.some(item => item.code === 'MISSING_COMPLETION_BLANK'));
+});
+
 test('import reports malformed reading markers without discarding the question', () => {
   const text = `QUESTION 1
 Domain: Information and Ideas
