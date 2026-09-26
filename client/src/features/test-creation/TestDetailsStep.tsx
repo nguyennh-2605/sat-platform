@@ -13,6 +13,7 @@ interface TestDetailsStepProps {
 export function TestDetailsStep({ form, isAdmin }: TestDetailsStepProps) {
   const { control, register, formState: { errors } } = form;
   const category = form.watch('category');
+  const officialDurations = { RW: 64, MATH: 70 } as const;
 
   return (
     <div className="min-h-0 overflow-y-auto px-1">
@@ -27,7 +28,13 @@ export function TestDetailsStep({ form, isAdmin }: TestDetailsStepProps) {
           <Controller control={control} name="subject" render={({ field }) => (
             <Field>
               <FieldLabel htmlFor="test-subject">Subject</FieldLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
+              <Select value={field.value} onValueChange={value => {
+                const nextSubject = value as keyof typeof officialDurations;
+                const currentDuration = form.getValues('duration');
+                const shouldUseSubjectDefault = category === 'REAL' || currentDuration === officialDurations[field.value];
+                field.onChange(nextSubject);
+                if (shouldUseSubjectDefault) form.setValue('duration', officialDurations[nextSubject], { shouldDirty: true, shouldValidate: true });
+              }}>
                 <SelectTrigger id="test-subject" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent position="popper" align="start">
                   <SelectItem value="RW">Reading & Writing</SelectItem>
@@ -78,7 +85,13 @@ export function TestDetailsStep({ form, isAdmin }: TestDetailsStepProps) {
             <Controller control={control} name="category" render={({ field }) => (
               <Field>
                 <FieldLabel htmlFor="test-publication">Publication</FieldLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
+                <Select value={field.value} onValueChange={value => {
+                  field.onChange(value);
+                  if (value === 'REAL') {
+                    form.setValue('moduleCount', 2, { shouldDirty: true, shouldValidate: true });
+                    form.setValue('duration', officialDurations[form.getValues('subject')], { shouldDirty: true, shouldValidate: true });
+                  }
+                }}>
                   <SelectTrigger id="test-publication" className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent position="popper" align="start">
                     <SelectItem value="PRACTICE">Practice test</SelectItem>
