@@ -99,8 +99,9 @@ The first paragraph was wrapped by the source
 document and includes a pressure-
 treated material.
 
-The second paragraph is also
-wrapped across lines.
+The second paragraph describes research that either confirms or
+
+contradicts prior findings while remaining one paragraph.
 
 [QUESTION]
 Which conclusion is best
@@ -117,7 +118,7 @@ wrap, not a paragraph boundary.`;
 
   assert.equal(
     question.blocks[0].content,
-    'The first paragraph was wrapped by the source document and includes a pressure-treated material.\n\nThe second paragraph is also wrapped across lines.',
+    'The first paragraph was wrapped by the source document and includes a pressure-treated material.\n\nThe second paragraph describes research that either confirms or contradicts prior findings while remaining one paragraph.',
   );
   assert.equal(question.questionText, 'Which conclusion is best supported by the text?');
   assert.equal(question.choices[0].text, 'The first answer was wrapped across source lines.');

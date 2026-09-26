@@ -11,14 +11,28 @@ const normalizeText = (value) => String(value || '')
   .replace(/\n{3,}/g, '\n\n')
   .trim();
 
-const normalizeProse = (value) => normalizeText(value)
-  .split(/\n\s*\n/)
-  .map(paragraph => paragraph
+const unwrapParagraph = (paragraph) => paragraph
     .split('\n')
     .map(line => line.trim())
     .filter(Boolean)
-    .reduce((result, line) => `${result}${result && !result.endsWith('-') ? ' ' : ''}${line}`, ''))
+    .reduce((result, line) => `${result}${result && !result.endsWith('-') ? ' ' : ''}${line}`, '');
+
+const normalizeProse = (value) => normalizeText(value)
+  .split(/\n\s*\n/)
+  .map(unwrapParagraph)
   .filter(Boolean)
+  .reduce((paragraphs, paragraph) => {
+    const previous = paragraphs.at(-1);
+    const previousSentenceIsOpen = previous && !/[.!?]["'’”\)\]]*$/.test(previous);
+    const continuesWithLowercase = /^[^A-Za-z]*[a-z]/.test(paragraph);
+
+    if (previousSentenceIsOpen && continuesWithLowercase) {
+      paragraphs[paragraphs.length - 1] = `${previous}${previous.endsWith('-') ? '' : ' '}${paragraph}`;
+    } else {
+      paragraphs.push(paragraph);
+    }
+    return paragraphs;
+  }, [])
   .join('\n\n');
 
 const issue = (severity, code, message) => ({ severity, code, message });
