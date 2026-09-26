@@ -8,6 +8,7 @@ const { INTEGRITY_FILTERS, normalizeIntegrityFilter } = require('../utils/test-i
 const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
 const { normalizeSatTestMonth, testMonthWhere } = require('../utils/sat-test-months');
 const { assertUsableImages, imageAssetIds, syncTestImages } = require('./test-image.service');
+const { firstMathContentError, isValidSprAnswer } = require('../utils/math-content-validation');
 
 const activeStatuses = { in: ['DRAFT', 'PUBLISHED'] };
 
@@ -341,7 +342,39 @@ const normalizeChoices = (choices) => (Array.isArray(choices) ? choices : [])
   .map(choice => ({ id: String(choice?.id || '').trim().toUpperCase(), text: String(choice?.text || '').trim() }))
   .filter(choice => choice.id && choice.text);
 
-const validateSections = ({ sections, subject }) => {
+const validateBlocks = ({ blocks, moduleOrder, questionNumber, status }) => {
+  const normalized = Array.isArray(blocks) ? blocks : [];
+  for (const block of normalized) {
+    if (!block || !['text', 'table', 'poem', 'note', 'image'].includes(block.type)) {
+      throw new ApiError(422, { error: `Question ${questionNumber} in Module ${moduleOrder} contains an unsupported content block.` });
+    }
+    if (block.type === 'table') {
+      const headers = Array.isArray(block.headers) ? block.headers : [];
+      const rows = Array.isArray(block.rows) ? block.rows : [];
+      if (headers.length === 0 || rows.some(row => !Array.isArray(row) || row.length !== headers.length)) {
+        throw new ApiError(422, { error: `Question ${questionNumber} in Module ${moduleOrder} has a table with inconsistent columns.` });
+      }
+    }
+    if (status === 'PUBLISHED' && block.type === 'image' && !block.assetId) {
+      throw new ApiError(422, { error: `Question ${questionNumber} in Module ${moduleOrder} needs a platform-hosted image before publishing.` });
+    }
+  }
+  return normalized;
+};
+
+const assertOfficialTestShape = ({ sections, subject, duration, category, status }) => {
+  if (category !== 'REAL' || status !== 'PUBLISHED') return;
+  const expectedQuestions = subject === 'MATH' ? 22 : 27;
+  const expectedDuration = subject === 'MATH' ? 70 : 64;
+  if (sections.length !== 2 || sections.some(section => section.questions.length !== expectedQuestions)) {
+    throw new ApiError(422, { error: `Published official ${subject === 'MATH' ? 'Math' : 'Reading & Writing'} tests require 2 modules with ${expectedQuestions} questions each.` });
+  }
+  if (duration !== expectedDuration) {
+    throw new ApiError(422, { error: `Published official ${subject === 'MATH' ? 'Math' : 'Reading & Writing'} tests require a ${expectedDuration}-minute duration.` });
+  }
+};
+
+const validateSections = ({ sections, subject, status = 'DRAFT' }) => {
   if (!Array.isArray(sections) || sections.length === 0) {
     throw new ApiError(400, { error: 'Add at least one module with questions.' });
   }
@@ -352,7 +385,7 @@ const validateSections = ({ sections, subject }) => {
   const seenOrders = new Set();
   return sections.map((section, sectionIndex) => {
     const order = Number(section?.order || sectionIndex + 1);
-    if (!Number.isInteger(order) || order < 1 || seenOrders.has(order)) {
+    if (!Number.isInteger(order) || order !== sectionIndex + 1 || seenOrders.has(order)) {
       throw new ApiError(422, { error: `Module ${sectionIndex + 1} has an invalid order.` });
     }
     seenOrders.add(order);
@@ -385,12 +418,37 @@ const validateSections = ({ sections, subject }) => {
         if (!correctAnswer) {
           throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} is missing the correct answer.` });
         }
+        if (subject === 'RW' && type === 'SPR') {
+          throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} must contain choices A, B, C, and D.` });
+        }
         if (type === 'MCQ') {
-          if (choices.length < 2) {
-            throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} needs answer choices.` });
+          if (choices.map(choice => choice.id).join('') !== 'ABCD') {
+            throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} must contain exactly one choice each for A, B, C, and D in order.` });
           }
           if (!choices.some(choice => choice.id === correctAnswer)) {
             throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} has an answer that does not match its choices.` });
+          }
+        }
+
+        const blocks = validateBlocks({
+          blocks: question?.blocks,
+          moduleOrder: order,
+          questionNumber: questionIndex + 1,
+          status,
+        });
+        const normalizedQuestion = {
+          questionText,
+          choices: type === 'MCQ' ? choices : [],
+          explanation: String(question?.explanation || '').trim() || null,
+          blocks,
+        };
+        if (subject === 'MATH') {
+          const latexError = firstMathContentError(normalizedQuestion);
+          if (latexError) {
+            throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} has invalid Math content (${latexError}).` });
+          }
+          if (type === 'SPR' && !isValidSprAnswer(correctAnswer)) {
+            throw new ApiError(422, { error: `Question ${questionIndex + 1} in Module ${order} needs a valid decimal or fraction answer.` });
           }
         }
 
@@ -399,9 +457,9 @@ const validateSections = ({ sections, subject }) => {
           questionText,
           correctAnswer,
           type,
-          explanation: String(question?.explanation || '').trim() || null,
-          blocks: Array.isArray(question?.blocks) ? question.blocks : [],
-          choices: type === 'MCQ' ? choices : [],
+          explanation: normalizedQuestion.explanation,
+          blocks: normalizedQuestion.blocks,
+          choices: normalizedQuestion.choices,
           domainCode: classification.domain.code,
           skillCode: classification.skill.code,
         };
@@ -425,7 +483,10 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
     throw new ApiError(400, { error: 'Enter a valid test duration.' });
   }
 
-  const validatedSections = validateSections({ sections, subject });
+  const finalStatus = status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
+  const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
+  const validatedSections = validateSections({ sections, subject, status: finalStatus });
+  assertOfficialTestShape({ sections: validatedSections, subject, duration: normalizedDuration, category: finalCategory, status: finalStatus });
   const imageIds = await assertUsableImages({ sections: validatedSections, userId });
   let normalizedSections;
   try {
@@ -434,10 +495,8 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
   } catch (error) {
     throw new ApiError(400, { error: error.message });
   }
-  const finalStatus = status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
   const scope = userRole === 'ADMIN' ? 'SYSTEM' : 'PERSONAL';
   const isPublic = scope === 'SYSTEM' && finalStatus === 'PUBLISHED';
-  const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
   const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' ? normalizeSatTestMonth(testDate) : null;
   if (finalCategory === 'REAL' && !finalTestDate) throw new ApiError(400, { error: 'Choose a valid SAT testing month.' });
 
@@ -502,18 +561,30 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
   });
 };
 
+const serializeBlockMetadata = metadata => {
+  const values = Object.fromEntries(Object.entries(metadata).filter(([, value]) => String(value || '').trim()));
+  return Object.keys(values).length ? `@meta ${JSON.stringify(values)}` : '';
+};
+
 const serializeBlock = (block) => {
   if (!block || typeof block !== 'object') return '';
   if (block.type === 'text') return `[TEXT]\n${String(block.content || '').trim()}`;
   if (block.type === 'table') {
+    const metadata = serializeBlockMetadata({ title: block.title, note: block.note });
     const rows = [block.headers, ...(Array.isArray(block.rows) ? block.rows : [])]
       .filter(Array.isArray)
       .map(row => row.map(cell => String(cell || '').trim()).join('\t'));
-    return `[TABLE]\n${rows.join('\n')}`;
+    return `[TABLE]\n${[metadata, ...rows].filter(Boolean).join('\n')}`;
   }
-  if (block.type === 'poem') return `[POEM]\n${(block.lines || []).join('\n')}`;
+  if (block.type === 'poem') {
+    const metadata = serializeBlockMetadata({ title: block.title, author: block.author });
+    return `[POEM]\n${[metadata, ...(block.lines || [])].filter(Boolean).join('\n')}`;
+  }
   if (block.type === 'note') return `[NOTE]\n${(block.lines || []).map(line => `- ${line}`).join('\n')}`;
-  if (block.type === 'image') return `[IMG]\n${block.assetId ? `asset:${block.assetId}` : String(block.src || '').trim()}`;
+  if (block.type === 'image') {
+    const metadata = serializeBlockMetadata({ alt: block.alt, caption: block.caption });
+    return `[IMG]\n${[metadata, block.assetId ? `asset:${block.assetId}` : String(block.src || '').trim()].filter(Boolean).join('\n')}`;
+  }
   return '';
 };
 
@@ -655,7 +726,10 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
   if (!['RW', 'MATH'].includes(subject)) throw new ApiError(400, { error: 'Choose Reading & Writing or Math.' });
   const normalizedDuration = Number.parseInt(duration, 10);
   if (!Number.isInteger(normalizedDuration) || normalizedDuration < 1) throw new ApiError(400, { error: 'Enter a valid test duration.' });
-  const validatedSections = validateSections({ sections, subject });
+  const finalStatus = status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
+  const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
+  const validatedSections = validateSections({ sections, subject, status: finalStatus });
+  assertOfficialTestShape({ sections: validatedSections, subject, duration: normalizedDuration, category: finalCategory, status: finalStatus });
   const imageIds = await assertUsableImages({ sections: validatedSections, userId, existingTestId: existing.id });
   let normalizedSections;
   try {
@@ -664,7 +738,6 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
   } catch (error) {
     throw new ApiError(400, { error: error.message });
   }
-  const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
   const finalTestDate = userRole === 'ADMIN' && finalCategory === 'REAL' ? normalizeSatTestMonth(testDate) : null;
   if (finalCategory === 'REAL' && !finalTestDate) throw new ApiError(400, { error: 'Choose a valid SAT testing month.' });
 
@@ -676,10 +749,10 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
         title: normalizedTitle,
         duration: normalizedDuration,
         subject,
-        status: status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT',
+        status: finalStatus,
         mode: mode === 'EXAM' ? 'EXAM' : 'PRACTICE',
         category: finalCategory,
-        isPublic: existing.scope === 'SYSTEM' && status === 'PUBLISHED',
+        isPublic: existing.scope === 'SYSTEM' && finalStatus === 'PUBLISHED',
         testDate: finalTestDate,
         folderId: existing.scope === 'PERSONAL' && Number.isInteger(Number(folderId)) ? Number(folderId) : null,
         sections: {
@@ -717,7 +790,25 @@ exports.updateTestStatus = async ({ testId, status, userId, userRole }) => {
   if (!['DRAFT', 'PUBLISHED', 'ARCHIVED'].includes(normalizedStatus)) {
     throw new ApiError(400, { error: 'Test status is invalid.' });
   }
-  const test = await manageableTest({ testId, userId, userRole });
+  const test = await manageableTest({
+    testId,
+    userId,
+    userRole,
+    include: normalizedStatus === 'PUBLISHED'
+      ? { sections: { orderBy: { order: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } } }
+      : {},
+  });
+  if (normalizedStatus === 'PUBLISHED') {
+    const validatedSections = validateSections({ sections: test.sections, subject: test.subject, status: normalizedStatus });
+    assertOfficialTestShape({
+      sections: validatedSections,
+      subject: test.subject,
+      duration: test.duration,
+      category: test.category,
+      status: normalizedStatus,
+    });
+    await assertUsableImages({ sections: validatedSections, userId, existingTestId: test.id });
+  }
   return prisma.$transaction(async tx => {
     const updated = await tx.test.update({
       where: { id: test.id },
@@ -891,3 +982,4 @@ exports.deleteTest = async ({ testId, userId, userRole }) => {
 
 exports.serializeTest = serializeTest;
 exports._testListPaginationHelpers = { encodeTestCursor, decodeTestCursor, testCursorBoundaryWhere };
+exports._testContentValidationHelpers = { assertOfficialTestShape, validateSections };

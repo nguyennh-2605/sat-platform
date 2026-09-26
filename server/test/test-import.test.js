@@ -178,3 +178,121 @@ Answer: A`;
   assert.ok(question.issues.some(item => item.code === 'UNKNOWN_CONTENT_TAG'));
   assert.equal(question.questionText, 'What is implied?');
 });
+
+test('import rejects duplicate or incomplete A-D choice labels', () => {
+  const text = `QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[QUESTION]
+What is implied?
+A. One
+A. Duplicate
+B. Two
+Answer: A`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+  assert.ok(question.issues.some(item => item.code === 'INVALID_CHOICES' && item.severity === 'error'));
+});
+
+test('import rejects Reading and Writing questions without A-D choices', () => {
+  const text = `QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[QUESTION]
+What is implied?
+Answer: 12`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+  assert.equal(question.type, 'SPR');
+  assert.ok(question.issues.some(item => item.code === 'RW_REQUIRES_CHOICES' && item.severity === 'error'));
+});
+
+test('import rejects duplicate question numbers while keeping editor ids unique', () => {
+  const question = number => `QUESTION ${number}
+Domain: Information and Ideas
+Skill: Inferences
+
+[QUESTION]
+What is implied?
+A. One
+B. Two
+C. Three
+D. Four
+Answer: A`;
+  const preview = previewText({ text: `${question(1)}\n\n${question(1)}`, subject: 'RW', moduleCount: 1 });
+  assert.ok(preview.issues.some(item => item.code === 'INVALID_QUESTION_ORDER' && item.severity === 'error'));
+  assert.notEqual(preview.modules[0].questions[0].clientId, preview.modules[0].questions[1].clientId);
+});
+
+test('import rejects ragged tab-separated tables', () => {
+  const text = `QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[TABLE]
+Group\tValue
+A
+
+[QUESTION]
+What is implied?
+A. One
+B. Two
+C. Three
+D. Four
+Answer: A`;
+  const question = previewText({ text, subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+  assert.ok(question.issues.some(item => item.code === 'INVALID_TABLE_SHAPE' && item.severity === 'error'));
+});
+
+test('Math import rejects raw prose outside text commands and invalid SPR answers', () => {
+  const text = `QUESTION 1
+Domain: Algebra
+Skill: Linear Equations in One Variable
+
+If x is 2, what is x?
+Answer: x`;
+  const question = previewText({ text, subject: 'MATH', moduleCount: 1 }).modules[0].questions[0];
+  assert.ok(question.issues.some(item => item.code === 'INVALID_LATEX' && item.severity === 'error'));
+  assert.ok(question.issues.some(item => item.code === 'INVALID_SPR_ANSWER' && item.severity === 'error'));
+});
+
+test('missing and external images block publishing validation', () => {
+  const base = source => `QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[IMG]
+${source}
+
+[QUESTION]
+What is implied?
+A. One
+B. Two
+C. Three
+D. Four
+Answer: A`;
+  const missing = previewText({ text: base(''), subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+  const external = previewText({ text: base('https://example.com/image.png'), subject: 'RW', moduleCount: 1 }).modules[0].questions[0];
+  assert.ok(missing.issues.some(item => item.code === 'IMAGE_REQUIRED' && item.severity === 'error'));
+  assert.ok(external.issues.some(item => item.code === 'MANAGED_IMAGE_REQUIRED' && item.severity === 'error'));
+});
+
+test('import reports content that would otherwise be discarded before markers', () => {
+  const text = `Document heading
+=== MODULE 1 ===
+Module directions
+QUESTION 1
+Domain: Information and Ideas
+Skill: Inferences
+
+[QUESTION]
+What is implied?
+A. One
+B. Two
+C. Three
+D. Four
+Answer: A`;
+  const preview = previewText({ text, subject: 'RW', moduleCount: 1 });
+  assert.ok(preview.issues.some(item => item.code === 'IGNORED_DOCUMENT_PREAMBLE'));
+  assert.ok(preview.issues.some(item => item.code === 'IGNORED_MODULE_PREAMBLE'));
+});

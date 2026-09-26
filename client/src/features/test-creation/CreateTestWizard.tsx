@@ -18,7 +18,6 @@ import {
   UploadCloud,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import katex from 'katex';
 import axiosClient from '../../lib/axios';
 import BlockRenderer from '../../components/content/BlockRenderer';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
@@ -33,6 +32,7 @@ import { ui } from '../../components/ui/styles';
 import { useDashboardBack } from '../navigation/DashboardBackContext';
 import { createTestDetailsSchema, normalizeTestCategoryForForm } from './create-test.schema';
 import type { EditTestPayload, ExtractedDocument, ImportIssue, ImportPreview, ImportQuestion, IssueSeverity, Subject, TaxonomyDomain, TestDetailsValues, TestStatus } from './create-test.types';
+import { hasInvalidStrictLatex, isValidSprAnswer } from './math-content-validation';
 import { TestDetailsStep } from './TestDetailsStep';
 
 const emptyPreview = (): ImportPreview => ({
@@ -40,6 +40,8 @@ const emptyPreview = (): ImportPreview => ({
   summary: { questionCount: 0, classifiedCount: 0, errorCount: 0, warningCount: 0 },
   issues: [],
 });
+
+const publicationOnlyIssueCodes = new Set(['IMAGE_REQUIRED', 'MANAGED_IMAGE_REQUIRED']);
 
 const importTemplate = `=== MODULE 1 ===
 
@@ -129,31 +131,10 @@ const uploadToSignedUrl = (url: string, file: File, headers: Record<string, stri
   else request.send(file);
 });
 
-const mathLatexValues = (question: ImportQuestion) => {
-  const values = [question.questionText, ...question.choices.map(choice => choice.text), question.explanation || ''];
-  question.blocks.forEach(block => {
-    if (block.type === 'text') values.push(block.content);
-    if (block.type === 'table') values.push(block.title || '', ...block.headers, ...block.rows.flat(), block.note || '');
-    if (block.type === 'poem') values.push(block.title || '', ...block.lines, block.author || '');
-    if (block.type === 'note') values.push(...block.lines);
-    if (block.type === 'image') values.push(block.caption || '');
-  });
-  return values.filter(value => value.trim());
-};
-
-const hasInvalidStrictLatex = (question: ImportQuestion) => mathLatexValues(question).some(value => {
-  if (value.includes('$')) return true;
-  try {
-    katex.renderToString(value, { throwOnError: true, strict: false, trust: false });
-    return false;
-  } catch {
-    return true;
-  }
-});
-
 const reviewIssues = (question: ImportQuestion, taxonomy: TaxonomyDomain[], subject: Subject): ImportIssue[] => {
   const issues = question.issues.filter(item => ![
-    'MISSING_QUESTION_TEXT', 'MISSING_ANSWER', 'MISSING_DOMAIN', 'MISSING_SKILL', 'MISSING_CHOICES', 'ANSWER_NOT_IN_CHOICES', 'INVALID_LATEX',
+    'MISSING_QUESTION_TEXT', 'MISSING_ANSWER', 'MISSING_DOMAIN', 'MISSING_SKILL', 'MISSING_CHOICES', 'INVALID_CHOICES',
+    'ANSWER_NOT_IN_CHOICES', 'INVALID_LATEX', 'INVALID_SPR_ANSWER', 'RW_REQUIRES_CHOICES',
   ].includes(item.code));
   const domain = taxonomy.find(item => item.code === question.domainCode);
   const skill = domain?.skills.find(item => item.code === question.skillCode);
@@ -162,12 +143,20 @@ const reviewIssues = (question: ImportQuestion, taxonomy: TaxonomyDomain[], subj
   if (!question.correctAnswer.trim()) issues.push({ severity: 'error', code: 'MISSING_ANSWER', message: 'Correct answer is missing.' });
   if (!domain) issues.push({ severity: 'error', code: 'MISSING_DOMAIN', message: 'Choose a content domain.' });
   if (!skill) issues.push({ severity: 'error', code: 'MISSING_SKILL', message: 'Choose a skill that belongs to the content domain.' });
-  if (question.type === 'MCQ' && question.choices.length < 2) issues.push({ severity: 'error', code: 'MISSING_CHOICES', message: 'Multiple-choice questions need answer choices.' });
+  if (question.type === 'MCQ' && question.choices.map(choice => choice.id).join('') !== 'ABCD') {
+    issues.push({ severity: 'error', code: 'INVALID_CHOICES', message: 'Multiple-choice questions must contain exactly one choice each for A, B, C, and D in order.' });
+  }
+  if (subject === 'RW' && question.type === 'SPR') {
+    issues.push({ severity: 'error', code: 'RW_REQUIRES_CHOICES', message: 'Reading & Writing questions must contain choices A, B, C, and D.' });
+  }
   if (question.type === 'MCQ' && question.correctAnswer && !question.choices.some(choice => choice.id === question.correctAnswer.toUpperCase())) {
     issues.push({ severity: 'error', code: 'ANSWER_NOT_IN_CHOICES', message: 'Correct answer does not match any answer choice.' });
   }
   if (subject === 'MATH' && hasInvalidStrictLatex(question)) {
     issues.push({ severity: 'error', code: 'INVALID_LATEX', message: 'Math content must be valid raw LaTeX without $ delimiters. Put prose inside \\text{...}.' });
+  }
+  if (subject === 'MATH' && question.type === 'SPR' && question.correctAnswer && !isValidSprAnswer(question.correctAnswer)) {
+    issues.push({ severity: 'error', code: 'INVALID_SPR_ANSWER', message: 'A Math student-produced answer must be a valid decimal or fraction.' });
   }
   return issues;
 };
@@ -223,6 +212,7 @@ const CreateTestWizard = () => {
   const [buildTab, setBuildTab] = useState<'DETAILS' | 'IMPORT'>(editTestId ? 'IMPORT' : 'DETAILS');
   const [taxonomy, setTaxonomy] = useState<TaxonomyDomain[]>([]);
   const [preview, setPreview] = useState<ImportPreview>(emptyPreview);
+  const [previewInput, setPreviewInput] = useState<{ text: string; subject: Subject; moduleCount: number } | null>(null);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
   const [rawText, setRawText] = useState('');
   const [guideOpen, setGuideOpen] = useState(false);
@@ -262,16 +252,39 @@ const CreateTestWizard = () => {
   const questions = useMemo(() => preview.modules.flatMap(module => module.questions), [preview]);
   const selectedQuestion = questions.find(question => question.clientId === selectedQuestionId) || questions[0] || null;
   const selectedDomain = taxonomy.find(domain => domain.code === selectedQuestion?.domainCode);
-  const blockingErrors = preview.summary.errorCount > 0 || preview.summary.questionCount === 0;
+  const previewErrors = useMemo(() => [
+    ...preview.issues,
+    ...preview.modules.flatMap(module => module.questions.flatMap(question => question.issues)),
+  ].filter(item => item.severity === 'error'), [preview]);
+  const previewIsStale = Boolean(previewInput && preview.summary.questionCount > 0 && (
+    previewInput.text !== rawText || previewInput.subject !== subject || previewInput.moduleCount !== moduleCount
+  ));
+  const officialIssues = useMemo<ImportIssue[]>(() => {
+    if (!isAdmin || details.category !== 'REAL') return [];
+    const expectedQuestions = subject === 'MATH' ? 22 : 27;
+    const expectedDuration = subject === 'MATH' ? 70 : 64;
+    const issues: ImportIssue[] = [];
+    if (preview.modules.length !== 2 || preview.modules.some(module => module.questions.length !== expectedQuestions)) {
+      issues.push({ severity: 'error', code: 'INVALID_OFFICIAL_SHAPE', message: `Published official ${subject === 'MATH' ? 'Math' : 'Reading & Writing'} tests require 2 modules with ${expectedQuestions} questions each.` });
+    }
+    if (Number(details.duration) !== expectedDuration) {
+      issues.push({ severity: 'error', code: 'INVALID_OFFICIAL_DURATION', message: `Published official ${subject === 'MATH' ? 'Math' : 'Reading & Writing'} tests require a ${expectedDuration}-minute duration.` });
+    }
+    return issues;
+  }, [details.category, details.duration, isAdmin, preview.modules, subject]);
+  const draftBlockingErrors = preview.summary.questionCount === 0
+    || previewErrors.some(item => !publicationOnlyIssueCodes.has(item.code));
+  const publishBlockingErrors = preview.summary.questionCount === 0 || previewErrors.length > 0 || officialIssues.length > 0;
   const activeImportTemplate = subject === 'MATH' ? mathImportTemplate : importTemplate;
 
   useEffect(() => {
     if (selectedQuestion && selectedQuestion.clientId !== selectedQuestionId) setSelectedQuestionId(selectedQuestion.clientId);
   }, [selectedQuestion, selectedQuestionId]);
 
-  const applyPreview = (nextPreview: ImportPreview) => {
+  const applyPreview = (nextPreview: ImportPreview, sourceText: string) => {
     const reviewed = reviewPreview(nextPreview, taxonomy, subject);
     setPreview(reviewed);
+    setPreviewInput({ text: sourceText, subject, moduleCount });
     setContentDirty(true);
     const firstQuestion = reviewed.modules[0]?.questions[0];
     if (firstQuestion) setSelectedQuestionId(firstQuestion.clientId);
@@ -298,7 +311,7 @@ const CreateTestWizard = () => {
         subject,
         moduleCount,
       });
-      applyPreview(response);
+      applyPreview(response, text);
       toast.success('Preview updated');
     } catch (error: unknown) {
       const message = requestErrorMessage(error, 'Unable to parse the supplied text.');
@@ -335,6 +348,7 @@ const CreateTestWizard = () => {
           moduleCount: detail.moduleCount,
         });
         setPreview(parsed);
+        setPreviewInput({ text: detail.structuredText, subject: detail.subject, moduleCount: detail.moduleCount });
         setSelectedQuestionId(parsed.modules[0]?.questions[0]?.clientId || '');
         setContentDirty(false);
         setBuildTab('IMPORT');
@@ -364,7 +378,7 @@ const CreateTestWizard = () => {
         subject,
         moduleCount,
       });
-      applyPreview({ ...response, fileName: extracted.fileName });
+      applyPreview({ ...response, fileName: extracted.fileName }, extracted.text);
       toast.success('Document loaded into the editor');
     } catch (error: unknown) {
       console.error(error);
@@ -427,7 +441,10 @@ const CreateTestWizard = () => {
 
   const saveTest = async (nextStatus: Exclude<TestStatus, 'ARCHIVED'>) => {
     if (editLocked) return toast.error('This test is already used by a classroom. Duplicate it to create a new editable version');
-    if (blockingErrors) return toast.error('Resolve all errors before saving the test');
+    if (previewIsStale) return toast.error('Update the preview before saving changes');
+    if (nextStatus === 'PUBLISHED' ? publishBlockingErrors : draftBlockingErrors) {
+      return toast.error(nextStatus === 'PUBLISHED' ? 'Resolve all publishing errors before publishing the test' : 'Resolve all content errors before saving the draft');
+    }
     setIsSaving(true);
     try {
       const values = detailsForm.getValues();
@@ -514,6 +531,11 @@ const CreateTestWizard = () => {
       toast.error('Import questions and update the preview before continuing');
       return;
     }
+    if (previewIsStale) {
+      setBuildTab('IMPORT');
+      toast.error('The structured text or setup changed. Update the preview before continuing');
+      return;
+    }
     setStage('REVIEW');
   });
 
@@ -532,8 +554,8 @@ const CreateTestWizard = () => {
               ) : (
                 <>
                   <Button variant="outline" onClick={() => { setStage('BUILD'); setBuildTab('IMPORT'); }}><ArrowLeft data-icon="inline-start" />Replace import</Button>
-                  <Button variant="outline" disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('DRAFT')}><Save data-icon="inline-start" />{isSaving ? 'Saving…' : testStatus === 'DRAFT' ? 'Save draft' : 'Move to draft'}</Button>
-                  <Button disabled={blockingErrors || isSaving || editLocked} onClick={() => void saveTest('PUBLISHED')}><CheckCircle2 data-icon="inline-start" />Publish test</Button>
+                  <Button variant="outline" disabled={draftBlockingErrors || previewIsStale || isSaving || editLocked} onClick={() => void saveTest('DRAFT')}><Save data-icon="inline-start" />{isSaving ? 'Saving…' : testStatus === 'DRAFT' ? 'Save draft' : 'Move to draft'}</Button>
+                  <Button disabled={publishBlockingErrors || previewIsStale || isSaving || editLocked} onClick={() => void saveTest('PUBLISHED')}><CheckCircle2 data-icon="inline-start" />Publish test</Button>
                 </>
               )}
             </div>
@@ -557,6 +579,7 @@ const CreateTestWizard = () => {
                         <div className="flex items-center justify-between border-b border-border pb-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">Structured text</span><span>{rawText.length.toLocaleString()} characters</span></div>
                         {/* The structured editor needs direct cursor-selection APIs so image blocks can be inserted at the caret. */}
                         <textarea aria-label="Structured test content" ref={editorRef} value={rawText} onChange={event => { setRawText(event.target.value); setContentDirty(true); }} readOnly={editLocked} spellCheck={false} className="min-h-80 flex-1 resize-none rounded-lg border border-input bg-transparent p-3 font-mono text-xs leading-6 text-foreground outline-none placeholder:text-muted-foreground read-only:cursor-not-allowed read-only:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" placeholder={activeImportTemplate} />
+                        {previewIsStale && <ImportNotice tone="warning" message="The structured text or setup changed after the last preview. Update the preview before continuing." />}
                         {importError && <ImportNotice tone="error" message={importError} />}
                         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
                           {/* Native file inputs are required because the shared text Input does not expose the browser file-picker contract. */}
@@ -589,8 +612,9 @@ const CreateTestWizard = () => {
 
           {!isLoadingEdit && stage === 'REVIEW' && (
             <div className="wizard-step-enter flex min-h-0 flex-1 flex-col gap-4">
-              <Card className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3 text-xs text-muted-foreground"><span className="font-medium text-foreground">{preview.fileName || 'Pasted content'}</span><span>{preview.summary.questionCount} questions</span><span>{preview.summary.classifiedCount} classified</span><span className={preview.summary.errorCount ? 'font-semibold text-danger' : 'text-success'}>{preview.summary.errorCount} errors</span><span className={preview.summary.warningCount ? 'font-medium text-warning' : ''}>{preview.summary.warningCount} warnings</span></Card>
+              <Card className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3 text-xs text-muted-foreground"><span className="font-medium text-foreground">{preview.fileName || 'Pasted content'}</span><span>{preview.summary.questionCount} questions</span><span>{preview.summary.classifiedCount} classified</span><span className={previewErrors.length + officialIssues.length ? 'font-semibold text-danger' : 'text-success'}>{previewErrors.length + officialIssues.length} errors</span><span className={preview.summary.warningCount ? 'font-medium text-warning' : ''}>{preview.summary.warningCount} warnings</span></Card>
               {preview.issues.map((item, index) => <ImportNotice key={`${item.code}-${index}`} tone={item.severity} message={item.message} />)}
+              {officialIssues.map(item => <ImportNotice key={item.code} tone={item.severity} message={item.message} />)}
               <Tabs value={mobileReviewPane} onValueChange={value => setMobileReviewPane(value as 'PREVIEW' | 'EDIT')} className="contents">
               <div className="lg:hidden"><TabsList className="w-full"><TabsTrigger value="PREVIEW" className="flex-1">Question preview</TabsTrigger><TabsTrigger value="EDIT" className="flex-1">Classification & answer</TabsTrigger></TabsList></div>
               <div className="grid min-h-[620px] grid-cols-1 overflow-hidden rounded-card border border-ui-border bg-surface lg:h-[640px] lg:min-h-0 lg:grid-cols-[220px_minmax(0,1fr)_280px]">
@@ -599,7 +623,7 @@ const CreateTestWizard = () => {
                 <TabsContent value="EDIT" forceMount asChild><aside className={`${mobileReviewPane === 'EDIT' ? 'block' : 'hidden'} min-h-0 min-w-0 overflow-y-auto bg-muted/30 p-5 lg:block`}>{selectedQuestion ? <QuestionEditor question={selectedQuestion} domain={selectedDomain} taxonomy={taxonomy} onChange={updateQuestion} /> : null}</aside></TabsContent>
               </div>
               </Tabs>
-              {blockingErrors && <p className="text-right text-xs text-destructive">Resolve {preview.summary.errorCount || 'all'} validation {preview.summary.errorCount === 1 ? 'error' : 'errors'} before saving.</p>}
+              {(publishBlockingErrors || previewIsStale) && <p className="text-right text-xs text-destructive">Resolve publishing errors and update the preview before publishing. Drafts may keep unresolved image placeholders.</p>}
             </div>
           )}
         </div>
@@ -633,9 +657,10 @@ function FormattingGuide({ subject, template }: { subject: Subject; template: st
         <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[TABLE]</code> Put each row on a new line, separate cells with the <strong className="font-semibold text-foreground">Tab key</strong>, and use the first row as the header.</p>
         <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[POEM]</code> Put each verse line on its own line.</p>
         <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[NOTE]</code> Put each supporting fact on a new line, optionally beginning with <code>-</code> or <code>•</code>.</p>
-        <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[IMG]</code> Use Upload image to store a private image and insert its reference. Existing public image URLs remain supported.</p>
+        <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[IMG]</code> Use Upload image to store a private image and insert its <code>asset:</code> reference. Empty placeholders and external URLs may remain in a draft but block publishing.</p>
+        <p>Generated edit text may include an <code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">@meta {'{'}...{'}'}</code> JSON line after a block tag. Keep it intact to preserve table titles, notes, poem authors, and image accessibility text.</p>
       </div>
-      <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900"><strong className="font-semibold">Uploaded documents:</strong> use selectable text in PDF, DOCX, or TXT format. Scanned image-only PDFs cannot be read.</div>
+      <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900"><strong className="font-semibold">Uploaded documents:</strong> use selectable text in PDF, DOCX, or TXT format. Scanned image-only PDFs cannot be read.{subject === 'MATH' && ' Equation extraction does not convert formulas to LaTeX, so prepare the Math source in the structured format above before importing.'}</div>
     </div>
     <div className="min-w-0">
       <div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-foreground">Example template</h3><Button variant="ghost" size="sm" onClick={() => void navigator.clipboard.writeText(template).then(() => toast.success('Template copied'))}>Copy template</Button></div>
