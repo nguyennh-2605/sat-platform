@@ -12,6 +12,7 @@ import { SAT_TEST_MONTHS, satTestMonthLabel, type SatTestMonthFilter } from '@/l
 import { useDebounce } from '../../hooks/useDebounce';
 import TeacherTestLibrary from './TeacherTestLibrary';
 import AdminTestManagement from './AdminTestManagement';
+import { practiceCenterCache } from './practiceCenterCache';
 
 interface ClassInfo {
   id: string;
@@ -68,7 +69,6 @@ interface PracticeCacheEntry {
   snapshots: Partial<Record<ViewMode, GridStateSnapshot>>;
 }
 
-const practiceCache = new Map<string, PracticeCacheEntry>();
 const usableGridSnapshot = (snapshot?: GridStateSnapshot) => Boolean(snapshot && snapshot.item.height > 0 && snapshot.item.width > 0 && snapshot.viewport.height > 0 && snapshot.viewport.width > 0);
 const VirtualGridList = forwardRef<HTMLDivElement, ComponentProps<'div'>>(({ className, ...props }, ref) => <div ref={ref} {...props} className={`grid grid-cols-1 gap-4 pb-4 md:grid-cols-2 xl:grid-cols-3 ${className || ''}`} />);
 const VirtualList = forwardRef<HTMLDivElement, ComponentProps<'div'>>(({ className, ...props }, ref) => <div ref={ref} {...props} className={`divide-y divide-ui-border/60 ${className || ''}`} />);
@@ -133,7 +133,7 @@ function PracticeCenter() {
   const activeFilterCount = Number(subject !== 'ALL') + Number(mode !== 'ALL') + Number(month !== 'ALL') + Number(classFilter !== 'ALL');
   const queryKey = useMemo(() => JSON.stringify({ q: debouncedSearch.trim(), subject, mode, month, classFilter, sortOrder }), [classFilter, debouncedSearch, mode, month, sortOrder, subject]);
   const restoreSnapshot = useMemo(() => {
-    const snapshot = practiceCache.get(queryKey)?.snapshots[viewMode];
+    const snapshot = practiceCenterCache.get<PracticeCacheEntry>(queryKey)?.snapshots[viewMode];
     return usableGridSnapshot(snapshot) ? snapshot : undefined;
   }, [queryKey, viewMode]);
 
@@ -159,7 +159,7 @@ function PracticeCenter() {
       setTests(items);
       setTotal(data.total);
       setNextCursor(data.nextCursor);
-      practiceCache.set(queryKey, { items, total: data.total, nextCursor: data.nextCursor, snapshots: practiceCache.get(queryKey)?.snapshots || {} });
+      practiceCenterCache.set<PracticeCacheEntry>(queryKey, { items, total: data.total, nextCursor: data.nextCursor, snapshots: practiceCenterCache.get<PracticeCacheEntry>(queryKey)?.snapshots || {} });
     } catch (error) {
       if (currentRequest !== requestId.current) return;
       console.error(error);
@@ -179,7 +179,7 @@ function PracticeCenter() {
       setTests(current => {
         const known = new Set(current.map(test => test.id));
         const combined = [...current, ...newItems.filter(test => !known.has(test.id))];
-        practiceCache.set(queryKey, { items: combined, total, nextCursor: data.nextCursor, snapshots: practiceCache.get(queryKey)?.snapshots || {} });
+        practiceCenterCache.set<PracticeCacheEntry>(queryKey, { items: combined, total, nextCursor: data.nextCursor, snapshots: practiceCenterCache.get<PracticeCacheEntry>(queryKey)?.snapshots || {} });
         return combined;
       });
       setNextCursor(data.nextCursor);
@@ -192,7 +192,7 @@ function PracticeCenter() {
   }, [buildParams, loading, loadingMore, nextCursor, queryKey, total]);
 
   useEffect(() => {
-    const cached = practiceCache.get(queryKey);
+    const cached = practiceCenterCache.get<PracticeCacheEntry>(queryKey);
     if (cached) {
       setTests(cached.items);
       setTotal(cached.total);
@@ -279,9 +279,9 @@ function PracticeCenter() {
 
   const saveSnapshot = useCallback((snapshot: GridStateSnapshot) => {
     if (!usableGridSnapshot(snapshot)) return;
-    const cached = practiceCache.get(queryKey) || { items: tests, total, nextCursor, snapshots: {} };
+    const cached = practiceCenterCache.get<PracticeCacheEntry>(queryKey) || { items: tests, total, nextCursor, snapshots: {} };
     cached.snapshots[viewMode] = snapshot;
-    practiceCache.set(queryKey, cached);
+    practiceCenterCache.set<PracticeCacheEntry>(queryKey, cached);
   }, [nextCursor, queryKey, tests, total, viewMode]);
 
   return (

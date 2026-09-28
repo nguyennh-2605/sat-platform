@@ -4,6 +4,7 @@ import { AlertTriangle, Maximize } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient from '../../lib/axios';
 import { invalidateQueryCache } from '../../lib/queryCache';
+import { invalidatePracticeCenterCache } from '../practice-test/practiceCenterCache';
 // import cac component
 import QuestionHeader from '../../features/quiz/QuestionHeader';
 import AnswerOption from '../../features/quiz/AnswerOption';
@@ -526,6 +527,7 @@ function ExamRoom() {
         setApiResult(response);
         setIsSubmitted(true);
         invalidateQueryCache('/api/tests', '/api/results-analytics');
+        invalidatePracticeCenterCache();
         toast.success("Test submitted");
     } catch (error) {
         console.error("Lỗi mạng:", error);
@@ -936,6 +938,7 @@ function ExamRoom() {
       await axiosClient.post(`/api/test/${id}/save-progress${contextQuery}`, payload);
 
       invalidateQueryCache('/api/tests');
+      invalidatePracticeCenterCache();
       toast.success("Test saved");
       navigate('/dashboard/practice-test');
 
