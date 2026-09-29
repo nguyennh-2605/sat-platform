@@ -1,12 +1,10 @@
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { VirtuosoGrid, type GridStateSnapshot } from 'react-virtuoso';
-import { formatDistanceToNow } from 'date-fns';
-import { Archive, ArrowUpDown, BookOpen, CalendarDays, Check, Clock3, Copy, FilePenLine, Grid2X2, History, List, MoreHorizontal, Pencil, Play, Plus, RefreshCw, RotateCcw, SlidersHorizontal, Trash2, UserRound, X } from 'lucide-react';
+import { Archive, ArrowUpDown, BookOpen, CalendarDays, Check, Copy, FilePenLine, Grid2X2, List, MoreHorizontal, Pencil, Play, Plus, RefreshCw, RotateCcw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge, Button, EmptyState, Modal, PageHeader, Tabs } from '@/components/ui/AppUI';
+import { Badge, Button, Card, EmptyState, Modal, PageHeader, Tabs } from '@/components/ui/AppUI';
 import { DataSurface, DataToolbar, DataToolbarActions, DataToolbarGroup, DataToolbarSearch } from '@/components/ui/data-surface';
 import axiosClient from '@/lib/axios';
 import { cachedGet, invalidateQueryCache } from '@/lib/queryCache';
@@ -15,6 +13,7 @@ import { capitalizeFirstLetter } from '@/utils/text';
 import { SAT_TEST_MONTHS, satTestMonthLabel, type SatTestMonthFilter } from '@/lib/satTestMonths';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 type LibrarySource = 'MY' | 'SYSTEM';
 type TestStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
@@ -48,7 +47,7 @@ const LibraryGridList = forwardRef<HTMLDivElement, ComponentProps<'div'>>(({ cla
 const LibraryList = forwardRef<HTMLDivElement, ComponentProps<'div'>>(({ className, ...props }, ref) => <div ref={ref} {...props} className={`divide-y divide-ui-border/60 ${className || ''}`} />);
 const LibraryGridItem = forwardRef<HTMLDivElement, ComponentProps<'div'>>((props, ref) => <div ref={ref} {...props} className="min-w-0" />);
 const LibraryListItem = forwardRef<HTMLDivElement, ComponentProps<'div'>>((props, ref) => <div ref={ref} {...props} />);
-const LibraryListHeader = ({ source }: { source: LibrarySource }) => <div className="grid min-w-[900px] grid-cols-[minmax(280px,2fr)_150px_100px_90px_150px_130px_48px] gap-4 border-b border-ui-border bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground"><span>Test</span><span>Subject</span><span>Type</span><span>Questions</span><span>{source === 'MY' ? 'Status' : 'Source'}</span><span>Updated</span><span /></div>;
+const LibraryListHeader = ({ source }: { source: LibrarySource }) => <div className="grid min-w-[900px] grid-cols-[minmax(210px,1.45fr)_140px_140px_90px_110px_120px_152px] gap-4 border-b border-ui-border bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground"><span>Test</span><span>Type</span><span>{source === 'MY' ? 'Status' : 'Source'}</span><span>Questions</span><span>Duration</span><span>Updated</span><span className="text-right">Actions</span></div>;
 const MyTestsListHeader = () => <LibraryListHeader source="MY" />;
 const SystemTestsListHeader = () => <LibraryListHeader source="SYSTEM" />;
 
@@ -259,9 +258,9 @@ export default function TeacherTestLibrary() {
         <LibraryToolbar source={source} search={search} onSearch={setSearch} subject={subject} onSubject={value => updateQuery('subject', value)} mode={mode} onMode={value => updateQuery('mode', value)} status={status} onStatus={value => updateQuery('status', value)} month={month} onMonth={value => updateQuery('month', value)} sort={sort} onSort={value => updateQuery('sort', value)} view={view} onView={changeView} hasActiveFilters={hasStructuredFilters} onReset={resetFilters} loading={loading || loadingMore} onRefresh={() => void refresh()} onCreate={() => navigate('/dashboard/practice-test/create')} />
       </DataSurface>
 
-        {error && !loading && tests.length === 0 ? <EmptyState icon={<RefreshCw size={22} />} title="Unable to load tests" description={error} action={<Button variant="outline" onClick={() => void refresh()}><RefreshCw size={17} />Try again</Button>} />
+        {error && !loading && tests.length === 0 ? <EmptyState icon={<RefreshCw size={22} />} title="Unable to load tests" description={error} action={<Button variant="outline" onClick={() => void refresh()}><RefreshCw size={17} />Try again</Button>} className="min-h-80" />
           : loading ? <LibrarySkeleton view={view} />
-            : tests.length === 0 ? <EmptyState icon={<BookOpen size={22} />} title={source === 'SYSTEM' ? 'No system tests found' : status === 'ARCHIVED' ? 'No archived tests' : 'No tests found'} description={hasFilters ? 'Adjust or clear the current filters.' : source === 'MY' ? 'Create your first test to begin building your library.' : 'Published platform tests will appear here.'} action={hasFilters ? <Button variant="outline" onClick={resetFilters}><X size={16} />Clear filters</Button> : source === 'MY' ? <Button onClick={() => navigate('/dashboard/practice-test/create')}><Plus size={16} />Create test</Button> : undefined} />
+            : tests.length === 0 ? <EmptyState icon={<BookOpen size={22} />} title={source === 'SYSTEM' ? 'No system tests found' : status === 'ARCHIVED' ? 'No archived tests' : 'No tests found'} description={hasFilters ? 'Adjust or clear the current filters.' : source === 'MY' ? 'Create your first test to begin building your library.' : 'Published platform tests will appear here.'} action={hasFilters ? <Button variant="outline" onClick={resetFilters}><X size={16} />Clear filters</Button> : source === 'MY' ? <Button onClick={() => navigate('/dashboard/practice-test/create')}><Plus size={16} />Create test</Button> : undefined} className="min-h-80" />
               : <VirtuosoGrid
                   key={`${queryKey}:${view}`}
                   data={tests}
@@ -310,8 +309,8 @@ function LibraryToolbar({ source, search, onSearch, subject, onSubject, mode, on
     </DataToolbarGroup>
     <DataToolbarActions>
       <RadioFilter icon={<ArrowUpDown size={16} />} label={`Sort: ${sort === 'NEWEST' ? 'Newest' : 'Oldest'}`} value={sort} onChange={value => onSort(value as SortOrder)} options={[['NEWEST', 'Recently updated'], ['OLDEST', 'Oldest updated']]} align="end" />
-      <div className="flex h-8 items-center rounded-control border border-ui-border bg-background p-0.5" role="group" aria-label="Display mode"><Button variant="ghost" size="sm" className={`h-7 px-2 shadow-none ${view === 'GRID' ? 'bg-muted text-foreground' : ''}`} onClick={() => onView('GRID')} aria-label="Card view" aria-pressed={view === 'GRID'}>{view === 'GRID' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}<Grid2X2 size={17} aria-hidden="true" /></Button><Button variant="ghost" size="sm" className={`h-7 px-2 shadow-none ${view === 'LIST' ? 'bg-muted text-foreground' : ''}`} onClick={() => onView('LIST')} aria-label="List view" aria-pressed={view === 'LIST'}>{view === 'LIST' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}<List size={18} aria-hidden="true" /></Button></div>
-      <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8 shadow-none" aria-label="More library actions"><MoreHorizontal size={17} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem disabled={loading} onSelect={onRefresh}>{loading ? <LoadingSpinner /> : <RefreshCw />}Refresh library</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+      <div className="flex h-8 items-center rounded-control border border-ui-border bg-surface p-0.5" role="group" aria-label="Display mode"><Button variant="ghost" size="sm" className={`h-7 px-2 shadow-none ${view === 'GRID' ? 'bg-accent text-foreground' : ''}`} onClick={() => onView('GRID')} aria-label="Card view" aria-pressed={view === 'GRID'}>{view === 'GRID' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}<Grid2X2 size={17} aria-hidden="true" /></Button><Button variant="ghost" size="sm" className={`h-7 px-2 shadow-none ${view === 'LIST' ? 'bg-accent text-foreground' : ''}`} onClick={() => onView('LIST')} aria-label="List view" aria-pressed={view === 'LIST'}>{view === 'LIST' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}<List size={18} aria-hidden="true" /></Button></div>
+      <Button variant="outline" size="sm" className="w-9 px-0" onClick={onRefresh} disabled={loading} aria-label="Refresh tests">{loading ? <LoadingSpinner /> : <RefreshCw size={20} strokeWidth={2.25} aria-hidden="true" />}</Button>
       <Button size="sm" onClick={onCreate}><Plus size={16} />Create test</Button>
     </DataToolbarActions>
   </DataToolbar>;
@@ -325,34 +324,42 @@ function RadioFilter({ icon, label, value, onChange, options, align = 'start' }:
 interface TestActions { preview: (test: LibraryTest) => void; edit: (test: LibraryTest) => void; duplicate: (test: LibraryTest) => void; archive: (test: LibraryTest) => void; restore: (test: LibraryTest) => void; delete: (test: LibraryTest) => void }
 
 function LibraryCard({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
-  const system = source === 'SYSTEM';
-  return <Card size="sm" className="relative flex h-full flex-col gap-0 py-0 shadow-card transition-shadow duration-200 hover:shadow-raised">
-    {test.category === 'REAL' && <Badge className="absolute right-3 top-3 z-10 bg-primary text-primary-foreground shadow-sm">Official{satTestMonthLabel(test.testDate) ? ` · ${satTestMonthLabel(test.testDate)}` : ''}</Badge>}
-    <CardHeader className="gap-1 px-4 pb-0 pt-4">
-      <CardTitle className={`line-clamp-2 min-w-0 text-title font-medium text-foreground ${test.category === 'REAL' ? 'pr-32' : 'pr-2'}`}>{test.title}</CardTitle>
-      <CardAction className="flex items-center gap-1.5 pl-2">
-        <Badge className="font-medium text-muted-foreground">{subjectLabel[test.subject]}</Badge>
-        <TestMenu test={test} source={source} working={working} actions={actions} />
-      </CardAction>
-      <p className="col-start-1 row-start-2 -mt-0.5 truncate text-caption text-muted-foreground">{modeLabel[test.mode]}</p>
-    </CardHeader>
-    <CardContent className="px-4 pb-4 pt-3">
-      <ul className="space-y-2 text-body text-foreground">
-        <li className="flex items-center gap-2"><BookOpen size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span>{test.questionCount} questions</span></li>
-        <li className="flex items-center gap-2"><Clock3 size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /><span>{test.duration ? `${test.duration} minutes` : 'No time limit'}</span></li>
-        <li className="flex min-w-0 items-center gap-2">{system ? <UserRound size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" /> : <History size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />}<span className="truncate">{system ? `Provided by ${test.author?.name || 'SAT Platform'}` : `Updated ${relativeTime(test.updatedAt)}`}</span></li>
-      </ul>
-    </CardContent>
-    <CardFooter className="mt-auto bg-muted/30 p-3">
-      <PrimaryTestAction test={test} source={source} working={working} actions={actions} fullWidth />
-    </CardFooter>
+  return <Card className="relative flex min-h-64 flex-col overflow-hidden transition-shadow duration-200 hover:shadow-raised">
+    {test.category === 'REAL' && <Badge className="absolute right-12 top-3 z-10 border-primary/30 bg-primary text-primary-foreground shadow-sm">Official{satTestMonthLabel(test.testDate) ? ` · ${satTestMonthLabel(test.testDate)}` : ''}</Badge>}
+    <div className="absolute right-3 top-3 z-20"><TestMenu test={test} source={source} working={working} actions={actions} /></div>
+    <div className="flex h-28 shrink-0 items-start justify-between gap-3 p-5 pb-4 pr-12">
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className={`flex flex-wrap items-center gap-1.5 ${test.category === 'REAL' ? 'pr-28' : ''}`}>
+          <Badge tone={test.subject === 'MATH' ? 'gold' : 'green'}>{subjectLabel[test.subject]}</Badge>
+          <Badge>{modeLabel[test.mode]}</Badge>
+        </div>
+        <Tooltip>
+          <TooltipTrigger asChild><h2 className="line-clamp-2 cursor-default text-title font-semibold leading-5 text-foreground">{test.title}</h2></TooltipTrigger>
+          <TooltipContent className="max-w-sm">{test.title}</TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
+    <dl className="grid grid-cols-2 gap-px border-y border-ui-border bg-ui-border text-caption sm:grid-cols-4">
+      <LibraryMetric label="Questions" value={String(test.questionCount)} />
+      <LibraryMetric label="Duration" value={formatDuration(test.duration)} />
+      <LibraryMetric label="Updated" value={formatUpdatedAt(test.updatedAt)} />
+      <LibraryMetric label="Source" value={source === 'SYSTEM' ? test.author?.name || 'SAT Platform' : 'My library'} />
+    </dl>
+    <div className="mt-auto flex items-center justify-between gap-3 p-4 pl-5">
+      {source === 'MY' ? <StatusBadge status={test.status} /> : <Badge className="text-muted-foreground">System test</Badge>}
+      <PrimaryTestAction test={test} source={source} working={working} actions={actions} />
+    </div>
   </Card>;
 }
 
-function PrimaryTestAction({ test, source, working, actions, fullWidth = false }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions; fullWidth?: boolean }) {
-  if (source === 'SYSTEM' || test.status === 'PUBLISHED') return <Button variant="outline" size="sm" className={fullWidth ? 'w-full bg-surface' : undefined} disabled={working} onClick={() => actions.preview(test)}><Play size={15} />Open</Button>;
-  if (test.status === 'DRAFT') return <Button size="sm" className={fullWidth ? 'w-full' : undefined} disabled={working} onClick={() => actions.edit(test)}><FilePenLine size={15} />Continue</Button>;
-  return <Button variant="outline" size="sm" className={fullWidth ? 'w-full bg-surface' : undefined} disabled={working} onClick={() => actions.restore(test)}>{working ? <LoadingSpinner /> : <RotateCcw size={15} />}Restore</Button>;
+function LibraryMetric({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0 bg-muted/30 px-3 py-2.5 first:pl-5"><dt className="text-muted-foreground">{label}</dt><dd className="mt-0.5 truncate font-medium text-foreground" title={value}>{value}</dd></div>;
+}
+
+function PrimaryTestAction({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
+  if (source === 'SYSTEM' || test.status === 'PUBLISHED') return <Button variant="outline" size="sm" disabled={working} onClick={() => actions.preview(test)}><Play size={15} />Open</Button>;
+  if (test.status === 'DRAFT') return <Button size="sm" disabled={working} onClick={() => actions.edit(test)}><FilePenLine size={15} />Continue</Button>;
+  return <Button variant="outline" size="sm" disabled={working} onClick={() => actions.restore(test)}>{working ? <LoadingSpinner /> : <RotateCcw size={15} />}Restore</Button>;
 }
 
 function TestMenu({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
@@ -361,7 +368,7 @@ function TestMenu({ test, source, working, actions }: { test: LibraryTest; sourc
 
 function LibraryListRow({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
   const openDefault = (test: LibraryTest) => source === 'MY' && test.status === 'DRAFT' ? actions.edit(test) : actions.preview(test);
-  return <div className="grid min-w-[900px] grid-cols-[minmax(280px,2fr)_150px_100px_90px_150px_130px_48px] items-center gap-4 px-4 py-3 hover:bg-muted/20"><Button variant="ghost" className="h-auto min-w-0 justify-start gap-2 p-0 text-left text-foreground hover:bg-transparent hover:underline" onClick={() => openDefault(test)}><span className="truncate text-body font-medium" title={test.title}>{test.title}</span>{test.category === 'REAL' && <Badge className="shrink-0 bg-primary text-primary-foreground">Official{satTestMonthLabel(test.testDate) ? ` · ${satTestMonthLabel(test.testDate)}` : ''}</Badge>}</Button><span className="text-muted-foreground">{subjectLabel[test.subject]}</span><span className="text-muted-foreground">{modeLabel[test.mode]}</span><span className="tabular-nums text-muted-foreground">{test.questionCount}</span><span>{source === 'MY' ? <StatusBadge status={test.status} /> : <span className="text-muted-foreground">SAT Platform</span>}</span><span className="text-muted-foreground">{relativeTime(test.updatedAt)}</span><span className="text-right"><TestMenu test={test} source={source} working={working} actions={actions} /></span></div>;
+  return <div className="grid min-w-[900px] grid-cols-[minmax(210px,1.45fr)_140px_140px_90px_110px_120px_152px] items-center gap-4 px-4 py-3 hover:bg-muted/20"><Button variant="ghost" className="h-auto min-w-0 justify-start gap-2 p-0 text-left text-foreground hover:bg-transparent hover:underline" onClick={() => openDefault(test)}><span className="truncate text-body font-medium" title={test.title}>{test.title}</span>{test.category === 'REAL' && <Badge className="shrink-0 bg-primary text-primary-foreground">Official{satTestMonthLabel(test.testDate) ? ` · ${satTestMonthLabel(test.testDate)}` : ''}</Badge>}</Button><div className="flex flex-wrap gap-1"><Badge tone={test.subject === 'MATH' ? 'gold' : 'green'}>{test.subject === 'RW' ? 'R&W' : 'Math'}</Badge><Badge>{modeLabel[test.mode]}</Badge></div><span>{source === 'MY' ? <StatusBadge status={test.status} /> : <span className="text-caption text-muted-foreground">SAT Platform</span>}</span><span className="text-caption tabular-nums text-muted-foreground">{test.questionCount}</span><span className="text-caption text-muted-foreground">{formatDuration(test.duration)}</span><span className="text-caption text-muted-foreground">{formatUpdatedAt(test.updatedAt)}</span><span className="flex items-center justify-end gap-1"><PrimaryTestAction test={test} source={source} working={working} actions={actions} /><TestMenu test={test} source={source} working={working} actions={actions} /></span></div>;
 }
 
 function StatusBadge({ status }: { status: TestStatus }) {
@@ -369,13 +376,24 @@ function StatusBadge({ status }: { status: TestStatus }) {
 }
 
 function LibrarySkeleton({ view }: { view: ViewMode }) {
-  if (view === 'LIST') return <div><Skeleton className="h-12 rounded-none border-b border-ui-border" />{[1, 2, 3, 4, 5].map(item => <div key={item} className="flex h-16 items-center gap-5 border-b border-ui-border px-5 last:border-0"><Skeleton className="h-4 w-64" /><Skeleton className="h-4 w-32" /><Skeleton className="ml-auto h-8 w-32" /></div>)}</div>;
-  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-60 p-4"><Skeleton className="h-full w-full" /></Card>)}</div>;
+  if (view === 'LIST') return <div><Skeleton className="h-11 rounded-none border-b border-ui-border" />{[1, 2, 3, 4, 5].map(item => <div key={item} className="flex h-16 items-center gap-6 border-b border-ui-border/60 px-4 last:border-0"><Skeleton className="h-4 w-64" /><Skeleton className="h-6 w-24 rounded-full" /><Skeleton className="h-4 flex-1" /><Skeleton className="h-8 w-28" /></div>)}</div>;
+  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-72 p-5"><div className="mb-6 flex gap-2"><Skeleton className="h-5 w-24 rounded-full" /><Skeleton className="h-5 w-16 rounded-full" /></div><Skeleton className="h-5 w-3/4" /><Skeleton className="mt-3 h-4 w-full" /><Skeleton className="mt-8 h-20 w-full" /></Card>)}</div>;
 }
 
-const relativeTime = (value: string) => {
+const formatDuration = (value: number) => value ? `${Math.floor(value)} min` : 'No limit';
+
+const formatUpdatedAt = (value: string) => {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'recently' : formatDistanceToNow(date, { addSuffix: true });
+  if (Number.isNaN(date.getTime())) return 'Recently';
+  const elapsed = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 const errorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
