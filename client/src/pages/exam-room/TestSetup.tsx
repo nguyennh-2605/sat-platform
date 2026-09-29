@@ -125,7 +125,7 @@ export default function TestSetup({ data, isStarting, onBack, onStart }: TestSet
 
         <Card>
           <CardHeader className="border-b sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-            <CardTitle className="text-xl sm:text-2xl">{data.title}</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl"><h1>{data.title}</h1></CardTitle>
             <CardDescription>{data.description || 'Review your settings before the test begins.'}</CardDescription>
             <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:mt-0">
               <div><span className="text-muted-foreground">Subject</span><p className="font-medium">{subjectLabel(data.subject)}</p></div>
@@ -138,7 +138,7 @@ export default function TestSetup({ data, isStarting, onBack, onStart }: TestSet
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
           <Card>
             <CardHeader>
-              <CardTitle>{active ? 'Continue your attempt' : 'Choose your test experience'}</CardTitle>
+              <CardTitle><h2>{active ? 'Continue your attempt' : 'Choose your test experience'}</h2></CardTitle>
               <CardDescription>
                 {active
                   ? 'Mode and timing are locked after an attempt is created.'
@@ -236,7 +236,7 @@ export default function TestSetup({ data, isStarting, onBack, onStart }: TestSet
 
           <Card className="lg:sticky lg:top-6">
             <CardHeader className="border-b">
-              <CardTitle>Before you start</CardTitle>
+              <CardTitle><h2>Before you start</h2></CardTitle>
               <CardDescription>These rules apply to the mode and timing selected on the left.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
