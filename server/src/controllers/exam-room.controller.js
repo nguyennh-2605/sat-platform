@@ -1,17 +1,44 @@
 const ApiError = require('../utils/ApiError');
 const examRoomService = require('../services/exam-room.service');
 
+const requestContext = req => ({
+  testId: parseInt(req.params.id),
+  userId: req.user.userId,
+  userRole: req.user.role,
+  assignmentId: req.query.assignmentId ? String(req.query.assignmentId) : null,
+  classId: req.query.classId ? String(req.query.classId) : null,
+  deliveryId: req.query.deliveryId ? String(req.query.deliveryId) : null,
+});
+
+exports.getTestSetup = async (req, res) => {
+  try {
+    res.json(await examRoomService.getTestSetup(requestContext(req)));
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error(error);
+    res.status(500).json({ error: 'Unable to load test setup.' });
+  }
+};
+
+exports.startTest = async (req, res) => {
+  try {
+    res.json(await examRoomService.startOrResumeTest({
+      ...requestContext(req),
+      attemptMode: req.body.attemptMode,
+      timingPreset: req.body.timingPreset,
+      customDurationMinutes: req.body.customDurationMinutes,
+    }));
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error(error);
+    res.status(500).json({ error: 'Unable to start test.' });
+  }
+};
+
 // 3. API LẤY CHI TIẾT ĐỀ THI & CÂU HỎI (Cho ExamRoom)
 exports.startOrResumeTest = async (req, res) => {
   try {
-    const data = await examRoomService.startOrResumeTest({
-      testId: parseInt(req.params.id),
-      userId: req.user.userId,
-      userRole: req.user.role,
-      assignmentId: req.query.assignmentId ? String(req.query.assignmentId) : null,
-      classId: req.query.classId ? String(req.query.classId) : null,
-      deliveryId: req.query.deliveryId ? String(req.query.deliveryId) : null,
-    });
+    const data = await examRoomService.startOrResumeTest(requestContext(req));
     res.json(data);
   } catch (error) {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
@@ -51,6 +78,20 @@ exports.beginTest = async (req, res) => {
     if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
     console.error(error);
     res.status(500).json({ error: 'Lỗi bắt đầu bài thi' });
+  }
+};
+
+exports.pauseTest = async (req, res) => {
+  try {
+    res.json(await examRoomService.pauseTest({
+      userId: req.user.userId,
+      submissionId: req.body.submissionId,
+      testId: parseInt(req.params.id),
+    }));
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error(error);
+    res.status(500).json({ error: 'Unable to pause test.' });
   }
 };
 

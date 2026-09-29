@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
-import { LoaderCircle } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { Skeleton } from '@/components/ui/skeleton';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/AppUI';
 import { Button } from '@/components/ui/button';
@@ -56,10 +57,10 @@ function AnnouncementDialogContent({ onClose, classId, announcement, onSaved }: 
     } finally { setSaving(false); }
   };
   const verb = announcement ? 'Save changes' : 'Publish announcement';
-  return <Modal open onClose={() => !saving && onClose()} closeOnBackdrop={!saving} presentation="content-dialog" title={announcement ? 'Edit announcement' : 'New announcement'} subtitle={announcement ? 'Update the message shared with this class.' : 'Share an update with everyone in this class.'} className="max-w-2xl!" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !title.trim()} onClick={() => void submit()}>{saving ? <><LoaderCircle className="animate-spin" aria-hidden="true" />Saving…</> : verb}</Button></>}>
+  return <Modal open onClose={() => !saving && onClose()} closeOnBackdrop={!saving} presentation="content-dialog" title={announcement ? 'Edit announcement' : 'New announcement'} subtitle={announcement ? 'Update the message shared with this class.' : 'Share an update with everyone in this class.'} className="max-w-2xl!" footer={<><Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button disabled={saving || !title.trim()} onClick={() => void submit()}>{saving ? <><LoadingSpinner />Saving…</> : verb}</Button></>}>
     <div className="space-y-5">
       <Field><FieldLabel htmlFor="announcement-title">Title</FieldLabel><Input id="announcement-title" autoFocus value={title} onChange={event => setTitle(event.target.value)} placeholder="What should students know?" maxLength={160} /></Field>
-      <Field><FieldLabel id="announcement-message-label">Message</FieldLabel><Suspense fallback={<div className="h-52 animate-pulse rounded-lg border border-ui-border bg-muted/30" aria-label="Loading rich text editor" />}><RichTextEditor id="announcement-message" labelledBy="announcement-message-label" value={content} onChange={setContent} placeholder="Write your announcement…" disabled={saving} /></Suspense></Field>
+      <Field><FieldLabel id="announcement-message-label">Message</FieldLabel><Suspense fallback={<Skeleton className="h-52 border border-ui-border" aria-label="Loading rich text editor" />}><RichTextEditor id="announcement-message" labelledBy="announcement-message-label" value={content} onChange={setContent} placeholder="Write your announcement…" disabled={saving} /></Suspense></Field>
       <div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="announcement-attachments">Attachment URLs</FieldLabel><Textarea id="announcement-attachments" rows={3} value={attachments} onChange={event => setAttachments(event.target.value)} placeholder="One URL per line" /></Field><Field><FieldLabel htmlFor="announcement-links">Reference links</FieldLabel><Textarea id="announcement-links" rows={3} value={links} onChange={event => setLinks(event.target.value)} placeholder="One URL per line" /></Field></div>
       <Field orientation="horizontal" className="rounded-lg border border-ui-border bg-muted/20 p-3"><Checkbox id="announcement-pinned" checked={isPinned} disabled={saving} onCheckedChange={checked => setIsPinned(Boolean(checked))} /><div className="min-w-0"><FieldLabel htmlFor="announcement-pinned">Pin announcement</FieldLabel><FieldDescription>Keep this update above recent announcements. A class can pin up to five.</FieldDescription></div></Field>
     </div>

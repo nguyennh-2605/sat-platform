@@ -141,6 +141,9 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - `Badge`: chỉ thể hiện metadata/status, không dùng thay button.
 - `Toast`: success 3 giây, error 5 giây, mặc định 4 giây; không chứa thao tác nghiệp vụ bắt buộc.
 - `EmptyState`: luôn có title; description giải thích bước tiếp theo; action chỉ thêm khi người dùng có hành động hợp lệ.
+- `LoadingSpinner`: dùng cho trạng thái pending nằm trong button hoặc control nhỏ; không import trực tiếp icon spinner, không tự dựng spinner bằng border và không dùng emoji loading.
+- `LoadingState`: dùng cho trạng thái tải toàn page/panel khi chưa có cấu trúc nội dung để giữ lại; label phải mô tả dữ liệu hoặc hành động đang chờ khi ngữ cảnh chưa rõ.
+- `Skeleton`: dùng cho first-load có layout dự đoán được và phải mô phỏng đúng anatomy của nội dung thật. Không viết `animate-pulse` trực tiếp trong feature; refresh nền giữ lại dữ liệu cũ và dùng `LoadingSpinner` tại control kích hoạt.
 
 - Trong dashboard có sidebar cố định bên trái, modal/panel thuộc một page phải được giới hạn trong vùng nội dung bên phải và không phủ, làm tối hoặc dịch chuyển sidebar. Dùng `Modal` với `presentation="content-dialog"` cho popup của page; variant này phải portal vào `document.body` và offset theo chiều rộng sidebar để không bị ancestor có `transform`, animation hoặc overflow làm lệch vị trí. Popup vẫn phải có khoảng đệm, backdrop và kích thước dialog bình thường. Chỉ dùng `presentation="content-panel"` khi người dùng thực sự yêu cầu một màn hình chi tiết phủ kín vùng nội dung.
 
@@ -242,6 +245,9 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Giáo viên chỉ được sửa lifecycle/nội dung đề do chính giáo viên đó tạo.
 - Học sinh thấy đề admin đăng và đề giáo viên giao cho lớp của mình.
 - Practice Center của Student tiếp tục hiển thị attempt status, progress, last attempt và score từ dữ liệu thật.
+- Published System tests mở một setup screen trước khi tạo attempt. Student có thể chọn Practice hoặc Exam simulation và timing phù hợp; assigned/class tests chỉ hiển thị cấu hình đã khóa. Practice mặc định vẫn có countdown để luyện pacing, đồng thời hỗ trợ half time, extra time, custom total time và untimed. Exam simulation chỉ hỗ trợ standard, 50% extra hoặc double time, yêu cầu full-screen và không cho Save & Exit.
+- Setup screen phải cho xem trước mode, tổng thời gian và hành vi pause/resume. Khi đã có Submission `DOING`, cấu hình của attempt không được chỉnh lại và copy phải nói rõ đây là lượt làm đang tiếp tục.
+- Setup screen là confirmation cuối cùng: đặt cấu hình và hướng dẫn trước bài theo bố cục ngang khi đủ rộng. `Continue` phải bắt đầu/resume attempt và đi thẳng vào Exam Room; không chèn thêm modal `Ready to begin`.
 - Card phải gọn; title, metadata, progress và action không được cách nhau quá xa.
 - Teacher Test Library card dùng anatomy `CardHeader → CardContent → CardFooter`: title và subject cùng hàng, mode là subtitle nằm sát title; question count, duration và source/updated time là các metadata row compact. Footer chỉ có một content action; lifecycle và duplicate nằm trong menu dấu ba chấm.
 - Hiển thị question count, progress percentage, last attempt và score khi có dữ liệu thật.

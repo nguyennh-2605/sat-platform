@@ -5,32 +5,53 @@ const { gradeQuestions } = require('../utils/grading');
 const testDeliveryService = require('./test-delivery.service');
 const errorLogService = require('./error-log.service');
 const { normalizeQuestionTimingSnapshot, timingRowsFromSnapshot } = require('../utils/question-timing');
-const { allocateModuleDurations, moduleTiming } = require('../utils/module-timing');
+const { moduleTiming } = require('../utils/module-timing');
+const {
+  TIMING_PRESETS,
+  attemptModeFor,
+  isUntimedAttempt,
+  resolveAttemptConfiguration,
+  timingPresetFor,
+  timingSnapshotFor,
+} = require('../utils/attempt-configuration');
 
 const orderedSections = sections => [...(sections || [])].sort((a, b) => a.order - b.order);
 
 const examTimingPayload = ({ submission, test, serverTime = new Date() }) => {
   const sections = orderedSections(test.sections);
-  const durations = allocateModuleDurations(test.duration, sections.length);
+  const timingSnapshot = timingSnapshotFor(submission, test);
   const currentModule = Math.min(Math.max(Number(submission.currentModule) || 1, 1), sections.length);
   const moduleExpiresAt = submission.moduleExpiresAt || null;
+  const attemptMode = attemptModeFor(submission, test);
+  const timingPreset = timingPresetFor(submission);
   return {
     serverTime,
+    attemptMode,
+    timingPreset,
     currentModule,
     totalModules: sections.length,
-    moduleDuration: durations[currentModule - 1],
+    moduleDuration: timingSnapshot[currentModule - 1]?.allowedSeconds === null
+      ? null
+      : timingSnapshot[currentModule - 1].allowedSeconds / 60,
+    moduleDurationSeconds: timingSnapshot.map(item => item.allowedSeconds),
+    standardModuleDurationSeconds: timingSnapshot.map(item => item.standardSeconds),
+    allowedDurationSeconds: submission.allowedDurationSeconds
+      ?? timingSnapshot.reduce((total, item) => total + (item.allowedSeconds || 0), 0),
     moduleStartedAt: submission.moduleStartedAt || null,
     moduleExpiresAt,
-    timeLeft: test.mode === 'EXAM' && moduleExpiresAt
+    moduleAdvanceAvailableAt: attemptMode === 'EXAM' && submission.moduleStartedAt
+      ? new Date(new Date(submission.moduleStartedAt).getTime() + timingSnapshot[currentModule - 1].standardSeconds * 1000)
+      : null,
+    timeLeft: !isUntimedAttempt(submission) && moduleExpiresAt
       ? Math.max(0, Math.ceil((new Date(moduleExpiresAt).getTime() - serverTime.getTime()) / 1000))
       : submission.timeRemaining,
   };
 };
 
-const reconcileExamModule = async ({ submission, test, now = new Date(), db = prisma }) => {
-  if (test.mode !== 'EXAM' || !submission.beganAt) return submission;
+const reconcileTimedModule = async ({ submission, test, now = new Date(), db = prisma }) => {
+  if (isUntimedAttempt(submission) || !submission.beganAt || !submission.moduleExpiresAt) return submission;
   const sections = orderedSections(test.sections);
-  const durations = allocateModuleDurations(test.duration, sections.length);
+  const timingSnapshot = timingSnapshotFor(submission, test);
   let currentModule = Math.min(Math.max(Number(submission.currentModule) || 1, 1), sections.length);
   let moduleStartedAt = submission.moduleStartedAt ? new Date(submission.moduleStartedAt) : null;
   let moduleExpiresAt = submission.moduleExpiresAt ? new Date(submission.moduleExpiresAt) : null;
@@ -38,10 +59,10 @@ const reconcileExamModule = async ({ submission, test, now = new Date(), db = pr
   if (!moduleStartedAt || !moduleExpiresAt) {
     if (currentModule === 1) {
       moduleStartedAt = new Date(submission.beganAt);
-      moduleExpiresAt = new Date(moduleStartedAt.getTime() + durations[0] * 60 * 1000);
+      moduleExpiresAt = new Date(moduleStartedAt.getTime() + timingSnapshot[0].allowedSeconds * 1000);
     } else {
-      moduleStartedAt = new Date(new Date(submission.beganAt).getTime() + durations[0] * 60 * 1000);
-      moduleExpiresAt = new Date(moduleStartedAt.getTime() + durations[1] * 60 * 1000);
+      moduleStartedAt = new Date(new Date(submission.beganAt).getTime() + timingSnapshot[0].allowedSeconds * 1000);
+      moduleExpiresAt = new Date(moduleStartedAt.getTime() + timingSnapshot[1].allowedSeconds * 1000);
     }
   }
 
@@ -49,7 +70,7 @@ const reconcileExamModule = async ({ submission, test, now = new Date(), db = pr
   if (currentModule === 1 && sections.length > 1 && now >= moduleExpiresAt) {
     currentModule = 2;
     moduleStartedAt = moduleExpiresAt;
-    moduleExpiresAt = new Date(moduleStartedAt.getTime() + durations[1] * 60 * 1000);
+    moduleExpiresAt = new Date(moduleStartedAt.getTime() + timingSnapshot[1].allowedSeconds * 1000);
     currentQuestionIndex = sections[0].questions?.length || 0;
   }
 
@@ -67,105 +88,162 @@ const reconcileExamModule = async ({ submission, test, now = new Date(), db = pr
   });
 };
 
-exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, classId, deliveryId }) => {
+const loadTestContext = async ({ testId, userId, userRole, assignmentId, classId, deliveryId, includeQuestions }) => {
   if (!userId || isNaN(userId)) {
-    throw new ApiError(400, { error: "Thiếu thông tin User ID (userId is missing or invalid)" });
+    throw new ApiError(400, { error: 'User information is missing or invalid.' });
   }
 
-  // Lấy bài thi -> Lấy Section -> Lấy Question (Test -> Section -> Question)
   const test = await prisma.test.findUnique({
     where: { id: Number(testId) },
     include: {
       sections: {
-        orderBy: { order: 'asc' }, // Sắp xếp Module 1 trước, Module 2 sau
-        include: {
-          questions: {
-            orderBy: { order: 'asc' },
-            // KHÔNG lấy trường 'correctAnswer' để tránh lộ đáp án
-            select: {
-              id: true,
-              blocks: true,
-              questionText: true,
-              choices: true,
-              type: true
-            }
-          }
-        }
-      }
-    }
+        orderBy: { order: 'asc' },
+        ...(includeQuestions ? {
+          include: {
+            questions: {
+              orderBy: { order: 'asc' },
+              select: { id: true, blocks: true, questionText: true, choices: true, type: true },
+            },
+          },
+        } : {
+          select: { order: true, duration: true, _count: { select: { questions: true } } },
+        }),
+      },
+    },
   });
 
-  // Nếu test.sections rỗng thì do database chưa có data
-  if (!test || !test.sections || test.sections.length === 0) {
-    throw new ApiError(404, { error: "Đề thi này chưa có câu hỏi nào (Data rỗng)" });
+  if (!test || !test.sections?.length) {
+    throw new ApiError(404, { error: 'This test has no questions.' });
   }
 
   if (userRole === 'TEACHER' && test.authorId !== userId) {
-    throw new ApiError(403, { error: 'Bạn không có quyền truy cập đề thi này' });
-  }
-
-  if (userRole === 'STUDENT') {
-    const isSystemPublishedTest = test.scope === 'SYSTEM' && test.status === 'PUBLISHED';
-    let hasClassAccess = false;
-
-    if (deliveryId) {
-      await testDeliveryService.assertStudentDeliveryAccess({ deliveryId, testId, userId });
-      hasClassAccess = true;
-    } else if (assignmentId) {
-      const assignment = await prisma.assignment.findFirst({
-        where: {
-          id: assignmentId,
-          testIds: { has: testId },
-          class: { students: { some: { id: userId } } }
-        },
-        select: { id: true }
-      });
-      hasClassAccess = !!assignment;
-    } else if (classId) {
-      const classTestAccess = await prisma.classTest.findFirst({
-        where: {
-          classId,
-          testId,
-          isHidden: false,
-          class: { students: { some: { id: userId } } }
-        },
-        select: { id: true }
-      });
-      hasClassAccess = !!classTestAccess;
-    }
-
-    if (!isSystemPublishedTest && !hasClassAccess) {
-      throw new ApiError(403, { error: 'Đề thi này chưa được giao cho lớp của bạn' });
-    }
+    throw new ApiError(403, { error: 'You do not have access to this test.' });
   }
 
   let selectedClassTestId = null;
   let selectedDelivery = null;
+  let hasClassAccess = false;
   if (deliveryId) {
+    if (userRole === 'STUDENT') {
+      await testDeliveryService.assertStudentDeliveryAccess({ deliveryId, testId, userId });
+    }
     selectedDelivery = await prisma.testDelivery.findUnique({ where: { id: String(deliveryId) } });
     if (!selectedDelivery || selectedDelivery.testId !== Number(testId)) {
       throw new ApiError(400, { error: 'The assigned test does not match this test.' });
     }
     selectedClassTestId = selectedDelivery.legacyClassTestId;
-  } else if (!assignmentId && classId) {
+    hasClassAccess = true;
+  } else if (assignmentId) {
+    const assignment = await prisma.assignment.findFirst({
+      where: {
+        id: assignmentId,
+        testIds: { has: Number(testId) },
+        ...(userRole === 'STUDENT' ? { class: { students: { some: { id: userId } } } } : {}),
+      },
+      select: { id: true },
+    });
+    hasClassAccess = Boolean(assignment);
+  } else if (classId) {
     const classTest = await prisma.classTest.findFirst({
       where: {
-        classId: classId,
-        testId: testId,
+        classId,
+        testId: Number(testId),
         ...(userRole === 'STUDENT' ? {
           isHidden: false,
-          class: { students: { some: { id: userId } } }
-        } : {})
+          class: { students: { some: { id: userId } } },
+        } : {}),
       },
-      select: { id: true }
+      select: { id: true },
     });
-
-    if (!classTest) {
-      throw new ApiError(400, { error: "Bài test này không thuộc lớp đã chọn" });
-    }
-
+    if (!classTest) throw new ApiError(400, { error: 'This test is not assigned to the selected class.' });
     selectedClassTestId = classTest.id;
+    hasClassAccess = true;
   }
+
+  const isSystemPublishedTest = test.scope === 'SYSTEM' && test.status === 'PUBLISHED';
+  if (userRole === 'STUDENT' && !isSystemPublishedTest && !hasClassAccess) {
+    throw new ApiError(403, { error: 'This test has not been assigned to your class.' });
+  }
+
+  return {
+    test,
+    selectedClassTestId,
+    selectedDelivery,
+    canCustomize: userRole === 'STUDENT'
+      && isSystemPublishedTest
+      && !deliveryId
+      && !assignmentId
+      && !classId,
+  };
+};
+
+const submissionContextWhere = ({ userId, testId, assignmentId, deliveryId, selectedClassTestId }) => ({
+  userId,
+  testId: Number(testId),
+  ...(deliveryId
+    ? { deliveryId: String(deliveryId) }
+    : { assignmentId: assignmentId || null, classTestId: selectedClassTestId }),
+  status: 'DOING',
+});
+
+exports.getTestSetup = async params => {
+  const { test, selectedClassTestId, canCustomize } = await loadTestContext({ ...params, includeQuestions: false });
+  const activeSubmission = await prisma.submission.findFirst({
+    where: submissionContextWhere({ ...params, selectedClassTestId }),
+    orderBy: { startedAt: 'desc' },
+    select: {
+      id: true,
+      attemptMode: true,
+      timingPreset: true,
+      allowedDurationSeconds: true,
+      moduleTimingSnapshot: true,
+      beganAt: true,
+    },
+  });
+  const standardTiming = resolveAttemptConfiguration({ test, canCustomize: false });
+  return {
+    id: test.id,
+    title: test.title,
+    description: test.description,
+    subject: test.subject,
+    questionCount: test.sections.reduce((total, section) => total + section._count.questions, 0),
+    standardDurationSeconds: test.duration * 60,
+    standardModuleDurationSeconds: standardTiming.moduleTimingSnapshot.map(item => item.standardSeconds),
+    defaultMode: test.mode,
+    canCustomize,
+    timingPresets: canCustomize ? TIMING_PRESETS : ['STANDARD'],
+    activeAttempt: activeSubmission ? {
+      submissionId: activeSubmission.id,
+      attemptMode: attemptModeFor(activeSubmission, test),
+      timingPreset: timingPresetFor(activeSubmission),
+      allowedDurationSeconds: activeSubmission.allowedDurationSeconds,
+      moduleTimingSnapshot: timingSnapshotFor(activeSubmission, test),
+      beganAt: activeSubmission.beganAt,
+    } : null,
+  };
+};
+
+exports.startOrResumeTest = async ({
+  testId,
+  userId,
+  userRole,
+  assignmentId,
+  classId,
+  deliveryId,
+  attemptMode,
+  timingPreset,
+  customDurationMinutes,
+}) => {
+  const { test, selectedClassTestId, selectedDelivery, canCustomize } = await loadTestContext({
+    testId, userId, userRole, assignmentId, classId, deliveryId, includeQuestions: true,
+  });
+  const attemptConfiguration = resolveAttemptConfiguration({
+    test,
+    requestedMode: attemptMode,
+    requestedTimingPreset: timingPreset,
+    customDurationMinutes,
+    canCustomize,
+  });
 
   // Serverless deployments can issue the same GET concurrently. A PostgreSQL
   // transaction-scoped advisory lock makes find-or-create atomic per user/test.
@@ -176,14 +254,7 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${Number(userId)}::integer, ${Number(testId)}::integer)`;
 
     const activeSubmission = await tx.submission.findFirst({
-      where: {
-        userId,
-        testId,
-        ...(deliveryId
-          ? { deliveryId: String(deliveryId) }
-          : { assignmentId, classTestId: selectedClassTestId }),
-        status: 'DOING'
-      },
+      where: submissionContextWhere({ userId, testId, assignmentId, deliveryId, selectedClassTestId }),
       orderBy: { startedAt: 'desc' }
     });
 
@@ -208,7 +279,6 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
       attemptNo = priorAttempts.reduce((highest, item) => Math.max(highest, item.attemptNo), 0) + 1;
     }
 
-    const firstModuleDuration = allocateModuleDurations(test.duration, test.sections.length)[0];
     return tx.submission.create({
       data: {
         userId,
@@ -217,9 +287,10 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
         classTestId: selectedClassTestId,
         deliveryId: deliveryId ? String(deliveryId) : null,
         attemptNo,
+        ...attemptConfiguration,
         status: "DOING",
         startedAt: new Date(),
-        timeRemaining: firstModuleDuration * 60,
+        timeRemaining: attemptConfiguration.moduleTimingSnapshot[0].allowedSeconds,
         currentModule: 1,
         currentQuestionIndex: 0,
         savedAnswers: {}
@@ -228,12 +299,13 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
   });
 
   const serverTime = new Date();
-  const reconciledSubmission = await reconcileExamModule({ submission, test, now: serverTime });
+  const reconciledSubmission = await reconcileTimedModule({ submission, test, now: serverTime });
   const timing = examTimingPayload({ submission: reconciledSubmission, test, serverTime });
 
   // Trả về đề thi + Thông tin phiên làm bài
   return {
     ...test,
+    mode: timing.attemptMode,
     session: {
       submissionId: reconciledSubmission.id,
       startedAt: reconciledSubmission.startedAt,
@@ -243,8 +315,14 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
       currentModule: timing.currentModule,
       totalModules: timing.totalModules,
       moduleDuration: timing.moduleDuration,
+      moduleDurationSeconds: timing.moduleDurationSeconds,
+      standardModuleDurationSeconds: timing.standardModuleDurationSeconds,
+      allowedDurationSeconds: timing.allowedDurationSeconds,
+      attemptMode: timing.attemptMode,
+      timingPreset: timing.timingPreset,
       moduleStartedAt: timing.moduleStartedAt,
       moduleExpiresAt: timing.moduleExpiresAt,
+      moduleAdvanceAvailableAt: timing.moduleAdvanceAvailableAt,
       currentQuestionIndex: reconciledSubmission.currentQuestionIndex,
       questionTimingSnapshot: reconciledSubmission.questionTimingSnapshot || {},
       violationCount: reconciledSubmission.violationCount,
@@ -252,11 +330,9 @@ exports.startOrResumeTest = async ({ testId, userId, userRole, assignmentId, cla
       // the browser compensate when a student's device clock is fast or slow.
       serverTime,
       beganAt: reconciledSubmission.beganAt,
-      module1ExpiresAt: test.mode === 'EXAM' && reconciledSubmission.beganAt
-        ? new Date(new Date(reconciledSubmission.beganAt).getTime() + allocateModuleDurations(test.duration, test.sections.length)[0] * 60 * 1000)
-        : null,
-      expiresAt: test.mode === 'EXAM' && reconciledSubmission.beganAt
-        ? new Date(new Date(reconciledSubmission.beganAt).getTime() + test.duration * 60 * 1000)
+      module1ExpiresAt: timing.moduleExpiresAt,
+      expiresAt: timing.allowedDurationSeconds !== null && reconciledSubmission.beganAt
+        ? new Date(new Date(reconciledSubmission.beganAt).getTime() + timing.allowedDurationSeconds * 1000)
         : null,
       delivery: selectedDelivery ? {
         id: selectedDelivery.id,
@@ -285,9 +361,9 @@ exports.beginTest = async ({ userId, submissionId, testId }) => {
   if (!submission) throw new ApiError(404, { error: 'Không tìm thấy phiên làm bài đang hoạt động' });
 
   let beganAt = submission.beganAt;
-  if (submission.test.mode === 'EXAM' && !beganAt) {
-    const now = new Date();
-    const firstDuration = allocateModuleDurations(submission.test.duration, submission.test.sections.length)[0];
+  const now = new Date();
+  const timingSnapshot = timingSnapshotFor(submission, submission.test);
+  if (!beganAt) {
     // updateMany makes this one-shot even when the start button/request is retried.
     await prisma.submission.updateMany({
       where: { id: submission.id, beganAt: null, status: 'DOING' },
@@ -296,17 +372,33 @@ exports.beginTest = async ({ userId, submissionId, testId }) => {
         startedAt: now,
         currentModule: 1,
         moduleStartedAt: now,
-        moduleExpiresAt: new Date(now.getTime() + firstDuration * 60 * 1000),
-        timeRemaining: firstDuration * 60
+        moduleExpiresAt: isUntimedAttempt(submission)
+          ? null
+          : new Date(now.getTime() + timingSnapshot[0].allowedSeconds * 1000),
+        timeRemaining: timingSnapshot[0].allowedSeconds,
       }
     });
     const current = await prisma.submission.findUnique({ where: { id: submission.id } });
     beganAt = current.beganAt;
     Object.assign(submission, current);
+  } else if (attemptModeFor(submission, submission.test) === 'PRACTICE'
+    && !isUntimedAttempt(submission)
+    && !submission.moduleExpiresAt) {
+    const secondsLeft = Number.isInteger(submission.timeRemaining)
+      ? submission.timeRemaining
+      : timingSnapshot[(submission.currentModule || 1) - 1].allowedSeconds;
+    const resumed = await prisma.submission.update({
+      where: { id: submission.id },
+      data: {
+        moduleStartedAt: now,
+        moduleExpiresAt: new Date(now.getTime() + secondsLeft * 1000),
+      },
+    });
+    Object.assign(submission, resumed);
   }
 
   const serverTime = new Date();
-  const reconciled = await reconcileExamModule({ submission, test: submission.test, now: serverTime });
+  const reconciled = await reconcileTimedModule({ submission, test: submission.test, now: serverTime });
   return { ...examTimingPayload({ submission: reconciled, test: submission.test, serverTime }), beganAt };
 };
 
@@ -328,27 +420,30 @@ exports.advanceModule = async ({ userId, submissionId, testId }) => {
   if (sections.length < 2) throw new ApiError(409, { error: 'This test has no second module.' });
 
   const now = new Date();
-  const reconciled = await reconcileExamModule({ submission, test: submission.test, now });
+  const reconciled = await reconcileTimedModule({ submission, test: submission.test, now });
   if (reconciled.currentModule === 2) {
     return {
       ...examTimingPayload({ submission: reconciled, test: submission.test, serverTime: now }),
       currentQuestionIndex: reconciled.currentQuestionIndex,
     };
   }
-  if (submission.test.mode === 'EXAM' && reconciled.moduleExpiresAt && now < new Date(reconciled.moduleExpiresAt)) {
+  const timingSnapshot = timingSnapshotFor(reconciled, submission.test);
+  const attemptMode = attemptModeFor(reconciled, submission.test);
+  const standardUnlockAt = reconciled.moduleStartedAt
+    ? new Date(new Date(reconciled.moduleStartedAt).getTime() + timingSnapshot[0].standardSeconds * 1000)
+    : null;
+  if (attemptMode === 'EXAM' && standardUnlockAt && now < standardUnlockAt) {
     throw new ApiError(409, {
       error: 'Module 1 is still in progress.',
-      timeLeft: Math.max(1, Math.ceil((new Date(reconciled.moduleExpiresAt).getTime() - now.getTime()) / 1000)),
+      timeLeft: Math.max(1, Math.ceil((standardUnlockAt.getTime() - now.getTime()) / 1000)),
     });
   }
 
   const next = moduleTiming({ totalDuration: submission.test.duration, sections, moduleNumber: 2 });
-  const moduleStartedAt = submission.test.mode === 'EXAM' && reconciled.moduleExpiresAt
-    ? new Date(reconciled.moduleExpiresAt)
-    : now;
-  const moduleExpiresAt = submission.test.mode === 'EXAM'
-    ? new Date(moduleStartedAt.getTime() + next.durationMinutes * 60 * 1000)
-    : null;
+  const moduleStartedAt = now;
+  const moduleExpiresAt = isUntimedAttempt(reconciled) || !reconciled.beganAt
+    ? null
+    : new Date(moduleStartedAt.getTime() + timingSnapshot[1].allowedSeconds * 1000);
   const updated = await prisma.submission.update({
     where: { id: submission.id },
     data: {
@@ -356,7 +451,7 @@ exports.advanceModule = async ({ userId, submissionId, testId }) => {
       currentQuestionIndex: next.firstQuestionIndex,
       moduleStartedAt,
       moduleExpiresAt,
-      timeRemaining: next.durationMinutes * 60,
+      timeRemaining: timingSnapshot[1].allowedSeconds,
     },
   });
   return {
@@ -384,15 +479,16 @@ exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, current
   if (submission.status === 'COMPLETED') throw new ApiError(400, { message: "Bài đã nộp rồi" });
 
   const clientTimeLeft = Number(timeLeft);
-  const authoritativeTimeLeft = submission.test.mode === 'EXAM' && submission.moduleExpiresAt
+  const attemptMode = attemptModeFor(submission, submission.test);
+  const authoritativeTimeLeft = !isUntimedAttempt(submission) && submission.moduleExpiresAt
     ? Math.max(0, Math.ceil((new Date(submission.moduleExpiresAt).getTime() - Date.now()) / 1000))
-    : (Number.isFinite(clientTimeLeft) ? Math.max(0, Math.floor(clientTimeLeft)) : submission.timeRemaining);
-  const questionTimingSnapshot = submission.test.mode === 'EXAM'
+    : (isUntimedAttempt(submission) ? null : (Number.isFinite(clientTimeLeft) ? Math.max(0, Math.floor(clientTimeLeft)) : submission.timeRemaining));
+  const questionTimingSnapshot = attemptMode === 'EXAM'
     ? normalizeQuestionTimingSnapshot({
         snapshot: questionTimings,
         questionIds: submission.test.sections.flatMap(section => section.questions.map(question => question.id)),
         maxTotalMs: submission.beganAt
-          ? Math.min(submission.test.duration * 60 * 1000, Math.max(0, Date.now() - new Date(submission.beganAt).getTime()))
+          ? Math.min(submission.allowedDurationSeconds || submission.test.duration * 60, Math.max(0, (Date.now() - new Date(submission.beganAt).getTime()) / 1000)) * 1000
           : 0,
       })
     : null;
@@ -415,9 +511,40 @@ exports.saveProgress = async ({ userId, submissionId, answers, timeLeft, current
       violationCount: Number.isFinite(Number(violationCount))
         ? Math.max(submission.violationCount, Number(violationCount))
         : submission.violationCount,
-      ...(submission.test.mode === 'EXAM' ? { questionTimingSnapshot } : {}),
+      ...(attemptMode === 'EXAM' ? { questionTimingSnapshot } : {}),
     }
   });
+};
+
+exports.pauseTest = async ({ userId, submissionId, testId }) => {
+  const submission = await prisma.submission.findFirst({
+    where: { id: Number(submissionId), userId, testId, status: 'DOING' },
+    include: {
+      test: {
+        select: {
+          mode: true,
+          duration: true,
+          sections: { orderBy: { order: 'asc' }, select: { order: true, duration: true, questions: { select: { id: true } } } },
+        },
+      },
+    },
+  });
+  if (!submission) throw new ApiError(404, { error: 'Active test session not found.' });
+  if (attemptModeFor(submission, submission.test) !== 'PRACTICE') {
+    throw new ApiError(409, { error: 'Exam simulations cannot be paused.' });
+  }
+  if (isUntimedAttempt(submission)) return examTimingPayload({ submission, test: submission.test });
+
+  const now = new Date();
+  const reconciled = await reconcileTimedModule({ submission, test: submission.test, now });
+  const timeRemaining = reconciled.moduleExpiresAt
+    ? Math.max(0, Math.ceil((new Date(reconciled.moduleExpiresAt).getTime() - now.getTime()) / 1000))
+    : reconciled.timeRemaining;
+  const paused = await prisma.submission.update({
+    where: { id: submission.id },
+    data: { moduleExpiresAt: null, timeRemaining },
+  });
+  return examTimingPayload({ submission: paused, test: submission.test, serverTime: now });
 };
 
 exports.submitTest = async ({ userId, submissionId, answers, violationCount, testId, assignmentId, classId, deliveryId, questionTimings }) => {
@@ -484,12 +611,13 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
   const safeAnswers = submittedAnswers && typeof submittedAnswers === 'object' && !Array.isArray(submittedAnswers)
     ? submittedAnswers
     : {};
-  const timingSnapshot = test.mode === 'EXAM'
+  const attemptMode = attemptModeFor(submission, test);
+  const timingSnapshot = attemptMode === 'EXAM'
     ? normalizeQuestionTimingSnapshot({
         snapshot: questionTimings || submission.questionTimingSnapshot,
         questionIds: allQuestions.map(question => question.id),
         maxTotalMs: submission.beganAt
-          ? Math.min(test.duration * 60 * 1000, Math.max(0, Date.now() - new Date(submission.beganAt).getTime()))
+          ? Math.min((submission.allowedDurationSeconds || test.duration * 60) * 1000, Math.max(0, Date.now() - new Date(submission.beganAt).getTime()))
           : 0,
       })
     : {};
@@ -505,7 +633,7 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
         violationCount: safeViolationCount,
         endTime: new Date(),
         savedAnswers: safeAnswers,
-        ...(test.mode === 'EXAM' ? { questionTimingSnapshot: timingSnapshot } : {}),
+        ...(attemptMode === 'EXAM' ? { questionTimingSnapshot: timingSnapshot } : {}),
       }
     });
 
@@ -578,6 +706,11 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
               score: correctCount,
               violationCount: safeViolationCount,
               startedAt: submission.startedAt,
+              beganAt: submission.beganAt,
+              attemptMode,
+              timingPreset: timingPresetFor(submission),
+              allowedDurationSeconds: submission.allowedDurationSeconds,
+              moduleTimingSnapshot: submission.moduleTimingSnapshot,
               currentQuestionIndex: submission.currentQuestionIndex,
               savedAnswers: safeAnswers,
               timeRemaining: submission.timeRemaining,
@@ -620,7 +753,7 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
       });
     }
 
-    if (test.mode === 'EXAM') {
+    if (attemptMode === 'EXAM') {
       await tx.questionTiming.deleteMany({ where: { submissionId: submission.id } });
       const timingRows = timingRowsFromSnapshot({ submissionId: submission.id, snapshot: timingSnapshot });
       if (timingRows.length > 0) await tx.questionTiming.createMany({ data: timingRows });

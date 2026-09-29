@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { BookOpenCheck, Check, LoaderCircle, Search } from 'lucide-react';
+import { BookOpenCheck, Check, Search } from 'lucide-react';
+import { LoadingSpinner, LoadingState } from '@/components/ui/loading';
 import toast from 'react-hot-toast';
 import { Modal, Tabs } from '@/components/ui/AppUI';
 import { Badge } from '@/components/ui/badge';
@@ -158,7 +159,7 @@ export function AssignmentComposer({ open, onClose, classId, students, initialLe
     footer={<>
       <Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button>
       <Button disabled={saving || !title.trim() || (!editing && (!students.length || (!allStudents && !studentIds.length)))} onClick={() => void submit()}>
-        {saving ? <><LoaderCircle className="animate-spin" />Saving…</> : editing ? 'Save changes' : 'Publish assignment'}
+        {saving ? <><LoadingSpinner />Saving…</> : editing ? 'Save changes' : 'Publish assignment'}
       </Button>
     </>}
   >
@@ -341,7 +342,7 @@ export function AssignTestsComposer({ open, onClose, classId, students: fixedStu
     footer={<>
       <Button variant="outline" disabled={saving} onClick={onClose}>Cancel</Button>
       <Button disabled={saving || !selectedClassId || !selectedIds.length || !students.length || (!allStudents && !studentIds.length)} onClick={() => void submit()}>
-        {saving ? <><LoaderCircle className="animate-spin" />Assigning…</> : `Assign ${selectedIds.length || ''} test${selectedIds.length === 1 ? '' : 's'}`}
+        {saving ? <><LoadingSpinner />Assigning…</> : `Assign ${selectedIds.length || ''} test${selectedIds.length === 1 ? '' : 's'}`}
       </Button>
     </>}
   >
@@ -375,7 +376,7 @@ export function AssignTestsComposer({ open, onClose, classId, students: fixedStu
 
       <div className="max-h-64 overflow-y-auto rounded-card border border-ui-border p-1">
         {loading
-          ? <p className="py-10 text-center text-body text-muted-foreground">Loading tests…</p>
+          ? <LoadingState label="Loading tests…" />
           : tests.length === 0
             ? <p className="py-10 text-center text-body text-muted-foreground">No published tests found.</p>
             : <div>{tests.map(test => {

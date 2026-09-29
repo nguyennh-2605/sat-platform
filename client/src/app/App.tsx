@@ -8,6 +8,7 @@ import { QuizToolProvider } from '../context/QuizToolContext';
 import { AuthSessionGuard } from '../features/auth/AuthSessionGuard';
 import { getAuthStatus, subscribeAuthSession } from '../lib/authSession';
 import { FocusTimerProvider } from '../features/focus-timer/FocusTimerProvider';
+import { LoadingState } from '../components/ui/loading';
 
 const HomePage = lazy(() => import('../pages/home/HomePage'));
 const AuthPage = lazy(() => import('../pages/auth/AuthPage'));
@@ -27,11 +28,11 @@ const AssignmentDetail = lazy(() => import('../features/assignment/AssignmentDet
 const Vocabulary = lazy(() => import('../pages/vocabulary/Vocabulary'));
 const ProfileSettings = lazy(() => import('../pages/profile/ProfileSettings'));
 
-const RouteFallback = () => <div className="flex min-h-screen items-center justify-center bg-background text-body text-muted-foreground">Loading…</div>;
+const RouteFallback = () => <LoadingState className="min-h-screen bg-background" label="Loading page…" />;
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const status = useSyncExternalStore(subscribeAuthSession, getAuthStatus, getAuthStatus);
-  if (status === 'loading') return <div className="flex min-h-screen items-center justify-center bg-background text-body text-muted-foreground">Restoring your session…</div>;
+  if (status === 'loading') return <LoadingState className="min-h-screen bg-background" label="Restoring your session…" />;
   if (status === 'anonymous') return <Navigate to="/auth" replace />;
   return children;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, ChevronRight, CirclePlay, ClipboardCheck, ExternalLink, FileText, FileUp, Link2, LoaderCircle, MoreHorizontal, Plus, Target, Trash2, UploadCloud, Video, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronRight, CirclePlay, ClipboardCheck, ExternalLink, FileText, FileUp, Link2, MoreHorizontal, Plus, Target, Trash2, UploadCloud, Video, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axiosClient from '@/lib/axios';
@@ -16,6 +16,8 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboardBack } from '@/features/navigation/DashboardBackContext';
 import { cn } from '@/lib/utils';
 import { LessonResourceViewer, type ViewerBlock } from './LessonResourceViewer';
@@ -397,7 +399,7 @@ export default function LessonWorkspace() {
     if (target) document.getElementById(`lesson-block-${target}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  if (loading) return <div className="h-full min-w-0 overflow-y-auto overflow-x-hidden bg-background"><main className="mx-auto w-full max-w-screen-2xl space-y-4 p-4 md:p-6"><div className="h-24 animate-pulse rounded-card bg-muted" /><div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]"><div className="h-96 min-w-0 animate-pulse rounded-card bg-muted" /><div className="h-96 min-w-0 animate-pulse rounded-card bg-muted" /></div></main></div>;
+  if (loading) return <div className="h-full min-w-0 overflow-y-auto overflow-x-hidden bg-background"><main className="mx-auto w-full max-w-screen-2xl space-y-4 p-4 md:p-6"><Skeleton className="h-24" /><div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]"><Skeleton className="h-96 min-w-0" /><Skeleton className="h-96 min-w-0" /></div></main></div>;
   if (!workspace) return <div className="h-full min-w-0 overflow-y-auto overflow-x-hidden bg-background"><main className="mx-auto w-full max-w-screen-2xl p-4 md:p-6"><Card className="p-8 text-center"><p className="text-body text-muted-foreground">This lesson could not be loaded.</p><Button className="mt-4" onClick={() => navigate(`/dashboard/class/${classId}`)}>Back to class</Button></Card></main></div>;
 
   const { lesson } = workspace;
@@ -524,7 +526,7 @@ function AttendancePanel({ students, entries, loading, saving, dirty, recordedAt
   return <DataSurface className="min-w-0 max-w-full overflow-hidden xl:sticky xl:top-4" aria-labelledby="attendance-heading">
     <div className="flex items-start justify-between gap-3 border-b border-ui-border px-4 py-3">
       <div className="min-w-0"><h2 id="attendance-heading" className="text-title font-semibold text-foreground">Class attendance</h2><p className="mt-0.5 text-caption text-muted-foreground">{recordedAt ? `Last saved ${formatDate(recordedAt)}` : 'Record one status for each student.'}</p></div>
-      <Button size="sm" disabled={loading || saving || !dirty || students.length === 0 || entries.length !== students.length} onClick={onSave}>{saving ? <LoaderCircle size={14} className="animate-spin" /> : <Check size={14} />}{saving ? 'Saving…' : 'Save'}</Button>
+      <Button size="sm" disabled={loading || saving || !dirty || students.length === 0 || entries.length !== students.length} onClick={onSave}>{saving ? <LoadingSpinner /> : <Check size={14} />}{saving ? 'Saving…' : 'Save'}</Button>
     </div>
     <DataTableViewport>
       <Table className="w-full table-fixed">
@@ -545,7 +547,7 @@ function LabeledField({ label, htmlFor, children }: { label: string; htmlFor: st
 }
 
 function TextBlockDialog({ open, form, setForm, saving, editing, onClose, onSave }: { open: boolean; form: { title: string; body: string; isRequired: boolean }; setForm: React.Dispatch<React.SetStateAction<{ title: string; body: string; isRequired: boolean }>>; saving: boolean; editing: boolean; onClose: () => void; onSave: () => void }) {
-  return <Modal open={open} closeOnBackdrop presentation="content-dialog" onClose={onClose} title={editing ? 'Edit lesson content' : 'Add lesson content'} subtitle="Add instructions, context, or study notes to this stage." footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={saving || !form.title.trim() || !form.body.trim()} onClick={onSave}>{saving ? <LoaderCircle className="animate-spin" /> : null}Save</Button></>}>
+  return <Modal open={open} closeOnBackdrop presentation="content-dialog" onClose={onClose} title={editing ? 'Edit lesson content' : 'Add lesson content'} subtitle="Add instructions, context, or study notes to this stage." footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={saving || !form.title.trim() || !form.body.trim()} onClick={onSave}>{saving ? <LoadingSpinner /> : null}Save</Button></>}>
     <div className="space-y-4">
       <LabeledField label="Title" htmlFor="block-title"><Input id="block-title" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder="What students should know" /></LabeledField>
       <LabeledField label="Content" htmlFor="block-content"><Textarea id="block-content" className="min-h-48" value={form.body} onChange={event => setForm(current => ({ ...current, body: event.target.value }))} placeholder="Write lesson instructions or study notes…" /></LabeledField>
@@ -575,7 +577,7 @@ function ResourceDialog({ open, kind, form, setForm, file, setFile, uploadProgre
     if (!form.name.trim()) setForm(current => ({ ...current, name: next.name }));
   };
 
-  return <Modal open={open} closeOnBackdrop={!saving} presentation="content-dialog" onClose={onClose} title={title} subtitle={subtitle} footer={<><Button variant="outline" onClick={onClose}>{saving ? 'Cancel upload' : 'Cancel'}</Button><Button disabled={disabled} onClick={onSave}>{saving ? <LoaderCircle className="animate-spin" /> : null}{saving && fileMode ? `Uploading ${uploadProgress}%` : actionLabel}</Button></>}>
+  return <Modal open={open} closeOnBackdrop={!saving} presentation="content-dialog" onClose={onClose} title={title} subtitle={subtitle} footer={<><Button variant="outline" onClick={onClose}>{saving ? 'Cancel upload' : 'Cancel'}</Button><Button disabled={disabled} onClick={onSave}>{saving ? <LoadingSpinner /> : null}{saving && fileMode ? `Uploading ${uploadProgress}%` : actionLabel}</Button></>}>
     <div className="space-y-4">
       {fileMode && <div>
         <input ref={inputRef} id="resource-file" type="file" className="sr-only" accept={RESOURCE_FILE_ACCEPT} disabled={saving} onChange={event => selectFile(event.target.files?.[0] || null)} />

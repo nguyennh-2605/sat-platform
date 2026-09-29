@@ -11,6 +11,7 @@ import { NeedsAttention } from './NeedsAttention';
 import { OverviewSnapshots } from './OverviewSnapshots';
 import { RecentActivity } from './RecentActivity';
 import type { AdminActivityResponse, AdminOverviewResponse, AdminRecentActivityResponse, OverviewRange } from './admin-overview.types';
+import { LoadingSpinner } from '@/components/ui/loading';
 
 const overviewRanges = new Set<OverviewRange>(['7d', '30d', '90d']);
 const normalizeRange = (value: string | null): OverviewRange => overviewRanges.has(value as OverviewRange) ? value as OverviewRange : '30d';
@@ -106,7 +107,7 @@ export default function AdminOverview() {
               </SelectContent>
             </Select>
             <Button variant="outline" size="icon" disabled={refreshing} onClick={refresh} aria-label="Refresh overview">
-              <RefreshCw className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? <LoadingSpinner /> : <RefreshCw />}
             </Button>
           </div>}
         />

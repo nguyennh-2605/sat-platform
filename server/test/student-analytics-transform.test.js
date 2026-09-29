@@ -17,7 +17,7 @@ const makeAnswers = (correctCount, total, timed = true) => Array.from({ length: 
   duration: timed ? (index % 3 === 0 ? 150000 : 60000) : null,
 }));
 
-const makeSubmission = ({ id = 1, correct = 6, total = 10, subject = 'MATH', status = 'COMPLETED', classroom = false, mode = 'EXAM' } = {}) => {
+const makeSubmission = ({ id = 1, correct = 6, total = 10, subject = 'MATH', status = 'COMPLETED', classroom = false, mode = 'EXAM', attemptMode } = {}) => {
   const answers = makeAnswers(correct, total);
   return {
     id,
@@ -27,6 +27,7 @@ const makeSubmission = ({ id = 1, correct = 6, total = 10, subject = 'MATH', sta
     deliveryId: classroom ? `delivery-${id}` : null,
     assignmentId: null,
     classTestId: null,
+    attemptMode,
     test: { id, title: `Test ${id}`, subject, mode },
     answers: answers.map(({ duration, ...answer }) => answer),
     questionTimings: answers.map(answer => ({ questionId: answer.question.id, activeDurationMs: answer.duration })),
@@ -96,4 +97,9 @@ test('pacing ignores partial timings from ineligible Practice attempts', () => {
   assert.equal(payload.pacing.timedQuestions, 0);
   assert.equal(payload.meta.timingCoverage.answeredQuestions, 0);
   assert.equal(payload.skillPerformance.find(item => item.code === domain.code).avgTimeMs, null);
+});
+
+test('pacing eligibility follows the attempt mode snapshot instead of the test default', () => {
+  assert.equal(isTimingEligible(makeSubmission({ mode: 'PRACTICE', attemptMode: 'EXAM' })), true);
+  assert.equal(isTimingEligible(makeSubmission({ mode: 'EXAM', attemptMode: 'PRACTICE' })), false);
 });

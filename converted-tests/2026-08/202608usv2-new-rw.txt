@@ -1,214 +1,237 @@
 === MODULE 1 ===
 
 QUESTION 1
-Domain: Craft and Structure
-Skill: Words in Context
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_WORDS_IN_CONTEXT
 
 [TEXT]
-The following text is adapted from Mark Twain's 1876 novel The Adventures of Tom Sawyer. Aunt
-Polly is having dinner with Tom, her mischievous young nephew.
-Aunt Polly asked [Tom] questions that were full of guile, and very deep—for she wanted to trap him
-into damaging revealments. Like many other simple-hearted souls, it was her pet vanity to believe she
-was endowed with a talent for dark and mysterious diplomacy, and she loved to contemplate her
-most transparent devices as marvels of low cunning.
+The following text is adapted from Mark Twain's 1876 novel The Adventures of Tom Sawyer. Aunt Polly is having dinner with Tom, her mischievous young nephew. Aunt Polly asked [Tom] questions that were full of guile, and very deep—for she wanted to trap him into damaging revealments. Like many other simple-hearted souls, it was her pet vanity to believe she was endowed with a talent for dark and mysterious diplomacy, and she loved to contemplate her most transparent ==devices== as marvels of low cunning.
 
 [QUESTION]
+
 As used in the text, what does the word “devices” most nearly mean?
 
 A. Anxieties
+
 B. Methods
+
 C. Technologies
+
 D. Illustrations
+
 Answer: B
 
 QUESTION 2
-Domain: Craft and Structure
-Skill: Words in Context
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_WORDS_IN_CONTEXT
 
 [TEXT]
-The Niaux Cave paintings --- paintings of animal figures found in what is now France and dating from
-11,000-17,000 years ago --- are sometimes said to be emotionally powerful despite their age, but in
-fact the paintings are ______ precisely because of their age. It is the link of shared humanity with the
-artists across so many centuries that makes the Niaux Cave paintings so meaningful.
+The Niaux Cave paintings --- paintings of animal figures found in what is now France and dating from 11,000-17,000 years ago --- are sometimes said to be emotionally powerful despite their age, but in fact the paintings are ______ precisely because of their age. It is the link of shared humanity with the artists across so many centuries that makes the Niaux Cave paintings so meaningful.
 
 [QUESTION]
+
 Which choice completes the text with the most logical and precise word or phrase?
 
 A. neglected
+
 B. simple
+
 C. authoritative
+
 D. moving
+
 Answer: D
 
 QUESTION 3
-Domain: Craft and Structure
-Skill: Words in Context
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_WORDS_IN_CONTEXT
 
 [TEXT]
-The place is an ectothermic (cold-blooded) fish, whereas the Pacific bluefin tuna is a regional
-endotherm; unlike that of ectotherms, its body temperature remains above the ambient water
-temperature. The basking shark had been classified as a full ectotherm, but researchers Haley R.
-Dolton et al. found that its body temperature remains 1.0 to 1.5°C above ambient, which is ______ that
-classification.
+The place is an ectothermic (cold-blooded) fish, whereas the Pacific bluefin tuna is a regional endotherm; unlike that of ectotherms, its body temperature remains above the ambient water temperature. The basking shark had been classified as a full ectotherm, but researchers Haley R. Dolton et al. found that its body temperature remains 1.0 to 1.5°C above ambient, which is ______ that classification.
 
 [QUESTION]
+
 Which choice completes the text with the most logical and precise word or phrase?
 
 A. opportune for
+
 B. subordinate to
+
 C. incongruous with
+
 D. indicative of
+
 Answer: C
 
 QUESTION 4
-Domain: Craft and Structure
-Skill: Words in Context
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_WORDS_IN_CONTEXT
 
 [TEXT]
-Many plants can produce and release jasmonic acid (JA), which repulses attacking insects, but there is
-a reason plants only do so _____: JA suppresses genes involved in leaf expansion and other
-developmental processes, so deploying it outside the context of an immediate threat is unlikely to
-yield a net advantage.
+Many plants can produce and release jasmonic acid (JA), which repulses attacking insects, but there is a reason plants only do so _____: JA suppresses genes involved in leaf expansion and other developmental processes, so deploying it outside the context of an immediate threat is unlikely to yield a net advantage.
 
 [QUESTION]
+
 Which choice completes the text with the most logical and precise word or phrase?
 
 A. haphazardly
+
 B. gratuitously
+
 C. unremittingly
+
 D. reactively
+
 Answer: D
 
 QUESTION 5
-Domain: Craft and Structure
-Skill: Words in Context
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_WORDS_IN_CONTEXT
 
 [TEXT]
-In their study of European rollers, lesser grey shrikes, and 92 other passerine birds in Iran, researchers
-used mitochondrial sequences to validate established species boundaries. When a particular data
-point was ______, they sought corroboration with the bird's nuclear DNA markers and morphological
-features to ensure the exception was an accurate finding.
+In their study of European rollers, lesser grey shrikes, and 92 other passerine birds in Iran, researchers used mitochondrial sequences to validate established species boundaries. When a particular data point was ______, they sought corroboration with the bird's nuclear DNA markers and morphological features to ensure the exception was an accurate finding.
 
 [QUESTION]
+
 Which choice completes the text with the most logical and precise word or phrase?
 
 A. anomalous
+
 B. tentative
+
 C. theoretical
+
 D. preliminary
+
 Answer: A
 
 QUESTION 6
-Domain: Craft and Structure
-Skill: Text Structure and Purpose
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_TEXT_STRUCTURE_AND_PURPOSE
 
 [TEXT]
-Humans aren't the only ones who use tools. Other animals also find tools helpful. Boxer crabs use
-stinging anemones to defend against attack. And despite sometimes being thought of as simple,
-many birds make clever use of tools as well. Striated herons have been observed using breadcrumbs
-and other lures to attract fish to the water's surface, making it easier for the herons to catch them.
+Humans aren't the only ones who use tools. Other animals also find tools helpful. ==Boxer crabs use stinging anemones to defend against attack.== And despite sometimes being thought of as simple, many birds make clever use of tools as well. Striated herons have been observed using breadcrumbs and other lures to attract fish to the water's surface, making it easier for the herons to catch them.
 
 [QUESTION]
+
 Which choice best describes the function of the underlined sentence?
 
 A. It emphasizes that boxer crabs are smarter than birds.
+
 B. It provides one example of tool use in a nonhuman animal.
+
 C. It explains that humans use tools for many different tasks.
+
 D. It argues that boxer crabs use tools more often than other animals do.
+
 Answer: B
 
 QUESTION 7
-Domain: Craft and Structure
-Skill: Text Structure and Purpose
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_TEXT_STRUCTURE_AND_PURPOSE
 
 [TEXT]
-How does the main melody in a song like “Irreplaceable” by Beyoncé (2006) compare to that in an
-older song like “All Shook Up” by Elvis Presley (1956)? In a 2024 study, Marcus Pearce and his
-coauthor analyzed the complexity of the main melodies in the five most popular songs each year
-from 1950 to 2023 --- including “Irreplaceable” and “All Shook Up” --- according to Billboard’s year-
-end singles charts. The researchers considered several features of complexity and concluded that over
-the decades, main melodies in popular music in the US have become less complex.
+How does the main melody in a song like “Irreplaceable” by Beyoncé (2006) compare to that in an older song like “All Shook Up” by Elvis Presley (1956)? In a 2024 study, Marcus Pearce and his coauthor analyzed the complexity of the main melodies in the five most popular songs each year from 1950 to 2023 --- including “Irreplaceable” and “All Shook Up” --- according to Billboard’s year-end singles charts. The researchers considered several features of complexity and concluded that over the decades, main melodies in popular music in the US have become less complex.
 
 [QUESTION]
+
 Which choice best states the main purpose of the text?
 
 A. To describe a method used by researchers to evaluate the complexity of melodies
+
 B. To compare two popular songs that were released many years apart
+
 C. To provide an overview of the history of Billboard’s year-end singles charts
+
 D. To discuss research that reveals a change over time in US popular music
+
 Answer: D
 
 QUESTION 8
-Domain: Craft and Structure
-Skill: Text Structure and Purpose
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_TEXT_STRUCTURE_AND_PURPOSE
 
 [TEXT]
-In The Jazz Continuum, LaTasha Barnes, Tyedric Hill, and other dancers seamlessly interweave recent
-dance styles, including hip-hop and voguing, with elements of the Lindy Hop, a popular swing dance
-of the 1930s with roots in the Black American community of Harlem, New York. Inspired by Barnes's
-curiosity about the similarities between the Lindy Hop and these seemingly unrelated dance styles,
-the show's choreography makes visible how intertwined their histories actually are. The show is
-therefore a testament to the Lindy Hop's enduring influence on American culture.
+In The Jazz Continuum, LaTasha Barnes, Tyedric Hill, and other dancers seamlessly interweave recent dance styles, including hip-hop and voguing, with elements of the Lindy Hop, a popular swing dance of the 1930s with roots in the Black American community of Harlem, New York. ==Inspired by Barnes's curiosity about the similarities between the Lindy Hop and these seemingly unrelated dance styles,== the show's choreography makes visible how intertwined their histories actually are. The show is therefore a testament to the Lindy Hop's enduring influence on American culture.
 
 [QUESTION]
+
 Which choice best states the function of the underlined portion in the text as a whole?
 
-A. It addresses the reasons why the historical connections between the dance styles mentioned
-earlier in the text have been generally overlooked.
-B. It provides evidence for the text's claim that the Lindy Hop has had a greater cultural impact
-than the other dances featured in The Jazz Continuum have had.
-C. It identifies the motivation for The Jazz Continuum's choreographic approach that is described
-earlier in the text.
-D. It identifies the specific ways in which the Lindy Hop is similar to the contemporary dance styles
-discussed in the text.
+A. It addresses the reasons why the historical connections between the dance styles mentioned earlier in the text have been generally overlooked.
+
+B. It provides evidence for the text's claim that the Lindy Hop has had a greater cultural impact than the other dances featured in The Jazz Continuum have had.
+
+C. It identifies the motivation for The Jazz Continuum's choreographic approach that is described earlier in the text.
+
+D. It identifies the specific ways in which the Lindy Hop is similar to the contemporary dance styles discussed in the text.
+
 Answer: C
 
 QUESTION 9
-Domain: Information and Ideas
-Skill: Central Ideas and Details
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_CENTRAL_IDEAS_AND_DETAILS
 
 [QUESTION]
-Companies involved in methane distribution include pipelines among their assets. But methane
-distribution is a very carbon-intensive industry, so as government agencies increase regulations on
-carbon emissions, demand for methane falls and the pipelines will eventually, or even suddenly,
-become liabilities as reduced methane prices make it more difficult to recover the expense of
-maintaining such equipment.
-What claim does the text make about the demand for methane?
 
-A. Companies involved in methane distribution can benefit from a decline in the demand for
-methane.
+Companies involved in methane distribution include pipelines among their assets. But methane distribution is a very carbon-intensive industry, so as government agencies increase regulations on carbon emissions, demand for methane falls and the pipelines will eventually, or even suddenly, become liabilities as reduced methane prices make it more difficult to recover the expense of maintaining such equipment. What claim does the text make about the demand for methane?
+
+A. Companies involved in methane distribution can benefit from a decline in the demand for methane.
+
 B. The regulations on carbon emissions are factors in the demand for methane.
+
 C. The demand for methane follows a predictable annual cycle.
+
 D. Companies involved in methane distribution are not affected by the demand for methane.
+
 Answer: B
 
 QUESTION 10
-Domain: Information and Ideas
-Skill: Command of Evidence – Textual
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_COMMAND_OF_EVIDENCE_TEXTUAL
 
 [TEXT]
-Claudine at School is a 1900 novel by Colette, originally written in French. The narrator is a fifteen-
-year-old girl living in a small, rural town. She presents herself as having a strong emotional
-attachment to the surrounding forests: ______
+Claudine at School is a 1900 novel by Colette, originally written in French. The narrator is a fifteen-year-old girl living in a small, rural town. She presents herself as having a strong emotional attachment to the surrounding forests: ______
 
 [QUESTION]
+
 Which quotation from a translation of Claudine at School most effectively illustrates the claim?
 
-A. “I heard a wolf once, at the beginning of winter, while I was picking up beech-nuts—those nice,
-oily little beech-nuts that tickle your throat and make you cough.”
-B. “And then there are my favourites, the great woods that are sixteen and twenty years old. It
-makes my heart bleed to see one of those cut down.”
-C. “Green meadows make rifts in [the woods] here and there, so do little patches of cultivation. But
-these do not amount to much, for the magnificent woods devour everything. As a result, this lovely
-region is atrociously poor and its few scattered farms provide just the requisite number of red roofs
-to set off the velvety green of the woods.”
-D. “If I had a Mamma, I know very well that she would not have let me stay [in Montigny] twenty-
-four hours. But Papa—he doesn’t notice anything and doesn’t bother about me.”
+A. “I heard a wolf once, at the beginning of winter, while I was picking up beech-nuts—those nice, oily little beech-nuts that tickle your throat and make you cough.”
+
+B. “And then there are my favourites, the great woods that are sixteen and twenty years old. It makes my heart bleed to see one of those cut down.”
+
+C. “Green meadows make rifts in [the woods] here and there, so do little patches of cultivation. But these do not amount to much, for the magnificent woods devour everything. As a result, this lovely region is atrociously poor and its few scattered farms provide just the requisite number of red roofs to set off the velvety green of the woods.”
+
+D. “If I had a Mamma, I know very well that she would not have let me stay [in Montigny] twenty-four hours. But Papa—he doesn’t notice anything and doesn’t bother about me.”
+
 Answer: B
 
 QUESTION 11
-Domain: Information and Ideas
-Skill: Command of Evidence – Quantitative
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_COMMAND_OF_EVIDENCE_QUANTITATIVE
 
 [TABLE]
 @meta {"title":"Myoglobin (Mb) Levels in the Cardiac Tissue of Three Teleost Species"}
@@ -218,308 +241,329 @@ Bunocephalus coracoideus	Red	18.02	0.59
 Pantodon buchholzi	White/pale	0.02	0.01
 
 [TEXT]
-Myoglobin (Mb) is a protein that primarily aids in oxygen storage and diffusion across the
-mitochondrial membrane in cardiac muscle cells; these are necessary functions in aerobic organisms,
-including teleost fish. Carrying out these functions typically requires Mb to be expressed at high
-levels, evidenced by red heart tissue. The table shows the average Mb levels and their standard
-deviations (indicating how dispersed the Mb levels of individual fish are in relation to the average) of
-three teleost fish species, as calculated by Daniel J. Macqueen et al. Based on the data, the
-researchers concluded that for some teleost species, oxygen storage and diffusion may occur with
-negligible assistance from Mb.
+Myoglobin (Mb) is a protein that primarily aids in oxygen storage and diffusion across the mitochondrial membrane in cardiac muscle cells; these are necessary functions in aerobic organisms, including teleost fish. Carrying out these functions typically requires Mb to be expressed at high levels, evidenced by red heart tissue. The table shows the average Mb levels and their standard deviations (indicating how dispersed the Mb levels of individual fish are in relation to the average) of three teleost fish species, as calculated by Daniel J. Macqueen et al. Based on the data, the researchers concluded that for some teleost species, oxygen storage and diffusion may occur with negligible assistance from Mb.
 
 [QUESTION]
+
 Which choice most effectively uses data from the table to support Macqueen et al.'s conclusion?
 
-A. On average, A. anguilla had higher Mb levels in their cardiac tissue than B.coracoideus and P
-buchholzi had.
-B. Less variation in Mb levels was observed among P. buchholzi individuals than among A. anguilla
-and B. coracoideus individuals.
+A. On average, A. anguilla had higher Mb levels in their cardiac tissue than B.coracoideus and P buchholzi had.
+
+B. Less variation in Mb levels was observed among P. buchholzi individuals than among A. anguilla and B. coracoideus individuals.
+
 C. P. buchholzi had very low Mb levels in their cardiac tissue.
-D. Greater average Mb levels in a certain species were associated with greater variance in Mb levels
-among individuals of that species.
+
+D. Greater average Mb levels in a certain species were associated with greater variance in Mb levels among individuals of that species.
+
 Answer: C
 
 QUESTION 12
-Domain: Information and Ideas
-Skill: Command of Evidence – Textual
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_COMMAND_OF_EVIDENCE_TEXTUAL
 
 [TEXT]
-Hypothesizing that lullabies, characterized by their less steady beat, are universally calming to infants,
-Constance M. Bainbridge and colleagues played a lullaby sung in the Selk'nam language and a non-
-lullaby sung in the Chuukese language to a group of infants. The team found that the infants' heart
-rates and pupil size both decreased more during the lullaby than during the non-lullaby. Since a
-decrease in heart rate is associated with relaxation, the team concluded that the lullaby relaxed the
-infants. However, noting that reduced heart rate can also be associated with increased attention, one
-critic argues that instead, the lullaby simply attracted the infants' attention.
+Hypothesizing that lullabies, characterized by their less steady beat, are universally calming to infants, Constance M. Bainbridge and colleagues played a lullaby sung in the Selk'nam language and a non-lullaby sung in the Chuukese language to a group of infants. The team found that the infants' heart rates and pupil size both decreased more during the lullaby than during the non-lullaby. Since a decrease in heart rate is associated with relaxation, the team concluded that the lullaby relaxed the infants. However, noting that reduced heart rate can also be associated with increased attention, one critic argues that instead, the lullaby simply attracted the infants' attention.
 
 [QUESTION]
+
 Which finding, if true, would most directly weaken the critic's claim?
 
 A. Parents of infants in the study preferred the Selk'nam lullaby over the Chuukese non-lullaby
+
 B. Increased attention to a stimulus is usually accompanied by an increase in pupil size.
-C. Infants in the study had no familiarity with either the Selk'nam language or the melody of the
-Ona lullaby.
+
+C. Infants in the study had no familiarity with either the Selk'nam language or the melody of the Ona lullaby.
+
 D. More frequent blinking has also been found to be a reliable indication of attention.
+
 Answer: B
 
 QUESTION 13
-Domain: Information and Ideas
-Skill: Command of Evidence – Quantitative
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_COMMAND_OF_EVIDENCE_QUANTITATIVE
 
 [TEXT]
-Students in a biology class investigated why individual house mice (Mus musculus) can differ from
-one another in their responsiveness to potential rewards. The students compared wild-type mice and
-knockout mice, which are mice with specific genes deactivated, when mice of each type were
-presented with the same reward system for particular behaviors. Finding that knockout mice with the
-gene Cartpt deactivated tended to show less sensitivity to rewards than wild-type mice, the students
-concluded that differences in reward responsiveness among house mice in nature are solely
-attributable to variations in the level of expression of Cartpt.
+Students in a biology class investigated why individual house mice (Mus musculus) can differ from one another in their responsiveness to potential rewards. The students compared wild-type mice and knockout mice, which are mice with specific genes deactivated, when mice of each type were presented with the same reward system for particular behaviors. Finding that knockout mice with the gene Cartpt deactivated tended to show less sensitivity to rewards than wild-type mice, the students concluded that differences in reward responsiveness among house mice in nature are solely attributable to variations in the level of expression of Cartpt.
 
 [QUESTION]
+
 Which finding, if true, would most directly weaken the students' conclusion?
 
-A. The mice with Cartpt deactivated were identical to the wild-type mice except with regard to
-reward responsiveness.
-B. The level of expression of Cartpt does not appear to affect the functioning of any other genes in
-house mice.
-C. A sampling of house mice captured in natural settings shows that individual mice can differ from
-one another in the level of expression of Cartpt.
-D. Some wild-type mice were very similar to the knockout mice with regard to reward
-responsiveness but showed a wide variety of levels of expression of Cartpt.
+A. The mice with Cartpt deactivated were identical to the wild-type mice except with regard to reward responsiveness.
+
+B. The level of expression of Cartpt does not appear to affect the functioning of any other genes in house mice.
+
+C. A sampling of house mice captured in natural settings shows that individual mice can differ from one another in the level of expression of Cartpt.
+
+D. Some wild-type mice were very similar to the knockout mice with regard to reward responsiveness but showed a wide variety of levels of expression of Cartpt.
+
 Answer: D
 
 QUESTION 14
-Domain: Information and Ideas
-Skill: Inferences
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_INFERENCES
 
 [TEXT]
-Humans are overwhelmingly right-hand dominant (85–90%) and can thus be said to exhibit strong
-population-level right handedness (PLRH). Among studies of nonhuman primates, G. Haass's 1958
-study of captive gorillas purported to show PLRH, while Jane Goodall's 1963 study of wild
-chimpanzees did not. Overall, the studies claiming PLRH in nonhuman primates find much lower
-incidences of right-handedness than humans exhibit, but it's worth noting that studies of captive
-primates tend to show significantly greater incidences of right-handedness than studies of wild
-primates do, therefore raising the possibility that ______
+Humans are overwhelmingly right-hand dominant (85–90%) and can thus be said to exhibit strong population-level right handedness (PLRH). Among studies of nonhuman primates, G. Haass's 1958 study of captive gorillas purported to show PLRH, while Jane Goodall's 1963 study of wild chimpanzees did not. Overall, the studies claiming PLRH in nonhuman primates find much lower incidences of right-handedness than humans exhibit, but it's worth noting that studies of captive primates tend to show significantly greater incidences of right-handedness than studies of wild primates do, therefore raising the possibility that ______
 
 [QUESTION]
+
 Which choice most logically completes the text?
 
-A. the greater exposure to humans among the captive gorillas induced them to acquire more
-right-handed behaviors.
-B. the number of individuals in the study of wild chimpanzees is insufficient to preclude the claim
-that nonhuman primates exhibit PLRH
-C. the apparent discrepancy between the studies' results may be partly attributable to the 1958
-study using different criteria when assessing hand dominance than were used in the 1963 study.
-D. the number of individuals in the study of captive gorillas is insufficient for a robust claim
-regarding evidence of PLRH.
+A. the greater exposure to humans among the captive gorillas induced them to acquire more right-handed behaviors.
+
+B. the number of individuals in the study of wild chimpanzees is insufficient to preclude the claim that nonhuman primates exhibit PLRH
+
+C. the apparent discrepancy between the studies' results may be partly attributable to the 1958 study using different criteria when assessing hand dominance than were used in the 1963 study.
+
+D. the number of individuals in the study of captive gorillas is insufficient for a robust claim regarding evidence of PLRH.
+
 Answer: A
 
 QUESTION 15
-Domain: Information and Ideas
-Skill: Inferences
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_INFERENCES
 
 [TEXT]
-Research such as the 2012 study of mammals by Soledad Lucía Uran and colleagues has shown that
-noise from human activity, like traffic on a busy highway, has significant effects on animals, and many
-governments require studies of the potential noise effects on wildlife before approving highway
-construction projects. Advocates for one such project in an area home to both mammals and birds
-
-argue that since previous research has shown that birds are, on average, less affected by such noise
-than mammals are, the effect of the proposed project on birds does not need to be studied.
-Conservationists counter that basing such a decision on average effects is problematic because ______
+Research such as the 2012 study of mammals by Soledad Lucía Uran and colleagues has shown that noise from human activity, like traffic on a busy highway, has significant effects on animals, and many governments require studies of the potential noise effects on wildlife before approving highway construction projects. Advocates for one such project in an area home to both mammals and birds argue that since previous research has shown that birds are, on average, less affected by such noise than mammals are, the effect of the proposed project on birds does not need to be studied. Conservationists counter that basing such a decision on average effects is problematic because ______
 
 [QUESTION]
+
 Which choice most logically completes the text?
 
-A. the effects of noise on birds have been more extensively documented than the effects on
-mammals have.
-B. the average for the effect of noise on birds is based on a much larger number of distinct species
-than the average for the effect of noise on mammals is.
-C. addressing the effects of noise on birds is likely to help mitigate some of the effects on
-mammals.
-D. the severity of the effect of noise on some species of birds could be much higher than the
-average effect.
+A. the effects of noise on birds have been more extensively documented than the effects on mammals have.
+
+B. the average for the effect of noise on birds is based on a much larger number of distinct species than the average for the effect of noise on mammals is.
+
+C. addressing the effects of noise on birds is likely to help mitigate some of the effects on mammals.
+
+D. the severity of the effect of noise on some species of birds could be much higher than the average effect.
+
 Answer: D
 
 QUESTION 16
-Domain: Standard English Conventions
-Skill: Form, Structure, and Sense
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_FORM_STRUCTURE_AND_SENSE
 
 [TEXT]
-The 1913 Armory Show in New York City was a groundbreaking art exhibition planned by a collective
-of 28 artists, among them Mahonri Young and Maurice B. Prendergast. By this time, many of these
-artists ______ tired of the staid realism that dominated American art at the time; the Armory Show
-aimed to jolt the artistic establishment awake with bold, experimental modernism.
+The 1913 Armory Show in New York City was a groundbreaking art exhibition planned by a collective of 28 artists, among them Mahonri Young and Maurice B. Prendergast. By this time, many of these artists ______ tired of the staid realism that dominated American art at the time; the Armory Show aimed to jolt the artistic establishment awake with bold, experimental modernism.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. will have grown
+
 B. grow
+
 C. are growing
+
 D. had grown
+
 Answer: D
 
 QUESTION 17
-Domain: Standard English Conventions
-Skill: Form, Structure, and Sense
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_FORM_STRUCTURE_AND_SENSE
 
 [TEXT]
-How a folktale begins depends largely on the language in which it originates. Many folktales in the
-Algerian Arabic language open with a phrase that roughly translates to “I've told you what's coming.”
-Tales in ______ the other hand, often begin with “once upon a time.”
+How a folktale begins depends largely on the language in which it originates. Many folktales in the Algerian Arabic language open with a phrase that roughly translates to “I've told you what's coming.” Tales in ______ the other hand, often begin with “once upon a time.”
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. English: on
+
 B. English, on
+
 C. English. On
+
 D. English --- on
+
 Answer: B
 
 QUESTION 18
-Domain: Standard English Conventions
-Skill: Form, Structure, and Sense
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_FORM_STRUCTURE_AND_SENSE
 
 [TEXT]
-A recipient of the Nobel Prize in Chemistry and the Golden Plate Award of the American Academy of
-Achievement, _____ known as femtochemistry when he devised an optical spectroscopy technique
-that allowed researchers to study ultrafast chemical reactions occurring within molecules.
+A recipient of the Nobel Prize in Chemistry and the Golden Plate Award of the American Academy of Achievement, _____ known as femtochemistry when he devised an optical spectroscopy technique that allowed researchers to study ultrafast chemical reactions occurring within molecules.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
-A. chemist Ahmed Zewail expanded the limits of measurability and introduced a new scientific
-discipline
-B. the result of chemist Ahmed Zewail's expansion of the limits of measurability was the
-introduction of a new scientific discipline
-C. the limits of measurability were expanded by chemist Ahmed Zewail who introduced a new
-scientific discipline
-D. the introduction of a new scientific discipline by chemist Ahmed Zewail led to the expansion of
-the limits of measurability
+A. chemist Ahmed Zewail expanded the limits of measurability and introduced a new scientific discipline
+
+B. the result of chemist Ahmed Zewail's expansion of the limits of measurability was the introduction of a new scientific discipline
+
+C. the limits of measurability were expanded by chemist Ahmed Zewail who introduced a new scientific discipline
+
+D. the introduction of a new scientific discipline by chemist Ahmed Zewail led to the expansion of the limits of measurability
+
 Answer: A
 
 QUESTION 19
-Domain: Standard English Conventions
-Skill: Form, Structure, and Sense
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_FORM_STRUCTURE_AND_SENSE
 
 [TEXT]
-In Virginia Woolf's To the Lighthouse (1927), the central action around which the novel ostensibly
-revolves --- the Ramsay family's long-promised trip to visit a lighthouse --- is deferred for nearly a
-decade and proves anticlimactic when, in the novel's final section, it finally ______ Woolf deliberately
-eschews plot-driven development, thus diverging from her Victorian predecessors, reflects her oft-
-stated conviction that the most significant events in human life occur not in the external world but
-within consciousness itself.
+In Virginia Woolf's To the Lighthouse (1927), the central action around which the novel ostensibly revolves --- the Ramsay family's long-promised trip to visit a lighthouse --- is deferred for nearly a decade and proves anticlimactic when, in the novel's final section, it finally ______ Woolf deliberately eschews plot-driven development, thus diverging from her Victorian predecessors, reflects her oft-stated conviction that the most significant events in human life occur not in the external world but within consciousness itself.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. happens.
+
 B. happens. That
+
 C. happens:
+
 D. happens that
+
 Answer: B
 
 QUESTION 20
-Domain: Standard English Conventions
-Skill: Form, Structure, and Sense
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_FORM_STRUCTURE_AND_SENSE
 
 [TEXT]
-The 1969 song “Boston Bernie” by Dexter Gordon is a famous jazz composition. Because ______
-harmonic structure from an earlier song (Jerome Kern's “All the Things You Are” from 1939) while
-introducing new melodic elements, Gordon's piece is what's called a “contrafact.”
+The 1969 song “Boston Bernie” by Dexter Gordon is a famous jazz composition. Because ______ harmonic structure from an earlier song (Jerome Kern's “All the Things You Are” from 1939) while introducing new melodic elements, Gordon's piece is what's called a “contrafact.”
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. they borrow they're
+
 B. it borrows its
+
 C. it borrows it's
+
 D. they borrow their
+
 Answer: B
 
 QUESTION 21
-Domain: Standard English Conventions
-Skill: Boundaries
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_BOUNDARIES
 
 [TEXT]
-Drought avoidance mechanisms—morphological adaptations that plants undergo when exposed to
-drought conditions—take a variety of forms. The Osage orange plant decreases the size of its leaves
-to reduce water loss through ______ in the soybean plant, drought triggers an elongation of the
-plant's primary root that increases water uptake.
+Drought avoidance mechanisms—morphological adaptations that plants undergo when exposed to drought conditions—take a variety of forms. The Osage orange plant decreases the size of its leaves to reduce water loss through ______ in the soybean plant, drought triggers an elongation of the plant's primary root that increases water uptake.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. transpiration. For instance, while
+
 B. transpiration, for instance, while
+
 C. transpiration; for instance,
+
 D. transpiration, for instance,
+
 Answer: B
 
 QUESTION 22
-Domain: Expression of Ideas
-Skill: Transitions
+
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_TRANSITIONS
 
 [TEXT]
-The Sydney Desalination Plant in Sydney, Australia, uses reverse osmosis to produce fresh water from
-salt water. _____ this is not the only way to desalinate (remove salt from) water. The Yanbu
-Desalination Plant in Yanbu, Saudi Arabia, uses a method called multistage flash distillation.
+The Sydney Desalination Plant in Sydney, Australia, uses reverse osmosis to produce fresh water from salt water. _____ this is not the only way to desalinate (remove salt from) water. The Yanbu Desalination Plant in Yanbu, Saudi Arabia, uses a method called multistage flash distillation.
 
 [QUESTION]
+
 Which choice completes the text with the most logical transition?
 
 A. However,
+
 B. In other words,
+
 C. As a result,
+
 D. Likewise,
+
 Answer: A
 
 QUESTION 23
-Domain: Expression of Ideas
-Skill: Transitions
+
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_TRANSITIONS
 
 [TEXT]
-Within a given ecosystem, energy tends to transfer across what ecologists, such as Veronica Andreo,
-call trophic levels. ______ primary producers, like plants, at the first trophic level provide energy (i.e.,
-food) for herbivores, like mosquito larvae, at the second level; those at the second level provide
-energy for carnivores and omnivores, like small birds, at the third; and so on, up the food chain
+Within a given ecosystem, energy tends to transfer across what ecologists, such as Veronica Andreo, call trophic levels. ______ primary producers, like plants, at the first trophic level provide energy (i.e., food) for herbivores, like mosquito larvae, at the second level; those at the second level provide energy for carnivores and omnivores, like small birds, at the third; and so on, up the food chain
 
 [QUESTION]
+
 Which choice completes the text with the most logical transition?
 
 A. For example,
+
 B. By contrast,
+
 C. However,
+
 D. Likewise,
+
 Answer: A
 
 QUESTION 24
-Domain: Expression of Ideas
-Skill: Transitions
+
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_TRANSITIONS
 
 [TEXT]
-In 1965, Morrie Turner’s comic strip Wee Pals became the first serial comic by a Black cartoonist to be
-syndicated, appearing in papers nationwide. ______ many other strips by Black cartoonists were
-syndicated, including Stephen Bentley’s Herb and Jamaal in 1989 and Keith Knight’s The Knight Life in
-2008.
+In 1965, Morrie Turner’s comic strip Wee Pals became the first serial comic by a Black cartoonist to be syndicated, appearing in papers nationwide. ______ many other strips by Black cartoonists were syndicated, including Stephen Bentley’s Herb and Jamaal in 1989 and Keith Knight’s The Knight Life in 2008.
 
 [QUESTION]
+
 Which choice completes the text with the most logical transition?
 
 A. Later,
+
 B. That is,
+
 C. For example,
+
 D. Previously,
+
 Answer: A
 
 QUESTION 25
-Domain: Expression of Ideas
-Skill: Rhetorical Synthesis
 
-[TEXT]
-While researching a topic, a student has taken the following notes:
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_RHETORICAL_SYNTHESIS
+
+[NOTE]
+- While researching a topic, a student has taken the following notes:
 - Christina Ying is a Filipina American playwright.
 - There's the Moon and Then There's You is a play by Ying.
 - It premiered in 2015 at the Bindlestiff Studio in San Francisco.
@@ -527,284 +571,294 @@ While researching a topic, a student has taken the following notes:
 - In the play, David aspires to be selected for a mission to the Moon.
 
 [QUESTION]
-The student wants to provide a brief overview of what happens in There's the Moon and Then There's
-You. Which choice most effectively uses information from the notes to accomplish this goal?
 
-A. In There's the Moon and Then There's You, a NASA astronaut named David aspires to be
-selected for a mission to the Moon.
-B. There's the Moon and Then There's You is a 2015 play that premiered at the Bindlestiff Studio in
-San Francisco.
-C. The 2015 play There's the Moon and Then There's You tells the story of Christina Ying, a Filipina
-American playwright.
+The student wants to provide a brief overview of what happens in There's the Moon and Then There's You. Which choice most effectively uses information from the notes to accomplish this goal?
+
+A. In There's the Moon and Then There's You, a NASA astronaut named David aspires to be selected for a mission to the Moon.
+
+B. There's the Moon and Then There's You is a 2015 play that premiered at the Bindlestiff Studio in San Francisco.
+
+C. The 2015 play There's the Moon and Then There's You tells the story of Christina Ying, a Filipina American playwright.
+
 D. Ying's play premiered in 2015 at the Bindlestiff Studio, which is located in San Francisco.
+
 Answer: A
 
 QUESTION 26
-Domain: Expression of Ideas
-Skill: Rhetorical Synthesis
 
-[TEXT]
-While researching a topic, a student has taken the following notes:
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_RHETORICAL_SYNTHESIS
+
+[NOTE]
+- While researching a topic, a student has taken the following notes:
 - Dinosaur fossil specimens can be found at science museums all over the world.
-- A dinosaur fossil specimen nicknamed Sue is housed at the Field Museum of Natural History in
-Chicago, Illinois.
+- A dinosaur fossil specimen nicknamed Sue is housed at the Field Museum of Natural History in Chicago, Illinois.
 - Sue, a Tyrannosaurus, lived in the Late Cretaceous period.
-- A dinosaur fossil specimen nicknamed Doyle is housed at the American Museum of Natural History
-in New York, New York.
+- A dinosaur fossil specimen nicknamed Doyle is housed at the American Museum of Natural History in New York, New York.
 - Doyle, a Triceratops, lived in the Late Cretaceous period.
 
 [QUESTION]
-The student wants to emphasize a similarity between the two dinosaur fossil specimens. Which choice
-most effectively uses relevant information from the notes to accomplish this goal?
 
-A. The Field Museum of Natural History is home to Sue, a Tyrannosaurus fossil specimen from the
-Late Cretaceous period.
-B. Both the Tyrannosaurus fossil specimen Sue and the Triceratops fossil specimen Doyle lived in
-the Late Cretaceous period.
-C. While the Tyrannosaurus fossil specimen Sue is in Chicago, Illinois, the Triceratops fossil
-specimen Doyle is in New York, New York.
-D. Dinosaur fossil specimens can be found at science museums all over the world, including in
-Chicago, Illinois, and New York, New York.
+The student wants to emphasize a similarity between the two dinosaur fossil specimens. Which choice most effectively uses relevant information from the notes to accomplish this goal?
+
+A. The Field Museum of Natural History is home to Sue, a Tyrannosaurus fossil specimen from the Late Cretaceous period.
+
+B. Both the Tyrannosaurus fossil specimen Sue and the Triceratops fossil specimen Doyle lived in the Late Cretaceous period.
+
+C. While the Tyrannosaurus fossil specimen Sue is in Chicago, Illinois, the Triceratops fossil specimen Doyle is in New York, New York.
+
+D. Dinosaur fossil specimens can be found at science museums all over the world, including in Chicago, Illinois, and New York, New York.
+
 Answer: B
 
 QUESTION 27
-Domain: Expression of Ideas
-Skill: Rhetorical Synthesis
 
-[TEXT]
-While researching a topic, a student has taken the following notes:
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_RHETORICAL_SYNTHESIS
+
+[NOTE]
+- While researching a topic, a student has taken the following notes:
 - The French Republican calendar replaced the Gregorian calendar in France from 1793 to 1805.
 - Both calendars are divided into twelve months.
-- The timelines for the months don't match. The fourth month of the French Republican calendar,
-Nivôse, begins during December, the twelfth month of the Gregorian calendar.
-- The eleventh month of the French Republican calendar, Thermidor, begins during July, the seventh
-month of the Gregorian calendar.
+- The timelines for the months don't match. The fourth month of the French Republican calendar, Nivôse, begins during December, the twelfth month of the Gregorian calendar.
+- The eleventh month of the French Republican calendar, Thermidor, begins during July, the seventh month of the Gregorian calendar.
 
 [QUESTION]
-The student wants to emphasize a difference between the French Republican and Gregorian
-calendars. Which choice most effectively uses relevant information from the notes to accomplish this
-goal?
 
-A. The French Republican calendar, which replaced the Gregorian calendar in France from 1793 to
-1805, has twelve months, including the months of Nivôse and Thermidor.
-B. Used in France from 1793 to 1805, the French Republican calendar includes the months of
-Nivôse and Thermidor (the fourth and eleventh months of the year).
-C. The timelines for the months of the two calendars don't match; for example, the fourth month of
-the French Republican calendar begins during the twelfth month of the Gregorian calendar.
+The student wants to emphasize a difference between the French Republican and Gregorian calendars. Which choice most effectively uses relevant information from the notes to accomplish this goal?
+
+A. The French Republican calendar, which replaced the Gregorian calendar in France from 1793 to 1805, has twelve months, including the months of Nivôse and Thermidor.
+
+B. Used in France from 1793 to 1805, the French Republican calendar includes the months of Nivôse and Thermidor (the fourth and eleventh months of the year).
+
+C. The timelines for the months of the two calendars don't match; for example, the fourth month of the French Republican calendar begins during the twelfth month of the Gregorian calendar.
+
 D. The twelfth and seventh months of the Gregorian calendar are December and July, respectively.
+
 Answer: C
 
 === MODULE 2 ===
 
 QUESTION 1
-Domain: Craft and Structure
-Skill: Words in Context
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_WORDS_IN_CONTEXT
 
 [TEXT]
-While higaki (cypress fence) and other traditional sashiko patterns are visually striking, the repeated
-stitches in this needlework technique also _____ textiles with resilience. Developed in the Edo period
-(1603–1868) in Japan to mend clothing and domestic textiles, sashiko uses tightly spaced rows of
-stitching to beautify and reinforce worn cloth.
+While higaki (cypress fence) and other traditional sashiko patterns are visually striking, the repeated stitches in this needlework technique also _____ textiles with resilience. Developed in the Edo period (1603–1868) in Japan to mend clothing and domestic textiles, sashiko uses tightly spaced rows of stitching to beautify and reinforce worn cloth.
 
 [QUESTION]
+
 Which choice completes the text with the most logical and precise word or phrase?
 
 A. belie
+
 B. depict
+
 C. imbue
+
 D. regale
+
 Answer: C
 
 QUESTION 2
-Domain: Craft and Structure
-Skill: Words in Context
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_WORDS_IN_CONTEXT
 
 [TEXT]
-Hydrogen production via water electrolysis is an emerging industry whose water usage relative to
-that of other industrial sectors is negligible. The industry's growth is thus unlikely to ______ water
-scarcity globally, but it could do so in South Korea: competition from other sectors for already scarce
-water resources in South Korea precludes its achievement of hydrogen self-sufficiency.
+Hydrogen production via water electrolysis is an emerging industry whose water usage relative to that of other industrial sectors is negligible. The industry's growth is thus unlikely to ______ water scarcity globally, but it could do so in South Korea: competition from other sectors for already scarce water resources in South Korea precludes its achievement of hydrogen self-sufficiency.
 
 [QUESTION]
+
 Which choice completes the text with the most logical and precise word or phrase?
 
 A. assuage
+
 B. rescind
+
 C. extricate
+
 D. exacerbate
+
 Answer: D
 
 QUESTION 3
-Domain: Craft and Structure
-Skill: Words in Context
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_WORDS_IN_CONTEXT
 
 [TEXT]
-Although it would be overstating the case to characterize the effects of oil shocks --- such as the 37%
-rise in oil prices between November 1947 and January 1948 --- as merely ______, Gbadebo Oladodu et
-al. have shown that the effects of oil shocks on gross domestic product (GDP) can be fairly modest. In
-the United States, for instance, recent oil shocks exerted only a slightly negative effect on GDP.
+Although it would be overstating the case to characterize the effects of oil shocks --- such as the 37% rise in oil prices between November 1947 and January 1948 --- as merely ______, Gbadebo Oladodu et al. have shown that the effects of oil shocks on gross domestic product (GDP) can be fairly modest. In the United States, for instance, recent oil shocks exerted only a slightly negative effect on GDP.
 
 [QUESTION]
+
 Which choice completes the text with the most logical and precise word or phrase?
 
 A. detrimental
+
 B. idiosyncratic
+
 C. nominal
+
 D. derivative
+
 Answer: C
 
 QUESTION 4
-Domain: Craft and Structure
-Skill: Words in Context
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_WORDS_IN_CONTEXT
 
 [TEXT]
-Accounts known as popular microhistories tell sweeping, century-spanning stories of ordinary objects
-like cotton and fish. _____ this approach with that of traditional microhistories, which undertake
-painstaking historical reconstructions of singular incidents, may seem unlikely, but both are guided
-by the idea that seemingly inconsequential subjects can reveal larger historical processes in surprising
-ways.
+Accounts known as popular microhistories tell sweeping, century-spanning stories of ordinary objects like cotton and fish. _____ this approach with that of traditional microhistories, which undertake painstaking historical reconstructions of singular incidents, may seem unlikely, but both are guided by the idea that seemingly inconsequential subjects can reveal larger historical processes in surprising ways.
 
 [QUESTION]
+
 Which choice completes the text with the most logical and precise word or phrase?
 
 A. Instituting
+
 B. Reconciling
+
 C. Contrasting
+
 D. Supplanting
+
 Answer: B
 
 QUESTION 5
-Domain: Craft and Structure
-Skill: Text Structure and Purpose
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_TEXT_STRUCTURE_AND_PURPOSE
 
 [TEXT]
-Positive expressive writing is self-reflective writing aimed at exploring positive topics and feelings like
-satisfaction. Techniques of positive expressive writing include one called “three good things,” which
-involves writing down three good things that happen each day, and “resource diary,” which involves
-writing about internal strengths and external support systems. In a large-scale analysis, Lauren Hoult
-and colleagues determined that while different techniques produce varying outcomes, they all tend
-to have a more consistent effect on well-being and positive outlook than on physical health and
-stress.
+Positive expressive writing is self-reflective writing aimed at exploring positive topics and feelings like satisfaction. Techniques of positive expressive writing include one called “three good things,” which involves writing down three good things that happen each day, and “resource diary,” which involves writing about internal strengths and external support systems. In a large-scale analysis, Lauren Hoult and colleagues determined that while different techniques produce varying outcomes, they all tend to have a more consistent effect on well-being and positive outlook than on physical health and stress.
 
 [QUESTION]
+
 Which choice best describes the overall structure of the text?
 
-A. It gives an overview of positive expressive writing and then states a research finding about this
-type of writing.
-B. It identifies several positive emotions and then asserts that positive expressive writing should be
-done daily to amplify those emotions.
-C. It describes one popular technique of positive expressive writing and then names the techniques
-researchers have found to be most useful.
-D. It introduces a study about positive expressive writing and then explains that the researchers are
-planning a follow-up study.
+A. It gives an overview of positive expressive writing and then states a research finding about this type of writing.
+
+B. It identifies several positive emotions and then asserts that positive expressive writing should be done daily to amplify those emotions.
+
+C. It describes one popular technique of positive expressive writing and then names the techniques researchers have found to be most useful.
+
+D. It introduces a study about positive expressive writing and then explains that the researchers are planning a follow-up study.
+
 Answer: A
 
 QUESTION 6
-Domain: Craft and Structure
-Skill: Text Structure and Purpose
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_TEXT_STRUCTURE_AND_PURPOSE
 
 [TEXT]
-The following text is from William Carlos Williams's 1925 creative nonfiction book In the American
-Grain.
-History follows governments and never men. It portrays us in generic patterns, like effigies or the
-carvings on sarcophagi, which say nothing save, of such and such a man, that he is dead. That's
-
-history. It is concerned only with the one thing: to say everything is dead. Then it fixes up the effigy:
-there that's finished. Not at all. History must stay open; it is all humanity. Are lives to be twisted
-forcibly about events, the mere accidents of geography and climate?
+The following text is from William Carlos Williams's 1925 creative nonfiction book In the American Grain. History follows governments and never men. It portrays us in generic patterns, like effigies or the carvings on sarcophagi, which say nothing save, of such and such a man, that he is dead. That's history. ==It is concerned only with the one thing: to say everything is dead.== Then it fixes up the effigy: there that's finished. Not at all. History must stay open; it is all humanity. Are lives to be twisted forcibly about events, the mere accidents of geography and climate?
 
 [QUESTION]
+
 Which choice best describes the function of the underlined sentence in the text as a whole?
 
 A. It identifies a flaw in human nature that historians have overlooked.
+
 B. It emphasizes a characteristic of the discipline of history that Williams condemns.
+
 C. It highlights a controversy among historians that Williams criticizes.
+
 D. It raises a question about the practice of history that Williams regards as unresolved.
+
 Answer: B
 
 QUESTION 7
-Domain: Craft and Structure
-Skill: Cross-Text Connections
+
+Domain: RW_CRAFT_AND_STRUCTURE
+
+Skill: RW_CROSS_TEXT_CONNECTIONS
 
 [TEXT]
 Text 1
-To discern the ecological role that blackberry plants, or Rubus fruticosus L. aggregate, serve for
-species of foraging insects, many of which are in decline, Annabel Squire and team recorded about
-two thousand insect visits to R. fruticosus (between 11 a.m. and 4 p.m.) during the plant's flowering
-period. They observed visits from a diverse range of species, including Chloromyia formosa and Apis
-mellifera.
+
+To discern the ecological role that blackberry plants, or Rubus fruticosus L. aggregate, serve for species of foraging insects, many of which are in decline, Annabel Squire and team recorded about two thousand insect visits to R. fruticosus (between 11 a.m. and 4 p.m.) during the plant's flowering period. They observed visits from a diverse range of species, including Chloromyia formosa and Apis mellifera.
+
 Text 2
-Researchers' focus on diurnal invertebrate pollinators has resulted in a decided lack of data on moth
-pollination, but using infrared detection equipment, Max Anderson et al. assessed how diurnal and
-nocturnal insects separately contribute to R. fruticosus pollination. They found that although 83% of
-all insect visits occurred during the day, pollen deposition rates were much higher during moths'
-nocturnal foraging.
+
+Researchers' focus on diurnal invertebrate pollinators has resulted in a decided lack of data on moth pollination, but using infrared detection equipment, Max Anderson et al. assessed how diurnal and nocturnal insects separately contribute to R. fruticosus pollination. They found that although 83% of all insect visits occurred during the day, pollen deposition rates were much higher during moths' nocturnal foraging.
 
 [QUESTION]
-Based on the texts, how would the author of Text 2 most likely respond to the information about
-Squire and team's study as presented in Text 1?
 
-A. By agreeing that the study's findings are helpful with the caveat that the study should have
-included more species of plants besides R. fruticosus
-B. By claiming that the observations by Squire and team might not include an important category
-of interactions between invertebrate pollinators and R. fruticosus
-C. By suggesting that Squire and team's conclusions were undermined by a failure to accurately
-distinguish diurnal pollinator visits from nocturnal pollinator visits in their data
-D. By criticizing the study for failing to account for the foraging behavior of vertebrate animals that
-pollinate R. fruticosus
+Based on the texts, how would the author of Text 2 most likely respond to the information about Squire and team's study as presented in Text 1?
+
+A. By agreeing that the study's findings are helpful with the caveat that the study should have included more species of plants besides R. fruticosus
+
+B. By claiming that the observations by Squire and team might not include an important category of interactions between invertebrate pollinators and R. fruticosus
+
+C. By suggesting that Squire and team's conclusions were undermined by a failure to accurately distinguish diurnal pollinator visits from nocturnal pollinator visits in their data
+
+D. By criticizing the study for failing to account for the foraging behavior of vertebrate animals that pollinate R. fruticosus
+
 Answer: B
 
 QUESTION 8
-Domain: Information and Ideas
-Skill: Central Ideas and Details
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_CENTRAL_IDEAS_AND_DETAILS
 
 [TEXT]
-Condemned by colonial officials in Zimbabwe as ruinous to rangelands and forests, goats have often
-been vilified as agents of environmental degradation. Scrutinizing the putative role of the goat in
-narratives of ecological decline, researchers Cara Loomis and Carol Kerven suggest that such
-narratives ______. Because goats are highly resilient, they often inhabit harsh landscapes that can no
-longer support other livestock species. As a result, they are frequently condemned for damage
-wrought over extended periods by other factors like overcultivation and soil erosion.
+Condemned by colonial officials in Zimbabwe as ruinous to rangelands and forests, goats have often been vilified as agents of environmental degradation. Scrutinizing the putative role of the goat in narratives of ecological decline, researchers Cara Loomis and Carol Kerven suggest that such narratives ______. Because goats are highly resilient, they often inhabit harsh landscapes that can no longer support other livestock species. As a result, they are frequently condemned for damage wrought over extended periods by other factors like overcultivation and soil erosion.
 
 [QUESTION]
+
 In context, which choice best completes the main argument presented in the text?
 
 A. may confuse an effect for a cause
+
 B. tend to generalize from isolated incidents
+
 C. are largely based on hearsay
+
 D. may underestimate their subject's insatiability
+
 Answer: A
 
 QUESTION 9
-Domain: Information and Ideas
-Skill: Inferences
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_INFERENCES
 
 [TEXT]
-High-reward flowers that produce relatively high volumes of nectar are thought to be especially
-attractive to green-fronted lancebills and other hummingbird species. But when María A. Maglianesi
-and team monitored hummingbird visits to flowering plants, including Psammisia ramiflora, at Las
-Nubes Project and other sites in Costa Rica, they found that visit frequencies weren't influenced by
-nectar traits. Rather, physical compatibility of flower corollas (collections of petals) and hummingbird
-bills more strongly predicted hummingbird-plant interaction patterns.
+High-reward flowers that produce relatively high volumes of nectar are thought to be especially attractive to green-fronted lancebills and other hummingbird species. But when María A. Maglianesi and team monitored hummingbird visits to flowering plants, including Psammisia ramiflora, at Las Nubes Project and other sites in Costa Rica, they found that visit frequencies weren't influenced by nectar traits. Rather, physical compatibility of flower corollas (collections of petals) and hummingbird bills more strongly predicted hummingbird-plant interaction patterns.
 
 [QUESTION]
+
 Which statement about hummingbird preferences is most strongly supported by the text?
 
-A. Hummingbirds consistently prefer plant species whose flowers have physical traits that are
-compatible with their bills but offer relatively low nectar rewards.
-B. Hummingbirds' preferences are primarily driven by trait-matching between their bills and flower
-corollas, though nectar qualities are a secondary factor driving their preferences.
-C. A floral trait found to influence which plant species hummingbirds prefer may result in certain
-hummingbird species visiting flowers with relatively low nectar rewards over those with higher
-nectar rewards.
-D. Physical compatibility between flower corollas and hummingbird bills becomes an important
-factor that influences hummingbird preferences when hummingbirds are uncertain about which
-plants produce high-reward nectar.
+A. Hummingbirds consistently prefer plant species whose flowers have physical traits that are compatible with their bills but offer relatively low nectar rewards.
+
+B. Hummingbirds' preferences are primarily driven by trait-matching between their bills and flower corollas, though nectar qualities are a secondary factor driving their preferences.
+
+C. A floral trait found to influence which plant species hummingbirds prefer may result in certain hummingbird species visiting flowers with relatively low nectar rewards over those with higher nectar rewards.
+
+D. Physical compatibility between flower corollas and hummingbird bills becomes an important factor that influences hummingbird preferences when hummingbirds are uncertain about which plants produce high-reward nectar.
+
 Answer: C
 
 QUESTION 10
-Domain: Information and Ideas
-Skill: Command of Evidence – Quantitative
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_COMMAND_OF_EVIDENCE_QUANTITATIVE
 
 [TABLE]
 @meta {"title":"Orientation of Paired Leaves in Grapevines and Related Species"}
@@ -815,25 +869,27 @@ Vitis rupestris	303	201	102	1.97
 Vitis × andersonii	10	9	1	9.00
 
 [TEXT]
-Many plants have leaves that are larger on one side of their long central axis than the other, a
-phenomenon known as asymmetrical orientation. University of California, Berkeley biologist Ciera
-Martinez and colleagues examined several species of grapevines and closely related plants, which
-have leaves that grow in pairs, to see if both leaves in a pair tend to be oriented toward the same side
-(that is, have more tissue on the same side) or not. They found that opposite-side orientations are
-more common than same-side orientations by ratios as high as ______
+Many plants have leaves that are larger on one side of their long central axis than the other, a phenomenon known as asymmetrical orientation. University of California, Berkeley biologist Ciera Martinez and colleagues examined several species of grapevines and closely related plants, which have leaves that grow in pairs, to see if both leaves in a pair tend to be oriented toward the same side (that is, have more tissue on the same side) or not. They found that opposite-side orientations are more common than same-side orientations by ratios as high as ______
 
 [QUESTION]
+
 Which choice most effectively uses data from the table to complete the assertion?
 
 A. 646 to 1.
+
 B. 2.99 to 1.
+
 C. 3.28 to 1.
+
 D. 843 to 1.
+
 Answer: C
 
 QUESTION 11
-Domain: Information and Ideas
-Skill: Command of Evidence – Quantitative
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_COMMAND_OF_EVIDENCE_QUANTITATIVE
 
 [TABLE]
 @meta {"title":"P50 Value, Mean Elevation, and Rainforest Occupancy for Five New Caledonian Woody Species"}
@@ -845,266 +901,283 @@ Hedycarya parvifolia	−3.1	956	86
 Zygogynum crassifolium	−4.0	572	24
 
 [TEXT]
-P50—the pressure in the xylem (water-conducting tissue) at which a plant loses 50% of its hydraulic
-conductivity due to embolisms (air bubbles in the water flow)—is a key index of xylem embolism
-resistance and, by extension, tolerance of water stress; lower P50 values indicate lower vulnerability to
-xylem embolisms. Studies have found that variation in this functional trait corresponds with the
-distribution of plant species along moisture and elevation gradients. A student hypothesizes that this
-pattern would persist in woody species in New Caledonia, which is home to moist tropical rainforests,
-dry forests, and a range of elevations. To test the hypothesis, the student analyzes P50 values as well
-as mean elevation and rainforest occupancy rates for New Caledonian woody species.
+P50—the pressure in the xylem (water-conducting tissue) at which a plant loses 50% of its hydraulic conductivity due to embolisms (air bubbles in the water flow)—is a key index of xylem embolism resistance and, by extension, tolerance of water stress; lower P50 values indicate lower vulnerability to xylem embolisms. Studies have found that variation in this functional trait corresponds with the distribution of plant species along moisture and elevation gradients. A student hypothesizes that this pattern would persist in woody species in New Caledonia, which is home to moist tropical rainforests, dry forests, and a range of elevations. To test the hypothesis, the student analyzes P50 values as well as mean elevation and rainforest occupancy rates for New Caledonian woody species.
 
 [QUESTION]
-Which choice best describes the extent to which the student's hypothesis is supported by data from
-the table?
 
-A. Although the data indicate that species' vulnerability to xylem embolisms varies within a
-relatively narrow range, their rainforest occupancy rates and elevation distributions vary much more
-widely; the hypothesis is therefore not supported.
-B. The data suggest a pattern in which species with enhanced tolerance of water stress are
-generally found at higher elevations and have higher rainforest occupancy, a relationship that holds
-across the majority of species examined; the hypothesis is therefore strongly supported.
-C. The data indicate that compared with Zygogynum crassifolium, which has the lowest rainforest
-occupancy rate and occurs at the lowest mean elevation, Paracryphia alticola, which has the highest
-rainforest occupancy rate and occurs at the highest mean elevation, is more vulnerable to water
-stress; the hypothesis is therefore strongly supported.
-D. Although the data suggest a pattern in which species' resistance to xylem embolisms tends to
-increase with decreasing elevation and rainforest occupancy, Hedycarya parvifolia is an exception to
-this trend; the hypothesis is therefore moderately supported.
+Which choice best describes the extent to which the student's hypothesis is supported by data from the table?
+
+A. Although the data indicate that species' vulnerability to xylem embolisms varies within a relatively narrow range, their rainforest occupancy rates and elevation distributions vary much more widely; the hypothesis is therefore not supported.
+
+B. The data suggest a pattern in which species with enhanced tolerance of water stress are generally found at higher elevations and have higher rainforest occupancy, a relationship that holds across the majority of species examined; the hypothesis is therefore strongly supported.
+
+C. The data indicate that compared with Zygogynum crassifolium, which has the lowest rainforest occupancy rate and occurs at the lowest mean elevation, Paracryphia alticola, which has the highest rainforest occupancy rate and occurs at the highest mean elevation, is more vulnerable to water stress; the hypothesis is therefore strongly supported.
+
+D. Although the data suggest a pattern in which species' resistance to xylem embolisms tends to increase with decreasing elevation and rainforest occupancy, Hedycarya parvifolia is an exception to this trend; the hypothesis is therefore moderately supported.
+
 Answer: D
 
 QUESTION 12
-Domain: Information and Ideas
-Skill: Central Ideas and Details
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_CENTRAL_IDEAS_AND_DETAILS
 
 [TEXT]
-Milena Mohri and colleagues conducted a meta-analysis of 330 studies to investigate the effect of
-soil characteristics, including pH, on the capacity of Festuca rubra and 47 other plant species to
-absorb chromium and other heavy metals from soil through their roots. Given that in soil, metal
-solubility (a key determinant of plants' metal uptake) negatively correlates with soil pH in the
-rhizosphere (soil immediately proximate to roots), the researchers hypothesized that plants' total
-metal content would negatively correlate with soil pH, but instead they found no correlation between
-the two variables overall. To explain the finding, they noted that many of the included studies didn't
-specify whether the reported soil profiles were those of the rhizosphere.
+Milena Mohri and colleagues conducted a meta-analysis of 330 studies to investigate the effect of soil characteristics, including pH, on the capacity of Festuca rubra and 47 other plant species to absorb chromium and other heavy metals from soil through their roots. Given that in soil, metal solubility (a key determinant of plants' metal uptake) negatively correlates with soil pH in the rhizosphere (soil immediately proximate to roots), the researchers hypothesized that plants' total metal content would negatively correlate with soil pH, but instead they found no correlation between the two variables overall. To explain the finding, they noted that many of the included studies didn't specify whether the reported soil profiles were those of the rhizosphere.
 
 [QUESTION]
+
 Which statement, if true, would best account for Mohri and colleagues' explanation?
 
-A. Because of their distinct chemical properties, different heavy metals exhibit varying degrees of
-solubility response to changes in soil pH in the rhizosphere.
-B. Relative concentrations of soluble metals in the rhizosphere are more strongly mediated by soil
-characteristics other than soil pH.
-C. Biochemical interactions between plant roots and adjacent soil can considerably alter soil
-chemistry, including soil pH.
-D. Plant species vary considerably in how deeply their root systems extend beyond the topsoil
-layer, where soil pH and metal concentrations are typically measured.
+A. Because of their distinct chemical properties, different heavy metals exhibit varying degrees of solubility response to changes in soil pH in the rhizosphere.
+
+B. Relative concentrations of soluble metals in the rhizosphere are more strongly mediated by soil characteristics other than soil pH.
+
+C. Biochemical interactions between plant roots and adjacent soil can considerably alter soil chemistry, including soil pH.
+
+D. Plant species vary considerably in how deeply their root systems extend beyond the topsoil layer, where soil pH and metal concentrations are typically measured.
+
 Answer: C
 
 QUESTION 13
-Domain: Information and Ideas
-Skill: Inferences
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_INFERENCES
 
 [TEXT]
-The Lex Orchia sumptuaria of 182–181 BCE was one in a succession of ancient Roman sumptuary laws
-governing expenditures on luxury, primarily regulating large banquets and other lavish events. Such
-laws, enacted against a backdrop of anxiety about social dynamism, were intended to limit
-aspirational overreaching for status but were infrequently enforced. Moreover, enforcement was
-generally limited to fines, which, when levied against high-profile offenders, were widely announced.
-The affluent accepted fines as merely a tax on privilege, even as the amounts increased with frequent
-revisions to the laws. Historians have therefore argued that enforcing sumptuary laws only minimally
-may have been a way to avoid undermining the laws' aims, given that ______
+The Lex Orchia sumptuaria of 182–181 BCE was one in a succession of ancient Roman sumptuary laws governing expenditures on luxury, primarily regulating large banquets and other lavish events. Such laws, enacted against a backdrop of anxiety about social dynamism, were intended to limit aspirational overreaching for status but were infrequently enforced. Moreover, enforcement was generally limited to fines, which, when levied against high-profile offenders, were widely announced. The affluent accepted fines as merely a tax on privilege, even as the amounts increased with frequent revisions to the laws. Historians have therefore argued that enforcing sumptuary laws only minimally may have been a way to avoid undermining the laws' aims, given that ______
 
 [QUESTION]
+
 Which choice most logically completes the text?
 
-A. the few fines that were imposed under the laws were tolerable to wealthy offenders and thus
-did not help the laws serve their intended purpose.
-B. the public announcement of fines could signal offenders' wealth and status, placing
-enforcement of the laws in conflict with their intent.
-C. less-affluent citizens were reluctant to risk incurring a fine and thus voluntarily complied with
-the laws even in the absence of regular enforcement.
-D. authorities focused enforcement on the wealthiest offenders, recognizing that pursuing
-offenders who were unable to pay the fines could weaken fines' effectiveness as a deterrent.
+A. the few fines that were imposed under the laws were tolerable to wealthy offenders and thus did not help the laws serve their intended purpose.
+
+B. the public announcement of fines could signal offenders' wealth and status, placing enforcement of the laws in conflict with their intent.
+
+C. less-affluent citizens were reluctant to risk incurring a fine and thus voluntarily complied with the laws even in the absence of regular enforcement.
+
+D. authorities focused enforcement on the wealthiest offenders, recognizing that pursuing offenders who were unable to pay the fines could weaken fines' effectiveness as a deterrent.
+
 Answer: B
 
 QUESTION 14
-Domain: Information and Ideas
-Skill: Inferences
+
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_INFERENCES
 
 [TEXT]
-In cave systems in the Umm Er Radhuma Formation of modern Saudi Arabia, Monika Markowska and
-colleagues found that from 60,000 to 530,000 years ago, both calcite and gypsum minerals formed in
-speleothems (stalactites, stalagmites, flowstones, and other cave formations); after this period,
-though, only gypsum deposits formed. The process of calcite formation requires sufficient vegetation
-and soil to produce carbonic acid that dissolves limestone, while gypsum deposits primarily form
-through evaporation processes and are typical in arid environments. Interestingly, there is some
-evidence of local groundwater reservoir increases after 60,000 years ago. The concurrent shift in
-speleothem mineral deposition, however, suggests that _____
+In cave systems in the Umm Er Radhuma Formation of modern Saudi Arabia, Monika Markowska and colleagues found that from 60,000 to 530,000 years ago, both calcite and gypsum minerals formed in speleothems (stalactites, stalagmites, flowstones, and other cave formations); after this period, though, only gypsum deposits formed. The process of calcite formation requires sufficient vegetation and soil to produce carbonic acid that dissolves limestone, while gypsum deposits primarily form through evaporation processes and are typical in arid environments. Interestingly, there is some evidence of local groundwater reservoir increases after 60,000 years ago. The concurrent shift in speleothem mineral deposition, however, suggests that _____
 
 [QUESTION]
+
 Which choice most logically completes the text?
 
-A. beginning 60,000 years ago, local precipitation fell to levels too low to maintain the vegetation
-necessary for gypsum formation.
+A. beginning 60,000 years ago, local precipitation fell to levels too low to maintain the vegetation necessary for gypsum formation.
+
 B. higher water levels in groundwater reservoirs were not due to increased local precipitation.
+
 C. declining local aridity after 60,000 years ago facilitated the shift in groundwater reservoir levels.
-D. changes in the mineral composition of groundwater reservoirs were independent of local
-precipitation patterns.
+
+D. changes in the mineral composition of groundwater reservoirs were independent of local precipitation patterns.
+
 Answer: B
 
 QUESTION 15
-Domain: Standard English Conventions
-Skill: Form, Structure, and Sense
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_FORM_STRUCTURE_AND_SENSE
 
 [TEXT]
-South Carolina resident Joseph Rainey, sworn in as a member of the US House of Representatives in
-1870, was one of the nearly two thousand African ______ during the decade following the Civil War.
+South Carolina resident Joseph Rainey, sworn in as a member of the US House of Representatives in 1870, was one of the nearly two thousand African ______ during the decade following the Civil War.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. Americans’ who won elections’
+
 B. American’ s who won elections
+
 C. Americans who won election’ s
+
 D. Americans who won elections
+
 Answer: D
 
 QUESTION 16
-Domain: Standard English Conventions
-Skill: Boundaries
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_BOUNDARIES
 
 [TEXT]
-A single specimen of the marine protist B. digitata collected in the South Atlantic in 1879 served the
-vital role of reference organism for all _____ specific organisms as representative of an entire species
-for the purposes of taxonomical identification is critical, according to biologists, to resolving
-uncertainties that arise when classifying new specimens.
+A single specimen of the marine protist B. digitata collected in the South Atlantic in 1879 served the vital role of reference organism for all _____ specific organisms as representative of an entire species for the purposes of taxonomical identification is critical, according to biologists, to resolving uncertainties that arise when classifying new specimens.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. B. digitata, identifying
+
 B. B. digitata identifying
+
 C. B. digitata and identifying
+
 D. B. digitata. Identifying
+
 Answer: D
 
 QUESTION 17
-Domain: Standard English Conventions
-Skill: Form, Structure, and Sense
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_FORM_STRUCTURE_AND_SENSE
 
 [TEXT]
-An accomplished birder might be able to spot thousands of different species over the course of a
-career, from Synthliboramphus hypoleucus to Fulica cristata, but no birder has ever achieved the
-ultimate ______ an in-person glimpse of all 10,000-plus species of birds.
+An accomplished birder might be able to spot thousands of different species over the course of a career, from Synthliboramphus hypoleucus to Fulica cristata, but no birder has ever achieved the ultimate ______ an in-person glimpse of all 10,000-plus species of birds.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. goal catching
+
 B. goal. Catching
+
 C. goal: catching
+
 D. goal; catching
+
 Answer: C
 
 QUESTION 18
-Domain: Standard English Conventions
-Skill: Boundaries
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_BOUNDARIES
 
 [TEXT]
-The recognition species concept (RSC) defines species based on common fertilization systems, not
-genetics as in the evolutionary genetic species concept ______ instance, a population of apes that
-interbreed by a common fertilization system might be classified as a unique species.
+The recognition species concept (RSC) defines species based on common fertilization systems, not genetics as in the evolutionary genetic species concept ______ instance, a population of apes that interbreed by a common fertilization system might be classified as a unique species.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. (EgSC). With RSC classification, for
+
 B. (EgSC), with RSC classification, for
+
 C. (EgSC), with RSC classification. For
+
 D. (EgSC), with RSC classification; for
+
 Answer: A
 
 QUESTION 19
-Domain: Standard English Conventions
-Skill: Boundaries
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_BOUNDARIES
 
 [TEXT]
-In a chemical reaction, the value known as molar mass helps convert between the mass of the
-reactants and the mass of the product. The gaseous ______ have molar masses of 42.08 and 150.21
-g/mol, respectively.
+In a chemical reaction, the value known as molar mass helps convert between the mass of the reactants and the mass of the product. The gaseous ______ have molar masses of 42.08 and 150.21 g/mol, respectively.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. compounds, propylene and thymol
+
 B. compounds, propylene and thymol,
+
 C. compounds propylene and thymol
+
 D. compounds propylene and thymol,
+
 Answer: C
 
 QUESTION 20
-Domain: Standard English Conventions
-Skill: Form, Structure, and Sense
+
+Domain: RW_STANDARD_ENGLISH_CONVENTIONS
+
+Skill: RW_FORM_STRUCTURE_AND_SENSE
 
 [TEXT]
-The Alpha Centauri meteor shower's brightness typically surpasses that of the Ursid meteor shower
-due to the interplay of three main factors --- namely, the size and composition of the ______ velocity
-upon entering Earth's mesosphere, with higher-velocity meteoroids releasing more energy; and
-atmospheric fluctuations, such as changes in air density.
+The Alpha Centauri meteor shower's brightness typically surpasses that of the Ursid meteor shower due to the interplay of three main factors --- namely, the size and composition of the ______ velocity upon entering Earth's mesosphere, with higher-velocity meteoroids releasing more energy; and atmospheric fluctuations, such as changes in air density.
 
 [QUESTION]
+
 Which choice completes the text so that it conforms to the conventions of Standard English?
 
 A. meteoroids, their
+
 B. meteoroids --- their
+
 C. meteoroids; their
+
 D. meteoroids. Their
+
 Answer: C
 
 QUESTION 21
-Domain: Expression of Ideas
-Skill: Transitions
+
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_TRANSITIONS
 
 [TEXT]
-D-2 steel, an alloy that contains 1.50% carbon, 0.60% manganese, and 1.10% vanadium, is an air-
-hardening steel. ______ D-2 steel is properly quenched by heating the steel to 1,850°F and then rapidly
-cooling in air to near room temperature, which increases its hardness.
+D-2 steel, an alloy that contains 1.50% carbon, 0.60% manganese, and 1.10% vanadium, is an air-hardening steel. ______ D-2 steel is properly quenched by heating the steel to 1,850°F and then rapidly cooling in air to near room temperature, which increases its hardness.
 
 [QUESTION]
+
 Which choice completes the text with the most logical transition?
 
 A. Similarly,
+
 B. For example,
+
 C. As such,
+
 D. Even so,
+
 Answer: C
 
 QUESTION 22
-Domain: Expression of Ideas
-Skill: Transitions
+
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_TRANSITIONS
 
 [TEXT]
-Between the thirteenth and fifteenth centuries, during the height of the Indian Ocean trade network,
-Ternate emerged as an important port city in the Moluccas. _____ Ternate's strategic location
-facilitated the exchange of cloves and nutmeg between distant regions, contributing to a prosperous
-commercial ecosystem that connected ports from Africa to East Asia.
+Between the thirteenth and fifteenth centuries, during the height of the Indian Ocean trade network, Ternate emerged as an important port city in the Moluccas. _____ Ternate's strategic location facilitated the exchange of cloves and nutmeg between distant regions, contributing to a prosperous commercial ecosystem that connected ports from Africa to East Asia.
 
 [QUESTION]
+
 Which choice completes the text with the most logical transition?
 
 A. However,
+
 B. Indeed,
+
 C. Likewise,
+
 D. As a result,
+
 Answer: B
 
 QUESTION 23
-Domain: Information and Ideas
-Skill: Central Ideas and Details
 
-[TEXT]
-- Since 1931, the New York Times (NYT) Best Sellers list has been a measure of the most successful
-books in the US.
+Domain: RW_INFORMATION_AND_IDEAS
+
+Skill: RW_CENTRAL_IDEAS_AND_DETAILS
+
+[NOTE]
+- Since 1931, the New York Times (NYT) Best Sellers list has been a measure of the most successful books in the US.
 - Kwame Alexander and Toni Morrison are Black authors who have reached the NYT Best Sellers list.
 - The Crossover is a children's book by Kwame Alexander.
 - It reached the NYT Best Sellers list on August 27, 2017.
@@ -1112,135 +1185,130 @@ books in the US.
 - It reached the NYT Best Sellers list on May 3, 1992.
 
 [QUESTION]
-Which choice most effectively uses information from the given sentences to emphasize the different
-years in which the books reached the NYT Best Sellers list?
 
-A. The Crossover and Jazz are both books by Black authors that have reached the NYT Best Sellers
-list.
+Which choice most effectively uses information from the given sentences to emphasize the different years in which the books reached the NYT Best Sellers list?
+
+A. The Crossover and Jazz are both books by Black authors that have reached the NYT Best Sellers list.
+
 B. Kwame Alexander and Toni Morrison are both NYT best-selling authors.
-C. Kwame Alexander's The Crossover and Toni Morrison's Jazz are both NYT best sellers, but the
-former is a children's book, whereas the latter is a novel.
-D. The novel Jazz became an NYT best seller in 1992; The Crossover, a children's book, joined this
-list as well, but in 2017.
+
+C. Kwame Alexander's The Crossover and Toni Morrison's Jazz are both NYT best sellers, but the former is a children's book, whereas the latter is a novel.
+
+D. The novel Jazz became an NYT best seller in 1992; The Crossover, a children's book, joined this list as well, but in 2017.
+
 Answer: D
 
 QUESTION 24
-Domain: Expression of Ideas
-Skill: Rhetorical Synthesis
 
-[TEXT]
-While researching a topic, a student has taken the following notes:
-- Roads designated as National Scenic Byways (NSBs) must have noteworthy features in one of six
-categories.
-- These features can be significant for their scenic, natural, historic, cultural, recreational, or
-archaeological appeal.
-- The Country Music Highway in Kentucky was selected to be an NSB because of the cultural features
-along its route.
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_RHETORICAL_SYNTHESIS
+
+[NOTE]
+- While researching a topic, a student has taken the following notes:
+- Roads designated as National Scenic Byways (NSBs) must have noteworthy features in one of six categories.
+- These features can be significant for their scenic, natural, historic, cultural, recreational, or archaeological appeal.
+- The Country Music Highway in Kentucky was selected to be an NSB because of the cultural features along its route.
 - It provides access to theaters, music festivals, and museums.
 - The Illinois River Road in Illinois was selected because of the natural features along its route.
 - It provides access to river bluffs, wetlands, and prairies.
 
 [QUESTION]
-The student wants to indicate why the two roads were selected to be NSBs. Which choice most
-effectively uses relevant information from the notes to accomplish this goal?
 
-A. The Illinois River Road was chosen as an NSB for its significant natural features, while the
-Country Music Highway was selected for its cultural features.
-B. The Country Music Highway, like the Illinois River Road, has significant natural features such as
-river bluffs, wetlands, and prairies.
-C. The Country Music Highway was selected as an NSB for its noteworthy cultural features, but
-other NSBs could be significant for natural or archaeological reasons.
+The student wants to indicate why the two roads were selected to be NSBs. Which choice most effectively uses relevant information from the notes to accomplish this goal?
+
+A. The Illinois River Road was chosen as an NSB for its significant natural features, while the Country Music Highway was selected for its cultural features.
+
+B. The Country Music Highway, like the Illinois River Road, has significant natural features such as river bluffs, wetlands, and prairies.
+
+C. The Country Music Highway was selected as an NSB for its noteworthy cultural features, but other NSBs could be significant for natural or archaeological reasons.
+
 D. The Illinois River Road provides access to noteworthy natural features but not cultural areas.
+
 Answer: A
 
 QUESTION 25
-Domain: Expression of Ideas
-Skill: Rhetorical Synthesis
 
-[TEXT]
-While researching a topic, a student has taken the following notes:
-- 1950s: The Institute of African Studies (IAS) is proposed and initially formed at the University
-College of the Gold Coast (now the University of Ghana).
-- Some faculty, including Peter Shinnie and his committee, support a linguistic and cultural focus for
-the IAS.
-- This approach to African Studies is aligned with the British colonial academic models that were
-imposed prior to Ghana's independence in 1957.
-- Other faculty resist this narrow scope, calling instead for an interdisciplinary approach that includes
-African history, economics, and politics.
-- Early 1960s: Ghana's president Kwame Nkrumah reorganizes the IAS under an interdisciplinary,
-African-centered vision.
-- Nkrumah's reforms are part of a broader post-1945 movement to challenge colonial systems in
-Africa.
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_RHETORICAL_SYNTHESIS
+
+[NOTE]
+- While researching a topic, a student has taken the following notes:
+- 1950s: The Institute of African Studies (IAS) is proposed and initially formed at the University College of the Gold Coast (now the University of Ghana).
+- Some faculty, including Peter Shinnie and his committee, support a linguistic and cultural focus for the IAS.
+- This approach to African Studies is aligned with the British colonial academic models that were imposed prior to Ghana's independence in 1957.
+- Other faculty resist this narrow scope, calling instead for an interdisciplinary approach that includes African history, economics, and politics.
+- Early 1960s: Ghana's president Kwame Nkrumah reorganizes the IAS under an interdisciplinary, African-centered vision.
+- Nkrumah's reforms are part of a broader post-1945 movement to challenge colonial systems in Africa.
 
 [QUESTION]
-The student wants to place Kwame Nkrumah's reorganization of the IAS in historical context. Which
-choice most effectively uses relevant information from the notes to accomplish this goal?
 
-A. Nkrumah's early 1960s reorganization of the IAS was built directly on British academic models
-that had long supported interdisciplinary African Studies in Ghanaian universities.
-B. Following Ghana's 1957 independence, Nkrumah reorganized the IAS with a linguistic and
-cultural focus, as recommended by Peter Shinnie and his committee.
-C. Nkrumah reorganized the IAS in the early 1960s to reflect an interdisciplinary, African-centered
-vision, aligning with a broader post-1945 movement to challenge colonial systems in Africa.
-D. Nkrumah's changes to African Studies reflected faculty concerns that the field should move
-beyond colonial frameworks and include areas like history, politics, and economics.
+The student wants to place Kwame Nkrumah's reorganization of the IAS in historical context. Which choice most effectively uses relevant information from the notes to accomplish this goal?
+
+A. Nkrumah's early 1960s reorganization of the IAS was built directly on British academic models that had long supported interdisciplinary African Studies in Ghanaian universities.
+
+B. Following Ghana's 1957 independence, Nkrumah reorganized the IAS with a linguistic and cultural focus, as recommended by Peter Shinnie and his committee.
+
+C. Nkrumah reorganized the IAS in the early 1960s to reflect an interdisciplinary, African-centered vision, aligning with a broader post-1945 movement to challenge colonial systems in Africa.
+
+D. Nkrumah's changes to African Studies reflected faculty concerns that the field should move beyond colonial frameworks and include areas like history, politics, and economics.
+
 Answer: C
 
 QUESTION 26
-Domain: Expression of Ideas
-Skill: Rhetorical Synthesis
 
-[TEXT]
-While researching a topic, a student has taken the following notes:
-- A copyright prevents a book's contents from being reproduced (published) without permission from
-the copyright holder.
-- When a book's copyright expires, the book enters the public domain and can be legally reproduced
-by anyone.
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_RHETORICAL_SYNTHESIS
+
+[NOTE]
+- While researching a topic, a student has taken the following notes:
+- A copyright prevents a book's contents from being reproduced (published) without permission from the copyright holder.
+- When a book's copyright expires, the book enters the public domain and can be legally reproduced by anyone.
 - New Hampshire is a poetry collection by Robert Frost.
-
 - It entered the public domain in 2019.
 - When We Were Very Young is a children's book by A.A. Milne.
 - It entered the public domain in 2020.
 
 [QUESTION]
-The student wants to emphasize a similarity between Robert Frost and A.A. Milne. Which choice most
-effectively uses relevant information from the notes to accomplish this goal?
 
-A. The year was 2020, and the copyright to A.A. Milne's When We Were Very Young had finally
-expired.
-B. Both New Hampshire and When We Were Very Young are in the public domain; however, one is
-a poetry collection and the other a children's book.
-C. New Hampshire, a poetry collection by Robert Frost, entered the public domain in 2019, unlike A.A.
-Milne's children's book When We Were Very Young.
+The student wants to emphasize a similarity between Robert Frost and A.A. Milne. Which choice most effectively uses relevant information from the notes to accomplish this goal?
+
+A. The year was 2020, and the copyright to A.A. Milne's When We Were Very Young had finally expired.
+
+B. Both New Hampshire and When We Were Very Young are in the public domain; however, one is a poetry collection and the other a children's book.
+
+C. New Hampshire, a poetry collection by Robert Frost, entered the public domain in 2019, unlike A.A. Milne's children's book When We Were Very Young.
+
 D. Robert Frost and A.A. Milne are two authors whose works recently entered the public domain.
+
 Answer: D
 
 QUESTION 27
-Domain: Expression of Ideas
-Skill: Rhetorical Synthesis
 
-[TEXT]
-While researching a topic, a student has taken the following notes:
-- The Clovis First hypothesis proposes that ancient humans known as Clovis were the first to populate
-North America.
+Domain: RW_EXPRESSION_OF_IDEAS
+
+Skill: RW_RHETORICAL_SYNTHESIS
+
+[NOTE]
+- While researching a topic, a student has taken the following notes:
+- The Clovis First hypothesis proposes that ancient humans known as Clovis were the first to populate North America.
 - The Clovis arrived around 13,000 years ago.
-- Stone tools found at the Saltville site in Virginia date to approximately 16,000 years ago. •
-Butchered mammoth bones found at the Shaffert site in Nebraska date to approximately 22,000 years
-ago.
-- These items support the idea that humans were present in North America before the Clovis
-population arrived.
+- Stone tools found at the Saltville site in Virginia date to approximately 16,000 years ago.
+- Butchered mammoth bones found at the Shaffert site in Nebraska date to approximately 22,000 years ago.
+- These items support the idea that humans were present in North America before the Clovis population arrived.
 
 [QUESTION]
-The student wants to emphasize a similarity between the items found at Saltville and those found at
-Shaffert. Which choice most effectively uses relevant information from the notes to accomplish this
-goal?
 
-A. Objects discovered at Saltville date to approximately 16,000 years ago; those found at Shaffert
-precede them, however, dating to approximately 22,000 years ago.
-B. Stone tools from Saltville date to approximately 16,000 years ago; in addition, butchered
-mammoth bones (which date to approximately 22,000 years ago) were discovered at Shaffert.
-C. Although the butchered mammoth bones found at Shaffert are older than the stone tools found
-at Saltville, both clearly predate the arrival of the Clovis population.
-D. The Clovis First hypothesis proposes that the Clovis, arriving around 13,000 years ago, were the
-first humans in North America.
+The student wants to emphasize a similarity between the items found at Saltville and those found at Shaffert. Which choice most effectively uses relevant information from the notes to accomplish this goal?
+
+A. Objects discovered at Saltville date to approximately 16,000 years ago; those found at Shaffert precede them, however, dating to approximately 22,000 years ago.
+
+B. Stone tools from Saltville date to approximately 16,000 years ago; in addition, butchered mammoth bones (which date to approximately 22,000 years ago) were discovered at Shaffert.
+
+C. Although the butchered mammoth bones found at Shaffert are older than the stone tools found at Saltville, both clearly predate the arrival of the Clovis population.
+
+D. The Clovis First hypothesis proposes that the Clovis, arriving around 13,000 years ago, were the first humans in North America.
+
 Answer: C

@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type Com
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { VirtuosoGrid, type GridStateSnapshot } from 'react-virtuoso';
 import { formatDistanceToNow } from 'date-fns';
-import { Archive, ArrowUpDown, BookOpen, CalendarDays, Check, Clock3, Copy, FilePenLine, Grid2X2, History, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, RefreshCw, RotateCcw, SlidersHorizontal, Trash2, UserRound, X } from 'lucide-react';
+import { Archive, ArrowUpDown, BookOpen, CalendarDays, Check, Clock3, Copy, FilePenLine, Grid2X2, History, List, MoreHorizontal, Pencil, Play, Plus, RefreshCw, RotateCcw, SlidersHorizontal, Trash2, UserRound, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,8 @@ import { cachedGet, invalidateQueryCache } from '@/lib/queryCache';
 import { useDebounce } from '@/hooks/useDebounce';
 import { capitalizeFirstLetter } from '@/utils/text';
 import { SAT_TEST_MONTHS, satTestMonthLabel, type SatTestMonthFilter } from '@/lib/satTestMonths';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type LibrarySource = 'MY' | 'SYSTEM';
 type TestStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
@@ -269,7 +271,7 @@ export default function TeacherTestLibrary() {
                     List: view === 'GRID' ? LibraryGridList : LibraryList,
                     Item: view === 'GRID' ? LibraryGridItem : LibraryListItem,
                     Header: view === 'LIST' ? source === 'MY' ? MyTestsListHeader : SystemTestsListHeader : undefined,
-                    Footer: () => loadingMore ? <div className="flex items-center justify-center gap-2 p-4 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading next results…</div> : !nextCursor ? <p className="p-4 text-center text-xs text-muted-foreground">All {total} tests loaded</p> : null,
+                    Footer: () => loadingMore ? <div className="flex items-center justify-center gap-2 p-4 text-sm text-muted-foreground"><LoadingSpinner />Loading next results…</div> : !nextCursor ? <p className="p-4 text-center text-xs text-muted-foreground">All {total} tests loaded</p> : null,
                   }}
                   itemContent={(_, test) => view === 'GRID' ? <LibraryCard test={test} source={source} working={workingId === test.id} actions={actions} /> : <LibraryListRow test={test} source={source} working={workingId === test.id} actions={actions} />}
                   endReached={() => void loadMore()}
@@ -309,7 +311,7 @@ function LibraryToolbar({ source, search, onSearch, subject, onSubject, mode, on
     <DataToolbarActions>
       <RadioFilter icon={<ArrowUpDown size={16} />} label={`Sort: ${sort === 'NEWEST' ? 'Newest' : 'Oldest'}`} value={sort} onChange={value => onSort(value as SortOrder)} options={[['NEWEST', 'Recently updated'], ['OLDEST', 'Oldest updated']]} align="end" />
       <div className="flex h-8 items-center rounded-control border border-ui-border bg-background p-0.5" role="group" aria-label="Display mode"><Button variant="ghost" size="sm" className={`h-7 px-2 shadow-none ${view === 'GRID' ? 'bg-muted text-foreground' : ''}`} onClick={() => onView('GRID')} aria-label="Card view" aria-pressed={view === 'GRID'}>{view === 'GRID' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}<Grid2X2 size={17} aria-hidden="true" /></Button><Button variant="ghost" size="sm" className={`h-7 px-2 shadow-none ${view === 'LIST' ? 'bg-muted text-foreground' : ''}`} onClick={() => onView('LIST')} aria-label="List view" aria-pressed={view === 'LIST'}>{view === 'LIST' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}<List size={18} aria-hidden="true" /></Button></div>
-      <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8 shadow-none" aria-label="More library actions"><MoreHorizontal size={17} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem disabled={loading} onSelect={onRefresh}><RefreshCw className={loading ? 'animate-spin' : ''} />Refresh library</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+      <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8 shadow-none" aria-label="More library actions"><MoreHorizontal size={17} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem disabled={loading} onSelect={onRefresh}>{loading ? <LoadingSpinner /> : <RefreshCw />}Refresh library</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
       <Button size="sm" onClick={onCreate}><Plus size={16} />Create test</Button>
     </DataToolbarActions>
   </DataToolbar>;
@@ -350,7 +352,7 @@ function LibraryCard({ test, source, working, actions }: { test: LibraryTest; so
 function PrimaryTestAction({ test, source, working, actions, fullWidth = false }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions; fullWidth?: boolean }) {
   if (source === 'SYSTEM' || test.status === 'PUBLISHED') return <Button variant="outline" size="sm" className={fullWidth ? 'w-full bg-surface' : undefined} disabled={working} onClick={() => actions.preview(test)}><Play size={15} />Open</Button>;
   if (test.status === 'DRAFT') return <Button size="sm" className={fullWidth ? 'w-full' : undefined} disabled={working} onClick={() => actions.edit(test)}><FilePenLine size={15} />Continue</Button>;
-  return <Button variant="outline" size="sm" className={fullWidth ? 'w-full bg-surface' : undefined} disabled={working} onClick={() => actions.restore(test)}>{working ? <LoaderCircle size={15} className="animate-spin" /> : <RotateCcw size={15} />}Restore</Button>;
+  return <Button variant="outline" size="sm" className={fullWidth ? 'w-full bg-surface' : undefined} disabled={working} onClick={() => actions.restore(test)}>{working ? <LoadingSpinner /> : <RotateCcw size={15} />}Restore</Button>;
 }
 
 function TestMenu({ test, source, working, actions }: { test: LibraryTest; source: LibrarySource; working: boolean; actions: TestActions }) {
@@ -367,8 +369,8 @@ function StatusBadge({ status }: { status: TestStatus }) {
 }
 
 function LibrarySkeleton({ view }: { view: ViewMode }) {
-  if (view === 'LIST') return <div className="animate-pulse"><div className="h-12 border-b border-ui-border bg-muted" />{[1, 2, 3, 4, 5].map(item => <div key={item} className="flex h-16 items-center gap-5 border-b border-ui-border px-5 last:border-0"><span className="h-4 w-64 rounded-sm bg-muted" /><span className="h-4 w-32 rounded-sm bg-muted" /><span className="ml-auto h-8 w-32 rounded-control bg-muted" /></div>)}</div>;
-  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-60 animate-pulse bg-muted" />)}</div>;
+  if (view === 'LIST') return <div><Skeleton className="h-12 rounded-none border-b border-ui-border" />{[1, 2, 3, 4, 5].map(item => <div key={item} className="flex h-16 items-center gap-5 border-b border-ui-border px-5 last:border-0"><Skeleton className="h-4 w-64" /><Skeleton className="h-4 w-32" /><Skeleton className="ml-auto h-8 w-32" /></div>)}</div>;
+  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-60 p-4"><Skeleton className="h-full w-full" /></Card>)}</div>;
 }
 
 const relativeTime = (value: string) => {

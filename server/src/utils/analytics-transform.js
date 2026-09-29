@@ -31,7 +31,8 @@ const trendOf = points => {
 
 const averageOf = values => values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
 
-const isTimingEligible = submission => submission?.status === 'COMPLETED' && submission?.test?.mode === 'EXAM';
+const isTimingEligible = submission => submission?.status === 'COMPLETED'
+  && (submission?.attemptMode || submission?.test?.mode) === 'EXAM';
 
 const sourceOf = submission => submission.deliveryId || submission.classTestId || submission.assignmentId
   ? 'CLASSROOM'

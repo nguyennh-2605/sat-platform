@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Clock3, LoaderCircle, Pause, Play, RotateCcw, Square } from 'lucide-react';
+import { Clock3, Pause, Play, RotateCcw, Square } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading';
 import { Button } from '@/components/ui/button';
 import { Mascot } from '@/components/brand/Mascot';
 import { Input } from '@/components/ui/input';
@@ -79,7 +80,7 @@ export function FocusClock() {
           className="min-w-20 gap-1.5 font-mono tabular-nums sm:min-w-30"
           aria-label={session ? `Focus timer: ${display} remaining, ${session.status.toLowerCase()}` : 'Open focus timer'}
         >
-          {loading ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : session?.status === 'RUNNING' ? <span className="size-2 rounded-full bg-emerald-500" aria-hidden="true" /> : <Clock3 aria-hidden="true" />}
+          {loading ? <LoadingSpinner /> : session?.status === 'RUNNING' ? <span className="size-2 rounded-full bg-emerald-500" aria-hidden="true" /> : <Clock3 aria-hidden="true" />}
           <span>{display}</span>
           <span className="hidden font-sans sm:inline">{session?.status === 'PAUSED' ? 'Paused' : 'Focus'}</span>
         </Button>
@@ -139,7 +140,7 @@ export function FocusClock() {
                 </Select>
               </label>
               <Button disabled={busy || loading} onClick={() => void startSession()}>
-                {pendingAction === 'start' ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}
+                {pendingAction === 'start' ? <LoadingSpinner /> : <Play aria-hidden="true" />}
                 Start focus session
               </Button>
             </>

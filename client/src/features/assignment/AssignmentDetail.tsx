@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
-import { Check, ChevronDown, CircleDashed, Edit, ExternalLink, FileText, Link as LinkIcon, LoaderCircle, MoreHorizontal, RotateCcw, Send, Trash2, TriangleAlert, Upload, X } from 'lucide-react';
+import { Check, ChevronDown, CircleDashed, Edit, ExternalLink, FileText, Link as LinkIcon, MoreHorizontal, RotateCcw, Send, Trash2, TriangleAlert, Upload, X } from 'lucide-react';
+import { LoadingSpinner, LoadingState } from '@/components/ui/loading';
+import { Skeleton } from '@/components/ui/skeleton';
 import toast from 'react-hot-toast';
 
 import { ResourceIcon } from '@/components/resource-icon';
@@ -342,7 +344,7 @@ function StudentSubmissionPanel({ assignment, deadline, onSubmitted }: { assignm
         </section>
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-ui-border pt-4">
           {draft && hasContent && <Button variant="ghost" disabled={saving || uploadBusy} onClick={() => setDiscardOpen(true)}>Discard changes</Button>}
-          <Button disabled={saving || uploadBusy || saveState === 'saving' || !hasContent} onClick={() => void submit()}>{saving ? <><LoaderCircle className="animate-spin" />Submitting…</> : <><Send />{submitted ? 'Resubmit' : 'Submit assignment'}</>}</Button>
+          <Button disabled={saving || uploadBusy || saveState === 'saving' || !hasContent} onClick={() => void submit()}>{saving ? <><LoadingSpinner />Submitting…</> : <><Send />{submitted ? 'Resubmit' : 'Submit assignment'}</>}</Button>
         </div>
       </> : submitted ? <>
         <section aria-labelledby="submitted-response-heading"><h3 id="submitted-response-heading" className="text-sm font-medium">Response</h3>{submitted.textResponse ? <p className="mt-2 whitespace-pre-wrap rounded-control bg-muted/50 p-3 text-sm leading-6 text-foreground">{submitted.textResponse}</p> : <p className="mt-1 text-xs text-muted-foreground">No written response.</p>}</section>
@@ -354,8 +356,8 @@ function StudentSubmissionPanel({ assignment, deadline, onSubmitted }: { assignm
       {work?.reviewedAt && <section className="border-t border-ui-border pt-4" aria-labelledby="teacher-feedback-heading"><h3 id="teacher-feedback-heading" className="text-sm font-semibold">{staleReview ? 'Previous feedback' : 'Teacher feedback'}</h3>{assignment.maxPoints != null && work.score != null && <p className="mt-3 text-xl font-semibold tabular-nums">{work.score} <span className="text-sm font-normal text-muted-foreground">/ {assignment.maxPoints}</span></p>}{work.feedback && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground">{work.feedback}</p>}{!work.feedback && work.score == null && <p className="mt-2 text-xs text-muted-foreground">Your teacher marked this submission as reviewed.</p>}<p className="mt-3 text-xs text-muted-foreground">{staleReview ? 'Reviewed before your latest submission' : `Reviewed ${formatDateTime(work.reviewedAt)}`}</p></section>}
     </div>
   </DataSurface>
-  <Dialog open={linkOpen} onOpenChange={setLinkOpen}><DialogContent><DialogHeader><DialogTitle>Add link</DialogTitle><DialogDescription>Add a webpage or cloud document to your submission.</DialogDescription></DialogHeader><div className="space-y-4"><label className="space-y-2"><span className="text-sm font-medium">URL</span><Input type="url" value={linkUrl} onChange={event => setLinkUrl(event.target.value)} placeholder="https://…" autoFocus /></label><label className="space-y-2"><span className="text-sm font-medium">Display name <span className="font-normal text-muted-foreground">(optional)</span></span><Input value={linkName} onChange={event => setLinkName(event.target.value)} placeholder="Research notes" /></label></div><DialogFooter><Button variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button><Button disabled={addingLink || !linkUrl.trim()} onClick={() => void addLink()}>{addingLink && <LoaderCircle className="animate-spin" />}Add link</Button></DialogFooter></DialogContent></Dialog>
-  <Dialog open={discardOpen} onOpenChange={setDiscardOpen}><DialogContent><DialogHeader><DialogTitle>Discard changes?</DialogTitle><DialogDescription>{submitted ? 'Your saved draft and its draft-only attachments will be removed. Your submitted work will not change.' : 'Your saved response and draft attachments will be permanently removed.'}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setDiscardOpen(false)}>Keep editing</Button><Button variant="destructive" disabled={saving} onClick={() => void cancelEditing()}>{saving && <LoaderCircle className="animate-spin" />}Discard changes</Button></DialogFooter></DialogContent></Dialog></>;
+  <Dialog open={linkOpen} onOpenChange={setLinkOpen}><DialogContent><DialogHeader><DialogTitle>Add link</DialogTitle><DialogDescription>Add a webpage or cloud document to your submission.</DialogDescription></DialogHeader><div className="space-y-4"><label className="space-y-2"><span className="text-sm font-medium">URL</span><Input type="url" value={linkUrl} onChange={event => setLinkUrl(event.target.value)} placeholder="https://…" autoFocus /></label><label className="space-y-2"><span className="text-sm font-medium">Display name <span className="font-normal text-muted-foreground">(optional)</span></span><Input value={linkName} onChange={event => setLinkName(event.target.value)} placeholder="Research notes" /></label></div><DialogFooter><Button variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button><Button disabled={addingLink || !linkUrl.trim()} onClick={() => void addLink()}>{addingLink && <LoadingSpinner />}Add link</Button></DialogFooter></DialogContent></Dialog>
+  <Dialog open={discardOpen} onOpenChange={setDiscardOpen}><DialogContent><DialogHeader><DialogTitle>Discard changes?</DialogTitle><DialogDescription>{submitted ? 'Your saved draft and its draft-only attachments will be removed. Your submitted work will not change.' : 'Your saved response and draft attachments will be permanently removed.'}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setDiscardOpen(false)}>Keep editing</Button><Button variant="destructive" disabled={saving} onClick={() => void cancelEditing()}>{saving && <LoadingSpinner />}Discard changes</Button></DialogFooter></DialogContent></Dialog></>;
 }
 
 function TeacherStudentWork({ assignmentId, maxPoints, deadline }: { assignmentId: string; maxPoints: number | null; deadline: string | null }) {
@@ -657,7 +659,7 @@ function SubmissionViewer({ detail, deadline, reviewOpen, reviewTriggerRef, onRe
               </DropdownMenu>
               : <div className="flex min-w-0 items-center gap-2 text-sm font-medium"><SubmissionSourceIcon source={source} item={activeItem} /><span className="truncate">{sourceLabel}</span></div>}
           </div>
-          {activeItem && <Button variant="ghost" size="sm" disabled={opening || !activeItem.fileAsset} onClick={() => void openActiveFile()}>{opening ? <LoaderCircle className="animate-spin" /> : null}Open in new tab<ExternalLink /></Button>}
+          {activeItem && <Button variant="ghost" size="sm" disabled={opening || !activeItem.fileAsset} onClick={() => void openActiveFile()}>{opening ? <LoadingSpinner /> : null}Open in new tab<ExternalLink /></Button>}
         </div>}
         {source === 'response' && content?.textResponse
           ? <article className="mx-auto max-w-4xl whitespace-pre-wrap px-6 py-8 text-sm leading-7 text-foreground md:px-8">{content.textResponse}</article>
@@ -697,7 +699,7 @@ function SubmissionResourceViewer({ item, studentName }: { item: SubmissionItem;
     return () => { active = false; };
   }, [item]);
 
-  if (loading) return <div className="flex min-h-[320px] items-center justify-center lg:min-h-[440px]"><LoaderCircle className="size-5 animate-spin text-muted-foreground" /><span className="sr-only">Loading file</span></div>;
+  if (loading) return <LoadingState className="min-h-[320px] lg:min-h-[440px]" label="Loading file…" />;
   if (!url) return <EmptyState surface={false} title="File unavailable" description="A temporary access link could not be created." />;
   return <div className="flex min-h-[360px] flex-col lg:min-h-[560px]">
     {kind === 'pdf' && <iframe src={url} title={`${studentName} PDF submission`} referrerPolicy="no-referrer" className="h-[60dvh] min-h-[360px] w-full bg-muted/20 lg:h-[72dvh] lg:min-h-[560px] lg:max-h-[840px]" />}
@@ -754,7 +756,7 @@ function ReviewPanel({ assignmentId, detail, maxPoints, score, feedback, dirty, 
         </label>
         {saveError && <p role="alert" className="rounded-control border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">{saveError}</p>}
       </div>
-      <div className="border-t border-ui-border bg-surface p-4"><Button type="submit" className="w-full" disabled={!canSave}>{saving ? <><LoaderCircle className="animate-spin" />Saving…</> : 'Save review'}</Button>{detail.state === 'REVIEWED' && !dirty && <p className="mt-2 text-center text-xs text-muted-foreground">No changes to save.</p>}</div></form>}
+      <div className="border-t border-ui-border bg-surface p-4"><Button type="submit" className="w-full" disabled={!canSave}>{saving ? <><LoadingSpinner />Saving…</> : 'Save review'}</Button>{detail.state === 'REVIEWED' && !dirty && <p className="mt-2 text-center text-xs text-muted-foreground">No changes to save.</p>}</div></form>}
   </div>;
 }
 
@@ -809,7 +811,7 @@ function SubmissionItemRow({ item, onRemove }: { item: SubmissionItem; onRemove?
     <Button type="button" variant="ghost" className="h-auto min-w-0 flex-1 justify-start rounded-none p-0 text-left font-normal hover:bg-transparent" onClick={() => void open()}>
       <AttachmentContent><AttachmentTitle className="group-hover/button:underline">{itemLabel(item)}</AttachmentTitle><AttachmentDescription>{detail}</AttachmentDescription></AttachmentContent>
     </Button>
-    {opening && <LoaderCircle className="size-4 shrink-0 animate-spin text-muted-foreground" />}
+    {opening && <LoadingSpinner className="text-muted-foreground" />}
     {onRemove && <AttachmentActions><Button type="button" size="icon-xs" variant="ghost" aria-label={`Remove ${itemLabel(item)}`} onClick={() => onRemove(item.id)}><X /></Button></AttachmentActions>}
   </Attachment>;
 }
@@ -818,12 +820,12 @@ function UploadRow({ upload, onRetry, onRemove }: { upload: { file: File; progre
   return <Attachment state={upload.error ? 'error' : 'uploading'} className="rounded-none border-0 focus-within:ring-0">
     <AttachmentMedia><ResourceIcon mimeType={upload.file.type} fileName={upload.file.name} /></AttachmentMedia>
     <AttachmentContent><AttachmentTitle>{upload.file.name}</AttachmentTitle>{upload.error ? <AttachmentDescription className="text-destructive">{upload.error}</AttachmentDescription> : <><AttachmentDescription>Uploading {upload.progress}%</AttachmentDescription><Progress className="mt-1.5" value={upload.progress} /></>}</AttachmentContent>
-    {upload.error ? <AttachmentActions><Button type="button" size="icon-xs" variant="ghost" aria-label={`Retry ${upload.file.name}`} onClick={onRetry}><RotateCcw /></Button><Button type="button" size="icon-xs" variant="ghost" aria-label={`Remove ${upload.file.name}`} onClick={onRemove}><X /></Button></AttachmentActions> : <LoaderCircle className="size-4 shrink-0 animate-spin text-muted-foreground" />}
+    {upload.error ? <AttachmentActions><Button type="button" size="icon-xs" variant="ghost" aria-label={`Retry ${upload.file.name}`} onClick={onRetry}><RotateCcw /></Button><Button type="button" size="icon-xs" variant="ghost" aria-label={`Remove ${upload.file.name}`} onClick={onRemove}><X /></Button></AttachmentActions> : <LoadingSpinner className="text-muted-foreground" />}
   </Attachment>;
 }
 
 function SaveState({ state }: { state: 'idle' | 'saving' | 'saved' | 'error' }) {
-  if (state === 'saving') return <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground"><LoaderCircle className="size-3 animate-spin" />Saving…</span>;
+  if (state === 'saving') return <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground"><LoadingSpinner size="xs" />Saving…</span>;
   if (state === 'saved') return <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground"><Check className="size-3" />Saved</span>;
   if (state === 'error') return <span className="text-xs font-normal text-destructive">Couldn’t save</span>;
   return null;
@@ -844,10 +846,10 @@ function uploadToSignedUrl(url: string, file: File, headers: Record<string, stri
 function WorkFilterMenu({ value, onChange, disabled = false }: { value: WorkFilter; onChange: (value: WorkFilter) => void; disabled?: boolean }) { const labels: Record<WorkFilter, string> = { ALL: 'All students', NEEDS_REVIEW: 'Needs review', REVIEWED: 'Reviewed', MISSING: 'Missing', NOT_SUBMITTED: 'Not submitted' }; return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="justify-between lg:w-full" disabled={disabled}>{labels[value]}<ChevronDown size={14} /></Button></DropdownMenuTrigger><DropdownMenuContent align="start" className="w-52"><DropdownMenuLabel>Student work status</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuRadioGroup value={value} onValueChange={next => onChange(next as WorkFilter)}>{Object.entries(labels).map(([key, label]) => <DropdownMenuRadioItem key={key} value={key}>{label}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuContent></DropdownMenu>; }
 function WorkBadge({ state, student = false }: { state: WorkState; student?: boolean }) { const config: Record<WorkState, { label: string; tone: 'neutral' | 'warning' | 'success' | 'danger' }> = { NOT_SUBMITTED: { label: 'Not submitted', tone: 'neutral' }, NEEDS_REVIEW: { label: student ? 'Submitted' : 'Needs review', tone: 'warning' }, REVIEWED: { label: 'Reviewed', tone: 'success' }, MISSING: { label: 'Missing', tone: 'danger' } }; return <Badge tone={config[state].tone} className="shrink-0">{config[state].label}</Badge>; }
 function ResourceLink({ url, title, detail, fileName }: { url: string; title: string; detail: string; fileName?: string }) { return <Attachment asChild className="group rounded-none border-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><a href={url} target="_blank" rel="noreferrer"><AttachmentMedia><ResourceIcon url={fileName ? undefined : url} fileName={fileName} /></AttachmentMedia><AttachmentContent><AttachmentTitle className="group-hover:underline">{title}</AttachmentTitle><AttachmentDescription>{detail}</AttachmentDescription></AttachmentContent><ExternalLink aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" /></a></Attachment>; }
-function AssignmentSkeleton() { return <div className="mx-auto max-w-screen-2xl space-y-4 p-4 md:p-6" aria-label="Loading assignment"><div className="h-20 animate-pulse rounded-card bg-muted" /><div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(380px,400px)]"><div className="h-72 animate-pulse rounded-card bg-muted" /><div className="h-72 animate-pulse rounded-card bg-muted" /></div></div>; }
-function ListSkeleton() { return <div className="space-y-1 p-1">{Array.from({ length: 6 }, (_, index) => <div key={index} className="flex h-14 animate-pulse items-center gap-3 px-2"><div className="size-8 rounded-full bg-muted" /><div className="flex-1 space-y-2"><div className="h-3 w-2/3 rounded bg-muted" /><div className="h-2.5 w-1/2 rounded bg-muted" /></div></div>)}</div>; }
-function DetailSkeleton() { return <div className="space-y-5 p-5"><div className="h-5 w-44 animate-pulse rounded bg-muted" /><div className="h-28 animate-pulse rounded-control bg-muted" /><div className="h-24 animate-pulse rounded-control bg-muted" /></div>; }
-function ReviewSkeleton() { return <div className="space-y-5 p-5"><div className="h-5 w-24 animate-pulse rounded bg-muted" /><div className="h-10 animate-pulse rounded-control bg-muted" /><div className="h-40 animate-pulse rounded-control bg-muted" /></div>; }
+function AssignmentSkeleton() { return <div className="mx-auto max-w-screen-2xl space-y-4 p-4 md:p-6" aria-label="Loading assignment"><Skeleton className="h-20" /><div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(380px,400px)]"><Skeleton className="h-72" /><Skeleton className="h-72" /></div></div>; }
+function ListSkeleton() { return <div className="space-y-1 p-1">{Array.from({ length: 6 }, (_, index) => <div key={index} className="flex h-14 items-center gap-3 px-2"><Skeleton className="size-8 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-3 w-2/3" /><Skeleton className="h-2.5 w-1/2" /></div></div>)}</div>; }
+function DetailSkeleton() { return <div className="space-y-5 p-5"><Skeleton className="h-5 w-44" /><Skeleton className="h-28" /><Skeleton className="h-24" /></div>; }
+function ReviewSkeleton() { return <div className="space-y-5 p-5"><Skeleton className="h-5 w-24" /><Skeleton className="h-10" /><Skeleton className="h-40" /></div>; }
 function formatDate(value: string) { return format(parseISO(value), 'MMM d, yyyy'); }
 function formatDateTime(value: string) { return format(parseISO(value), 'MMM d, yyyy · HH:mm'); }
 function formatShortDateTime(value: string) { return format(parseISO(value), 'MMM d · HH:mm'); }

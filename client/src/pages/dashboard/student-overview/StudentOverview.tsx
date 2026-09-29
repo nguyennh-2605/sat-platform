@@ -13,6 +13,7 @@ import { StudentRecentResults } from './StudentRecentResults';
 import { StudentSummaryCards } from './StudentSummaryCards';
 import { StudentTasksSection } from './StudentTasksSection';
 import type { StudentOverviewResponse, StudentPracticePick, StudentTaskItem, StudentTasksResponse } from './student-overview.types';
+import { LoadingSpinner } from '@/components/ui/loading';
 
 const emptyTasks: StudentTasksResponse = { items: [], summary: { todayRemaining: 0, weekCompleted: 0, weekTotal: 0, weekPercentage: 0 }, calendar: [] };
 
@@ -73,7 +74,7 @@ export default function StudentOverview() {
     <main className="mx-auto w-full max-w-screen-2xl p-4 md:p-6">
       <div className="grid gap-6 lg:grid-cols-12">
         <section className="flex min-w-0 flex-col gap-6 lg:col-span-9">
-          <header className="flex items-start justify-between gap-4"><div><h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">Welcome back, {firstName}</h1><p className="mt-1 text-base text-muted-foreground">Plan today, complete your coursework, and keep your SAT progress moving.</p></div><Button variant="outline" size="icon" disabled={loading} onClick={() => void loadOverview(true)} aria-label="Refresh overview"><RefreshCw className={loading ? 'animate-spin' : ''} /></Button></header>
+          <header className="flex items-start justify-between gap-4"><div><h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">Welcome back, {firstName}</h1><p className="mt-1 text-base text-muted-foreground">Plan today, complete your coursework, and keep your SAT progress moving.</p></div><Button variant="outline" size="icon" disabled={loading} onClick={() => void loadOverview(true)} aria-label="Refresh overview">{loading ? <LoadingSpinner /> : <RefreshCw />}</Button></header>
           <StudentSummaryCards summary={tasks.summary} preferences={data.preferences} onShowToday={showToday} onSatDateSaved={value => setData(current => current ? { ...current, preferences: { ...current.preferences, satTestDate: value } } : current)} onScoreGoalSaved={value => setData(current => current ? { ...current, preferences: { ...current.preferences, ...value } } : current)} />
           <div ref={tasksSectionRef}>{tasksError && tasks.items.length === 0 ? <Card className="p-6"><EmptyState icon={<RefreshCw />} title="Tasks could not be loaded" description="Your progress and practice are still available." action={<Button variant="outline" onClick={() => void loadTasks(true)}><RefreshCw />Try again</Button>} /></Card> : <StudentTasksSection data={tasks} selectedDate={selectedDate} showTodayRequest={showTodayRequest} onClearDate={() => setSelectedDate(undefined)} onOpen={openTask} onReload={() => loadTasks(true)} />}</div>
           <section className="grid min-w-0 gap-6 xl:grid-cols-12" aria-label="Progress and practice"><div className="min-w-0 xl:col-span-7"><StudentProgress progress={data.progress} /></div><div className="min-w-0 xl:col-span-5"><StudentPracticePicks items={data.practice} onOpen={openPractice} /></div></section>

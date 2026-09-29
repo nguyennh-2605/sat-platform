@@ -1,5 +1,6 @@
 import { hasGrantedAllScopesGoogle, useGoogleLogin, type TokenResponse } from '@react-oauth/google';
-import { ExternalLink, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { ExternalLink, FileSpreadsheet } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -99,7 +100,7 @@ export function GoogleSheetsExportButton({ draftStore }: { draftStore: Reflectio
       onClick={startExport}
       title={hasUnsavedChanges ? 'Save changes before exporting' : 'Export all entries to a native Google Sheet'}
     >
-      {exporting ? <Loader2 className="animate-spin" aria-hidden="true" /> : <FileSpreadsheet aria-hidden="true" />}
+      {exporting ? <LoadingSpinner /> : <FileSpreadsheet aria-hidden="true" />}
       {exporting ? 'Exporting…' : 'Export to Sheets'}
     </Button>
     {exportedSheetUrl && <Button variant="ghost" size="sm" asChild>

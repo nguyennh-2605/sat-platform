@@ -13,7 +13,6 @@ import {
   CircleHelp,
   Eye,
   ImagePlus,
-  LoaderCircle,
   Save,
   UploadCloud,
 } from 'lucide-react';
@@ -28,6 +27,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { Field, FieldLabel } from '../../components/ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { LoadingSpinner, LoadingState } from '../../components/ui/loading';
 import { ui } from '../../components/ui/styles';
 import { useDashboardBack } from '../navigation/DashboardBackContext';
 import { createTestDetailsSchema, normalizeTestCategoryForForm } from './create-test.schema';
@@ -560,7 +560,7 @@ const CreateTestWizard = () => {
               )}
             </div>
           </div>
-          {isLoadingEdit && <Card className="flex min-h-[360px] items-center justify-center gap-3 p-8 text-sm text-muted-foreground"><LoaderCircle size={20} className="animate-spin text-primary" />Loading test content…</Card>}
+          {isLoadingEdit && <Card><LoadingState className="min-h-[360px]" label="Loading test content…" /></Card>}
           {!isLoadingEdit && stage === 'BUILD' && (
             <div className="wizard-step-enter flex min-h-0 flex-1 flex-col gap-4">
               {editLocked && <ImportNotice tone="warning" message="This test is read-only because a student has already started it. Duplicate it from Test Library to make structural changes." />}
@@ -586,10 +586,10 @@ const CreateTestWizard = () => {
                           <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void parseFile(file); }} />
                           <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadImage(file); }} />
                           <Button type="button" variant="ghost" size="sm" onClick={() => setGuideOpen(true)}><CircleHelp data-icon="inline-start" />Formatting guide</Button>
-                          <Button type="button" variant="outline" size="sm" disabled={isParsing || editLocked} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <UploadCloud data-icon="inline-start" />}Upload file</Button>
-                          <Button type="button" variant="outline" size="sm" disabled={isUploadingImage || editLocked} onClick={() => imageInputRef.current?.click()}>{isUploadingImage ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <ImagePlus data-icon="inline-start" />}{isUploadingImage ? `Uploading ${imageUploadProgress ?? 0}%` : 'Upload image'}</Button>
+                          <Button type="button" variant="outline" size="sm" disabled={isParsing || editLocked} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoadingSpinner data-icon="inline-start" /> : <UploadCloud data-icon="inline-start" />}Upload file</Button>
+                          <Button type="button" variant="outline" size="sm" disabled={isUploadingImage || editLocked} onClick={() => imageInputRef.current?.click()}>{isUploadingImage ? <LoadingSpinner data-icon="inline-start" /> : <ImagePlus data-icon="inline-start" />}{isUploadingImage ? `Uploading ${imageUploadProgress ?? 0}%` : 'Upload image'}</Button>
                           {isUploadingImage && <Button type="button" variant="ghost" size="sm" onClick={() => imageUploadAbortRef.current?.abort()}>Cancel upload</Button>}
-                          <Button type="button" size="sm" disabled={isParsing || !rawText.trim() || editLocked} onClick={() => void previewText()}>{isParsing ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Eye data-icon="inline-start" />}Update preview</Button>
+                          <Button type="button" size="sm" disabled={isParsing || !rawText.trim() || editLocked} onClick={() => void previewText()}>{isParsing ? <LoadingSpinner data-icon="inline-start" /> : <Eye data-icon="inline-start" />}Update preview</Button>
                         </div>
                       </div>
                     </TabsContent>
