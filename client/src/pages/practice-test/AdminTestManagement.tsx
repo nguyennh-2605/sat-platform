@@ -15,7 +15,6 @@ import {
   Grid2X2,
   History,
   List,
-  LoaderCircle,
   MoreHorizontal,
   Pencil,
   Play,
@@ -30,6 +29,8 @@ import {
 import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -383,7 +384,7 @@ function AdminToolbar({ source, search, onSearch, subject, onSubject, mode, onMo
         <Button variant="ghost" size="sm" className={cn('h-7 px-2', view === 'GRID' && 'bg-muted text-foreground')} onClick={() => onView('GRID')} aria-label="Card view" aria-pressed={view === 'GRID'}>{view === 'GRID' && <Check className="size-3" aria-hidden="true" />}<Grid2X2 aria-hidden="true" /></Button>
         <Button variant="ghost" size="sm" className={cn('h-7 px-2', view === 'LIST' && 'bg-muted text-foreground')} onClick={() => onView('LIST')} aria-label="List view" aria-pressed={view === 'LIST'}>{view === 'LIST' && <Check className="size-3" aria-hidden="true" />}<List aria-hidden="true" /></Button>
       </div>
-      <Button variant="outline" size="icon-sm" onClick={onRefresh} disabled={loading} aria-label="Refresh tests"><RefreshCw className={cn(loading && 'animate-spin')} aria-hidden="true" /></Button>
+      <Button variant="outline" size="icon-sm" onClick={onRefresh} disabled={loading} aria-label="Refresh tests">{loading ? <LoadingSpinner /> : <RefreshCw aria-hidden="true" />}</Button>
       {source === 'SYSTEM' && <Button size="sm" onClick={onCreate}><Plus data-icon="inline-start" />Create test</Button>}
     </DataToolbarActions>
   </DataToolbar>;
@@ -410,7 +411,7 @@ function AdminTestTable({ tests, source, workingId, actions }: { tests: AdminTes
 
 function AdminTestCard({ test, source, working, actions }: { test: AdminTest; source: AdminSource; working: boolean; actions: TestActions }) {
   const primary = source === 'TEACHER'
-    ? <Button className="w-full" disabled={working} onClick={() => actions.copyToSystem(test)}>{working ? <LoaderCircle className="animate-spin" /> : <Copy />}Copy to System Library</Button>
+    ? <Button className="w-full" disabled={working} onClick={() => actions.copyToSystem(test)}>{working ? <LoadingSpinner /> : <Copy />}Copy to System Library</Button>
     : test.capabilities.canEdit
       ? <Button className="w-full" disabled={working} onClick={() => actions.edit(test)}><Pencil />Edit test</Button>
       : <Button className="w-full" variant="outline" disabled={working} onClick={() => actions.preview(test)}><Play />Preview</Button>;
@@ -449,8 +450,8 @@ function StatusBadge({ status }: { status: TestStatus }) {
 }
 
 function AdminTestSkeleton({ view }: { view: ViewMode }) {
-  if (view === 'GRID') return <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-60 animate-pulse bg-muted/60 shadow-none" />)}</div>;
-  return <div className="animate-pulse"><div className="h-11 border-b border-ui-border bg-muted/50" />{[1, 2, 3, 4, 5].map(item => <div key={item} className="flex h-14 items-center gap-6 border-b border-ui-border px-4 last:border-0"><span className="h-4 w-64 rounded-sm bg-muted" /><span className="h-5 w-20 rounded-sm bg-muted" /><span className="ml-auto h-7 w-7 rounded-lg bg-muted" /></div>)}</div>;
+  if (view === 'GRID') return <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-60 p-4 shadow-none"><Skeleton className="h-full w-full" /></Card>)}</div>;
+  return <div><Skeleton className="h-11 rounded-none border-b border-ui-border" />{[1, 2, 3, 4, 5].map(item => <div key={item} className="flex h-14 items-center gap-6 border-b border-ui-border px-4 last:border-0"><Skeleton className="h-4 w-64" /><Skeleton className="h-5 w-20" /><Skeleton className="ml-auto size-7" /></div>)}</div>;
 }
 
 const usageLabel = (test: AdminTest) => {

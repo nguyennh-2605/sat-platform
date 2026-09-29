@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { VirtuosoGrid, type GridStateSnapshot } from 'react-virtuoso';
-import { ArrowUpDown, BookOpen, BookOpenCheck, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, Grid2X2, GraduationCap, List, LoaderCircle, Play, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUpDown, BookOpen, BookOpenCheck, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDashed, Clock3, Grid2X2, GraduationCap, List, Play, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { capitalizeFirstLetter } from '../../utils/text';
@@ -13,6 +13,8 @@ import { useDebounce } from '../../hooks/useDebounce';
 import TeacherTestLibrary from './TeacherTestLibrary';
 import AdminTestManagement from './AdminTestManagement';
 import { practiceCenterCache } from './practiceCenterCache';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ClassInfo {
   id: string;
@@ -289,7 +291,6 @@ function PracticeCenter() {
       <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
         <section className="flex flex-col gap-4">
           <PageHeader title={<span className="font-medium">Practice Center</span>} description="Find assigned and public SAT tests, then continue where you left off." />
-          {(!loading || total > 0 || classes.length > 0) && <div className="flex flex-wrap items-center gap-2"><Badge className="gap-1.5 rounded-sm px-2 py-1"><BookOpenCheck size={13} aria-hidden="true" />{total} tests</Badge></div>}
         </section>
 
         <DataSurface aria-label="Practice Center controls">
@@ -311,7 +312,7 @@ function PracticeCenter() {
             List: viewMode === 'GRID' ? VirtualGridList : VirtualList,
             Item: viewMode === 'GRID' ? VirtualGridItem : VirtualListItem,
             Header: viewMode === 'LIST' ? PracticeListHeader : undefined,
-            Footer: () => loadingMore ? <div className="flex items-center justify-center gap-2 p-4 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading next results…</div> : !nextCursor ? <p className="p-4 text-center text-xs text-muted-foreground">All {total} tests loaded</p> : null,
+            Footer: () => loadingMore ? <div className="flex items-center justify-center gap-2 p-4 text-sm text-muted-foreground"><LoadingSpinner />Loading next results…</div> : !nextCursor ? <p className="p-4 text-center text-xs text-muted-foreground">All {total} tests loaded</p> : null,
           }}
           itemContent={(_, test) => viewMode === 'GRID' ? <TestCard test={test} onStart={() => handleStart(test)} /> : <TestListRow test={test} onStart={() => handleStart(test)} />}
           endReached={() => void loadMore()}
@@ -346,14 +347,14 @@ function PracticeToolbar({ search, onSearchChange, subject, onSubjectChange, mod
       <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={activeFilterCount > 0 ? 'bg-muted text-foreground' : undefined}><SlidersHorizontal size={15} />Filter{activeFilterCount > 0 && <Badge className="ml-1 min-w-5 justify-center px-1.5">{activeFilterCount}</Badge>}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52"><DropdownMenuLabel>Filter tests</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuGroup><DropdownMenuSub><DropdownMenuSubTrigger><BookOpen />Subject</DropdownMenuSubTrigger><DropdownMenuSubContent sideOffset={8} className="w-48"><DropdownMenuLabel>Subject</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuRadioGroup value={subject} onValueChange={value => onSubjectChange(value as SubjectFilter)}><DropdownMenuRadioItem value="ALL">All subjects</DropdownMenuRadioItem><DropdownMenuRadioItem value="RW">Reading & Writing</DropdownMenuRadioItem><DropdownMenuRadioItem value="MATH">Math</DropdownMenuRadioItem></DropdownMenuRadioGroup></DropdownMenuSubContent></DropdownMenuSub><DropdownMenuSub><DropdownMenuSubTrigger><BookOpenCheck />Test type</DropdownMenuSubTrigger><DropdownMenuSubContent sideOffset={8} className="w-44"><DropdownMenuLabel>Test type</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuRadioGroup value={mode} onValueChange={value => onModeChange(value as ModeFilter)}><DropdownMenuRadioItem value="ALL">All types</DropdownMenuRadioItem><DropdownMenuRadioItem value="EXAM">Exam</DropdownMenuRadioItem><DropdownMenuRadioItem value="PRACTICE">Practice</DropdownMenuRadioItem></DropdownMenuRadioGroup></DropdownMenuSubContent></DropdownMenuSub><DropdownMenuSub><DropdownMenuSubTrigger><CalendarDays />Official month</DropdownMenuSubTrigger><DropdownMenuSubContent sideOffset={8} className="w-44"><DropdownMenuLabel>SAT test month</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuRadioGroup value={month} onValueChange={value => onMonthChange(value as SatTestMonthFilter)}><DropdownMenuRadioItem value="ALL">All months</DropdownMenuRadioItem>{SAT_TEST_MONTHS.map(item => <DropdownMenuRadioItem key={item.value} value={item.value}>{item.label}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuSubContent></DropdownMenuSub>{classes.length > 0 && <DropdownMenuSub><DropdownMenuSubTrigger><GraduationCap />Class</DropdownMenuSubTrigger><DropdownMenuSubContent sideOffset={8} className="w-56"><DropdownMenuLabel>Class</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuRadioGroup value={classFilter} onValueChange={onClassChange}><DropdownMenuRadioItem value="ALL">All classes</DropdownMenuRadioItem>{classes.map(item => <DropdownMenuRadioItem key={item.id} value={item.id}>{item.name}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuSubContent></DropdownMenuSub>}</DropdownMenuGroup><DropdownMenuSeparator /><DropdownMenuItem disabled={activeFilterCount === 0} onSelect={onResetFilters}><X />Reset filters</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
       <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><ArrowUpDown size={15} />{sortOrder === 'NEWEST' ? 'Newest' : 'Oldest'}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuLabel>Sort by</DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuRadioGroup value={sortOrder} onValueChange={value => onSortChange(value as SortOrder)}><DropdownMenuRadioItem value="NEWEST">Newest first</DropdownMenuRadioItem><DropdownMenuRadioItem value="OLDEST">Oldest first</DropdownMenuRadioItem></DropdownMenuRadioGroup></DropdownMenuContent></DropdownMenu>
       <div className="flex h-8 items-center rounded-control border border-ui-border bg-surface p-0.5" role="group" aria-label="Display mode"><Button variant="ghost" size="sm" className={`h-7 px-2 shadow-none ${viewMode === 'GRID' ? 'bg-accent text-foreground' : ''}`} onClick={() => onViewModeChange('GRID')} aria-label="Card view" aria-pressed={viewMode === 'GRID'}>{viewMode === 'GRID' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}<Grid2X2 size={17} aria-hidden="true" /></Button><Button variant="ghost" size="sm" className={`h-7 px-2 shadow-none ${viewMode === 'LIST' ? 'bg-accent text-foreground' : ''}`} onClick={() => onViewModeChange('LIST')} aria-label="List view" aria-pressed={viewMode === 'LIST'}>{viewMode === 'LIST' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}<List size={18} aria-hidden="true" /></Button></div>
-      <Button variant="outline" size="sm" className="w-9 px-0" onClick={onRefresh} disabled={loading} aria-label="Refresh tests"><RefreshCw size={20} strokeWidth={2.25} className={loading ? 'animate-spin' : ''} aria-hidden="true" /></Button>
+      <Button variant="outline" size="sm" className="w-9 px-0" onClick={onRefresh} disabled={loading} aria-label="Refresh tests">{loading ? <LoadingSpinner /> : <RefreshCw size={20} strokeWidth={2.25} aria-hidden="true" />}</Button>
     </DataToolbarActions>
   </DataToolbar>;
 }
 
 function TestStatus({ test }: { test: TestItem }) {
   if (test.attemptStatus === 'COMPLETED') return <Badge className="gap-1.5 px-1.5 text-muted-foreground"><CheckCircle2 size={13} className="fill-success text-white" />Completed</Badge>;
-  if (test.attemptStatus === 'DOING' || test.isDoing) return <Badge className="gap-1.5 px-1.5 text-muted-foreground"><LoaderCircle size={13} />In progress</Badge>;
+  if (test.attemptStatus === 'DOING' || test.isDoing) return <Badge className="gap-1.5 px-1.5 text-muted-foreground"><CircleDashed size={13} />In progress</Badge>;
   return <Badge className="gap-1.5 px-1.5 text-muted-foreground"><Clock3 size={13} />Not started</Badge>;
 }
 
@@ -384,8 +385,8 @@ function TestListRow({ test, onStart }: { test: TestItem; onStart: () => void })
 }
 
 function PracticeSkeleton({ viewMode }: { viewMode: ViewMode }) {
-  if (viewMode === 'LIST') return <div className="animate-pulse"><div className="h-11 border-b border-ui-border bg-muted/20" />{[1, 2, 3, 4, 5].map(item => <div key={item} className="flex h-16 items-center gap-6 border-b border-ui-border/60 px-4 last:border-0"><span className="h-4 w-64 rounded-sm bg-muted" /><span className="h-6 w-24 rounded-full bg-muted" /><span className="h-2 flex-1 rounded-full bg-muted" /><span className="h-8 w-24 rounded-control bg-muted" /></div>)}</div>;
-  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-72 animate-pulse p-5"><div className="mb-6 flex gap-2"><span className="h-5 w-24 rounded-full bg-muted" /><span className="h-5 w-16 rounded-full bg-muted" /></div><div className="h-5 w-3/4 rounded-sm bg-muted" /><div className="mt-3 h-4 w-full rounded-sm bg-muted" /><div className="mt-8 h-2 w-full rounded-full bg-muted" /></Card>)}</div>;
+  if (viewMode === 'LIST') return <div><Skeleton className="h-11 rounded-none border-b border-ui-border" />{[1, 2, 3, 4, 5].map(item => <div key={item} className="flex h-16 items-center gap-6 border-b border-ui-border/60 px-4 last:border-0"><Skeleton className="h-4 w-64" /><Skeleton className="h-6 w-24 rounded-full" /><Skeleton className="h-2 flex-1 rounded-full" /><Skeleton className="h-8 w-24" /></div>)}</div>;
+  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{[1, 2, 3, 4, 5, 6].map(item => <Card key={item} className="h-72 p-5"><div className="mb-6 flex gap-2"><Skeleton className="h-5 w-24 rounded-full" /><Skeleton className="h-5 w-16 rounded-full" /></div><Skeleton className="h-5 w-3/4" /><Skeleton className="mt-3 h-4 w-full" /><Skeleton className="mt-8 h-2 w-full rounded-full" /></Card>)}</div>;
 }
 
 export default PracticeTest;

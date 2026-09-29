@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Download, ExternalLink, FileText, Image as ImageIcon, LoaderCircle, TriangleAlert, Video } from 'lucide-react';
+import { Download, ExternalLink, FileText, Image as ImageIcon, TriangleAlert, Video } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '@/components/ui/AppUI';
 import { Button } from '@/components/ui/button';
 import axiosClient from '@/lib/axios';
+import { LoadingSpinner } from '@/components/ui/loading';
 
 type ResourceKind = 'FILE' | 'VIDEO' | 'LINK' | 'EMBED';
 
@@ -143,12 +144,12 @@ export function LessonResourceViewer({ block, canManage, onClose, onProgress }: 
     footer={<>
       {resource.fileAssetId && <Button variant="outline" onClick={() => void download()}><Download />Download</Button>}
       {sourceUrl && <Button variant="outline" onClick={openOriginal}><ExternalLink />Open original</Button>}
-      {!canManage && !block.completed && resource.kind !== 'LINK' && <Button disabled={progressSaving || Boolean(loadError)} onClick={() => void markDone()}>{progressSaving ? <LoaderCircle className="animate-spin" /> : null}Mark as done</Button>}
+      {!canManage && !block.completed && resource.kind !== 'LINK' && <Button disabled={progressSaving || Boolean(loadError)} onClick={() => void markDone()}>{progressSaving ? <LoadingSpinner /> : null}Mark as done</Button>}
       <Button variant={canManage || block.completed || resource.kind === 'LINK' ? 'default' : 'ghost'} onClick={onClose}>Close</Button>
     </>}
   >
     <div className="flex h-full min-h-0 items-center justify-center overflow-hidden rounded-control border border-ui-border bg-muted/25">
-      {loading ? <ViewerMessage icon={<LoaderCircle className="animate-spin" />} title="Preparing preview…" description="Creating a secure, temporary viewer link." />
+      {loading ? <ViewerMessage icon={<LoadingSpinner size="md" />} title="Preparing preview…" description="Creating a secure, temporary viewer link." />
         : loadError ? <ViewerMessage icon={<TriangleAlert />} title="Preview unavailable" description={loadError} />
           : embedUrl ? <div className="aspect-video w-full max-w-5xl overflow-hidden bg-black"><iframe src={embedUrl} title={resource.name} className="size-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen sandbox="allow-scripts allow-same-origin allow-presentation allow-popups" referrerPolicy="strict-origin-when-cross-origin" /></div>
             : canPreviewImage ? <img src={sourceUrl} alt={resource.name} className="max-h-full max-w-full object-contain" />

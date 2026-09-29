@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Archive, Check, Copy, FilePenLine, LoaderCircle, Pencil, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
+import { Archive, Check, Copy, FilePenLine, Pencil, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ContentBlock } from '@/types/quiz';
 import { Badge, Button, Card, EmptyState, Modal, PageHeader, Tabs } from '@/components/ui/AppUI';
@@ -11,6 +11,8 @@ import FormattedTextRenderer from '@/components/content/TextRenderer';
 import ReadingText from '@/components/content/ReadingText';
 import axiosClient from '@/lib/axios';
 import { invalidateQueryCache } from '@/lib/queryCache';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type DetailTab = 'OVERVIEW' | 'QUESTIONS';
 type TestStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
@@ -116,11 +118,11 @@ export default function TestDetail() {
     }
   };
 
-  if (loading) return <div className="mx-auto max-w-screen-2xl space-y-4 p-4 md:p-6"><div className="h-24 animate-pulse rounded-card bg-muted" /><div className="h-80 animate-pulse rounded-card bg-muted" /></div>;
+  if (loading) return <div className="mx-auto max-w-screen-2xl space-y-4 p-4 md:p-6"><Skeleton className="h-24" /><Skeleton className="h-80" /></div>;
   if (!test || error) return <div className="mx-auto max-w-screen-2xl p-4 md:p-6"><EmptyState icon={<TriangleAlert size={23} />} title="Test not found" description={error || 'This test may have been removed or you may not have access.'} /></div>;
 
   return <div className="h-full overflow-y-auto bg-background"><main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
-    <PageHeader title={test.title} description={`${test.subject === 'MATH' ? 'Math' : 'Reading & Writing'} · ${test.mode === 'EXAM' ? 'Exam' : 'Practice'}`} actions={<div className="flex flex-wrap items-center gap-2">{test.capabilities.canRestore && <Button variant="outline" size="sm" disabled={working} onClick={() => void updateStatus('PUBLISHED')}><RotateCcw size={15} />Restore</Button>}{test.capabilities.canEdit && <Button size="sm" disabled={working} onClick={() => navigate(`/dashboard/practice-test/create?edit=${test.id}`)}><Pencil size={15} />Edit test</Button>}{test.capabilities.canDuplicate && <Button variant={test.capabilities.canEdit ? 'outline' : 'primary'} size="sm" disabled={working} onClick={() => void duplicate()}>{working ? <LoaderCircle size={15} className="animate-spin" /> : <Copy size={15} />}{test.scope === 'SYSTEM' && localStorage.getItem('userRole') === 'TEACHER' ? 'Duplicate to My Tests' : 'Duplicate'}</Button>}{test.capabilities.canCopyToSystem && <Button size="sm" disabled={working} onClick={() => void copyToSystem()}>{working ? <LoaderCircle size={15} className="animate-spin" /> : <Copy size={15} />}Copy to System Library</Button>}</div>} />
+    <PageHeader title={test.title} description={`${test.subject === 'MATH' ? 'Math' : 'Reading & Writing'} · ${test.mode === 'EXAM' ? 'Exam' : 'Practice'}`} actions={<div className="flex flex-wrap items-center gap-2">{test.capabilities.canRestore && <Button variant="outline" size="sm" disabled={working} onClick={() => void updateStatus('PUBLISHED')}><RotateCcw size={15} />Restore</Button>}{test.capabilities.canEdit && <Button size="sm" disabled={working} onClick={() => navigate(`/dashboard/practice-test/create?edit=${test.id}`)}><Pencil size={15} />Edit test</Button>}{test.capabilities.canDuplicate && <Button variant={test.capabilities.canEdit ? 'outline' : 'primary'} size="sm" disabled={working} onClick={() => void duplicate()}>{working ? <LoadingSpinner /> : <Copy size={15} />}{test.scope === 'SYSTEM' && localStorage.getItem('userRole') === 'TEACHER' ? 'Duplicate to My Tests' : 'Duplicate'}</Button>}{test.capabilities.canCopyToSystem && <Button size="sm" disabled={working} onClick={() => void copyToSystem()}>{working ? <LoadingSpinner /> : <Copy size={15} />}Copy to System Library</Button>}</div>} />
     <div className="overflow-x-auto"><Tabs items={[{ value: 'OVERVIEW' as const, label: 'Overview' }, { value: 'QUESTIONS' as const, label: `Questions (${test.questionCount})` }]} value={activeTab} onValueChange={setActiveTab} ariaLabel="Test detail sections" /></div>
 
     {activeTab === 'OVERVIEW' ? <Overview test={test} onArchive={() => void updateStatus('ARCHIVED')} onDelete={() => setDeleteOpen(true)} working={working} /> : <Questions test={test} />}

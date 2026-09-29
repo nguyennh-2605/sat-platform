@@ -6,6 +6,7 @@ import { Badge, Button, Card, EmptyState, Modal } from '../../components/ui/AppU
 import { DataSurface } from '@/components/ui/data-surface';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ui } from '../../components/ui/styles';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ActivityAssignee {
   studentId: number;
@@ -77,7 +78,7 @@ export default function ClassroomVocabularyPanel({ classId, canManage }: { class
     }
   };
 
-  if (loading) return <div className="grid gap-4 md:grid-cols-2">{[1, 2, 3].map(item => <div key={item} className="h-40 animate-pulse rounded-card border border-ui-border bg-surface" />)}</div>;
+  if (loading) return <div className="grid gap-4 md:grid-cols-2">{[1, 2, 3].map(item => <Skeleton key={item} className="h-40" />)}</div>;
 
   return <section aria-labelledby="coursework-heading" className="space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-4">

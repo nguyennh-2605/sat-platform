@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ResourceIcon } from '@/components/resource-icon';
 import { RichTextContent } from '@/components/ui/rich-text-content';
 import { displayHost, fileNameFromUrl, getLinkPresentation } from '@/lib/resource-presentation';
@@ -277,7 +278,7 @@ function AnnouncementResources({ fileUrls, links }: { fileUrls: string[]; links:
 }
 
 function AnnouncementFeedSkeleton() {
-  return <div className="divide-y divide-ui-border border-y border-ui-border" aria-label="Loading announcements">{Array.from({ length: 3 }, (_, index) => <div key={index} className="flex gap-4 px-2 py-6"><div className="size-8 shrink-0 animate-pulse rounded-full bg-muted" /><div className="flex-1 space-y-3"><div className="h-3 w-44 animate-pulse rounded bg-muted" /><div className="h-4 w-2/3 animate-pulse rounded bg-muted" /><div className="h-3 w-full animate-pulse rounded bg-muted" /></div></div>)}</div>;
+  return <div className="divide-y divide-ui-border border-y border-ui-border" aria-label="Loading announcements">{Array.from({ length: 3 }, (_, index) => <div key={index} className="flex gap-4 px-2 py-6"><Skeleton className="size-8 shrink-0 rounded-full" /><div className="flex-1 space-y-3"><Skeleton className="h-3 w-44" /><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-full" /></div></div>)}</div>;
 }
 
 function InviteCodeWidget({ classId }: { classId: string }) {
@@ -386,7 +387,7 @@ function RemoveStudentModal({ student, onClose, onRemove }: { student: ClassMemb
 }
 
 function ClassroomLoading() {
-  return <div className="h-full bg-background"><div className="h-24 animate-pulse border-b bg-muted/50" /><div className="mx-auto grid w-full max-w-[1400px] gap-8 p-8 lg:grid-cols-12"><div className="h-56 animate-pulse rounded-xl bg-muted lg:col-span-4" /><div className="h-80 animate-pulse rounded-xl bg-muted lg:col-span-8" /></div></div>;
+  return <div className="h-full bg-background"><Skeleton className="h-24 rounded-none border-b" /><div className="mx-auto grid w-full max-w-[1400px] gap-8 p-8 lg:grid-cols-12"><Skeleton className="h-56 lg:col-span-4" /><Skeleton className="h-80 lg:col-span-8" /></div></div>;
 }
 
 function ClassroomError({ message, onRetry }: { message: string; onRetry: () => void }) {

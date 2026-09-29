@@ -3,6 +3,7 @@ import type { ClipboardEvent, KeyboardEvent } from 'react';
 
 import { cn } from '@/lib/utils';
 import { sanitizeRichText } from '@/components/ui/rich-text-content';
+import { Skeleton } from '@/components/ui/skeleton';
 const hasUsableArrayConstructor = typeof Array.prototype.constructor === 'function';
 
 interface RichTextEditorProps {
@@ -60,7 +61,7 @@ const EMPTY_FORMATS: RichTextFormats = { bold: false, italic: false, underline: 
 const LazyQuillRichTextEditor = lazy(() => import('@/components/ui/quill-rich-text-editor'));
 
 const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function QuillRichTextEditor(props, forwardedRef) {
-  return <Suspense fallback={<div className="min-h-24 animate-pulse rounded-control border border-input bg-muted/20" role="status" aria-label="Loading editor" />}>
+  return <Suspense fallback={<Skeleton className="min-h-24 border border-input" role="status" aria-label="Loading editor" />}>
     <LazyQuillRichTextEditor ref={forwardedRef} {...props} />
   </Suspense>;
 });

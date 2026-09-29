@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
+import { LoadingState } from '@/components/ui/loading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/AppUI';
@@ -26,7 +27,7 @@ export function QuestionModal({ entry, onClose }: { entry: ErrorEntry | null; on
   }, [entryId, entryOrigin, retry]);
   return <Modal open={Boolean(entry)} onClose={onClose} presentation="content-dialog" title="Question context" subtitle={entry?.source || undefined} className="h-[calc(100vh-2rem)] max-w-5xl!">
       <div className="h-full min-h-0 overflow-y-auto">
-        {!entry || entryOrigin !== 'SYSTEM_QUESTION' ? <p className="text-muted-foreground">No linked question is available for this manual entry.</p> : loading ? <Loader2 className="animate-spin" aria-label="Loading question" /> : error ? <div role="alert">Unable to load the question. <Button variant="outline" onClick={() => { setLoading(true); setError(false); setRetry(value => value + 1); }}>Retry</Button></div> : question ? <>
+        {!entry || entryOrigin !== 'SYSTEM_QUESTION' ? <p className="text-muted-foreground">No linked question is available for this manual entry.</p> : loading ? <LoadingState label="Loading question…" /> : error ? <div role="alert">Unable to load the question. <Button variant="outline" onClick={() => { setLoading(true); setError(false); setRetry(value => value + 1); }}>Retry</Button></div> : question ? <>
           <QuestionContext entry={entry} question={question} />
           {question.explanation && <section className="mt-5"><h3 className="mb-2 font-medium">Explanation</h3><InteractiveText content={question.explanation} isMath={question.section?.test?.subject === 'MATH'} readOnly inheritTypography /></section>}
         </> : <p className="text-muted-foreground">The original question is no longer available.</p>}

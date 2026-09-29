@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DataSurface } from '@/components/ui/data-surface';
 import type { AdminRecentActivityResponse, AuditCategory } from './admin-overview.types';
+import { LoadingSpinner } from '@/components/ui/loading';
 
 const categoryDetails: Record<AuditCategory, { label: string; icon: typeof FileText }> = {
   ACCOUNT: { label: 'Account', icon: UserPlus },
@@ -83,7 +84,7 @@ export function RecentActivity({ data, loading, error, onRetry }: {
         <CardDescription>Important account, content, classroom, and delivery changes.</CardDescription>
         <CardAction>
           <Button variant="outline" size="sm" disabled={loading} onClick={onRetry}>
-            <RefreshCw className={loading ? 'animate-spin' : ''} />Refresh
+            {loading ? <LoadingSpinner /> : <RefreshCw />}Refresh
           </Button>
         </CardAction>
       </CardHeader>

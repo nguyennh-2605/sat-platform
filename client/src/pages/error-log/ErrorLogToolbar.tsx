@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { Bold, Check, Circle, Italic, Link2, List, ListOrdered, Loader2, RemoveFormatting, Underline } from 'lucide-react';
+import { Bold, Check, Circle, Italic, Link2, List, ListOrdered, RemoveFormatting, Underline } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading';
 
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -171,7 +172,7 @@ function DraftSaveIndicator({ store }: { store: ReflectionDraftStore }) {
   const summary = useDraftSummary(store);
 
   return <div className="hidden w-20 shrink-0 justify-end text-xs text-muted-foreground sm:flex" aria-live="polite">
-    {summary.status === 'saving' ? <span className="flex items-center gap-1"><Loader2 className="size-3 animate-spin" aria-hidden="true" />Saving…</span>
+    {summary.status === 'saving' ? <span className="flex items-center gap-1"><LoadingSpinner size="xs" />Saving…</span>
       : summary.status === 'error' ? <span className="text-danger">Save issue</span>
         : summary.status === 'saved' ? <span className="flex items-center gap-1"><Check className="size-3 text-success" aria-hidden="true" />Saved</span>
           : summary.status === 'pending' ? <span className="sr-only">Unsaved changes</span>

@@ -225,26 +225,26 @@ model Folder {
 }
 
 model Test {
-  id          Int            @id @default(autoincrement())
+  id          Int              @id @default(autoincrement())
   description String?
-  duration    Int            @default(64)
+  duration    Int              @default(64)
   title       String
-  mode        TestMode       @default(PRACTICE)
+  mode        TestMode         @default(PRACTICE)
   authorId    Int?
-  category    TestCategory   @default(PRACTICE)
-  isPublic    Boolean        @default(false)
-  subject     TestSubject    @default(RW)
-  status      TestStatus     @default(DRAFT)
-  scope       TestScope      @default(PERSONAL)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  category    TestCategory     @default(PRACTICE)
+  isPublic    Boolean          @default(false)
+  subject     TestSubject      @default(RW)
+  status      TestStatus       @default(DRAFT)
+  scope       TestScope        @default(PERSONAL)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   testDate    String?
   classTests  ClassTest[]
   sections    Section[]
   submissions Submission[]
   folderId    Int?
-  folder      Folder?        @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  author      User?          @relation(fields: [authorId], references: [id])
+  folder      Folder?          @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  author      User?            @relation(fields: [authorId], references: [id])
   deliveries  TestDelivery[]
   images      TestImageUsage[]
 
@@ -324,32 +324,36 @@ model QuestionSkill {
 }
 
 model Submission {
-  id                     Int              @id @default(autoincrement())
+  id                     Int                 @id @default(autoincrement())
   userId                 Int
   testId                 Int
   assignmentId           String?
-  assignment             Assignment?      @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  assignment             Assignment?         @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   classTestId            Int?
-  classTest              ClassTest?       @relation(fields: [classTestId], references: [id], onDelete: Cascade)
+  classTest              ClassTest?          @relation(fields: [classTestId], references: [id], onDelete: Cascade)
   deliveryId             String?
-  delivery               TestDelivery?    @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
-  attemptNo              Int              @default(1)
+  delivery               TestDelivery?       @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  attemptNo              Int                 @default(1)
+  attemptMode            TestMode            @default(PRACTICE)
+  timingPreset           AttemptTimingPreset @default(STANDARD)
+  allowedDurationSeconds Int?
+  moduleTimingSnapshot   Json?
   questionTimingSnapshot Json?
   endTime                DateTime?
   score                  Int?
-  violationCount         Int              @default(0)
-  startedAt              DateTime         @default(now())
+  violationCount         Int                 @default(0)
+  startedAt              DateTime            @default(now())
   beganAt                DateTime?
-  currentModule          Int              @default(1)
+  currentModule          Int                 @default(1)
   moduleStartedAt        DateTime?
   moduleExpiresAt        DateTime?
-  currentQuestionIndex   Int              @default(0)
+  currentQuestionIndex   Int                 @default(0)
   savedAnswers           Json?
   timeRemaining          Int?
-  status                 SubmissionStatus @default(DOING)
+  status                 SubmissionStatus    @default(DOING)
   answers                Answer[]
-  test                   Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
-  user                   User             @relation(fields: [userId], references: [id])
+  test                   Test                @relation(fields: [testId], references: [id], onDelete: Cascade)
+  user                   User                @relation(fields: [userId], references: [id])
   questionTimings        QuestionTiming[]
   errorLogs              ErrorLog[]
 
@@ -483,6 +487,15 @@ enum Role {
 enum TestMode {
   PRACTICE
   EXAM
+}
+
+enum AttemptTimingPreset {
+  STANDARD
+  HALF_TIME
+  EXTENDED_50
+  EXTENDED_100
+  CUSTOM
+  UNTIMED
 }
 
 enum TestCategory {

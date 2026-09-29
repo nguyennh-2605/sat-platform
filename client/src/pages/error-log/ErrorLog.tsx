@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TableVirtuoso, Virtuoso, type TableComponents, type TableVirtuosoHandle, type VirtuosoHandle } from 'react-virtuoso';
-import { CircleDashed, Loader2, Plus } from 'lucide-react';
+import { CircleDashed, Plus } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading';
 import { useSearchParams } from 'react-router-dom';
 
 import { EmptyState, Modal, PageHeader } from '@/components/ui/AppUI';
@@ -423,7 +424,7 @@ export default function ErrorLog() {
       /> : loading ? <LoadingRows mobile={compactLayout} headers={headers} /> : <div className="flex flex-1 items-center justify-center p-6">{error
         ? <div className="space-y-3 text-center" role="alert"><p>Unable to load your error log.</p><Button variant="outline" onClick={() => void load(null, true)}>Retry</Button></div>
         : <EmptyState icon={<CircleDashed />} title={hasFilters ? 'No matching entries' : 'No mistakes to review'} description={hasFilters ? 'Adjust your search or filters.' : 'Wrong answers from submitted tests appear here automatically.'} action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined} />}</div>}
-      {logs.length > 0 && loading && <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ui-border bg-surface px-3 py-1.5 text-xs text-muted-foreground shadow-sm" role="status"><Loader2 className="size-3 animate-spin" />Loading more…</div>}
+      {logs.length > 0 && loading && <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ui-border bg-surface px-3 py-1.5 text-xs text-muted-foreground shadow-sm" role="status"><LoadingSpinner size="xs" />Loading more…</div>}
       {logs.length > 0 && error && <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-control border border-danger/30 bg-surface px-3 py-1.5 text-xs text-danger shadow-sm" role="alert"><span>More entries could not be loaded.</span><Button variant="ghost" size="sm" onClick={() => void load(nextCursor)}>Retry</Button></div>}</div>
       {activeReflection && <ExpandedReflectionEditor
         active={activeReflection}

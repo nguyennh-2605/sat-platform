@@ -9,6 +9,7 @@ import {
   DataToolbarGroup,
   DataToolbarSearch,
 } from '@/components/ui/data-surface';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -481,15 +482,15 @@ function dateValue(value: string | null) {
 }
 
 function ActivitySkeleton({ canManage }: { canManage: boolean }) {
-  return <div className="animate-pulse overflow-hidden">
-      <div className="h-11 border-b border-ui-border-strong bg-muted/20" />
+  return <div className="overflow-hidden">
+      <Skeleton className="h-11 rounded-none border-b border-ui-border-strong" />
       {[1, 2, 3, 4].map(item => <div key={item} className="flex h-16 items-center gap-8 border-b border-ui-border/60 px-4 last:border-0">
-        <div className="min-w-0 flex-1 space-y-2"><div className="h-4 w-2/5 rounded-sm bg-muted" /><div className="h-3 w-3/5 rounded-sm bg-muted" /></div>
-        <div className="h-4 w-20 rounded-sm bg-muted" />
-        <div className="h-4 w-28 rounded-sm bg-muted" />
-        <div className="h-5 w-20 rounded-full bg-muted" />
-        {canManage && <div className="h-4 w-20 rounded-sm bg-muted" />}
-        {canManage && <div className="size-8 rounded-control bg-muted" />}
+        <div className="min-w-0 flex-1 space-y-2"><Skeleton className="h-4 w-2/5" /><Skeleton className="h-3 w-3/5" /></div>
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-5 w-20 rounded-full" />
+        {canManage && <Skeleton className="h-4 w-20" />}
+        {canManage && <Skeleton className="size-8" />}
       </div>)}
   </div>;
 }

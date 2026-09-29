@@ -85,6 +85,7 @@ This is a presentation-layer migration, not a Next.js migration.
 
 - [x] Classroom core surfaces (embedded analytics and vocabulary follow their owning migrations).
 - [x] Practice Center and the existing embedded Test Bank selector.
+- [x] Pre-attempt setup for System tests with per-attempt Practice/Exam mode and timing presets.
 - [x] Separate Teacher Test Library content lifecycle from Classroom test delivery and student attempt state.
 - [x] Add dedicated Admin Test Management with System Library, read-only Teacher Tests, and Copy to System Library.
 - [x] Results Analytics and Score Report.

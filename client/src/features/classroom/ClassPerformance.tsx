@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import axiosClient from '@/lib/axios';
 import { AssignmentComposer, AssignTestsComposer, type ActivityStudent, type LearningFollowUpDraft } from './activity-composer/ActivityComposers';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type PerformanceSection = 'OVERVIEW' | 'STUDENTS' | 'SKILLS' | 'ASSESSMENTS' | 'FOLLOW_UPS';
 type FollowUpStatus = 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'READY_TO_EVALUATE' | 'RESOLVED' | 'NEEDS_FOLLOW_UP' | 'DISMISSED';
@@ -282,4 +283,4 @@ function StatusBadge({ status }: { status: FollowUpStatus }) {
 function EmptyTable({ colSpan, text }: { colSpan: number; text: string }) { return <TableRow className="hover:bg-transparent"><TableCell colSpan={colSpan} className="h-44 text-center text-muted-foreground">{text}</TableCell></TableRow>; }
 function percent(value: number | null) { return value === null ? '—' : `${value}%`; }
 function dateLabel(value: string) { return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value)); }
-function PerformanceSkeleton() { return <div className="space-y-5 py-2"><div className="h-12 w-80 animate-pulse rounded bg-muted" /><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-xl bg-muted" />)}</div><div className="h-80 animate-pulse rounded-xl bg-muted" /></div>; }
+function PerformanceSkeleton() { return <div className="space-y-5 py-2"><Skeleton className="h-12 w-80" /><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-28" />)}</div><Skeleton className="h-80" /></div>; }

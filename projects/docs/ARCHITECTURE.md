@@ -190,8 +190,11 @@ Express Server (index.js → app.js)
 | `POST` | `/api/class-activities/assignments` | JWT + TEACHER/ADMIN | Publish an Assignment to all or selected students, optionally linked to a lesson |
 | `POST` | `/api/class-activities/homework` | JWT + TEACHER/ADMIN | Compatibility alias for Assignment creation; new clients must use `/assignments` |
 | `POST` | `/api/test-deliveries` | JWT + TEACHER/ADMIN | Bulk-publish one or more tests; one request creates one independent TestDelivery and ClassActivity per selected test |
-| `GET` | `/api/test/:id` | JWT | Start or resume a test session |
-| `POST` | `/api/test/:id/begin` | JWT | Start the server-authoritative Exam clock for Module 1 |
+| `GET` | `/api/test/:id/setup` | JWT | Read pre-attempt metadata, standard module timing, customization eligibility, and any active attempt without loading questions |
+| `POST` | `/api/test/:id/start` | JWT | Create or resume an attempt and snapshot its mode/timing; only self-study Published System tests accept student overrides |
+| `GET` | `/api/test/:id` | JWT | Legacy-compatible start/resume using the test defaults |
+| `POST` | `/api/test/:id/begin` | JWT | Start or resume the server-authoritative module clock; untimed Practice records its start without a deadline |
+| `POST` | `/api/test/:id/pause` | JWT | Pause a Practice countdown while preserving its server-calculated remaining time |
 | `POST` | `/api/test/:id/advance-module` | JWT | Move an active attempt to Module 2; Exam attempts cannot advance before the Module 1 deadline |
 | `POST` | `/api/test/:id/save-progress` | JWT | Auto-save answers, current module, server-bounded time, and current question |
 | `POST` | `/api/test/:id/submit` | JWT | Submit test → auto-grade → store results → notify teacher |
@@ -393,7 +396,7 @@ Folder ──1:N── Test
 
 **Test**: `id`, `title`, `description`, `duration` (default 64 min), `mode` (PRACTICE | EXAM), `status` (DRAFT | PUBLISHED | ARCHIVED), `scope` (SYSTEM | PERSONAL), `category` (REAL | CLASS | PRACTICE), transitional `isPublic`, `subject` (RW | MATH), `authorId` (creator attribution, FK → User), `folderId` (Personal tests only, FK → Folder), `createdAt`, `updatedAt`
 
-**Submission**: `id`, `userId`, `testId`, `assignmentId`, `classTestId`, `savedAnswers` (JSON), `timeRemaining`, `currentQuestionIndex`, `score`, `violationCount`, `status` (DOING | COMPLETED), `startedAt`, `endTime`
+**Submission**: `id`, `userId`, `testId`, `assignmentId`, `classTestId`, attempt snapshot fields (`attemptMode`, `timingPreset`, `allowedDurationSeconds`, `moduleTimingSnapshot`), `savedAnswers` (JSON), `timeRemaining`, `currentQuestionIndex`, `score`, `violationCount`, `status` (DOING | COMPLETED), `startedAt`, `endTime`. Attempt snapshots are immutable after creation so later Test edits do not change an in-progress clock.
 
 **Question**: `id`, `sectionId`, `type` (MCQ | SPR), `blocks` (JSON content), `questionText`, `choices` (JSON), `correctAnswer`, `explanation`, `order`
 
@@ -405,7 +408,7 @@ Folder ──1:N── Test
 
 **AuditEvent**: durable product-domain mutation history with `action`, `category`, optional actor reference plus actor snapshot, entity identity/label snapshot, allowlisted metadata, and `createdAt`. `AdminAuditLog` remains separate for privileged Admin CLI security operations. Submission analytics and raw operational errors are not duplicated into AuditEvent.
 
-**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestScope` (SYSTEM, PERSONAL), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR), `ErrorLogOrigin` (SYSTEM_QUESTION, MANUAL), and the `StudySession*` status/source/activity/resource enums
+**Enums**: `Role` (STUDENT, TEACHER, ADMIN), `TestMode` (PRACTICE, EXAM), `AttemptTimingPreset` (STANDARD, HALF_TIME, EXTENDED_50, EXTENDED_100, CUSTOM, UNTIMED), `TestStatus` (DRAFT, PUBLISHED, ARCHIVED), `TestScope` (SYSTEM, PERSONAL), `TestCategory` (REAL, CLASS, PRACTICE), `TestSubject` (RW, MATH), `SubmissionStatus` (DOING, COMPLETED), `QuestionType` (MCQ, SPR), `ErrorLogOrigin` (SYSTEM_QUESTION, MANUAL), and the `StudySession*` status/source/activity/resource enums
 
 ---
 
@@ -435,16 +438,17 @@ Folder ──1:N── Test
 1. Student navigates to /dashboard/practice-test
 2. GET /api/tests → lists all available tests (public, class-assigned, own)
 3. Student clicks "Start" → navigates to /test/:testId
-4. GET /api/test/:id → creates/finds Submission (status=DOING), returns test data + saved module progress
-5. In Exam mode, POST /api/test/:id/begin starts Module 1. The configured total duration is allocated across one or two modules (for example, 70 minutes becomes 35 + 35), and each module has an independent server deadline.
-6. Student answers questions; auto-save triggers periodically:
+4. GET /api/test/:id/setup → shows the confirmation screen without creating a Submission. A self-study Published System test may choose Practice or Exam simulation and an allowed timing preset; assigned/class tests remain locked to author settings.
+5. POST /api/test/:id/start → atomically creates/finds Submission (status=DOING), snapshots mode and per-module timing, then returns test data + saved progress.
+6. POST /api/test/:id/begin starts the active module. Timed attempts use independent server deadlines; untimed Practice has no deadline. Saving and exiting Practice calls `/pause`, while Exam simulation cannot pause.
+7. Student answers questions; auto-save triggers periodically:
    POST /api/test/:id/save-progress → updates savedAnswers, currentQuestionIndex, timeRemaining
-7. For a two-module test, POST /api/test/:id/advance-module starts Module 2 at its first question. Exam mode rejects early advancement; Practice mode permits it.
-8. Student clicks "Submit":
+8. For a two-module test, POST /api/test/:id/advance-module starts Module 2 at its first question. Exam simulation rejects advancement until standard module time has elapsed, including on extended-time attempts; Practice permits it.
+9. Student clicks "Submit":
    POST /api/test/:id/submit → grades all answers, stores in Answer table, sets status=COMPLETED
    → Auto-syncs score to any linked Assignment/ClassTest
    → Sends notification to teacher (if class-assigned)
-9. Student views the canonical report at /dashboard/score-report/:submissionId or opens aggregate history at /dashboard/results-analytics
+10. Student views the canonical report at /dashboard/score-report/:submissionId or opens aggregate history at /dashboard/results-analytics
 ```
 
 ### 8.2 Class Management Flow (Teacher)

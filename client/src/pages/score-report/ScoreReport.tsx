@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, Loader2, MinusCircle, XCircle } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, MinusCircle, XCircle } from 'lucide-react';
+import { LoadingState } from '@/components/ui/loading';
 
 import { PageHeader } from '@/components/ui/AppUI';
 import { Badge } from '@/components/ui/badge';
@@ -108,7 +109,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
     : -1;
   const reviewErrorLogId = reviewingQuestion?.errorLogId;
 
-  if (loading) return <ReportFrame><div className="flex min-h-80 items-center justify-center text-primary"><Loader2 className="size-6 animate-spin" /><span className="ml-3 text-body font-medium">Loading score report…</span></div></ReportFrame>;
+  if (loading) return <ReportFrame><LoadingState className="min-h-80" label="Loading score report…" /></ReportFrame>;
   if (loadError || !data) return <ReportFrame><div className="flex min-h-80 flex-col items-center justify-center gap-3 text-center"><XCircle className="size-9 text-danger" /><div><h1 className="text-heading font-semibold">Score report unavailable</h1><p className="mt-1 text-body text-muted-foreground">This result may no longer exist or you may not have access.</p></div><div className="flex flex-wrap justify-center gap-2">{requestKey && <Button onClick={retryLoad}>Try again</Button>}<Button variant="outline" onClick={handleBack}>Back to results</Button></div></div></ReportFrame>;
 
   const title = capitalizeFirstLetter(data.examTitle);

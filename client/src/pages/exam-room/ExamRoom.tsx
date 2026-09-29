@@ -19,6 +19,8 @@ import SingleColumnLayout from '../../components/layouts/SingleColumnLayout';
 import SPRInstructions from '../../features/quiz/SPRInstructions';
 import { useQuizTool } from '../../context/quiz-tool-context';
 import Calculator from '../../components/ui/Calculator';
+import TestSetup, { type AttemptMode, type TestSetupData, type TimingPreset } from './TestSetup';
+import { LoadingState } from '../../components/ui/loading';
 
 type QuestionTiming = { activeDurationMs: number; visitCount: number };
 
@@ -45,6 +47,11 @@ interface ExamSession {
   currentQuestionIndex: number;
   violationCount: number;
   questionTimingSnapshot?: Record<string, QuestionTiming>;
+  attemptMode: AttemptMode;
+  timingPreset: TimingPreset;
+  moduleDurationSeconds: Array<number | null>;
+  standardModuleDurationSeconds: number[];
+  moduleAdvanceAvailableAt?: string | null;
 }
 
 interface ExamApiResponse {
@@ -60,8 +67,9 @@ interface ExamApiResponse {
 interface ModuleTimingResponse {
   serverTime: string;
   moduleExpiresAt: string | null;
-  timeLeft: number;
+  timeLeft: number | null;
   currentQuestionIndex: number;
+  moduleAdvanceAvailableAt?: string | null;
 }
 
 const allocateModuleDurations = (totalDuration: number, moduleCount: number) => {
@@ -117,6 +125,9 @@ function ExamRoom() {
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [setup, setSetup] = useState<TestSetupData | null>(null);
+  const [isStartingAttempt, setIsStartingAttempt] = useState(false);
+  const [hasLoadedAttempt, setHasLoadedAttempt] = useState(false);
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
@@ -124,8 +135,7 @@ function ExamRoom() {
   // State cho tính năng Đánh dấu (Mark for Review)
   const [markedQuestions, setMarkedQuestions] = useState<number[]>([]);
 
-  // State Modal & Sidebar
-  const [showStartModal, setShowStartModal] = useState(true);
+  // State Sidebar
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   // State kết quả
@@ -176,6 +186,8 @@ function ExamRoom() {
 
   // State lưu mode của Test
   const [testMode, setTestMode] = useState<'PRACTICE' | 'EXAM'>('PRACTICE');
+  const [timingPreset, setTimingPreset] = useState<TimingPreset>('STANDARD');
+  const [moduleAdvanceAt, setModuleAdvanceAt] = useState<number | null>(null);
 
   // State để hiển thị màn hình chặn khi thoát fullscreen
   const [isFullscreenBlocked, setIsFullscreenBlocked] = useState(false);
@@ -250,197 +262,141 @@ function ExamRoom() {
 
   const [apiResult, setApiResult] = useState<BackendResult | null>(null);
 
-  // --- 1. GỌI API LẤY ĐỀ THI ---
-  useEffect(() => {
-    if (!id) return;
-
+  const hydrateExamData = useCallback((data: ExamApiResponse) => {
     const userId = localStorage.getItem('userId');
-    if (!userId) {
-      toast.error("You are not signed in");
+    if (!userId || !data.session) throw new Error('Test session not found.');
+    const allQuestions = data.sections.flatMap(section => section.questions.map(q => ({
+      id: q.id,
+      blocks: q.blocks,
+      questionText: q.questionText,
+      choices: Array.isArray(q.choices) ? q.choices.map(choice => ({ id: choice.id, text: choice.text })) : [],
+      moduleIndex: section.order,
+      type: q.type || 'MCQ',
+    } as QuestionData)));
+    setQuestions(allQuestions);
+    setFirstModuleLength(data.sections[0]?.questions.length || 0);
+
+    const session = data.session;
+    const moduleSeconds = session.moduleDurationSeconds?.length
+      ? session.moduleDurationSeconds
+      : allocateModuleDurations(data.duration, data.sections.length).map(minutes => minutes * 60);
+    setExamConfig({
+      mod1Duration: (moduleSeconds[0] || 0) / 60,
+      mod2Duration: (moduleSeconds[1] || 0) / 60,
+      totalModules: data.sections.length,
+    });
+    setTestInfo({ title: data.title, description: data.description || '', duration: data.duration, subject: data.subject });
+    const mode = session.attemptMode || data.mode || 'PRACTICE';
+    setTestMode(mode);
+    setTimingPreset(session.timingPreset || 'STANDARD');
+    setSubmissionId(session.submissionId);
+
+    const isModuleTwo = session.currentModule === 2
+      || (data.sections.length > 1 && session.currentQuestionIndex >= data.sections[0].questions.length);
+    setPhase(isModuleTwo ? 'MODULE_2' : 'MODULE_1');
+    const serverNowMs = session.serverTime ? new Date(session.serverTime).getTime() : Date.now();
+    const localDeadline = session.moduleExpiresAt
+      ? Date.now() + Math.max(0, new Date(session.moduleExpiresAt).getTime() - serverNowMs)
+      : null;
+    setEndTime(localDeadline);
+    setTimeLeft(session.timeLeft ?? 0);
+    setModuleAdvanceAt(session.moduleAdvanceAvailableAt
+      ? Date.now() + Math.max(0, new Date(session.moduleAdvanceAvailableAt).getTime() - serverNowMs)
+      : null);
+    setIsTimerRunning(false);
+
+    let restoredAnswers = session.savedAnswers && Object.keys(session.savedAnswers).length > 0 ? session.savedAnswers : {};
+    if (Object.keys(restoredAnswers).length === 0) {
+      const localSavedAnswers = localStorage.getItem(`answers_${userId}_${id}_${contextKey}`);
+      if (localSavedAnswers) {
+        try { restoredAnswers = JSON.parse(localSavedAnswers); } catch { localStorage.removeItem(`answers_${userId}_${id}_${contextKey}`); }
+      }
+    }
+    answersRef.current = restoredAnswers;
+    setAnswers(restoredAnswers);
+    const storedMarks = localStorage.getItem(`marks_${userId}_${id}_${contextKey}`);
+    const storedEliminations = localStorage.getItem(`eliminations_${userId}_${id}_${contextKey}`);
+    try { setMarkedQuestions(storedMarks ? JSON.parse(storedMarks) : []); } catch { setMarkedQuestions([]); }
+    try { setEliminatedMap(storedEliminations ? JSON.parse(storedEliminations) : {}); } catch { setEliminatedMap({}); }
+
+    const savedViolations = localStorage.getItem(`violations_${userId}_${id}_${contextKey}`);
+    const restoredViolations = mode === 'EXAM'
+      ? session.violationCount || parseInt(savedViolations || '0', 10) || 0
+      : 0;
+    violationCountRef.current = restoredViolations;
+    setViolationCount(restoredViolations);
+    setCurrentQuestionIndex(session.currentQuestionIndex);
+    if (mode === 'EXAM' && session.questionTimingSnapshot) questionTimingsRef.current = session.questionTimingSnapshot;
+    setHasLoadedAttempt(true);
+  }, [contextKey, id]);
+
+  useEffect(() => {
+    if (!id || hasFetched.current) return;
+    if (!localStorage.getItem('userId')) {
+      toast.error('You are not signed in');
       navigate('/login');
       return;
     }
-
-    if (hasFetched.current) {
-      return;
-    }
     hasFetched.current = true;
+    axiosClient.get<TestSetupData>(`/api/test/${id}/setup${contextQuery}`)
+      .then(setSetup)
+      .catch(error => {
+        toast.error(errorMessage(error, 'Unable to load test setup.'));
+        navigate('/dashboard/practice-test', { replace: true });
+      })
+      .finally(() => setIsLoading(false));
+  }, [contextQuery, id, navigate]);
 
-    const fetchExamData = async () => {
-      try {
-        setIsLoading(true);
-
-        const data = await axiosClient.get<ExamApiResponse>(`/api/test/${id}${contextQuery}`);
-
-        if (!data) throw new Error("No data");
-
-        if (data.sections) {
-          let allQuestions: QuestionData[] = [];
-          data.sections.forEach((section) => {
-            if (section.questions) {
-              const qs = section.questions.map((q) => {
-                let formattedChoices: QuestionData['choices'] = [];
-                if (Array.isArray(q.choices)) {
-                  formattedChoices = q.choices.map((c) => ({
-                    id: c.id,
-                    text: c.text
-                  }));
-                }
-                return {
-                  id: q.id,
-                  blocks: q.blocks,
-                  questionText: q.questionText,
-                  choices: formattedChoices,
-                  moduleIndex: section.order,
-                  type: q.type || 'MCQ'
-                } as QuestionData; 
-              });
-              allQuestions = [...allQuestions, ...qs];
-            }
-          });
-          setQuestions(allQuestions);
-
-          const moduleDurations = allocateModuleDurations(data.duration, data.sections.length);
-          setExamConfig({
-            mod1Duration: moduleDurations[0] || 0,
-            mod2Duration: moduleDurations[1] || 0,
-            totalModules: data.sections.length
-          });
-          
-          if (data.sections.length > 0) {
-            setFirstModuleLength(data.sections[0].questions.length);
-          }
-        }
-
-        setTestInfo({
-          title: data.title,
-          description: data.description || '',
-          duration: data.duration,
-          subject: data.subject
-        });
-
-        const mode = data.mode || 'PRACTICE';
-        setTestMode(mode);
-        if (mode === 'PRACTICE') {
-          setShowStartModal(false); // Vào làm luôn ko cần confirm
-        }
-
-        if (data.session) {
-          const {
-            submissionId, 
-            serverTime,
-            moduleExpiresAt,
-            currentModule: savedCurrentModule,
-            timeLeft: dbTimeLeft, 
-            savedAnswers: dbSavedAnswers, 
-            currentQuestionIndex: dbCurrentQuestionIndex,
-            violationCount: dbViolationCount,
-            questionTimingSnapshot,
-          } = data.session;
-
-          if (mode === 'EXAM' && questionTimingSnapshot && typeof questionTimingSnapshot === 'object') {
-            questionTimingsRef.current = questionTimingSnapshot;
-          }
-
-          setSubmissionId(submissionId);
-
-         let currentPhase = 'MODULE_1';
-          if (savedCurrentModule === 2 || (data.sections.length > 1 && dbCurrentQuestionIndex >= data.sections[0].questions.length)) {
-            currentPhase = 'MODULE_2';
-            setPhase('MODULE_2');
-          } else {
-            setPhase('MODULE_1');
-          }
-
-          const totalDurationMinutes = data.duration; 
-
-          let targetEndTime = 0;
-          let secondsRemaining = 0;
-
-          if (mode === 'PRACTICE') {
-            const moduleDurations = allocateModuleDurations(totalDurationMinutes, data.sections.length);
-            const activeModule = currentPhase === 'MODULE_2' ? 2 : 1;
-            const totalTimeLeft = dbTimeLeft !== null ? dbTimeLeft : ((moduleDurations[activeModule - 1] || totalDurationMinutes) * 60);
-            targetEndTime = Date.now() + (totalTimeLeft * 1000);
-            secondsRemaining = totalTimeLeft;
-          } else {
-              // Convert a server deadline to the local monotonic countdown.
-              // This compensates for a student's device clock being fast/slow.
-              const serverNowMs = serverTime ? new Date(serverTime).getTime() : Date.now();
-              const toLocalDeadline = (value: string | null) => value
-                ? Date.now() + Math.max(0, new Date(value).getTime() - serverNowMs)
-                : 0;
-              targetEndTime = toLocalDeadline(moduleExpiresAt);
-              secondsRemaining = targetEndTime
-                ? Math.max(0, Math.floor((targetEndTime - Date.now()) / 1000))
-                : 0;
-          }
-
-          setEndTime(targetEndTime);
-          setTimeLeft(secondsRemaining);
-
-          let restoredAnswers: { [key: string]: string } = {};
-          if (dbSavedAnswers && Object.keys(dbSavedAnswers).length > 0) {
-            restoredAnswers = dbSavedAnswers;
-          } else {
-            const localSavedAnswers = localStorage.getItem(`answers_${userId}_${id}_${contextKey}`);
-            if (localSavedAnswers) {
-              try {
-                restoredAnswers = JSON.parse(localSavedAnswers);
-              } catch {
-                localStorage.removeItem(`answers_${userId}_${id}_${contextKey}`);
-              }
-            }
-          }
-          answersRef.current = restoredAnswers;
-          setAnswers(restoredAnswers);
-
-          const storedMarks = localStorage.getItem(`marks_${userId}_${id}_${contextKey}`);
-          const storedEliminations = localStorage.getItem(`eliminations_${userId}_${id}_${contextKey}`);
-          try { setMarkedQuestions(storedMarks ? JSON.parse(storedMarks) : []); } catch { setMarkedQuestions([]); }
-          try { setEliminatedMap(storedEliminations ? JSON.parse(storedEliminations) : {}); } catch { setEliminatedMap({}); }
-
-          let restoredViolations = dbViolationCount || 0;
-          if (data.mode === 'EXAM' && !restoredViolations) {
-            const savedViolations = localStorage.getItem(`violations_${userId}_${id}_${contextKey}`);
-            restoredViolations = savedViolations ? parseInt(savedViolations, 10) || 0 : 0;
-          }
-          violationCountRef.current = data.mode === 'EXAM' ? restoredViolations : 0;
-          setViolationCount(data.mode === 'EXAM' ? restoredViolations : 0);
-          setCurrentQuestionIndex(dbCurrentQuestionIndex);
-
-          // Logic chạy timer
-          if (mode === 'EXAM' && !moduleExpiresAt) {
-              // The server starts the clock only after the explicit Begin call.
-              setIsTimerRunning(false);
-          } else if (secondsRemaining <= 0) {
-              void finishTestRef.current(submissionId, restoredAnswers);
-          } else {
-              setIsTimerRunning(mode === 'PRACTICE' || Boolean(moduleExpiresAt));
-          }
-        }
-      } catch (error) {
-        const response = apiErrorResponse(error);
-        if (response?.status === 409) {
-          const message = response.data?.error || 'This test attempt is no longer available.';
-          toast.error(message);
-          if (response.data?.code === 'ATTEMPT_LIMIT_REACHED' && response.data.submissionId) {
-            navigate(`/dashboard/score-report/${response.data.submissionId}`, { replace: true });
-          } else {
-            navigate('/dashboard/practice-test', { replace: true });
-          }
+  const handleConfigureAttempt = useCallback(async (configuration: {
+    attemptMode: AttemptMode;
+    timingPreset: TimingPreset;
+    customDurationMinutes?: number;
+  }) => {
+    if (!id) return;
+    setIsStartingAttempt(true);
+    let enteredFullscreen = false;
+    try {
+      if (configuration.attemptMode === 'EXAM') {
+        if (!document.documentElement.requestFullscreen) {
+          toast.error('Full-screen mode is not available in this browser.');
           return;
         }
-        console.error("Unable to load the test:", error);
-        toast.error(errorMessage(error, "Unable to load the test. Try again."));
-        navigate('/dashboard/practice-test', { replace: true });
-      } finally {
-        setIsLoading(false);
+        try {
+          await document.documentElement.requestFullscreen();
+        } catch {
+          toast.error('Allow full-screen mode to begin the exam simulation.');
+          return;
+        }
+        enteredFullscreen = true;
       }
-    };
-
-    fetchExamData();
-  }, [contextKey, contextQuery, id, navigate]);
+      const data = await axiosClient.post<ExamApiResponse>(`/api/test/${id}/start${contextQuery}`, configuration);
+      if (!data.session) throw new Error('Test session not found.');
+      const timing = await axiosClient.post<ModuleTimingResponse>(`/api/test/${id}/begin`, {
+        submissionId: data.session.submissionId,
+      });
+      hydrateExamData(data);
+      const serverNowMs = new Date(timing.serverTime).getTime();
+      const localModuleEnd = timing.moduleExpiresAt
+        ? Date.now() + Math.max(0, new Date(timing.moduleExpiresAt).getTime() - serverNowMs)
+        : null;
+      setEndTime(localModuleEnd);
+      setTimeLeft(timing.timeLeft ?? 0);
+      setModuleAdvanceAt(timing.moduleAdvanceAvailableAt
+        ? Date.now() + Math.max(0, new Date(timing.moduleAdvanceAvailableAt).getTime() - serverNowMs)
+        : null);
+      setIsTimerRunning(data.session.timingPreset !== 'UNTIMED');
+    } catch (error) {
+      if (enteredFullscreen && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      const response = apiErrorResponse(error);
+      if (response?.status === 409 && response.data?.code === 'ATTEMPT_LIMIT_REACHED' && response.data.submissionId) {
+        navigate(`/dashboard/score-report/${response.data.submissionId}`, { replace: true });
+      } else {
+        toast.error(errorMessage(error, 'Unable to prepare the test.'));
+      }
+    } finally {
+      setIsStartingAttempt(false);
+    }
+  }, [contextQuery, hydrateExamData, id, navigate]);
 
   useEffect(() => {
     const question = questions[currentQuestionIndex];
@@ -448,7 +404,6 @@ function ExamRoom() {
       && isTimerRunning
       && isPageVisible
       && !isReviewOpen
-      && !showStartModal
       && !isTransitioning
       && !isSubmitted
       && Boolean(question);
@@ -465,19 +420,7 @@ function ExamRoom() {
     }
 
     return flushActiveQuestion;
-  }, [currentQuestionIndex, flushActiveQuestion, isPageVisible, isReviewOpen, isSubmitted, isTimerRunning, isTransitioning, questions, showStartModal, testMode]);
-
-  // --- HÀM HỖ TRỢ ---
-  const enterFullscreen = async () => {
-    const elem = document.documentElement;
-    if (!elem.requestFullscreen) return false;
-    try {
-      await elem.requestFullscreen();
-      return true;
-    } catch {
-      return false;
-    }
-  };
+  }, [currentQuestionIndex, flushActiveQuestion, isPageVisible, isReviewOpen, isSubmitted, isTimerRunning, isTransitioning, questions, testMode]);
 
   // --- 2. LOGIC NỘP BÀI ---
   const finishTest = useCallback(async (
@@ -546,10 +489,10 @@ function ExamRoom() {
     try {
       const timing = await axiosClient.post<ModuleTimingResponse>(`/api/test/${id}/advance-module`, { submissionId });
       const serverNowMs = timing.serverTime ? new Date(timing.serverTime).getTime() : Date.now();
-      const secondsRemaining = testMode === 'EXAM' && timing.moduleExpiresAt
+      const secondsRemaining = timing.moduleExpiresAt
         ? Math.max(0, Math.floor((new Date(timing.moduleExpiresAt).getTime() - serverNowMs) / 1000))
-        : Number(timing.timeLeft) || examConfig.mod2Duration * 60;
-      const localDeadline = Date.now() + secondsRemaining * 1000;
+        : (timing.timeLeft ?? 0);
+      const localDeadline = timing.moduleExpiresAt ? Date.now() + secondsRemaining * 1000 : null;
       const userId = localStorage.getItem('userId');
       localStorage.setItem(
         `mod1TimeUsed_${userId}_${id}_${contextKey}`,
@@ -557,6 +500,9 @@ function ExamRoom() {
       );
       setEndTime(localDeadline);
       setTimeLeft(secondsRemaining);
+      setModuleAdvanceAt(timing.moduleAdvanceAvailableAt
+        ? Date.now() + Math.max(0, new Date(timing.moduleAdvanceAvailableAt).getTime() - serverNowMs)
+        : null);
       fiveMinuteAlertShownRef.current = false;
       setCurrentQuestionIndex(Number(timing.currentQuestionIndex));
       setPhase('MODULE_2');
@@ -567,7 +513,7 @@ function ExamRoom() {
     } finally {
       setIsTransitioning(false);
     }
-  }, [contextKey, examConfig.mod1Duration, examConfig.mod2Duration, examConfig.totalModules, id, phase, submissionId, testMode]);
+  }, [contextKey, examConfig.mod1Duration, examConfig.totalModules, id, phase, submissionId]);
 
   // --- LOGIC TIMER ---
   useEffect(() => {
@@ -743,37 +689,6 @@ function ExamRoom() {
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const handleStartTest = async () => {
-    if (testMode === 'EXAM') {
-      if (!submissionId || !id) {
-        toast.error('Test session not found. Reload the page.');
-        return;
-      }
-      const enteredFullscreen = await enterFullscreen();
-      if (!enteredFullscreen) {
-        toast.error('Allow full-screen mode to begin the test.');
-        return;
-      }
-      try {
-        const timing = await axiosClient.post(`/api/test/${id}/begin`, { submissionId });
-        const serverNowMs = new Date(timing.serverTime).getTime();
-        const toLocalDeadline = (value: string | null) => value
-          ? Date.now() + Math.max(0, new Date(value).getTime() - serverNowMs)
-          : 0;
-        const localModuleEnd = toLocalDeadline(timing.moduleExpiresAt);
-        setEndTime(localModuleEnd);
-        setTimeLeft(Math.max(0, Math.floor((localModuleEnd - Date.now()) / 1000)));
-      } catch (error) {
-        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-        console.error('Lỗi bắt đầu bài thi:', error);
-        toast.error('Unable to start the test. Try again.');
-        return;
-      }
-    }
-    setShowStartModal(false);
-    setIsTimerRunning(true);
-  };
-
   const handleSelectOption = (optionId: string) => {
     setAnswers(prev => {
         const newAnswers = { ...prev, [currentQ.id]: optionId };
@@ -936,6 +851,9 @@ function ExamRoom() {
       };
 
       await axiosClient.post(`/api/test/${id}/save-progress${contextQuery}`, payload);
+      if (testMode === 'PRACTICE') {
+        await axiosClient.post(`/api/test/${id}/pause`, { submissionId: Number(submissionId) });
+      }
 
       invalidateQueryCache('/api/tests');
       invalidatePracticeCenterCache();
@@ -978,15 +896,22 @@ function ExamRoom() {
 
   // --- RENDER LOADING ---
   if (isLoading) {
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="text-xl font-bold text-blue-600 animate-pulse">⏳ Loading test…</div>
-        </div>
-    );
+    return <LoadingState className="min-h-screen bg-background" label="Loading test…" />;
   }
 
   if (isSubmitting) {
-    return <div className="h-screen flex items-center justify-center text-blue-600 font-bold"> Grading…</div>;
+    return <LoadingState className="min-h-screen bg-background" label="Grading your test…" description="Your answers are being finalized." />;
+  }
+
+  if (setup && !hasLoadedAttempt) {
+    return (
+      <TestSetup
+        data={setup}
+        isStarting={isStartingAttempt}
+        onBack={() => navigate('/dashboard/practice-test')}
+        onStart={handleConfigureAttempt}
+      />
+    );
   }
 
   if (questions.length === 0) {
@@ -1007,13 +932,16 @@ function ExamRoom() {
 
   // 1. KIỂM TRA DỮ LIỆU TRƯỚC (Thêm đoạn này vào đầu hàm return hoặc trước khi khai báo currentQ)
   if (!questions || questions.length === 0 || !questions[currentQuestionIndex]) {
-    return <div className="p-10 text-center">Loading test…</div>;
+    return <LoadingState label="Loading test…" />;
   }
 
   // --- BIẾN CHO CÂU HỎI HIỆN TẠI ---
   const currentQ = questions[currentQuestionIndex]; 
   const sidebarOffset = phase === 'MODULE_2' ? splitIndex : 0;
-  const moduleAdvanceLocked = phase === 'REVIEW_1' && testMode === 'EXAM' && timeLeft > 0;
+  const moduleAdvanceLocked = phase === 'REVIEW_1'
+    && testMode === 'EXAM'
+    && moduleAdvanceAt !== null
+    && Date.now() < moduleAdvanceAt;
 
   // --- RENDER PHÒNG THI ---
 
@@ -1122,13 +1050,11 @@ function ExamRoom() {
     <div className="flex flex-col h-screen bg-gray-50 font-sans relative overflow-hidden">
       {/* COMPONENT LOADING */}
       {isTransitioning && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-xs">
-          {/* Icon Spinner xoay xoay */}
-          <div className="w-16 h-16 border-4 border-[#C2DDD4] border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-          
-          <h2 className="text-2xl font-bold text-slate-800">Preparing Module 2…</h2>
-          <p className="text-slate-500 mt-2">Please wait a moment</p>
-        </div>
+        <LoadingState
+          className="fixed inset-0 z-50 min-h-screen bg-background/90 backdrop-blur-xs"
+          label="Preparing Module 2…"
+          description="Your next module will begin in a moment."
+        />
       )}
 
       {/* HEADER */}
@@ -1148,8 +1074,8 @@ function ExamRoom() {
               {isTimeVisible ? (
                 <>
                   {/* Hiển thị giờ */}
-                  <div className={`font-mono text-xl font-bold mb-1 ${timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-slate-800'}`}>
-                    {formatTime(timeLeft)}
+                  <div className={`font-mono text-xl font-bold mb-1 ${timingPreset !== 'UNTIMED' && timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-slate-800'}`}>
+                    {timingPreset === 'UNTIMED' ? 'Untimed' : formatTime(timeLeft)}
                   </div>
                   
                   {/* Nút Hide: Có viền + Hiệu ứng nảy */}
@@ -1524,7 +1450,7 @@ function ExamRoom() {
               }}
 
               disabled={isNextAnimating || moduleAdvanceLocked}
-              title={moduleAdvanceLocked ? 'Module 2 begins when the Module 1 timer ends.' : undefined}
+              title={moduleAdvanceLocked ? 'Module 2 becomes available after standard Module 1 time.' : undefined}
 
               className={`
                 px-6 py-2.5 rounded-full font-bold flex items-center gap-2 shadow-lg
@@ -1547,25 +1473,6 @@ function ExamRoom() {
           </div>
         </footer>
       </div>
-
-      {/* MODAL START */}
-      {showStartModal && (
-        <div className="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-xl max-w-md w-full p-8 text-center shadow-2xl">
-            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-            </div>
-            <h2 className="text-2xl font-bold mb-2 text-slate-800">Ready to begin?</h2>
-            <p className="text-slate-600 mb-6 text-sm">
-                This test will run in full-screen mode.
-                <br/>⚠️ Each full-screen exit counts as one violation.
-            </p>
-            <button onClick={handleStartTest} className="w-full bg-[#1B7A5A] text-white font-medium py-3.5 rounded-lg hover:bg-[#145F47] transition shadow-xs">
-              Start test
-            </button>
-          </div>
-        </div>
-      )}  
 
       {/* --- MODAL CHẶN MÀN HÌNH KHI THOÁT FULLSCREEN --- */}
      {isFullscreenBlocked && (

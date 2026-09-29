@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axiosClient from '../../lib/axios';
 import { Button, Modal } from '../../components/ui/AppUI';
 import { capitalizeFirstLetter } from '../../utils/text';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export interface ClassroomTodoItem {
   key: string;
@@ -170,7 +171,7 @@ export function ClassroomTodoPanel() {
 }
 
 function TodoSkeleton() {
-  return <div className="space-y-1 py-2" aria-label="Loading To Do items">{[1, 2, 3].map(item => <div key={item} className="flex animate-pulse gap-3 border-b border-ui-border py-4"><div className="h-8 w-8 rounded-control bg-muted" /><div className="flex-1"><div className="h-4 w-4/5 rounded bg-muted" /><div className="mt-2 h-3 w-3/5 rounded bg-surface-subtle" /></div></div>)}</div>;
+  return <div className="space-y-1 py-2" aria-label="Loading To Do items">{[1, 2, 3].map(item => <div key={item} className="flex gap-3 border-b border-ui-border py-4"><Skeleton className="size-8" /><div className="flex-1"><Skeleton className="h-4 w-4/5" /><Skeleton className="mt-2 h-3 w-3/5" /></div></div>)}</div>;
 }
 
 function TestStartDialog({ item, onClose }: { item: ClassroomTodoItem | null; onClose: () => void }) {

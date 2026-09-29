@@ -8,6 +8,7 @@ import { type TestItem } from '../../types/quiz';
 import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
 import { Badge, Button, Card, Input } from '../../components/ui/AppUI';
+import { LoadingState } from '../../components/ui/loading';
 
 interface TestAssignmentManagerProps {
   onClose: () => void;
@@ -355,10 +356,7 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
               </div>
 
               {isLoading ? (
-                <div className="flex flex-col items-center justify-center h-48 text-gray-400">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-3"></div>
-                  <p>Loading data…</p>
-                </div>
+                <LoadingState className="h-48" label="Loading assignment data…" />
               ) : displayedFolders.length === 0 && displayedTests.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-gray-400">
                   <Folder size={48} className="mb-3 opacity-20" />
