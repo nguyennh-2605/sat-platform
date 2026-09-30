@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Check, ChevronRight, LockKeyhole, Map, Plus, Shuffle, Target } from 'lucide-react';
 import axiosClient from '@/lib/axios';
+import { updateStoredAuthUser } from '@/lib/authSession';
 import { appToast } from '@/components/ui/toast';
 import { Badge, Card, EmptyState, Modal, PageHeader } from '@/components/ui/AppUI';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,22 @@ import type { MilestoneQuestionPage, Roadmap as RoadmapData, RoadmapMilestone } 
 const errorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
 
 export default function Roadmap() {
-  return localStorage.getItem('userRole') === 'ADMIN' ? <AdminRoadmap /> : <StudentRoadmap />;
+  const [cachedRole] = useState<'STUDENT' | 'ADMIN'>(() => localStorage.getItem('userRole') === 'ADMIN' ? 'ADMIN' : 'STUDENT');
+  const [role, setRole] = useState<'STUDENT' | 'ADMIN' | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void axiosClient.get<{ role: string }, { role: string }>('/api/account/profile', { signal: controller.signal })
+      .then(profile => {
+        if (controller.signal.aborted) return;
+        const authoritativeRole = profile.role === 'ADMIN' ? 'ADMIN' : 'STUDENT';
+        updateStoredAuthUser({ role: authoritativeRole });
+        setRole(authoritativeRole);
+      })
+      .catch(() => { if (!controller.signal.aborted) setRole(cachedRole); });
+    return () => controller.abort();
+  }, [cachedRole]);
+  if (!role) return <LoadingState className="h-full" label="Loading roadmap…" />;
+  return role === 'ADMIN' ? <AdminRoadmap /> : <StudentRoadmap />;
 }
 
 function AdminRoadmap() {
@@ -40,7 +56,10 @@ function AdminRoadmap() {
   const active = roadmaps[0] || null;
   const load = async () => {
     setLoading(true);
-    try { setRoadmaps(await axiosClient.get<RoadmapData[], RoadmapData[]>('/api/roadmaps')); }
+    try {
+      const response = await axiosClient.get<RoadmapData[], RoadmapData[]>('/api/roadmaps');
+      setRoadmaps(Array.isArray(response) ? response : []);
+    }
     catch (error) { appToast.error(errorMessage(error, 'Unable to load roadmaps.')); }
     finally { setLoading(false); }
   };
@@ -105,7 +124,10 @@ function StudentRoadmap() {
   const [creatingRandom, setCreatingRandom] = useState(false);
   const load = async () => {
     try {
-      const nextRoadmap = await axiosClient.get<RoadmapData | null, RoadmapData | null>('/api/roadmaps');
+      const response = await axiosClient.get<RoadmapData | null, RoadmapData | null>('/api/roadmaps');
+      const nextRoadmap = response && !Array.isArray(response)
+        ? { ...response, milestones: Array.isArray(response.milestones) ? response.milestones : [] }
+        : null;
       setRoadmap(nextRoadmap);
       setSelected(current => current ? nextRoadmap?.milestones.find(milestone => milestone.id === current.id) || current : null);
     }
@@ -145,7 +167,7 @@ function StudentRoadmap() {
   if (selected) return <MilestoneWorkspace milestone={selected} questions={questions} loading={loadingQuestions} answers={answers} results={results} page={questionPage} onBack={() => { setSelected(null); setQuestions(null); }} onLoadPage={page => void loadQuestions(selected, page)} onAnswerChange={(id, value) => setAnswers(current => ({ ...current, [id]: value }))} onSubmit={question => void submitAnswer(question)} onConfirmTheory={() => void confirmTheory()} />;
   return <div className="h-full overflow-y-auto"><main className="mx-auto w-full max-w-5xl space-y-8 p-4 md:p-6">
     <PageHeader title={roadmap.title} description={roadmap.description || 'Follow the milestones, review the theory, and complete focused practice.'} actions={<Button variant="outline" onClick={() => setRandomOpen(true)}><Shuffle aria-hidden="true" />Create random quiz</Button>} />
-    <section className="relative space-y-4" aria-label="Learning milestones">{roadmap.milestones.map((milestone, index) => {
+    <section className="relative space-y-4" aria-label="Learning milestones">{roadmap.milestones.length === 0 ? <EmptyState icon={<Map aria-hidden="true" />} title="No milestones yet" description="The published roadmap does not contain any milestones." /> : roadmap.milestones.map((milestone, index) => {
       const progress = Math.min(100, Math.round(((milestone.answeredCount || 0) / milestone.requiredQuestionCount) * 100));
       return <Card key={milestone.id} className={`p-5 ${milestone.locked ? 'opacity-70' : ''}`}><div className="flex items-start gap-4"><span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${milestone.completedAt ? 'bg-success-soft text-success' : 'bg-muted text-foreground'}`}>{milestone.completedAt ? <Check aria-hidden="true" /> : milestone.locked ? <LockKeyhole aria-hidden="true" /> : index + 1}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-heading font-semibold text-foreground">{milestone.title}</h2>{milestone.description && <p className="mt-1 text-body text-muted-foreground">{milestone.description}</p>}</div><Button variant={milestone.completedAt ? 'outline' : 'default'} disabled={milestone.locked} onClick={() => void loadQuestions(milestone)}>{milestone.completedAt ? 'Practice again' : 'Continue'}<ChevronRight aria-hidden="true" /></Button></div><div className="mt-4"><div className="mb-2 flex justify-between text-caption text-muted-foreground"><span>{milestone.answeredCount || 0} of {milestone.requiredQuestionCount} questions completed</span><span>{progress}%</span></div><Progress value={progress} /></div></div></div></Card>;
     })}</section>
@@ -156,7 +178,7 @@ function StudentRoadmap() {
 function MilestoneWorkspace({ milestone, questions, loading, answers, results, page, onBack, onLoadPage, onAnswerChange, onSubmit, onConfirmTheory }: { milestone: RoadmapMilestone; questions: MilestoneQuestionPage | null; loading: boolean; answers: Record<string, string>; results: Record<string, { solutionLocked: boolean; isCorrect?: boolean; correctAnswer?: string; explanation?: string | null }>; page: number; onBack: () => void; onLoadPage: (page: number) => void; onAnswerChange: (id: string, value: string) => void; onSubmit: (question: BankQuestion) => void; onConfirmTheory: () => void }) {
   useDashboardBack(onBack);
   return <div className="h-full overflow-y-auto"><main className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-6"><PageHeader title={milestone.title} description={milestone.description || 'Review the theory, then work through the complete practice pool.'} />
-    <Card className="p-5"><div className="flex items-start gap-3"><BookOpen className="mt-0.5 text-primary" aria-hidden="true" /><div className="min-w-0 flex-1"><h2 className="text-title font-semibold text-foreground">Theory</h2><div className="mt-3 space-y-3 text-body leading-7 text-foreground">{milestone.theoryBlocks.map((block, index) => <p key={index} className="whitespace-pre-wrap">{block.content}</p>)}</div><Button className="mt-4" variant="outline" onClick={onConfirmTheory}>{milestone.theoryConfirmedAt ? <><Check aria-hidden="true" />Reviewed</> : 'Mark theory as reviewed'}</Button></div></div></Card>
+    <Card className="p-5"><div className="flex items-start gap-3"><BookOpen className="mt-0.5 text-primary" aria-hidden="true" /><div className="min-w-0 flex-1"><h2 className="text-title font-semibold text-foreground">Theory</h2><div className="mt-3 space-y-3 text-body leading-7 text-foreground">{(milestone.theoryBlocks || []).map((block, index) => <p key={index} className="whitespace-pre-wrap">{block.content}</p>)}</div><Button className="mt-4" variant="outline" onClick={onConfirmTheory}>{milestone.theoryConfirmedAt ? <><Check aria-hidden="true" />Reviewed</> : 'Mark theory as reviewed'}</Button></div></div></Card>
     <section><div className="mb-4 flex items-end justify-between gap-3"><div><h2 className="text-heading font-semibold text-foreground">Practice questions</h2><p className="mt-1 text-caption text-muted-foreground">All published questions matching this milestone's skills.</p></div>{questions && <Badge tone="neutral">{questions.pagination.total} questions</Badge>}</div>
       {loading ? <LoadingState label="Loading practice questions…" /> : !questions?.items.length ? <EmptyState icon={<Target aria-hidden="true" />} title="No practice questions" description="This milestone does not have published questions yet." /> : <div className="space-y-4">{questions.items.map((question, index) => {
         const result = results[question.id];
