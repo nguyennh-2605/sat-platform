@@ -40,3 +40,4 @@ Digital SAT Tests/
 
 # Local upstream visual reference; pinned in projects/docs/DESIGN_MIGRATION.md
 tmp/next-shadcn-admin-dashboard/
+tmp/sat-eqb-downloader/
