@@ -9,6 +9,7 @@ const { AUDIT_ACTIONS, recordAuditEvent } = require('./audit-event.service');
 const { normalizeSatTestMonth, testMonthWhere } = require('../utils/sat-test-months');
 const { assertUsableImages, imageAssetIds, syncTestImages } = require('./test-image.service');
 const { firstMathContentError, isValidSprAnswer } = require('../utils/math-content-validation');
+const questionBankService = require('./question-bank.service');
 
 const activeStatuses = { in: ['DRAFT', 'PUBLISHED'] };
 
@@ -152,7 +153,7 @@ exports.getTests = async ({ userId, userRole, query = {} }) => {
     ? normalizeIntegrityFilter(query.integrity)
     : '';
   const pagination = parsePagination(query, { defaultPageSize: 24, maxPageSize: 48 });
-  const filters = [whereCondition];
+  const filters = [whereCondition, { isDiscoverable: true }];
   if (search) filters.push({ OR: [
     { title: { contains: search, mode: 'insensitive' } },
     { description: { contains: search, mode: 'insensitive' } },
@@ -462,6 +463,8 @@ const validateSections = ({ sections, subject, status = 'DRAFT' }) => {
           choices: normalizedQuestion.choices,
           domainCode: classification.domain.code,
           skillCode: classification.skill.code,
+          sourceBankQuestionId: question?.sourceBankQuestionId ? String(question.sourceBankQuestionId) : null,
+          sourceBankVersionId: question?.sourceBankVersionId ? String(question.sourceBankVersionId) : null,
         };
       }),
     };
@@ -485,7 +488,8 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
 
   const finalStatus = status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
   const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
-  const validatedSections = validateSections({ sections, subject, status: finalStatus });
+  const hydratedSections = await questionBankService.hydrateBankQuestions({ sections, userId, userRole });
+  const validatedSections = validateSections({ sections: hydratedSections, subject, status: finalStatus });
   assertOfficialTestShape({ sections: validatedSections, subject, duration: normalizedDuration, category: finalCategory, status: finalStatus });
   const imageIds = await assertUsableImages({ sections: validatedSections, userId });
   let normalizedSections;
@@ -533,6 +537,8 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
               choices: q.choices,
               domainCode: q.domainCode,
               skillCode: q.skillCode,
+              sourceBankQuestionId: q.sourceBankQuestionId,
+              sourceBankVersionId: q.sourceBankVersionId,
             }))
           }
         }))
@@ -593,6 +599,8 @@ const serializeQuestion = (question) => {
     `QUESTION ${question.order}`,
     `Domain: ${question.domainCode || ''}`,
     `Skill: ${question.skillCode || ''}`,
+    ...(question.sourceBankQuestionId ? [`Source-Bank-Question: ${question.sourceBankQuestionId}`] : []),
+    ...(question.sourceBankVersionId ? [`Source-Bank-Version: ${question.sourceBankVersionId}`] : []),
     ...(Array.isArray(question.blocks) ? question.blocks.map(serializeBlock).filter(Boolean) : []),
     '[QUESTION]',
     question.questionText,
@@ -728,7 +736,8 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
   if (!Number.isInteger(normalizedDuration) || normalizedDuration < 1) throw new ApiError(400, { error: 'Enter a valid test duration.' });
   const finalStatus = status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
   const finalCategory = userRole === 'ADMIN' && category === 'REAL' ? 'REAL' : userRole === 'ADMIN' ? 'PRACTICE' : 'CLASS';
-  const validatedSections = validateSections({ sections, subject, status: finalStatus });
+  const hydratedSections = await questionBankService.hydrateBankQuestions({ sections, userId, userRole });
+  const validatedSections = validateSections({ sections: hydratedSections, subject, status: finalStatus });
   assertOfficialTestShape({ sections: validatedSections, subject, duration: normalizedDuration, category: finalCategory, status: finalStatus });
   const imageIds = await assertUsableImages({ sections: validatedSections, userId, existingTestId: existing.id });
   let normalizedSections;

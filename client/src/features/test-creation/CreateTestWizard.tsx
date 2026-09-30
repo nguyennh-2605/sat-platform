@@ -34,6 +34,7 @@ import { createTestDetailsSchema, normalizeTestCategoryForForm } from './create-
 import type { EditTestPayload, ExtractedDocument, ImportIssue, ImportPreview, ImportQuestion, IssueSeverity, Subject, TaxonomyDomain, TestDetailsValues, TestStatus } from './create-test.types';
 import { hasInvalidStrictLatex, isValidSprAnswer } from './math-content-validation';
 import { TestDetailsStep } from './TestDetailsStep';
+import { QuestionBankPicker } from './QuestionBankPicker';
 
 const emptyPreview = (): ImportPreview => ({
   modules: [],
@@ -209,7 +210,7 @@ const CreateTestWizard = () => {
   const subject = details.subject ?? 'RW';
   const moduleCount = details.moduleCount ?? 2;
   const [stage, setStage] = useState<'BUILD' | 'REVIEW'>('BUILD');
-  const [buildTab, setBuildTab] = useState<'DETAILS' | 'IMPORT'>(editTestId ? 'IMPORT' : 'DETAILS');
+  const [buildTab, setBuildTab] = useState<'DETAILS' | 'IMPORT' | 'BANK'>(editTestId ? 'IMPORT' : 'DETAILS');
   const [taxonomy, setTaxonomy] = useState<TaxonomyDomain[]>([]);
   const [preview, setPreview] = useState<ImportPreview>(emptyPreview);
   const [previewInput, setPreviewInput] = useState<{ text: string; subject: Subject; moduleCount: number } | null>(null);
@@ -477,6 +478,8 @@ const CreateTestWizard = () => {
             explanation: question.explanation,
             domainCode: question.domainCode,
             skillCode: question.skillCode,
+            sourceBankQuestionId: question.sourceBankQuestionId,
+            sourceBankVersionId: question.sourceBankVersionId,
           })),
         })),
       };
@@ -566,13 +569,17 @@ const CreateTestWizard = () => {
               {editLocked && <ImportNotice tone="warning" message="This test is read-only because a student has already started it. Duplicate it from Test Library to make structural changes." />}
               <form className="grid min-h-0 gap-5 xl:grid-cols-2" noValidate onSubmit={event => event.preventDefault()}>
                 <div className="flex min-h-[620px] min-w-0 flex-col gap-4 rounded-xl border border-border bg-card p-4">
-                  <Tabs value={buildTab} onValueChange={value => setBuildTab(value as 'DETAILS' | 'IMPORT')} className="min-h-0 flex-1">
+                  <Tabs value={buildTab} onValueChange={value => setBuildTab(value as 'DETAILS' | 'IMPORT' | 'BANK')} className="min-h-0 flex-1">
                     <TabsList className="w-full">
                       <TabsTrigger value="DETAILS">Details</TabsTrigger>
                       <TabsTrigger value="IMPORT">Import questions</TabsTrigger>
+                      <TabsTrigger value="BANK">Question Bank</TabsTrigger>
                     </TabsList>
                     <TabsContent value="DETAILS" className="min-h-0 flex-1 pt-2">
                       <TestDetailsStep form={detailsForm} isAdmin={isAdmin} />
+                    </TabsContent>
+                    <TabsContent value="BANK" className="min-h-0 flex-1 pt-2">
+                      <QuestionBankPicker subject={subject} moduleCount={moduleCount} disabled={editLocked} onUse={nextPreview => { applyPreview(nextPreview, ''); setRawText(''); }} />
                     </TabsContent>
                     <TabsContent value="IMPORT" className="min-h-0 flex-1 pt-2">
                       <div className="flex h-full min-h-[520px] flex-col gap-4">

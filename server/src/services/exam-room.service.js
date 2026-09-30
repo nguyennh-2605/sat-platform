@@ -6,6 +6,7 @@ const testDeliveryService = require('./test-delivery.service');
 const errorLogService = require('./error-log.service');
 const { normalizeQuestionTimingSnapshot, timingRowsFromSnapshot } = require('../utils/question-timing');
 const { moduleTiming } = require('../utils/module-timing');
+const questionBankService = require('./question-bank.service');
 const {
   TIMING_PRESETS,
   attemptModeFor,
@@ -161,7 +162,12 @@ const loadTestContext = async ({ testId, userId, userRole, assignmentId, classId
   }
 
   const isSystemPublishedTest = test.scope === 'SYSTEM' && test.status === 'PUBLISHED';
-  if (userRole === 'STUDENT' && !isSystemPublishedTest && !hasClassAccess) {
+  const isStudentGeneratedTest = userRole === 'STUDENT'
+    && test.scope === 'PERSONAL'
+    && test.status === 'PUBLISHED'
+    && test.authorId === Number(userId)
+    && test.isDiscoverable === false;
+  if (userRole === 'STUDENT' && !isSystemPublishedTest && !isStudentGeneratedTest && !hasClassAccess) {
     throw new ApiError(403, { error: 'This test has not been assigned to your class.' });
   }
 
@@ -170,7 +176,7 @@ const loadTestContext = async ({ testId, userId, userRole, assignmentId, classId
     selectedClassTestId,
     selectedDelivery,
     canCustomize: userRole === 'STUDENT'
-      && isSystemPublishedTest
+      && (isSystemPublishedTest || isStudentGeneratedTest)
       && !deliveryId
       && !assignmentId
       && !classId,
@@ -744,6 +750,20 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
         }))
       });
 
+      const questionById = new Map(allQuestions.map(question => [question.id, question]));
+      for (const answer of answersToSave) {
+        const question = questionById.get(answer.questionId);
+        if (question?.sourceBankQuestionId) {
+          await questionBankService.recordProgressWithDb({
+            db: tx,
+            userId,
+            question,
+            selectedChoice: answer.selectedChoice,
+            isCorrect: answer.isCorrect,
+          });
+        }
+      }
+
       await errorLogService.syncSubmissionErrorLogs({
         db: tx,
         userId,
@@ -795,13 +815,28 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
     }
   }
 
+  let solutionsLocked = false;
+  let solutionAvailableAt = null;
+  if (submission.deliveryId) {
+    const delivery = await prisma.testDelivery.findUnique({
+      where: { id: submission.deliveryId },
+      select: { status: true, dueAt: true },
+    });
+    solutionsLocked = Boolean(delivery && delivery.status === 'PUBLISHED' && (!delivery.dueAt || delivery.dueAt > new Date()));
+    solutionAvailableAt = solutionsLocked ? delivery?.dueAt || null : null;
+  }
+
   return {
     score: correctCount,
     total: totalQuestions,
     totalQuestions,
     submissionId: transactionResult.submission.id,
     submittedAt: transactionResult.submission.endTime,
-    details: responseDetails,
+    solutionsLocked,
+    solutionAvailableAt,
+    details: solutionsLocked
+      ? responseDetails.map(detail => ({ ...detail, correctOption: null, isCorrect: null }))
+      : responseDetails,
     message: "Nộp bài và lưu kết quả thành công"
   };
 };

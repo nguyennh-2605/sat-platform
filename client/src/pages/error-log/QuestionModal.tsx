@@ -28,6 +28,7 @@ export function QuestionModal({ entry, onClose }: { entry: ErrorEntry | null; on
   return <Modal open={Boolean(entry)} onClose={onClose} presentation="content-dialog" title="Question context" subtitle={entry?.source || undefined} className="h-[calc(100vh-2rem)] max-w-5xl!">
       <div className="h-full min-h-0 overflow-y-auto">
         {!entry || entryOrigin !== 'SYSTEM_QUESTION' ? <p className="text-muted-foreground">No linked question is available for this manual entry.</p> : loading ? <LoadingState label="Loading question…" /> : error ? <div role="alert">Unable to load the question. <Button variant="outline" onClick={() => { setLoading(true); setError(false); setRetry(value => value + 1); }}>Retry</Button></div> : question ? <>
+          {entry.solutionLocked && <p className="mb-4 rounded-control border border-warning/30 bg-warning-soft p-3 text-body text-foreground">The correct answer and explanation are locked while the assigned quiz is open.</p>}
           <QuestionContext entry={entry} question={question} />
           {question.explanation && <section className="mt-5"><h3 className="mb-2 font-medium">Explanation</h3><InteractiveText content={question.explanation} isMath={question.section?.test?.subject === 'MATH'} readOnly inheritTypography /></section>}
         </> : <p className="text-muted-foreground">The original question is no longer available.</p>}

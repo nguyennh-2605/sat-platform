@@ -27,6 +27,8 @@ const CreateTestWizard = lazy(() => import('../features/test-creation/CreateTest
 const AssignmentDetail = lazy(() => import('../features/assignment/AssignmentDetail'));
 const Vocabulary = lazy(() => import('../pages/vocabulary/Vocabulary'));
 const ProfileSettings = lazy(() => import('../pages/profile/ProfileSettings'));
+const QuestionBank = lazy(() => import('../pages/question-bank/QuestionBank'));
+const Roadmap = lazy(() => import('../pages/roadmap/Roadmap'));
 
 const RouteFallback = () => <LoadingState className="min-h-screen bg-background" label="Loading page…" />;
 
@@ -63,6 +65,8 @@ function App() {
                 <Route path="classes" element={<ClassroomList />} />
                 <Route path="vocabulary" element={<Vocabulary />} />
                 <Route path="profile" element={<ProfileSettings />} />
+                <Route path="question-bank" element={<RequireRole roles={['TEACHER', 'ADMIN']}><QuestionBank /></RequireRole>} />
+                <Route path="roadmap" element={<RequireRole roles={['STUDENT', 'ADMIN']}><Roadmap /></RequireRole>} />
                 <Route path="class/:classId" element={<Classroom />} />
                 <Route path="class/:classId/lesson/:lessonId" element={<LessonWorkspace />} />
                 <Route path="error-log" element={<RequireRole roles={['STUDENT']}><ErrorLog /></RequireRole>} />

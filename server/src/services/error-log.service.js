@@ -26,6 +26,28 @@ const ERROR_LOG_SELECT = {
   origin: true,
   version: true,
 };
+const ERROR_LOG_READ_SELECT = {
+  ...ERROR_LOG_SELECT,
+  submission: {
+    select: {
+      delivery: { select: { status: true, dueAt: true } },
+    },
+  },
+};
+
+const serializeErrorLog = (entry) => {
+  if (!entry) return entry;
+  if (!Object.prototype.hasOwnProperty.call(entry, 'submission')) return entry;
+  const delivery = entry.submission?.delivery;
+  const solutionLocked = Boolean(
+    delivery
+    && delivery.status === 'PUBLISHED'
+    && (!delivery.dueAt || new Date(delivery.dueAt) > new Date())
+  );
+  const { submission: _submission, ...publicEntry } = entry;
+  if (!solutionLocked) return publicEntry;
+  return { ...publicEntry, correctAnswer: null, solutionLocked: true, solutionAvailableAt: delivery?.dueAt?.toISOString() || null };
+};
 
 class ConcurrentErrorLogUpdate extends Error {}
 
@@ -257,7 +279,7 @@ exports.getErrorLogs = async ({ userId, query = {} }) => {
     ] }] } : where;
     const listQuery = prisma.errorLog.findMany({
       where: pageWhere,
-      select: ERROR_LOG_SELECT,
+      select: ERROR_LOG_READ_SELECT,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
     });
@@ -268,10 +290,10 @@ exports.getErrorLogs = async ({ userId, query = {} }) => {
           prisma.errorLog.count({ where }),
           prisma.errorLog.count({ where: { AND: [where, { reviewedAt: null }] } }),
         ]);
-    const items = rows.slice(0, limit);
+    const items = rows.slice(0, limit).map(serializeErrorLog);
     return {
       items,
-      nextCursor: rows.length > limit ? encodeCursor(items[items.length - 1]) : null,
+      nextCursor: rows.length > limit ? encodeCursor(rows[limit - 1]) : null,
       ...(cursor ? {} : { total, needsReview }),
     };
   }
@@ -281,19 +303,19 @@ exports.getErrorLogs = async ({ userId, query = {} }) => {
     prisma.errorLog.count({ where }),
     prisma.errorLog.findMany({
       where,
-      select: ERROR_LOG_SELECT,
+      select: ERROR_LOG_READ_SELECT,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: pagination.skip,
       take: pagination.pageSize,
     }),
   ]);
-  return { items, pagination: paginationMeta({ ...pagination, total }) };
+  return { items: items.map(serializeErrorLog), pagination: paginationMeta({ ...pagination, total }) };
 };
 
 exports.getErrorLog = async ({ id, userId }) => {
-  const entry = await prisma.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_SELECT });
+  const entry = await prisma.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_READ_SELECT });
   if (!entry) throw new ApiError(404, { message: 'Error log entry not found.' });
-  return entry;
+  return serializeErrorLog(entry);
 };
 
 exports.getErrorLogFacets = async ({ userId, query = {} }) => {
@@ -325,13 +347,22 @@ exports.getErrorLogFacets = async ({ userId, query = {} }) => {
 exports.getErrorLogQuestion = async ({ id, userId }) => {
   const entry = await prisma.errorLog.findFirst({ where: { id, userId }, select: {
     questionSnapshot: true,
+    submission: { select: { delivery: { select: { status: true, dueAt: true } } } },
     question: { select: {
       type: true, blocks: true, questionText: true, choices: true, explanation: true, order: true,
       section: { select: { name: true, order: true, test: { select: { title: true, subject: true } } } },
     } },
   } });
   if (!entry) throw new ApiError(404, { message: 'Error log entry not found.' });
-  return { question: normalizeQuestionForClient(entry.questionSnapshot || entry.question) };
+  const delivery = entry.submission?.delivery;
+  const solutionLocked = Boolean(delivery && delivery.status === 'PUBLISHED' && (!delivery.dueAt || delivery.dueAt > new Date()));
+  const question = normalizeQuestionForClient(entry.questionSnapshot || entry.question);
+  if (!solutionLocked) return { question };
+  return {
+    question: question ? { ...question, explanation: null } : question,
+    solutionLocked: true,
+    solutionAvailableAt: delivery?.dueAt?.toISOString() || null,
+  };
 };
 
 exports.createErrorLog = async ({ userId, data }) => {
@@ -347,19 +378,26 @@ exports.createErrorLog = async ({ userId, data }) => {
     reviewedAt: isReviewComplete(normalized) ? new Date() : null,
   };
   try {
-    return await prisma.errorLog.create({ data: createData, select: ERROR_LOG_SELECT });
+    const entry = await prisma.errorLog.create({ data: createData, select: ERROR_LOG_READ_SELECT });
+    return serializeErrorLog(entry);
   } catch (error) {
     if (clientMutationId && error?.code === 'P2002') {
       const existing = await prisma.errorLog.findFirst({ where: { userId, clientMutationId }, select: ERROR_LOG_SELECT });
-      if (existing) return existing;
+      if (existing) return serializeErrorLog(existing);
     }
     throw error;
   }
 };
 
-const publicErrorLog = entry => entry && Object.fromEntries(
-  Object.keys(ERROR_LOG_SELECT).map(field => [field, entry[field]])
-);
+const publicErrorLog = (entry) => {
+  if (!entry) return entry;
+  const selected = Object.fromEntries(Object.keys(ERROR_LOG_SELECT).map(field => [field, entry[field]]));
+  const delivery = entry.submission?.delivery;
+  const solutionLocked = Boolean(delivery && delivery.status === 'PUBLISHED' && (!delivery.dueAt || new Date(delivery.dueAt) > new Date()));
+  return solutionLocked
+    ? { ...selected, correctAnswer: null, solutionLocked: true, solutionAvailableAt: delivery?.dueAt?.toISOString() || null }
+    : selected;
+};
 const conflictError = current => new ApiError(409, {
   message: 'This error log entry changed in another tab. Review the latest row before saving again.',
   ...(current ? { current: publicErrorLog(current) } : {}),
@@ -372,7 +410,7 @@ exports.updateErrorLog = async ({ id, userId, data }) => {
   for (let attempt = 0; attempt < MAX_CONFLICT_RETRIES; attempt += 1) {
     try {
       return await prisma.$transaction(async tx => {
-        const existingLog = await tx.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_SELECT });
+        const existingLog = await tx.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_READ_SELECT });
         if (!existingLog) throw new ApiError(404, { message: 'Error log entry not found.' });
         if (expectedVersion !== undefined && existingLog.version !== expectedVersion) throw conflictError(existingLog);
 
@@ -397,12 +435,13 @@ exports.updateErrorLog = async ({ id, userId, data }) => {
           },
         });
         if (update.count === 0) throw new ConcurrentErrorLogUpdate();
-        return tx.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_SELECT });
+        const updated = await tx.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_READ_SELECT });
+        return serializeErrorLog(updated);
       });
     } catch (error) {
       if (!(error instanceof ConcurrentErrorLogUpdate)) throw error;
       if (expectedVersion !== undefined || attempt === MAX_CONFLICT_RETRIES - 1) {
-        const current = await prisma.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_SELECT });
+        const current = await prisma.errorLog.findFirst({ where: { id, userId }, select: ERROR_LOG_READ_SELECT });
         if (!current) throw new ApiError(404, { message: 'Error log entry not found.' });
         throw conflictError(current);
       }

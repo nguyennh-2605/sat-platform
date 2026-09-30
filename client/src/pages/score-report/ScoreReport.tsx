@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, MinusCircle, XCircle } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, LockKeyhole, MinusCircle, XCircle } from 'lucide-react';
 import { LoadingState } from '@/components/ui/loading';
 
 import { PageHeader } from '@/components/ui/AppUI';
@@ -168,7 +168,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
         classifiedQuestions={data.classificationCoverage.classified}
       />
 
-      <DataSurface>
+      {data.solutionsLocked ? <Card className="border-warning/30 bg-warning-soft"><CardContent className="flex items-start gap-3 py-5"><LockKeyhole className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" /><div><h2 className="text-title font-semibold text-foreground">Question review is locked</h2><p className="mt-1 text-body text-muted-foreground">This assigned quiz is still open, so correct answers and explanations remain hidden{data.solutionAvailableAt ? ` until ${formatDate(data.solutionAvailableAt)}` : ' until the teacher closes it'}.</p></div></CardContent></Card> : <DataSurface>
         <DataToolbar>
           <div><h2 className="text-title font-semibold text-foreground">Question review</h2><p className="mt-0.5 text-caption text-muted-foreground">Inspect each answer and read the authored explanation when available.</p></div>
           <DataToolbarActions>
@@ -187,9 +187,9 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
         </Table>
 
         <DataPagination className="text-caption text-muted-foreground"><span>Showing {firstShown}–{lastShown} of {filteredQuestions.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon-sm" disabled={currentPage === 1} onClick={() => setPage(value => Math.max(1, value - 1))} aria-label="Previous page"><ChevronLeft /></Button><span className="min-w-16 text-center tabular-nums">{currentPage} of {totalPages}</span><Button variant="ghost" size="icon-sm" disabled={currentPage === totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))} aria-label="Next page"><ChevronRight /></Button></div></DataPagination>
-      </DataSurface>
+      </DataSurface>}
 
-      <QuestionReviewDialog
+      {!data.solutionsLocked && <QuestionReviewDialog
         key={reviewingQuestion?.id || 'closed'}
         data={reviewingQuestion}
         examTitle={title}
@@ -198,7 +198,7 @@ export default function ScoreReport({ initialData, onBackToHome }: ScoreReportPr
         onPrevious={reviewingQuestionIndex > 0 ? () => setReviewingQuestion(filteredQuestions[reviewingQuestionIndex - 1]) : undefined}
         onNext={reviewingQuestionIndex >= 0 && reviewingQuestionIndex < filteredQuestions.length - 1 ? () => setReviewingQuestion(filteredQuestions[reviewingQuestionIndex + 1]) : undefined}
         onOpenErrorLog={reviewErrorLogId ? () => navigate(`/dashboard/error-log?entry=${encodeURIComponent(reviewErrorLogId)}`) : undefined}
-      />
+      />}
     </ReportFrame>
   );
 }

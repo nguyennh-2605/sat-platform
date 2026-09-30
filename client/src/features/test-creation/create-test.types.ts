@@ -31,6 +31,8 @@ export interface ImportQuestion {
   explanation?: string;
   domainCode: string;
   skillCode: string;
+  sourceBankQuestionId?: string;
+  sourceBankVersionId?: string;
   issues: ImportIssue[];
 }
 export interface ImportModule { order: number; name: string; questions: ImportQuestion[] }

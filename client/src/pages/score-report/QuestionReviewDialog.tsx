@@ -66,7 +66,7 @@ export function QuestionReviewDialog({
             <div className="space-y-2" aria-label="Answer choices">
               {data.choices.map((choice, index) => {
                 const label = String.fromCharCode(65 + index);
-                const correct = [label, choice.id, choice.text].includes(data.correctAnswer);
+                const correct = data.correctAnswer != null && [label, choice.id, choice.text].includes(data.correctAnswer);
                 const selected = data.userAnswer != null && [label, choice.id, choice.text].includes(data.userAnswer);
                 return (
                   <div key={`${choice.id}-${index}`} className={`flex gap-3 rounded-control border p-3 ${correct ? 'border-success/40 bg-success-soft' : selected ? 'border-danger/40 bg-danger-soft' : 'border-ui-border bg-surface'}`}>

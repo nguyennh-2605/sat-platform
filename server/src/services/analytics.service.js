@@ -291,6 +291,7 @@ const getSubmissionDetailWithDb = async ({ db, id, userId }) => {
       test: {
         select: { title: true, subject: true, mode: true },
       },
+      delivery: { select: { status: true, dueAt: true } },
       answers: {
         select: {
           selectedChoice: true,
@@ -324,6 +325,11 @@ const getSubmissionDetailWithDb = async ({ db, id, userId }) => {
   if (!submission) {
     throw new ApiError(404, { message: 'Completed submission not found.' });
   }
+  const solutionsLocked = Boolean(
+    submission.delivery
+    && submission.delivery.status === 'PUBLISHED'
+    && (!submission.delivery.dueAt || new Date(submission.delivery.dueAt) > new Date())
+  );
 
   const elapsedDurationMs = submission.endTime
     ? Math.max(0, new Date(submission.endTime).getTime() - new Date(submission.beganAt || submission.startedAt).getTime())
@@ -494,7 +500,11 @@ const getSubmissionDetailWithDb = async ({ db, id, userId }) => {
         ? Number(((classifiedQuestionCount / questions.length) * 100).toFixed(1))
         : null,
     },
-    questions,
+    solutionsLocked,
+    solutionAvailableAt: solutionsLocked ? submission.delivery?.dueAt?.toISOString() || null : null,
+    questions: solutionsLocked
+      ? questions.map(question => ({ ...question, correctAnswer: null, explanation: null, isCorrect: null }))
+      : questions,
   };
 };
 

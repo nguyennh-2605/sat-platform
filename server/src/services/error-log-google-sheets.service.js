@@ -330,23 +330,32 @@ const createSheetsClient = accessToken => {
   return google.sheets({ version: 'v4', auth });
 };
 
-const loadExportEntries = userId => prisma.errorLog.findMany({
-  where: { userId },
-  select: {
-    id: true,
-    origin: true,
-    source: true,
-    sourceUrl: true,
-    category: true,
-    correctAnswer: true,
-    userAnswer: true,
-    whyWrong: true,
-    whyRight: true,
-    questionId: true,
-    createdAt: true,
-  },
-  orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-});
+const loadExportEntries = async (userId) => {
+  const entries = await prisma.errorLog.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      origin: true,
+      source: true,
+      sourceUrl: true,
+      category: true,
+      correctAnswer: true,
+      userAnswer: true,
+      whyWrong: true,
+      whyRight: true,
+      questionId: true,
+      createdAt: true,
+      submission: { select: { delivery: { select: { status: true, dueAt: true } } } },
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  const now = new Date();
+  return entries.map(({ submission, ...entry }) => {
+    const delivery = submission?.delivery;
+    const solutionLocked = Boolean(delivery && delivery.status === 'PUBLISHED' && (!delivery.dueAt || delivery.dueAt > now));
+    return solutionLocked ? { ...entry, correctAnswer: null } : entry;
+  });
+};
 
 const exportToGoogleSheet = async ({ userId, googleAccessToken, platformOrigin }) => {
   const accessToken = normalizeGoogleAccessToken(googleAccessToken);

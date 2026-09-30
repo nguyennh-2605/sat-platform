@@ -256,6 +256,10 @@ const parseQuestion = ({ text, moduleOrder, questionOrder, moduleIndex, question
   workingText = domain.text;
   const skill = extractLineField(workingText, 'Skill');
   workingText = skill.text;
+  const sourceBankQuestion = extractLineField(workingText, 'Source-Bank-Question');
+  workingText = sourceBankQuestion.text;
+  const sourceBankVersion = extractLineField(workingText, 'Source-Bank-Version');
+  workingText = sourceBankVersion.text;
 
   let passage = '';
   if (explicitMarkers.length) {
@@ -346,6 +350,8 @@ const parseQuestion = ({ text, moduleOrder, questionOrder, moduleIndex, question
     explanation: parsedQuestion.explanation,
     domainCode: domainMatch?.code || '',
     skillCode: skillMatch?.code || '',
+    sourceBankQuestionId: sourceBankQuestion.value || undefined,
+    sourceBankVersionId: sourceBankVersion.value || undefined,
     issues,
   };
 };
