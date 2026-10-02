@@ -13,7 +13,7 @@ const questionCount = test => (test?.sections || []).reduce((total, section) => 
 
 const todoHref = todo => {
   if (todo.type === 'VOCABULARY' && todo.activityId) return `/dashboard/vocabulary?activity=${todo.activityId}`;
-  if (todo.type === 'TEST' && todo.testId && todo.deliveryId) return `/test/${todo.testId}?deliveryId=${todo.deliveryId}`;
+  if ((todo.type === 'TEST' || todo.type === 'QUIZ') && todo.testId && todo.deliveryId) return `/test/${todo.testId}?deliveryId=${todo.deliveryId}`;
   if (todo.assignmentId) return `/dashboard/class/${todo.classId}/assignment/${todo.assignmentId}`;
   return `/dashboard/class/${todo.classId}`;
 };
@@ -22,7 +22,7 @@ const todoFocus = todo => ({
   type: 'CLASSROOM',
   title: todo.priority === 'OVERDUE' ? `Catch up on ${todo.title}` : todo.title,
   description: `${todo.className}${todo.dueAt ? ` · ${todo.priority === 'OVERDUE' ? 'Overdue' : 'Due soon'}` : ''}`,
-  actionLabel: todo.type === 'TEST' && todo.attemptStatus === 'DOING' ? 'Continue' : 'Open coursework',
+  actionLabel: (todo.type === 'TEST' || todo.type === 'QUIZ') && todo.attemptStatus === 'DOING' ? 'Continue' : 'Open coursework',
   href: todoHref(todo),
   dueAt: todo.dueAt || null,
   source: 'CLASSROOM',

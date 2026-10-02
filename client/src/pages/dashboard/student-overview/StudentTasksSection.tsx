@@ -20,7 +20,7 @@ import type { StudentTaskItem, StudentTasksResponse } from './student-overview.t
 
 type TaskView = 'TODAY' | 'TOMORROW' | 'WEEK' | 'COMPLETED' | 'DATE';
 
-const sourceLabels: Record<StudentTaskItem['type'], string> = { PERSONAL: 'Personal', ANNOUNCEMENT: 'Announcement', ASSIGNMENT: 'Assignment', TEST: 'Test', VOCABULARY: 'Vocabulary' };
+const sourceLabels: Record<StudentTaskItem['type'], string> = { PERSONAL: 'Personal', ANNOUNCEMENT: 'Announcement', ASSIGNMENT: 'Assignment', TEST: 'Test', QUIZ: 'Quiz', VOCABULARY: 'Vocabulary' };
 const dateForTask = (task: StudentTaskItem) => task.dueAt ? new Date(task.dueAt) : task.type === 'ANNOUNCEMENT' ? new Date(task.createdAt) : null;
 
 function filteredTasks(items: StudentTaskItem[], view: TaskView, selectedDate?: Date) {

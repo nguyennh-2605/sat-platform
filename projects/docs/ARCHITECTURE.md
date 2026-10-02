@@ -210,6 +210,23 @@ Express Server (index.js → app.js)
 | `DELETE` | `/api/bank/delete` | JWT | Delete folders and/or tests (owner-checked) |
 | `PUT` | `/api/bank/move` | JWT | Move folders/tests to another folder |
 
+### 5.5a Question Bank & Roadmap
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/question-bank` | JWT + TEACHER/ADMIN | Role-scoped reusable questions: Admin manages System questions; Teacher reads owned and published System questions |
+| `POST` | `/api/question-bank` | JWT + TEACHER/ADMIN | Create a Personal Teacher question or System Admin question with an immutable first version |
+| `POST` | `/api/question-bank/quizzes` | JWT + TEACHER/ADMIN | Create and assign a lesson Quiz from immutable Question Bank snapshots; Quiz remains distinct from Test in classroom activity data |
+| `PUT` | `/api/question-bank/:id` | JWT + owning TEACHER/ADMIN | Create the next immutable content version while preserving prior test snapshots |
+| `PATCH` | `/api/question-bank/:id/status` | JWT + owning TEACHER/ADMIN | Publish, archive, or restore a bank question |
+| `POST` | `/api/question-bank/random-quizzes` | JWT + STUDENT | Build a hidden Personal test snapshot from random unseen, published System questions |
+| `GET/POST/PATCH` | `/api/roadmaps[/:id]` | JWT + STUDENT/ADMIN | Students read the published roadmap; Admin lists, creates, and updates roadmap definitions |
+| `POST/PATCH` | `/api/roadmaps/:id/milestones[/:milestoneId]` | JWT + ADMIN | Create or update ordered milestones, theory blocks, completion count, and skill-backed dynamic pools |
+| `POST` | `/api/roadmaps/:id/publish` | JWT + ADMIN | Publish one roadmap and archive any previously published roadmap |
+| `GET` | `/api/roadmaps/milestones/:milestoneId/questions` | JWT + STUDENT | Read the shared dynamic practice pool for an unlocked milestone |
+| `POST` | `/api/roadmaps/milestones/:milestoneId/confirm-theory` | JWT + STUDENT | Record theory review without consuming a question completion |
+| `POST` | `/api/roadmaps/milestones/:milestoneId/questions/:questionId/answers` | JWT + STUDENT | Grade an unlimited retry and count distinct answered questions toward milestone completion |
+
 ### 5.6 Progress (Class Weeks & Lessons)
 
 | Method | Path | Auth | Description |
@@ -351,6 +368,9 @@ User ──1:N── ErrorLog
 User ──1:N── Notification
 User ──1:N── Folder
 User ──1:N── Test (authorId)
+User ──1:N── QuestionBankItem (ownerId)
+User ──1:N── StudentBankQuestionProgress
+User ──1:N── StudentMilestoneProgress
 User ──1:N── Submission
 User ──1:N── HomeworkSubmission
 User ──1:N── AuditEvent (actorUserId, set null on actor deletion)
@@ -372,6 +392,11 @@ Test ──M:1── Folder
 
 Section ──1:N── Question
 Question ──1:N── Answer
+QuestionBankItem ──1:N── QuestionBankVersion
+QuestionBankItem ──1:N── Question (snapshot provenance)
+Roadmap ──1:N── RoadmapMilestone
+RoadmapMilestone ──M:N── QuestionSkill (via MilestoneSkill)
+RoadmapMilestone ──1:N── BankQuestionAttempt
 
 Week ──1:N── Lesson
 Lesson ──1:N── LessonBlock
@@ -394,11 +419,15 @@ Folder ──1:N── Test
 
 **Assignment**: `id` (UUID), `title`, `content`, `fileUrls[]`, `links[]`, `testIds[]`, `deadline`, `classId` (FK → Class, cascade)
 
-**Test**: `id`, `title`, `description`, `duration` (default 64 min), `mode` (PRACTICE | EXAM), `status` (DRAFT | PUBLISHED | ARCHIVED), `scope` (SYSTEM | PERSONAL), `category` (REAL | CLASS | PRACTICE), transitional `isPublic`, `subject` (RW | MATH), `authorId` (creator attribution, FK → User), `folderId` (Personal tests only, FK → Folder), `createdAt`, `updatedAt`
+**Test**: `id`, `title`, `description`, `duration` (default 64 min), `mode` (PRACTICE | EXAM), `status` (DRAFT | PUBLISHED | ARCHIVED), `scope` (SYSTEM | PERSONAL), `category` (REAL | CLASS | PRACTICE), transitional `isPublic`, `isDiscoverable` (false for generated student quiz snapshots), `subject` (RW | MATH), `authorId` (creator attribution, FK → User), `folderId` (Personal tests only, FK → Folder), `createdAt`, `updatedAt`
 
 **Submission**: `id`, `userId`, `testId`, `assignmentId`, `classTestId`, attempt snapshot fields (`attemptMode`, `timingPreset`, `allowedDurationSeconds`, `moduleTimingSnapshot`), `savedAnswers` (JSON), `timeRemaining`, `currentQuestionIndex`, `score`, `violationCount`, `status` (DOING | COMPLETED), `startedAt`, `endTime`. Attempt snapshots are immutable after creation so later Test edits do not change an in-progress clock.
 
-**Question**: `id`, `sectionId`, `type` (MCQ | SPR), `blocks` (JSON content), `questionText`, `choices` (JSON), `correctAnswer`, `explanation`, `order`
+**Question**: `id`, `sectionId`, `type` (MCQ | SPR), `blocks` (JSON content), `questionText`, `choices` (JSON), `correctAnswer`, `explanation`, `order`, optional `sourceBankQuestionId` and `sourceBankVersionId`. Test questions remain independent snapshots even when their source bank item is edited or archived.
+
+**QuestionBankItem / QuestionBankVersion**: stable reusable identity plus immutable authored versions. Items own scope, lifecycle, SAT classification, subject/type, and difficulty; versions own content, choices, answer, explanation, creator, and version number.
+
+**Roadmap / RoadmapMilestone**: Admin-owned ordered curriculum. A milestone stores theory JSON, a required distinct-question count, and skill links; its practice pool is all currently Published System bank questions matching those skills. `StudentMilestoneProgress`, `StudentBankQuestionProgress`, and `BankQuestionAttempt` store review/completion and unlimited retry history.
 
 **Answer**: `id`, `submissionId`, `questionId`, `selectedChoice`, `isCorrect`
 
@@ -421,7 +450,11 @@ Folder ──1:N── Test
 | `/dashboard/practice-test` | PracticeTest | Test listing & filters |
 | `/dashboard/practice-test/my-bank/:folderId?` | TestBank | Folder-based test organization |
 | `/dashboard/practice-test/create` | CreateTestWizard | Multi-step test creation |
+| `/dashboard/question-bank` | QuestionBank | Admin System bank or Teacher Personal/System reusable question management |
+| `/dashboard/roadmap` | Roadmap | Admin-only roadmap builder; the unfinished Student roadmap route and navigation are disabled |
 | `/dashboard/class/:classId` | Classroom | Lessons, canonical activities with teacher result summaries, members, and announcements |
+| `/dashboard/class/:classId/lesson/:lessonId` | LessonWorkspace | Lesson materials, activities, progress, and teacher attendance |
+| `/dashboard/class/:classId/lesson/:lessonId/quiz/new` | CreateLessonQuiz | Teacher Quiz builder using published Question Bank questions for one lesson stage |
 | `/dashboard/class/:classId/assignment/:assignmentId` | AssignmentDetail | View/submit homework |
 | `/dashboard/error-log` | ErrorLog | Wrong answer tracking |
 | `/dashboard/results-analytics` | ResultAnalytics | Performance charts & history |
@@ -478,6 +511,18 @@ Folder ──1:N── Test
 7. Classroom Activities owns completion/performance; Test Library never displays student attempt state.
 8. Archiving prevents new delivery but preserves existing deliveries and student access/history.
 9. Assignment is a separate activity type. New Assignment flows never write tests into legacy Assignment.testIds[].
+```
+
+### 8.3a Question Bank, Roadmap, and Solution Embargo
+
+```text
+1. Admin publishes versioned System questions; Teachers publish versioned Personal questions and may also select published System questions.
+2. Create/Edit Test accepts structured text or Question Bank selections. The server resolves the selected versions and copies their full content into Test Question snapshots with provenance IDs.
+3. Admin can build and publish an ordered roadmap. Each milestone dynamically includes every published System question matching its configured skills.
+4. The unfinished Student Roadmap route, navigation entry, and milestone practice endpoints are temporarily disabled. The data model and implementation remain available for future work.
+5. A random student quiz selects only System questions that student has never answered, creates a hidden Personal Test snapshot, and uses the normal Exam Room and Submission pipeline.
+6. Teacher-created assigned quizzes do not filter out questions students may already have encountered.
+7. While a published delivery using a bank question is still open for a student, roadmap feedback, Score Report, Error Log, and Error Log export suppress the correct answer and explanation. Submission does not release solutions early; the delivery deadline or explicit close does.
 ```
 
 ### 8.4 Admin Test Management

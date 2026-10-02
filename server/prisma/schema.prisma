@@ -9,48 +9,54 @@ datasource db {
 }
 
 model User {
-  id                         Int                      @id @default(autoincrement())
-  email                      String                   @unique
-  googleSubject              String?                  @unique
+  id                         Int                           @id @default(autoincrement())
+  email                      String                        @unique
+  googleSubject              String?                       @unique
   password                   String?
-  createdAt                  DateTime                 @default(now())
+  createdAt                  DateTime                      @default(now())
   name                       String?
-  role                       Role                     @default(STUDENT)
+  role                       Role                          @default(STUDENT)
   avatar                     String?
   satTestDate                DateTime?
   currentSatScore            Int?
   targetSatScore             Int?
   dashboardBackground        String?
-  taughtClasses              Class[]                  @relation("TeacherClasses")
+  taughtClasses              Class[]                       @relation("TeacherClasses")
   errorLogs                  ErrorLog[]
   homeworkSubmissions        HomeworkSubmission[]
   submissions                Submission[]
   createdTests               Test[]
-  studyingClasses            Class[]                  @relation("StudentClasses")
+  studyingClasses            Class[]                       @relation("StudentClasses")
   notifications              Notification[]
   SubFolders                 Folder[]
-  createdDeliveries          TestDelivery[]           @relation("DeliveryCreator")
+  createdDeliveries          TestDelivery[]                @relation("DeliveryCreator")
   deliveryAssignments        DeliveryAssignee[]
   todoStates                 UserTodoState[]
   studentTasks               StudentTask[]
   refreshSessions            RefreshSession[]
-  ownedVocabularySets        VocabularySet[]          @relation("VocabularySetOwner")
-  createdVocabularySets      VocabularySet[]          @relation("VocabularySetCreator")
+  ownedVocabularySets        VocabularySet[]               @relation("VocabularySetOwner")
+  createdVocabularySets      VocabularySet[]               @relation("VocabularySetCreator")
   vocabularyProgress         VocabularyTermProgress[]
   vocabularySessions         VocabularyStudySession[]
-  createdActivities          ClassActivity[]          @relation("ActivityCreator")
-  createdAnnouncements       ClassAnnouncement[]      @relation("AnnouncementAuthor")
+  createdActivities          ClassActivity[]               @relation("ActivityCreator")
+  createdAnnouncements       ClassAnnouncement[]           @relation("AnnouncementAuthor")
   activityAssignments        ActivityAssignee[]
   lessonProgress             LessonProgress[]
   resourceProgress           ResourceProgress[]
-  auditEvents                AuditEvent[]             @relation("AuditEventActor")
-  fileAssets                 FileAsset[]              @relation("FileAssetOwner")
+  auditEvents                AuditEvent[]                  @relation("AuditEventActor")
+  fileAssets                 FileAsset[]                   @relation("FileAssetOwner")
   studySessions              StudySession[]
-  createdLearningFollowUps   LearningFollowUp[]       @relation("LearningFollowUpCreator")
-  learningFollowUpTargets    LearningFollowUpTarget[] @relation("LearningFollowUpTargetStudent")
-  recordedAttendanceSessions AttendanceSession[]      @relation("AttendanceRecorder")
-  attendanceRecords          AttendanceRecord[]       @relation("AttendanceStudent")
-  lessonBlockProgress        LessonBlockProgress[]    @relation("LessonBlockProgressStudent")
+  createdLearningFollowUps   LearningFollowUp[]            @relation("LearningFollowUpCreator")
+  learningFollowUpTargets    LearningFollowUpTarget[]      @relation("LearningFollowUpTargetStudent")
+  recordedAttendanceSessions AttendanceSession[]           @relation("AttendanceRecorder")
+  attendanceRecords          AttendanceRecord[]            @relation("AttendanceStudent")
+  lessonBlockProgress        LessonBlockProgress[]         @relation("LessonBlockProgressStudent")
+  ownedBankQuestions         QuestionBankItem[]            @relation("QuestionBankOwner")
+  createdBankVersions        QuestionBankVersion[]         @relation("QuestionBankVersionCreator")
+  bankQuestionProgress       StudentBankQuestionProgress[]
+  bankQuestionAttempts       BankQuestionAttempt[]
+  createdRoadmaps            Roadmap[]                     @relation("RoadmapCreator")
+  roadmapProgress            StudentMilestoneProgress[]
 }
 
 model RefreshSession {
@@ -225,28 +231,29 @@ model Folder {
 }
 
 model Test {
-  id          Int              @id @default(autoincrement())
-  description String?
-  duration    Int              @default(64)
-  title       String
-  mode        TestMode         @default(PRACTICE)
-  authorId    Int?
-  category    TestCategory     @default(PRACTICE)
-  isPublic    Boolean          @default(false)
-  subject     TestSubject      @default(RW)
-  status      TestStatus       @default(DRAFT)
-  scope       TestScope        @default(PERSONAL)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  testDate    String?
-  classTests  ClassTest[]
-  sections    Section[]
-  submissions Submission[]
-  folderId    Int?
-  folder      Folder?          @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  author      User?            @relation(fields: [authorId], references: [id])
-  deliveries  TestDelivery[]
-  images      TestImageUsage[]
+  id             Int              @id @default(autoincrement())
+  description    String?
+  duration       Int              @default(64)
+  title          String
+  mode           TestMode         @default(PRACTICE)
+  authorId       Int?
+  category       TestCategory     @default(PRACTICE)
+  isPublic       Boolean          @default(false)
+  subject        TestSubject      @default(RW)
+  status         TestStatus       @default(DRAFT)
+  scope          TestScope        @default(PERSONAL)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  testDate       String?
+  isDiscoverable Boolean          @default(true)
+  classTests     ClassTest[]
+  sections       Section[]
+  submissions    Submission[]
+  folderId       Int?
+  folder         Folder?          @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  author         User?            @relation(fields: [authorId], references: [id])
+  deliveries     TestDelivery[]
+  images         TestImageUsage[]
 
   @@index([authorId, status, updatedAt])
   @@index([scope, status, updatedAt])
@@ -279,48 +286,192 @@ model Section {
 }
 
 model Question {
-  id            Int              @id @default(autoincrement())
-  sectionId     Int
-  type          QuestionType     @default(MCQ)
-  choices       Json
-  correctAnswer String
-  blocks        Json
-  questionText  String
-  explanation   String?
-  order         Int              @default(0)
-  domainCode    String?
-  skillCode     String?
-  answers       Answer[]
-  section       Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  domain        QuestionDomain?  @relation("QuestionDomainQuestions", fields: [domainCode], references: [code], onDelete: SetNull)
-  skill         QuestionSkill?   @relation("QuestionSkillQuestions", fields: [skillCode], references: [code], onDelete: SetNull)
-  timings       QuestionTiming[]
-  errorLogs     ErrorLog[]
+  id                   Int                  @id @default(autoincrement())
+  sectionId            Int
+  type                 QuestionType         @default(MCQ)
+  choices              Json
+  correctAnswer        String
+  blocks               Json
+  questionText         String
+  explanation          String?
+  order                Int                  @default(0)
+  domainCode           String?
+  skillCode            String?
+  sourceBankQuestionId String?
+  sourceBankVersionId  String?
+  answers              Answer[]
+  section              Section              @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  domain               QuestionDomain?      @relation("QuestionDomainQuestions", fields: [domainCode], references: [code], onDelete: SetNull)
+  skill                QuestionSkill?       @relation("QuestionSkillQuestions", fields: [skillCode], references: [code], onDelete: SetNull)
+  sourceBankQuestion   QuestionBankItem?    @relation("QuestionBankSnapshots", fields: [sourceBankQuestionId], references: [id], onDelete: SetNull)
+  sourceBankVersion    QuestionBankVersion? @relation("QuestionBankVersionSnapshots", fields: [sourceBankVersionId], references: [id], onDelete: SetNull)
+  timings              QuestionTiming[]
+  errorLogs            ErrorLog[]
 
   @@index([domainCode])
   @@index([skillCode])
+  @@index([sourceBankQuestionId])
+  @@index([sourceBankVersionId])
 }
 
 model QuestionDomain {
-  code      String          @id
-  name      String
-  subject   TestSubject
-  sortOrder Int
-  skills    QuestionSkill[]
-  questions Question[]      @relation("QuestionDomainQuestions")
+  code          String             @id
+  name          String
+  subject       TestSubject
+  sortOrder     Int
+  skills        QuestionSkill[]
+  questions     Question[]         @relation("QuestionDomainQuestions")
+  bankQuestions QuestionBankItem[] @relation("BankQuestionDomainQuestions")
 
   @@index([subject, sortOrder])
 }
 
 model QuestionSkill {
-  code       String         @id
-  name       String
-  domainCode String
-  sortOrder  Int
-  domain     QuestionDomain @relation(fields: [domainCode], references: [code], onDelete: Cascade)
-  questions  Question[]     @relation("QuestionSkillQuestions")
+  code              String             @id
+  name              String
+  domainCode        String
+  sortOrder         Int
+  domain            QuestionDomain     @relation(fields: [domainCode], references: [code], onDelete: Cascade)
+  questions         Question[]         @relation("QuestionSkillQuestions")
+  bankQuestions     QuestionBankItem[] @relation("BankQuestionSkillQuestions")
+  roadmapMilestones MilestoneSkill[]
 
   @@index([domainCode, sortOrder])
+}
+
+model QuestionBankItem {
+  id         String                        @id @default(uuid())
+  ownerId    Int
+  scope      QuestionBankScope
+  status     QuestionBankStatus            @default(DRAFT)
+  subject    TestSubject
+  type       QuestionType                  @default(MCQ)
+  difficulty QuestionBankDifficulty        @default(MEDIUM)
+  domainCode String
+  skillCode  String
+  createdAt  DateTime                      @default(now())
+  updatedAt  DateTime                      @updatedAt
+  owner      User                          @relation("QuestionBankOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  domain     QuestionDomain                @relation("BankQuestionDomainQuestions", fields: [domainCode], references: [code], onDelete: Restrict)
+  skill      QuestionSkill                 @relation("BankQuestionSkillQuestions", fields: [skillCode], references: [code], onDelete: Restrict)
+  versions   QuestionBankVersion[]
+  snapshots  Question[]                    @relation("QuestionBankSnapshots")
+  progress   StudentBankQuestionProgress[]
+  attempts   BankQuestionAttempt[]
+
+  @@index([scope, status, subject, domainCode, skillCode])
+  @@index([ownerId, status, updatedAt])
+}
+
+model QuestionBankVersion {
+  id            String                @id @default(uuid())
+  questionId    String
+  version       Int
+  blocks        Json
+  questionText  String
+  choices       Json
+  correctAnswer String
+  explanation   String?
+  createdById   Int
+  createdAt     DateTime              @default(now())
+  question      QuestionBankItem      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdBy     User                  @relation("QuestionBankVersionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  snapshots     Question[]            @relation("QuestionBankVersionSnapshots")
+  attempts      BankQuestionAttempt[]
+
+  @@unique([questionId, version])
+  @@index([questionId, createdAt])
+}
+
+model StudentBankQuestionProgress {
+  userId         Int
+  questionId     String
+  attemptCount   Int              @default(0)
+  correctCount   Int              @default(0)
+  bestCorrect    Boolean          @default(false)
+  lastCorrect    Boolean?
+  firstAttemptAt DateTime?
+  lastAttemptAt  DateTime?
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question       QuestionBankItem @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, questionId])
+  @@index([userId, lastAttemptAt])
+}
+
+model Roadmap {
+  id          String             @id @default(uuid())
+  title       String
+  description String?
+  status      RoadmapStatus      @default(DRAFT)
+  createdById Int
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  createdBy   User               @relation("RoadmapCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  milestones  RoadmapMilestone[]
+
+  @@index([status, updatedAt])
+}
+
+model RoadmapMilestone {
+  id                    String                     @id @default(uuid())
+  roadmapId             String
+  title                 String
+  description           String?
+  order                 Int
+  theoryBlocks          Json
+  requiredQuestionCount Int                        @default(1)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  roadmap               Roadmap                    @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  skills                MilestoneSkill[]
+  progress              StudentMilestoneProgress[]
+  attempts              BankQuestionAttempt[]
+
+  @@unique([roadmapId, order])
+  @@index([roadmapId, order])
+}
+
+model MilestoneSkill {
+  milestoneId String
+  skillCode   String
+  milestone   RoadmapMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  skill       QuestionSkill    @relation(fields: [skillCode], references: [code], onDelete: Restrict)
+
+  @@id([milestoneId, skillCode])
+  @@index([skillCode])
+}
+
+model StudentMilestoneProgress {
+  userId            Int
+  milestoneId       String
+  theoryConfirmedAt DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestone         RoadmapMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@id([userId, milestoneId])
+  @@index([userId, completedAt])
+}
+
+model BankQuestionAttempt {
+  id             String              @id @default(uuid())
+  userId         Int
+  questionId     String
+  versionId      String
+  milestoneId    String?
+  selectedChoice String?
+  isCorrect      Boolean
+  createdAt      DateTime            @default(now())
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question       QuestionBankItem    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  version        QuestionBankVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  milestone      RoadmapMilestone?   @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+
+  @@index([userId, questionId, createdAt])
+  @@index([userId, milestoneId, createdAt])
 }
 
 model Submission {
@@ -591,6 +742,29 @@ enum QuestionType {
   SPR // Tự luận điền số (Grid-in)
 }
 
+enum QuestionBankScope {
+  SYSTEM
+  PERSONAL
+}
+
+enum QuestionBankStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum QuestionBankDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum RoadmapStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 enum ErrorLogOrigin {
   SYSTEM_QUESTION
   MANUAL
@@ -636,6 +810,7 @@ enum VocabularySessionStatus {
 
 enum ClassActivityType {
   TEST
+  QUIZ
   VOCABULARY
   HOMEWORK
   RESOURCE

@@ -35,6 +35,18 @@ test('bulk assignment creates one delivery and one canonical activity per test',
   assert.ok(createdActivities.every(item => item.type === 'TEST'));
 });
 
+test('quiz assignment keeps a distinct canonical activity type', async () => {
+  const createdDeliveries = [];
+  const createdActivities = [];
+  const db = fakeDeliveryDb({ createdDeliveries, createdActivities, classTestId: () => 1, accessibleTestIds: [21] });
+  await createDeliveriesWithDb({
+    db, classIds: ['class-1'], testIds: [21], activityType: 'QUIZ', userId: 7, userRole: 'TEACHER',
+  });
+  assert.equal(createdDeliveries.length, 1);
+  assert.equal(createdActivities.length, 1);
+  assert.equal(createdActivities[0].type, 'QUIZ');
+});
+
 test('bulk assignment validates every selected test before creating delivery records', async () => {
   const createdDeliveries = [];
   const createdActivities = [];

@@ -28,9 +28,9 @@ export interface QuestionResult {
   type: 'MCQ' | 'SPR';
   questionNumber: number;
   module: QuestionModule;
-  correctAnswer: string;
+  correctAnswer: string | null;
   userAnswer?: string | null;
-  isCorrect: boolean;
+  isCorrect: boolean | null;
   isOmitted: boolean;
   blocks: ContentBlock[];
   questionText: string;
@@ -83,5 +83,7 @@ export interface ScoreReportData {
     total: number;
     percentage: number | null;
   };
+  solutionsLocked?: boolean;
+  solutionAvailableAt?: string | null;
   questions: QuestionResult[];
 }

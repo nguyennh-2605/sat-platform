@@ -14,10 +14,10 @@ const addDays = (date, days) => new Date(date.getTime() + days * 86_400_000);
 const addHours = (date, hours) => new Date(date.getTime() + hours * 3_600_000);
 const activeAssignees = activity => (activity.assignees || []).filter(item => !item.excusedAt);
 const completedAssignees = activity => activeAssignees(activity).filter(item => item.status === 'COMPLETED');
-const assessedActivity = activity => activity.type === 'TEST' || activity.type === 'VOCABULARY';
+const assessedActivity = activity => activity.type === 'TEST' || activity.type === 'QUIZ' || activity.type === 'VOCABULARY';
 
 const activityHref = activity => {
-  if (activity.type === 'TEST' && activity.test?.testDeliveryId) {
+  if ((activity.type === 'TEST' || activity.type === 'QUIZ') && activity.test?.testDeliveryId) {
     return `/dashboard/class/${activity.classId}?tab=activities&deliveryId=${activity.test.testDeliveryId}`;
   }
   if (activity.type === 'HOMEWORK' && activity.homework?.assignmentId) {
@@ -26,7 +26,7 @@ const activityHref = activity => {
   return `/dashboard/class/${activity.classId}?tab=activities`;
 };
 
-const activityAction = activity => activity.type === 'TEST'
+const activityAction = activity => activity.type === 'TEST' || activity.type === 'QUIZ'
   ? 'View results'
   : activity.type === 'HOMEWORK'
     ? 'Open assignment'

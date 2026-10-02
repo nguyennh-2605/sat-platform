@@ -47,7 +47,7 @@ const priorityFor = dueAt => {
 
 const taskHref = item => {
   if (item.type === 'VOCABULARY') return `/dashboard/vocabulary?activity=${item.activityId}`;
-  if (item.type === 'TEST') return `/test/${item.testId}?deliveryId=${item.deliveryId}`;
+  if (item.type === 'TEST' || item.type === 'QUIZ') return `/test/${item.testId}?deliveryId=${item.deliveryId}`;
   if (item.type === 'ANNOUNCEMENT') return `/dashboard/class/${item.classId}?tab=announcements&announcementId=${item.announcementId}`;
   return `/dashboard/class/${item.classId}/assignment/${item.assignmentId}`;
 };
@@ -130,6 +130,7 @@ async function loadTaskSources({ db, userId }) {
       take: MAX_TASKS,
       select: {
         id: true, classId: true, createdAt: true, dueAt: true,
+        activity: { select: { activity: { select: { type: true } } } },
         class: { select: { name: true } },
         test: { select: { id: true, title: true, mode: true, duration: true, sections: { select: { _count: { select: { questions: true } } } } } },
         submissions: { where: { userId }, orderBy: { startedAt: 'desc' }, select: { status: true, endTime: true }, take: 10 },
@@ -202,19 +203,20 @@ async function getTasksWithDb({ db, userId, userRole, now = new Date() }) {
   }
 
   for (const delivery of deliveries) {
-    const key = `student-test:${delivery.id}`;
+    const activityType = delivery.activity?.activity?.type === 'QUIZ' ? 'QUIZ' : 'TEST';
+    const key = `student-${activityType.toLowerCase()}:${delivery.id}`;
     const state = stateByKey.get(key);
     const completedSubmission = delivery.submissions.find(submission => submission.status === 'COMPLETED');
     const totalQuestions = questionCount(delivery.test);
     tasks.push({
-      key, id: delivery.id, source: 'CLASSROOM', type: 'TEST', title: delivery.test.title,
-      description: `${totalQuestions} questions · ${delivery.test.mode === 'EXAM' ? 'Test mode' : 'Practice mode'}`,
+      key, id: delivery.id, source: 'CLASSROOM', type: activityType, title: delivery.test.title,
+      description: `${totalQuestions} questions · ${activityType === 'QUIZ' ? 'Quiz' : delivery.test.mode === 'EXAM' ? 'Test mode' : 'Practice mode'}`,
       className: delivery.class.name, classId: delivery.classId, testId: delivery.test.id, deliveryId: delivery.id,
       assignmentId: null, activityId: null,
       durationMinutes: delivery.test.duration, createdAt: delivery.createdAt, dueAt: delivery.dueAt,
       completedAt: completedSubmission?.endTime || null, completed: Boolean(completedSubmission), completionMode: 'SOURCE',
       priority: completedSubmission ? 'NORMAL' : priorityFor(delivery.dueAt), position: state?.position ?? null,
-      href: taskHref({ type: 'TEST', testId: delivery.test.id, deliveryId: delivery.id }),
+      href: taskHref({ type: activityType, testId: delivery.test.id, deliveryId: delivery.id }),
       canEdit: false, canDelete: false, canComplete: false,
     });
   }

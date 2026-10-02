@@ -1,4 +1,4 @@
-export type TeacherActivityType = 'TEST' | 'VOCABULARY' | 'HOMEWORK' | 'RESOURCE';
+export type TeacherActivityType = 'TEST' | 'QUIZ' | 'VOCABULARY' | 'HOMEWORK' | 'RESOURCE';
 
 export interface TeacherOverviewResponse {
   generatedAt: string;

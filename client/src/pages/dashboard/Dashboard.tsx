@@ -14,6 +14,8 @@ import {
   Search,
   Settings,
   Sun,
+  Database,
+  Map as MapIcon,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BrandMark } from '@/components/brand/BrandMark';
@@ -58,12 +60,15 @@ const navigation = [
   { to: '/dashboard/practice-test', label: 'Practice Center', icon: BookOpenCheck },
   { to: '/dashboard/classes', label: 'Classroom', icon: GraduationCap, activePrefixes: ['/dashboard/class/'] },
   { to: '/dashboard/vocabulary', label: 'Vocabulary', icon: BookA },
+  { to: '/dashboard/roadmap', label: 'Roadmap', icon: MapIcon, roles: ['ADMIN'] },
+  { to: '/dashboard/question-bank', label: 'Question Bank', icon: Database, roles: ['TEACHER', 'ADMIN'] },
   { to: '/dashboard/error-log', label: 'Error Log', icon: AlertCircle },
   { to: '/dashboard/results-analytics', label: 'Results & Analytics', icon: BarChart3 },
 ] as const;
 
 const navigationForRole = (role: string) => navigation
-  .filter(item => role === 'STUDENT' || !['/dashboard/error-log', '/dashboard/results-analytics'].includes(item.to))
+  .filter(item => (!('roles' in item) || item.roles.some(itemRole => itemRole === role))
+    && (role === 'STUDENT' || !['/dashboard/error-log', '/dashboard/results-analytics'].includes(item.to)))
   .map(item => {
     if (item.to === '/dashboard/practice-test') return { ...item, label: role === 'ADMIN' ? 'Test Management' : role === 'TEACHER' ? 'Test Library' : item.label };
     if (item.to === '/dashboard/classes' && role === 'TEACHER') return { ...item, label: 'Classrooms' };

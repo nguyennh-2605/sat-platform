@@ -36,7 +36,7 @@ import {
 import axiosClient from '@/lib/axios';
 import { AssignmentComposer, AssignTestsComposer, type ActivityStudent } from './activity-composer/ActivityComposers';
 
-type ActivityType = 'TEST' | 'HOMEWORK';
+type ActivityType = 'TEST' | 'QUIZ' | 'HOMEWORK';
 type ActivityTypeFilter = 'ALL' | ActivityType;
 type ActivityStatusFilter = 'ALL' | 'PUBLISHED' | 'DRAFT' | 'CLOSED' | 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE' | 'NEEDS_ATTENTION';
 type ActivityDateFilter = 'ALL' | 'THIS_WEEK' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'CUSTOM';
@@ -83,7 +83,7 @@ interface Choice<T extends string> {
   count?: number;
 }
 
-const TYPE_LABELS: Record<ActivityTypeFilter, string> = { ALL: 'All types', HOMEWORK: 'Assignments', TEST: 'Tests' };
+const TYPE_LABELS: Record<ActivityTypeFilter, string> = { ALL: 'All types', HOMEWORK: 'Assignments', QUIZ: 'Quizzes', TEST: 'Tests' };
 const SORT_LABELS: Record<ActivitySort, string> = {
   ASSIGNED_DESC: 'Newest assigned',
   ASSIGNED_ASC: 'Oldest assigned',
@@ -132,6 +132,7 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
   const counts = useMemo(() => ({
     ALL: activities.length,
     TEST: activities.filter(item => item.type === 'TEST').length,
+    QUIZ: activities.filter(item => item.type === 'QUIZ').length,
     HOMEWORK: activities.filter(item => item.type === 'HOMEWORK').length,
   }), [activities]);
 
@@ -188,7 +189,7 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
   };
 
   const openActivity = (activity: ClassActivity, review = false) => {
-    if (activity.type === 'TEST' && activity.test) {
+    if ((activity.type === 'TEST' || activity.type === 'QUIZ') && activity.test) {
       if (canManage) onOpenPerformance(activity.test.testDeliveryId);
       else navigate(`/test/${activity.test.testDelivery.testId}?deliveryId=${activity.test.testDeliveryId}`);
     } else if (activity.homework) {
@@ -196,7 +197,7 @@ export default function ClassroomActivities({ classId, students, canManage, onOp
     }
   };
 
-  const typeChoices: Array<Choice<ActivityTypeFilter>> = (['ALL', 'HOMEWORK', 'TEST'] as ActivityTypeFilter[]).map(value => ({ value, label: TYPE_LABELS[value], count: counts[value] }));
+  const typeChoices: Array<Choice<ActivityTypeFilter>> = (['ALL', 'HOMEWORK', 'QUIZ', 'TEST'] as ActivityTypeFilter[]).map(value => ({ value, label: TYPE_LABELS[value], count: counts[value] }));
   const statusChoices: Array<Choice<ActivityStatusFilter>> = canManage
     ? [
       { value: 'ALL', label: 'All status' },
@@ -379,7 +380,7 @@ function ActivityRow({ activity, canManage, onOpen, onReview }: { activity: Clas
           : <div><p className="font-medium tabular-nums text-foreground">{summary.completed} / {summary.assigned} completed</p>{secondaryCompletion && <p className="mt-1 text-caption text-muted-foreground">{secondaryCompletion}</p>}</div>
         : <StudentStatusBadge status={personalStatus} />}
     </TableCell>
-    {canManage && <TableCell>{activity.type === 'TEST'
+    {canManage && <TableCell>{activity.type === 'TEST' || activity.type === 'QUIZ'
       ? summary.averageScore == null
         ? <span className="text-muted-foreground">No scores yet</span>
         : <div><p className="font-medium tabular-nums text-foreground">{summary.averageScore}%</p><p className="mt-1 text-caption text-muted-foreground">Average score</p></div>
@@ -389,7 +390,7 @@ function ActivityRow({ activity, canManage, onOpen, onReview }: { activity: Clas
       <DropdownMenu>
         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="ml-auto size-9 shadow-none" aria-label={`Actions for ${activity.title}`}><Ellipsis size={16} /></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem onSelect={activity.type === 'HOMEWORK' && canManage ? onReview : onOpen}>{activity.type === 'TEST' ? 'View results' : canManage ? 'Review submissions' : 'Open assignment'}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={activity.type === 'HOMEWORK' && canManage ? onReview : onOpen}>{activity.type === 'TEST' || activity.type === 'QUIZ' ? 'View results' : canManage ? 'Review submissions' : 'Open assignment'}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </TableCell>}
@@ -437,7 +438,7 @@ function needsAttention(activity: ClassActivity) {
 }
 
 function activityMetadata(activity: ClassActivity) {
-  const type = activity.type === 'TEST' ? 'Test' : 'Assignment';
+  const type = activity.type === 'TEST' ? 'Test' : activity.type === 'QUIZ' ? 'Quiz' : 'Assignment';
   if (!activity.lesson) return `${type} · No week · No session`;
   const weekNumber = String(activity.lesson.week.order + 1).padStart(2, '0');
   const sessionNumber = String(activity.lesson.order + 1).padStart(2, '0');

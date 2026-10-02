@@ -31,6 +31,8 @@ interface ErrorEntry {
   updatedAt: string;
   submissionId: number | null;
   questionId: number | null;
+  solutionLocked?: boolean;
+  solutionAvailableAt?: string | null;
 }
 
 export type { ReviewStatus, ErrorEntry, ErrorQuestion };

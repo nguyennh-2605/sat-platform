@@ -60,7 +60,7 @@ export interface StudentOverviewResponse {
   classroom: { available: boolean; membershipCount: number; todos: ClassroomTodoItem[] };
 }
 
-export type StudentTaskSource = 'PERSONAL' | 'ANNOUNCEMENT' | 'ASSIGNMENT' | 'TEST' | 'VOCABULARY';
+export type StudentTaskSource = 'PERSONAL' | 'ANNOUNCEMENT' | 'ASSIGNMENT' | 'TEST' | 'QUIZ' | 'VOCABULARY';
 
 export interface StudentTaskItem {
   key: string;

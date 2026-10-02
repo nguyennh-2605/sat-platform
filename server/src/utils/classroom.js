@@ -2,8 +2,11 @@ const CLASS_COLORS = Object.freeze([
   '#1B7A5A',
   '#0F4D38',
   '#2563EB',
+  '#7C3AED',
+  '#0E7490',
   '#A16207',
   '#B45309',
+  '#BE123C',
   '#8B3A62',
   '#475569',
 ]);

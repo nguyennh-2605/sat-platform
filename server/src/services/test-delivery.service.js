@@ -54,7 +54,7 @@ const median = (values) => {
   return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 };
 
-const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lessonId, lessonPhase, title, availableAt, dueAt, maxAttempts, scorePolicy, followUp, userId, userRole }) => {
+const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lessonId, lessonPhase, title, availableAt, dueAt, maxAttempts, scorePolicy, followUp, activityType = 'TEST', userId, userRole }) => {
   const normalizedClassIds = [...new Set((Array.isArray(classIds) ? classIds : []).map(String).filter(Boolean))];
   const normalizedTestIds = [...new Set((Array.isArray(testIds) ? testIds : []).map(Number).filter(Number.isInteger))];
   const normalizedStudentIds = [...new Set((Array.isArray(studentIds) ? studentIds : []).map(parseUserId).filter(Number.isInteger))];
@@ -69,6 +69,7 @@ const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lesso
   }
   const normalizedMaxAttempts = Math.min(10, Math.max(1, Number.parseInt(maxAttempts, 10) || 1));
   const normalizedScorePolicy = validScorePolicies.has(scorePolicy) ? scorePolicy : 'FIRST';
+  const normalizedActivityType = activityType === 'QUIZ' ? 'QUIZ' : 'TEST';
   if (lessonId && normalizedClassIds.length !== 1) {
     throw new ApiError(400, { error: 'A lesson can only be attached when assigning to one class.' });
   }
@@ -79,7 +80,7 @@ const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lesso
     throw new ApiError(400, { error: 'A learning follow-up can only be assigned within one class.' });
   }
 
-  return db.$transaction(async tx => {
+  const createInTransaction = async tx => {
     const classes = [];
     for (const classId of normalizedClassIds) {
       classes.push(await assertClassManager(tx, { classId, userId, userRole }));
@@ -159,7 +160,7 @@ const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lesso
         });
         const canonicalActivity = await tx.classActivity.create({
           data: {
-            type: 'TEST',
+            type: normalizedActivityType,
             status: 'PUBLISHED',
             classId: classroom.id,
             lessonId: lessonId ? String(lessonId) : null,
@@ -183,7 +184,7 @@ const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lesso
         await tx.notification.createMany({
           data: assigneeIds.map(studentId => ({
             userId: studentId,
-            message: `${classroom.name}: ${delivery.title}`,
+            message: `${classroom.name}: ${normalizedActivityType === 'QUIZ' ? 'Quiz' : 'Test'} — ${delivery.title}`,
             link: `/dashboard/class/${classroom.id}?tab=activities`,
           })),
         });
@@ -204,7 +205,8 @@ const createDeliveriesWithDb = async ({ db, classIds, testIds, studentIds, lesso
       });
     }
     return deliveries;
-  });
+  };
+  return typeof db.$transaction === 'function' ? db.$transaction(createInTransaction) : createInTransaction(db);
 };
 
 exports.createDeliveriesWithDb = createDeliveriesWithDb;

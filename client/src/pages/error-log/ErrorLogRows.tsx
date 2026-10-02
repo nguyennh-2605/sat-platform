@@ -51,7 +51,7 @@ function RowMenu({ entry, disabled, actions }: { entry: ErrorEntry; disabled: bo
   return <DropdownMenu>
     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" disabled={disabled} aria-label={`Actions for ${entry.source}`}><MoreHorizontal /></Button></DropdownMenuTrigger>
     <DropdownMenuContent align="end">
-      <DropdownMenuItem onSelect={() => actions.editEntry(entry)}><Pencil />Edit details</DropdownMenuItem>
+      {!entry.solutionLocked && <DropdownMenuItem onSelect={() => actions.editEntry(entry)}><Pencil />Edit details</DropdownMenuItem>}
       <DropdownMenuItem variant="destructive" onSelect={() => actions.deleteEntry(entry)}><Trash2 />Delete entry</DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>;
@@ -80,7 +80,7 @@ export const ErrorLogDesktopRow = memo(function ErrorLogDesktopRow(props: ErrorL
     <TableCell className="w-[4%] px-1 text-center align-top"><ReviewStatusIcon reviewed={Boolean(entry.reviewedAt)} /></TableCell>
     <TableCell className="w-[11%] break-words border-r border-ui-border/60 px-2 align-top font-medium">{entry.category || 'General'}</TableCell>
     <TableCell className="w-[17%] border-r border-ui-border/60 px-2 align-top"><SourceButton entry={entry} onOpen={() => actions.openSource(entry)} /></TableCell>
-    <TableCell className="w-[7%] break-words px-2 align-top font-medium tabular-nums text-success">{entry.correctAnswer || '—'}</TableCell>
+    <TableCell className={`w-[7%] break-words px-2 align-top font-medium tabular-nums ${entry.solutionLocked ? 'text-warning' : 'text-success'}`}>{entry.solutionLocked ? 'Locked' : entry.correctAnswer || '—'}</TableCell>
     <TableCell className="w-[7%] break-words border-r border-ui-border/70 px-2 align-top font-medium tabular-nums text-danger">{entry.userAnswer || 'Omitted'}</TableCell>
     {reflections.map(({ field, label }) => <TableCell key={field} className={`w-[25%] p-0 align-top ${field === 'whyWrong' ? 'border-r border-ui-border/70' : ''}`}><ReflectionCell {...props} field={field} label={label} previewMaxHeight="max-h-80" /></TableCell>)}
     <TableCell className="w-[4%] px-1 text-right align-top"><RowMenu entry={entry} disabled={dirty} actions={actions} /></TableCell>
@@ -96,7 +96,7 @@ export const ErrorLogMobileCard = memo(function ErrorLogMobileCard(props: ErrorL
       <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{entry.category || 'General'}</p><SourceButton entry={entry} onOpen={() => actions.openSource(entry)} /></div>
       <RowMenu entry={entry} disabled={dirty} actions={actions} />
     </header>
-    <div className="grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-muted-foreground">Correct</p><p className="font-medium tabular-nums text-success">{entry.correctAnswer || '—'}</p></div><div><p className="text-xs text-muted-foreground">Yours</p><p className="font-medium tabular-nums text-danger">{entry.userAnswer || 'Omitted'}</p></div></div>
+    <div className="grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-muted-foreground">Correct</p><p className={`font-medium tabular-nums ${entry.solutionLocked ? 'text-warning' : 'text-success'}`}>{entry.solutionLocked ? 'Locked' : entry.correctAnswer || '—'}</p></div><div><p className="text-xs text-muted-foreground">Yours</p><p className="font-medium tabular-nums text-danger">{entry.userAnswer || 'Omitted'}</p></div></div>
     {reflections.map(({ field, label }) => <section key={field}><h3 className="mb-1 text-xs font-medium text-muted-foreground">{label}</h3><ReflectionCell {...props} field={field} label={label} previewMaxHeight="max-h-72" /></section>)}
   </article>;
 });

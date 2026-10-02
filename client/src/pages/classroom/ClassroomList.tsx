@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowRight, CalendarClock, Copy, GraduationCap, MoreHorizontal, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Check, Clock3, Copy, GraduationCap, MoreHorizontal, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,19 @@ import { capitalizeFirstLetter } from '../../utils/text';
 
 type ClassSort = 'NEWEST' | 'NAME' | 'STUDENTS';
 
+const CLASS_COLOR_OPTIONS = [
+  { value: '#1B7A5A', label: 'Emerald' },
+  { value: '#0F4D38', label: 'Forest' },
+  { value: '#2563EB', label: 'Blue' },
+  { value: '#7C3AED', label: 'Violet' },
+  { value: '#0E7490', label: 'Cyan' },
+  { value: '#A16207', label: 'Gold' },
+  { value: '#B45309', label: 'Amber' },
+  { value: '#BE123C', label: 'Rose' },
+  { value: '#8B3A62', label: 'Berry' },
+  { value: '#475569', label: 'Slate' },
+] as const;
+
 interface ClassSummary {
   id: string;
   name: string;
@@ -32,7 +45,7 @@ interface ClassSummary {
   studentCount: number;
   canManage: boolean;
   dueInNext7DaysCount: number;
-  nextActivity: { id: string; type: 'TEST' | 'VOCABULARY' | 'HOMEWORK' | 'RESOURCE'; title: string; dueAt: string } | null;
+  nextActivity: { id: string; type: 'TEST' | 'QUIZ' | 'VOCABULARY' | 'HOMEWORK' | 'RESOURCE'; title: string; dueAt: string } | null;
   lastContentUpdateAt: string | null;
 }
 
@@ -85,7 +98,6 @@ export default function ClassroomList() {
         <PageHeader
           title={<span className="flex items-center gap-2">Classrooms{!loading && !loadError && <Badge variant="secondary">{classes.length}</Badge>}</span>}
           description={canCreate ? 'Manage classes, students, assignments, and learning progress.' : 'Open a class to view assignments and learning activity.'}
-          actions={canCreate ? <Button size="sm" onClick={() => setEditor({ mode: 'create' })}><Plus aria-hidden="true" />Create class</Button> : undefined}
         />
 
         <section className="min-w-0 space-y-4" aria-label="Classes">
@@ -95,10 +107,13 @@ export default function ClassroomList() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                 <Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search classrooms…" aria-label="Search classrooms" className="w-full pl-9" />
               </label>
-              <Select value={sort} onValueChange={value => setSort(value as ClassSort)}>
-                <SelectTrigger className="w-full sm:w-36" aria-label="Sort classrooms"><SelectValue /></SelectTrigger>
-                <SelectContent align="end"><SelectItem value="NEWEST">Newest</SelectItem><SelectItem value="NAME">Name</SelectItem><SelectItem value="STUDENTS">Student count</SelectItem></SelectContent>
-              </Select>
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                <Select value={sort} onValueChange={value => setSort(value as ClassSort)}>
+                  <SelectTrigger className="min-w-0 flex-1 sm:w-36" aria-label="Sort classrooms"><SelectValue /></SelectTrigger>
+                  <SelectContent align="end"><SelectItem value="NEWEST">Newest</SelectItem><SelectItem value="NAME">Name</SelectItem><SelectItem value="STUDENTS">Student count</SelectItem></SelectContent>
+                </Select>
+                {canCreate && <Button className="shrink-0" onClick={() => setEditor({ mode: 'create' })}><Plus aria-hidden="true" />Create class</Button>}
+              </div>
             </div>
           )}
             {loading ? <ClassGridSkeleton /> : loadError ? (
@@ -131,14 +146,6 @@ export default function ClassroomList() {
 }
 
 function ClassCard({ classroom, showTeacher, onOpen, onEdit, onDelete }: { classroom: ClassSummary; showTeacher: boolean; onOpen: () => void; onEdit: () => void; onDelete: () => void }) {
-  const activityType = classroom.nextActivity?.type === 'TEST'
-    ? 'Test'
-    : classroom.nextActivity?.type === 'VOCABULARY'
-      ? 'Vocabulary'
-      : classroom.nextActivity?.type === 'HOMEWORK'
-        ? 'Assignment'
-        : 'Resource';
-
   const copyClassCode = async () => {
     try {
       await navigator.clipboard.writeText(classroom.id);
@@ -148,23 +155,28 @@ function ClassCard({ classroom, showTeacher, onOpen, onEdit, onDelete }: { class
     }
   };
 
+  const updatedAt = classroom.lastContentUpdateAt || classroom.createdAt;
+
   return (
-    <Card size="sm" interactive>
-      <CardHeader>
-        <div className="min-w-0">
-          <CardTitle>
-            <button type="button" onClick={onOpen} className="line-clamp-2 text-left font-semibold outline-none hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring">
-              {classroom.name}
-            </button>
-          </CardTitle>
-          <CardDescription className="mt-0.5 truncate">
-            {showTeacher ? `Teacher: ${classroom.teacher?.name || 'Unassigned'}` : `${classroom.studentCount} ${classroom.studentCount === 1 ? 'student' : 'students'}`}
-          </CardDescription>
-        </div>
-        {classroom.canManage && (
-          <CardAction>
+    <Card
+      size="sm"
+      interactive
+      className="group/class relative cursor-pointer gap-0 overflow-hidden py-0 outline-none transition-shadow hover:shadow-md focus-within:ring-3 focus-within:ring-ring/50"
+    >
+      <button type="button" onClick={onOpen} className="absolute inset-0 z-1 rounded-[inherit] outline-none" aria-label={`Open ${classroom.name}`} />
+      <div
+        className="pointer-events-none relative aspect-[16/7] min-h-36 overflow-hidden"
+        style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${classroom.color} 52%, white) 0%, ${classroom.color} 48%, color-mix(in srgb, ${classroom.color} 42%, black) 100%)` }}
+        aria-hidden="true"
+      >
+        <div className="absolute inset-x-0 top-0 h-1/2 bg-linear-to-b from-white/10 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-t from-black/12 to-transparent" />
+      </div>
+
+      {classroom.canManage && (
+        <div className="absolute right-3 top-3 z-10" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" className="-mr-1 -mt-1" aria-label={`Actions for ${classroom.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild><Button variant="secondary" size="icon" className="border border-white/25 bg-black/20 text-white shadow-sm backdrop-blur-sm hover:bg-black/35 hover:text-white" aria-label={`Actions for ${classroom.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => void copyClassCode()}><Copy aria-hidden="true" />Copy class code</DropdownMenuItem>
                 <DropdownMenuItem onSelect={onEdit}><Pencil aria-hidden="true" />Edit class</DropdownMenuItem>
@@ -172,47 +184,37 @@ function ClassCard({ classroom, showTeacher, onOpen, onEdit, onDelete }: { class
                 <DropdownMenuItem variant="destructive" onSelect={onDelete}><Trash2 aria-hidden="true" />Delete class</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </CardAction>
-        )}
+        </div>
+      )}
+
+      <CardHeader className="pointer-events-none gap-3 px-4 py-4 sm:px-5">
+        <CardTitle className="line-clamp-2 text-base font-semibold text-foreground transition-colors group-hover/class:text-primary">{classroom.name}</CardTitle>
+        <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 px-0 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5"><Users className="size-3.5" aria-hidden="true" />{classroom.studentCount} {classroom.studentCount === 1 ? 'student' : 'students'}</span>
+          <span className="flex items-center gap-1.5"><Clock3 className="size-3.5" aria-hidden="true" />Updated {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}</span>
+          {showTeacher && <span className="w-full truncate">Teacher: {classroom.teacher?.name || 'Unassigned'}</span>}
+        </CardContent>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {showTeacher && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Users className="size-4" aria-hidden="true" /><span>{classroom.studentCount} {classroom.studentCount === 1 ? 'student' : 'students'}</span></div>}
-        {classroom.nextActivity ? (
-          <div className="rounded-lg border bg-muted/30 p-3">
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-foreground">Next activity</span>
-              <Badge variant="outline">{activityType}</Badge>
-            </div>
-            <p className="truncate text-sm font-semibold">{classroom.nextActivity.title}</p>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"><CalendarClock className="size-3.5" aria-hidden="true" />Due {format(new Date(classroom.nextActivity.dueAt), 'MMM d, h:mm a')}</p>
-            {classroom.dueInNext7DaysCount > 1 && <p className="mt-2 text-xs text-muted-foreground">+{classroom.dueInNext7DaysCount - 1} more due in the next 7 days</p>}
-          </div>
-        ) : (
-          <div className="flex min-h-16 items-center justify-center rounded-lg bg-muted/40 px-3 py-3 text-center text-xs text-muted-foreground">No coursework due in the next 7 days</div>
-        )}
-      </CardContent>
-      <CardFooter className="justify-between gap-3 py-2.5">
-        <span className="truncate text-xs text-muted-foreground">
-          {classroom.lastContentUpdateAt ? `Updated ${formatDistanceToNow(new Date(classroom.lastContentUpdateAt), { addSuffix: true })}` : 'No content published yet'}
-        </span>
-        <Button variant="ghost" size="sm" className="shrink-0" onClick={onOpen}>Open<ArrowRight aria-hidden="true" /></Button>
-      </CardFooter>
     </Card>
   );
 }
 
 function ClassEditorModal({ state, onClose, onSaved }: { state: { mode: 'create' | 'edit'; classroom?: ClassSummary } | null; onClose: () => void; onSaved: () => Promise<void> }) {
   const [name, setName] = useState('');
+  const [color, setColor] = useState<string>(CLASS_COLOR_OPTIONS[0].value);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { setName(state?.classroom?.name || ''); }, [state]);
+  useEffect(() => {
+    setName(state?.classroom?.name || '');
+    setColor(state?.classroom?.color || CLASS_COLOR_OPTIONS[0].value);
+  }, [state]);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!state || !name.trim()) return;
     setSaving(true);
     try {
-      if (state.mode === 'create') await axiosClient.post('/api/classes', { name: name.trim() });
-      else await axiosClient.patch(`/api/classes/${state.classroom?.id}`, { name: name.trim() });
+      if (state.mode === 'create') await axiosClient.post('/api/classes', { name: name.trim(), color });
+      else await axiosClient.patch(`/api/classes/${state.classroom?.id}`, { name: name.trim(), color });
       toast.success(state.mode === 'create' ? 'Class created' : 'Class updated');
       await onSaved();
     } catch (error) {
@@ -220,9 +222,13 @@ function ClassEditorModal({ state, onClose, onSaved }: { state: { mode: 'create'
     } finally { setSaving(false); }
   };
 
-  return <Modal open={Boolean(state)} onClose={onClose} closeOnBackdrop title={state?.mode === 'edit' ? 'Edit class' : 'Create class'} subtitle={state?.mode === 'edit' ? 'Update the class name.' : 'Create a learning space for lessons, activities, and students.'} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !name.trim()} onClick={save}>{saving ? 'Saving…' : state?.mode === 'edit' ? 'Save changes' : 'Create class'}</Button></>}>
-    <form onSubmit={save}>
+  return <Modal open={Boolean(state)} onClose={onClose} closeOnBackdrop title={state?.mode === 'edit' ? 'Edit class' : 'Create class'} subtitle={state?.mode === 'edit' ? 'Update the class name and cover color.' : 'Create a learning space for lessons, activities, and students.'} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button disabled={saving || !name.trim()} onClick={save}>{saving ? 'Saving…' : state?.mode === 'edit' ? 'Save changes' : 'Create class'}</Button></>}>
+    <form onSubmit={save} className="space-y-5">
       <label className="block text-sm font-medium">Class name<Input autoFocus className="mt-2" maxLength={100} value={name} onChange={event => setName(event.target.value)} placeholder="e.g. SAT Math 12A1" /></label>
+      <fieldset><legend className="text-sm font-medium text-foreground">Cover color</legend><div className="mt-3 grid grid-cols-5 gap-3">{CLASS_COLOR_OPTIONS.map(option => {
+        const selected = color === option.value;
+        return <button key={option.value} type="button" aria-label={option.label} aria-pressed={selected} title={option.label} onClick={() => setColor(option.value)} className="relative aspect-square rounded-xl border border-white/20 shadow-sm outline-none transition-shadow hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50" style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${option.value} 52%, white), ${option.value} 48%, color-mix(in srgb, ${option.value} 42%, black))` }}>{selected && <span className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-black/10 text-white"><Check className="size-5" strokeWidth={2.5} /></span>}</button>;
+      })}</div></fieldset>
     </form>
   </Modal>;
 }
@@ -247,5 +253,5 @@ function DeleteClassModal({ target, onClose, onDeleted }: { target: ClassSummary
 }
 
 function ClassGridSkeleton() {
-  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} size="sm"><CardHeader><div className="flex gap-3"><Skeleton className="size-9 shrink-0 rounded-lg" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3.5 w-1/2" /></div></div><CardAction><Skeleton className="size-8" /></CardAction></CardHeader><CardContent><Skeleton className="h-24 w-full rounded-lg" /></CardContent><CardFooter className="justify-between py-2.5"><Skeleton className="h-3 w-28" /><Skeleton className="h-8 w-16" /></CardFooter></Card>)}</div>;
+  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading classes">{Array.from({ length: 6 }, (_, index) => <Card key={index} size="sm" className="gap-0 overflow-hidden py-0"><Skeleton className="aspect-[16/7] min-h-36 w-full rounded-none" /><CardHeader className="gap-3 px-5 py-4"><Skeleton className="h-5 w-2/3" /><CardContent className="flex gap-4 px-0"><Skeleton className="h-3.5 w-24" /><Skeleton className="h-3.5 w-32" /></CardContent></CardHeader></Card>)}</div>;
 }
