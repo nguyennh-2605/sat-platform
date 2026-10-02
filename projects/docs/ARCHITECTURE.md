@@ -214,8 +214,9 @@ Express Server (index.js → app.js)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/question-bank` | JWT + TEACHER/ADMIN | Role-scoped reusable questions: Admin manages System questions; Teacher reads owned and published System questions. Students access practice only through unlocked roadmap milestone endpoints |
+| `GET` | `/api/question-bank` | JWT + TEACHER/ADMIN | Role-scoped reusable questions: Admin manages System questions; Teacher reads owned and published System questions |
 | `POST` | `/api/question-bank` | JWT + TEACHER/ADMIN | Create a Personal Teacher question or System Admin question with an immutable first version |
+| `POST` | `/api/question-bank/quizzes` | JWT + TEACHER/ADMIN | Create and assign a lesson Quiz from immutable Question Bank snapshots; Quiz remains distinct from Test in classroom activity data |
 | `PUT` | `/api/question-bank/:id` | JWT + owning TEACHER/ADMIN | Create the next immutable content version while preserving prior test snapshots |
 | `PATCH` | `/api/question-bank/:id/status` | JWT + owning TEACHER/ADMIN | Publish, archive, or restore a bank question |
 | `POST` | `/api/question-bank/random-quizzes` | JWT + STUDENT | Build a hidden Personal test snapshot from random unseen, published System questions |
@@ -450,8 +451,10 @@ Folder ──1:N── Test
 | `/dashboard/practice-test/my-bank/:folderId?` | TestBank | Folder-based test organization |
 | `/dashboard/practice-test/create` | CreateTestWizard | Multi-step test creation |
 | `/dashboard/question-bank` | QuestionBank | Admin System bank or Teacher Personal/System reusable question management |
-| `/dashboard/roadmap` | Roadmap | Admin roadmap builder or Student theory-and-practice learning path |
+| `/dashboard/roadmap` | Roadmap | Admin-only roadmap builder; the unfinished Student roadmap route and navigation are disabled |
 | `/dashboard/class/:classId` | Classroom | Lessons, canonical activities with teacher result summaries, members, and announcements |
+| `/dashboard/class/:classId/lesson/:lessonId` | LessonWorkspace | Lesson materials, activities, progress, and teacher attendance |
+| `/dashboard/class/:classId/lesson/:lessonId/quiz/new` | CreateLessonQuiz | Teacher Quiz builder using published Question Bank questions for one lesson stage |
 | `/dashboard/class/:classId/assignment/:assignmentId` | AssignmentDetail | View/submit homework |
 | `/dashboard/error-log` | ErrorLog | Wrong answer tracking |
 | `/dashboard/results-analytics` | ResultAnalytics | Performance charts & history |
@@ -515,8 +518,8 @@ Folder ──1:N── Test
 ```text
 1. Admin publishes versioned System questions; Teachers publish versioned Personal questions and may also select published System questions.
 2. Create/Edit Test accepts structured text or Question Bank selections. The server resolves the selected versions and copies their full content into Test Question snapshots with provenance IDs.
-3. Admin publishes one ordered roadmap. Each milestone dynamically includes every published System question matching its configured skills, so all students share the same pool.
-4. Students review theory and retry practice without limit. The milestone unlocks the next one after the configured number of distinct questions has been answered.
+3. Admin can build and publish an ordered roadmap. Each milestone dynamically includes every published System question matching its configured skills.
+4. The unfinished Student Roadmap route, navigation entry, and milestone practice endpoints are temporarily disabled. The data model and implementation remain available for future work.
 5. A random student quiz selects only System questions that student has never answered, creates a hidden Personal Test snapshot, and uses the normal Exam Room and Submission pipeline.
 6. Teacher-created assigned quizzes do not filter out questions students may already have encountered.
 7. While a published delivery using a bank question is still open for a student, roadmap feedback, Score Report, Error Log, and Error Log export suppress the correct answer and explanation. Submission does not release solutions early; the delivery deadline or explicit close does.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, ChevronRight, CirclePlay, ClipboardCheck, ExternalLink, FileText, FileUp, Link2, MoreHorizontal, Plus, Target, Trash2, UploadCloud, Video, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronRight, CirclePlay, ClipboardCheck, ExternalLink, FileText, FileUp, ListChecks, Link2, MoreHorizontal, Plus, Target, Trash2, UploadCloud, Video, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axiosClient from '@/lib/axios';
@@ -31,7 +31,7 @@ interface ResourceProgress { completedAt: string | null; positionSeconds: number
 interface LessonResource { id: string; name: string; url: string; kind: ResourceKind; provider: string | null; mimeType: string | null; durationSeconds: number | null; fileAssetId: string | null; progress: ResourceProgress | null }
 interface LessonActivity {
   id: string;
-  type: 'TEST' | 'HOMEWORK' | 'VOCABULARY' | 'RESOURCE';
+  type: 'TEST' | 'QUIZ' | 'HOMEWORK' | 'VOCABULARY' | 'RESOURCE';
   title: string;
   instructions: string | null;
   availableAt: string | null;
@@ -422,6 +422,7 @@ export default function LessonWorkspace() {
           onAddVideo={() => openResourceEditor(phase.value, 'VIDEO')}
           onAddLink={() => openResourceEditor(phase.value, 'LINK')}
           onAddAssignment={() => setComposer({ kind: 'ASSIGNMENT', phase: phase.value })}
+          onAddQuiz={() => navigate(`/dashboard/class/${lesson.week.class.id}/lesson/${lesson.id}/quiz/new?phase=${phase.value}`)}
           onAddTest={() => setComposer({ kind: 'TEST', phase: phase.value })}
           onMove={(index, direction) => void moveBlock(phase.value, index, direction)}
           onRequired={(block, value) => void updateBlock(block, { isRequired: value })}
@@ -443,7 +444,7 @@ export default function LessonWorkspace() {
   </main></div>;
 }
 
-function PhaseSection({ phase, blocks, canManage, working, last, onAddText, onAddFile, onAddVideo, onAddLink, onAddAssignment, onAddTest, onMove, onRequired, onPhase, onDelete, onOpen }: {
+function PhaseSection({ phase, blocks, canManage, working, last, onAddText, onAddFile, onAddVideo, onAddLink, onAddAssignment, onAddQuiz, onAddTest, onMove, onRequired, onPhase, onDelete, onOpen }: {
   phase: { value: LessonPhase; title: string; description: string };
   blocks: LessonBlock[];
   canManage: boolean;
@@ -454,6 +455,7 @@ function PhaseSection({ phase, blocks, canManage, working, last, onAddText, onAd
   onAddVideo: () => void;
   onAddLink: () => void;
   onAddAssignment: () => void;
+  onAddQuiz: () => void;
   onAddTest: () => void;
   onMove: (index: number, direction: -1 | 1) => void;
   onRequired: (block: LessonBlock, value: boolean) => void;
@@ -464,7 +466,7 @@ function PhaseSection({ phase, blocks, canManage, working, last, onAddText, onAd
   return <section className={last ? undefined : 'border-b border-ui-border'} aria-labelledby={`lesson-phase-${phase.value}`}>
     <header className="flex flex-col gap-3 bg-section-header px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:px-5">
       <div className="min-w-0"><h2 id={`lesson-phase-${phase.value}`} className="text-title font-semibold text-foreground">{phase.title}</h2><p className="mt-0.5 text-caption leading-5 text-muted-foreground">{phase.description}</p></div>
-      {canManage && <AddContentMenu onText={onAddText} onFile={onAddFile} onVideo={onAddVideo} onLink={onAddLink} onAssignment={onAddAssignment} onTest={onAddTest} />}
+      {canManage && <AddContentMenu onText={onAddText} onFile={onAddFile} onVideo={onAddVideo} onLink={onAddLink} onAssignment={onAddAssignment} onQuiz={onAddQuiz} onTest={onAddTest} />}
     </header>
     <div className="divide-y divide-ui-border/70">
       {blocks.length === 0 ? <p className="px-5 py-5 text-body text-muted-foreground">{canManage ? `No ${phase.title.toLowerCase()} content yet.` : 'No content for this stage.'}</p> : blocks.map((block, index) => <LessonBlockRow key={block.id} block={block} index={index} count={blocks.length} canManage={canManage} working={working} onMove={onMove} onRequired={onRequired} onPhase={onPhase} onDelete={onDelete} onOpen={onOpen} />)}
@@ -472,8 +474,8 @@ function PhaseSection({ phase, blocks, canManage, working, last, onAddText, onAd
   </section>;
 }
 
-function AddContentMenu({ onText, onFile, onVideo, onLink, onAssignment, onTest }: { onText: () => void; onFile: () => void; onVideo: () => void; onLink: () => void; onAssignment: () => void; onTest: () => void }) {
-  return <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm" variant="outline"><Plus size={14} />Add content</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-60"><DropdownMenuLabel>Learning material</DropdownMenuLabel><DropdownMenuItem onSelect={onText}><FileText />Add note</DropdownMenuItem><DropdownMenuItem onSelect={onFile}><FileUp />Upload file</DropdownMenuItem><DropdownMenuItem onSelect={onVideo}><Video />Add video</DropdownMenuItem><DropdownMenuItem onSelect={onLink}><Link2 />Add link</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuLabel>Student work</DropdownMenuLabel><DropdownMenuItem onSelect={onAssignment}><ClipboardCheck />Assignment</DropdownMenuItem><DropdownMenuItem onSelect={onTest}><CirclePlay />Existing test</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
+function AddContentMenu({ onText, onFile, onVideo, onLink, onAssignment, onQuiz, onTest }: { onText: () => void; onFile: () => void; onVideo: () => void; onLink: () => void; onAssignment: () => void; onQuiz: () => void; onTest: () => void }) {
+  return <DropdownMenu><DropdownMenuTrigger asChild><Button size="sm" variant="outline"><Plus size={14} />Add content</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-64"><DropdownMenuLabel>Learning material</DropdownMenuLabel><DropdownMenuItem onSelect={onText}><FileText />Add note</DropdownMenuItem><DropdownMenuItem onSelect={onFile}><FileUp />Upload file</DropdownMenuItem><DropdownMenuItem onSelect={onVideo}><Video />Add video</DropdownMenuItem><DropdownMenuItem onSelect={onLink}><Link2 />Add link</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuLabel>Student work</DropdownMenuLabel><DropdownMenuItem onSelect={onAssignment}><ClipboardCheck />Assignment</DropdownMenuItem><DropdownMenuItem onSelect={onQuiz}><ListChecks />Create quiz from Question Bank</DropdownMenuItem><DropdownMenuItem onSelect={onTest}><CirclePlay />Assign existing test</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
 }
 
 function LessonBlockRow({ block, index, count, canManage, working, onMove, onRequired, onPhase, onDelete, onOpen }: {
@@ -488,9 +490,9 @@ function LessonBlockRow({ block, index, count, canManage, working, onMove, onReq
   onDelete: (block: LessonBlock) => void;
   onOpen: (block: LessonBlock) => void;
 }) {
-  const icon = block.kind === 'TEXT' ? <FileText size={16} /> : block.kind === 'RESOURCE' ? block.resource?.kind === 'VIDEO' ? <Video size={16} /> : <Link2 size={16} /> : block.activity?.type === 'TEST' ? <CirclePlay size={16} /> : <ClipboardCheck size={16} />;
+  const icon = block.kind === 'TEXT' ? <FileText size={16} /> : block.kind === 'RESOURCE' ? block.resource?.kind === 'VIDEO' ? <Video size={16} /> : <Link2 size={16} /> : block.activity?.type === 'TEST' ? <CirclePlay size={16} /> : block.activity?.type === 'QUIZ' ? <ListChecks size={16} /> : <ClipboardCheck size={16} />;
   const title = block.title || block.resource?.name || block.activity?.title || 'Untitled content';
-  const type = block.kind === 'TEXT' ? 'Note' : block.kind === 'RESOURCE' ? block.resource?.kind === 'VIDEO' ? 'Video' : block.resource?.kind === 'FILE' ? 'File' : block.resource?.kind === 'EMBED' ? 'Embedded activity' : 'Link' : block.activity?.type === 'TEST' ? 'Test' : 'Assignment';
+  const type = block.kind === 'TEXT' ? 'Note' : block.kind === 'RESOURCE' ? block.resource?.kind === 'VIDEO' ? 'Video' : block.resource?.kind === 'FILE' ? 'File' : block.resource?.kind === 'EMBED' ? 'Embedded activity' : 'Link' : block.activity?.type === 'TEST' ? 'Test' : block.activity?.type === 'QUIZ' ? 'Quiz' : 'Assignment';
   const metadata = block.activity?.dueAt ? `Due ${formatDate(block.activity.dueAt)}` : block.activity?.test ? `${block.activity.test.questionCount} questions · ${block.activity.test.duration} min` : block.resource?.provider ? block.resource.provider.replaceAll('_', ' ') : null;
   const external = block.kind === 'RESOURCE';
   return <article id={`lesson-block-${block.id}`} className="flex min-w-0 items-center gap-1 px-2 transition-colors hover:bg-muted/40 focus-within:bg-muted/40 sm:px-3">

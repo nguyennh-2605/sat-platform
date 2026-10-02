@@ -810,6 +810,7 @@ enum VocabularySessionStatus {
 
 enum ClassActivityType {
   TEST
+  QUIZ
   VOCABULARY
   HOMEWORK
   RESOURCE

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeContent } = require('../src/services/question-bank.service');
+const { listWhere, normalizeContent } = require('../src/services/question-bank.service');
 const { previewText } = require('../src/services/test-import.service');
 
 test('question bank validation normalizes reusable multiple-choice content', () => {
@@ -71,4 +71,23 @@ Answer: B`,
   const question = preview.modules[0].questions[0];
   assert.equal(question.sourceBankQuestionId, 'bank-question-1');
   assert.equal(question.sourceBankVersionId, 'bank-version-3');
+});
+
+test('question bank list supports multiple domains, skills, and difficulties', () => {
+  const where = listWhere({
+    userId: 7,
+    userRole: 'TEACHER',
+    source: 'SYSTEM',
+    subject: 'MATH',
+    domainCodes: 'MATH_ALGEBRA,MATH_ADVANCED_MATH',
+    skillCodes: ['MATH_LINEAR_EQUATIONS_ONE_VARIABLE', 'MATH_NONLINEAR_FUNCTIONS'],
+    difficulties: 'EASY,HARD,UNKNOWN',
+  });
+
+  assert.deepEqual(where.domainCode, { in: ['MATH_ALGEBRA', 'MATH_ADVANCED_MATH'] });
+  assert.deepEqual(where.skillCode, { in: ['MATH_LINEAR_EQUATIONS_ONE_VARIABLE', 'MATH_NONLINEAR_FUNCTIONS'] });
+  assert.deepEqual(where.difficulty, { in: ['EASY', 'HARD'] });
+  assert.equal(where.subject, 'MATH');
+  assert.equal(where.scope, 'SYSTEM');
+  assert.equal(where.status, 'PUBLISHED');
 });

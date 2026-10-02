@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { BookOpen, Check, ChevronRight, LockKeyhole, Map, Plus, Shuffle, Target } from 'lucide-react';
 import axiosClient from '@/lib/axios';
 import { updateStoredAuthUser } from '@/lib/authSession';
@@ -36,7 +36,8 @@ export default function Roadmap() {
     return () => controller.abort();
   }, [cachedRole]);
   if (!role) return <LoadingState className="h-full" label="Loading roadmap…" />;
-  return role === 'ADMIN' ? <AdminRoadmap /> : <StudentRoadmap />;
+  if (role !== 'ADMIN') return <Navigate to="/dashboard" replace />;
+  return <AdminRoadmap />;
 }
 
 function AdminRoadmap() {
@@ -109,7 +110,7 @@ function AdminRoadmap() {
   </main></div>;
 }
 
-function StudentRoadmap() {
+export function StudentRoadmap() {
   const navigate = useNavigate();
   const [roadmap, setRoadmap] = useState<RoadmapData | null | undefined>(undefined);
   const [selected, setSelected] = useState<RoadmapMilestone | null>(null);

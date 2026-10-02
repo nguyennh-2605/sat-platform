@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export interface ClassroomTodoItem {
   key: string;
-  type: 'TEST_RESULT' | 'ANNOUNCEMENT' | 'ASSIGNMENT' | 'TEST' | 'VOCABULARY';
+  type: 'TEST_RESULT' | 'QUIZ_RESULT' | 'ANNOUNCEMENT' | 'ASSIGNMENT' | 'TEST' | 'QUIZ' | 'VOCABULARY';
   classId: string;
   className: string;
   title: string;
@@ -55,7 +55,7 @@ const duration = (milliseconds?: number | null) => {
 };
 
 const itemSummary = (item: ClassroomTodoItem) => {
-  if (item.type === 'TEST_RESULT') {
+  if (item.type === 'TEST_RESULT' || item.type === 'QUIZ_RESULT') {
     const parts = [Number.isFinite(item.score) ? `${item.score}/${item.totalQuestions} correct` : null, duration(item.durationMs)];
     return parts.filter(Boolean).join(' · ');
   }
@@ -71,7 +71,7 @@ const itemTrailingMeta = (item: ClassroomTodoItem) => {
 };
 
 const iconFor = (type: ClassroomTodoItem['type']) => {
-  if (type === 'TEST_RESULT') return BarChart3;
+  if (type === 'TEST_RESULT' || type === 'QUIZ_RESULT') return BarChart3;
   if (type === 'ANNOUNCEMENT') return Megaphone;
   if (type === 'ASSIGNMENT') return ClipboardList;
   if (type === 'VOCABULARY') return BookA;
@@ -126,7 +126,7 @@ export function ClassroomTodoPanel() {
       navigate(`/dashboard/vocabulary?activity=${item.activityId}`);
       return;
     }
-    if (item.type === 'TEST') {
+    if (item.type === 'TEST' || item.type === 'QUIZ') {
       setSelectedTest(item);
       return;
     }
@@ -135,7 +135,7 @@ export function ClassroomTodoPanel() {
       navigate(`/dashboard/class/${item.classId}?tab=announcements&announcementId=${item.announcementId}`);
       return;
     }
-    if (item.type === 'TEST_RESULT' && item.deliveryId) {
+    if ((item.type === 'TEST_RESULT' || item.type === 'QUIZ_RESULT') && item.deliveryId) {
       void acknowledge(item);
       navigate(`/dashboard/class/${item.classId}?tab=activities&deliveryId=${item.deliveryId}`);
       return;
@@ -191,9 +191,9 @@ function TestStartDialog({ item, onClose }: { item: ClassroomTodoItem | null; on
     closeOnBackdrop
     presentation="content-dialog"
     title={capitalizeFirstLetter(item?.title)}
-    subtitle={item ? `${capitalizeFirstLetter(item.className)} · ${item.testMode === 'EXAM' ? 'Test mode' : 'Practice mode'}` : undefined}
+    subtitle={item ? `${capitalizeFirstLetter(item.className)} · ${item.type === 'QUIZ' ? 'Quiz' : item.testMode === 'EXAM' ? 'Test mode' : 'Practice mode'}` : undefined}
     className="!max-w-lg"
-    footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={start}>{item?.attemptStatus === 'DOING' ? 'Continue' : 'Start test'}</Button></>}
+    footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={start}>{item?.attemptStatus === 'DOING' ? 'Continue' : item?.type === 'QUIZ' ? 'Start quiz' : 'Start test'}</Button></>}
   >
     <div className="grid grid-cols-2 gap-3 text-sm">
       <TestFact label="Questions" value={String(item?.totalQuestions || '—')} />

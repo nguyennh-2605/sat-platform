@@ -56,7 +56,7 @@ export default function StudentOverview() {
   }, [navigate]);
   const openPractice = (item: StudentPracticePick) => openTest({ id: item.id, title: item.title, duration: item.duration }, `/test/${item.id}`);
   const openTask = (item: StudentTaskItem) => {
-    if (item.type === 'TEST' && item.testId) return openTest({ id: item.testId, title: item.title, duration: item.durationMinutes }, item.href);
+    if ((item.type === 'TEST' || item.type === 'QUIZ') && item.testId) return openTest({ id: item.testId, title: item.title, duration: item.durationMinutes }, item.href);
     if (item.href) navigate(item.href);
   };
   const satDate = data?.preferences.satTestDate && new Date(data.preferences.satTestDate).getTime() > now ? new Date(data.preferences.satTestDate) : undefined;

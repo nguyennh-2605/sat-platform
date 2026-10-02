@@ -49,7 +49,7 @@ This is a presentation-layer migration, not a Next.js migration.
 | Create/Edit Test workspace | `dashboard/invoice` | shared `field`, `select`, `tabs`, `card` primitives | Build/Review composition implemented without a stepper; Details and Import share the left card, live preview remains on the right, and Review actions live in the page header |
 | Test Bank | `dashboard/file-manager` | `dashboard/tasks` | No standalone route currently; embedded assignment selector aligned |
 | Question Bank | `dashboard/tasks`, `dashboard/file-manager` | shared DataSurface/Table and content-dialog | Implemented as role-scoped Admin System and Teacher Personal/System libraries; the Create/Edit Test workspace can copy selected immutable bank versions into test snapshots |
-| Learning Roadmap | `dashboard/academy`, `dashboard/tasks` | shared Card, Progress, Modal, and content-dialog patterns | Implemented with an Admin milestone builder and a Student sequential theory/practice path backed by live System Question Bank skill pools; random unseen-question quizzes reuse Exam Room |
+| Learning Roadmap | `dashboard/academy`, `dashboard/tasks` | shared Card, Progress, Modal, and content-dialog patterns | Admin milestone builder remains available; the unfinished Student route, navigation, and practice endpoints are temporarily disabled |
 | Results Analytics | `dashboard/analytics` | `dashboard/default` | Student diagnostic workspace implemented as one scrollable page with URL-backed range/subject filters, sticky anchor navigation, rule-based Focus Areas, cross-subject snapshot, independently loaded Study Consistency from completed Focus Clock sessions, real attempt accuracy trend, expandable SAT skill hierarchy, Error Log review links, QuestionTiming pacing coverage, and paginated completed Attempts. Study time remains explicitly opt-in tracked focus time rather than inferred wall-clock activity |
 | Error Log | `dashboard/tasks` | working spreadsheet; shared DataSurface/Table, DataDock/Sheet, and content-dialog | Container-responsive grid/cards with one sticky utility bar, a stable expanded out-of-row reflection editor, coordinated Quill-native inline shortcuts and application-level navigation commands, inline link editing, review chips/facets, searchable category filter, memoized keyed drafts, serialized optimistic autosave/conflict recovery, automatic cursor loading, idempotent external manual sources, and an origin-aware snapshot modal |
 | Vocabulary | `dashboard/tasks` | Quizlet/Knowt set-first workflow, rich-list patterns | Implemented as a set-first workspace with coverage/mastery progress, dynamic new/learning review CTA, searchable word rich list, word detail Sheet, range/mastery setup, persisted resumable sessions, reversible Shuffle, flashcard completion loop, and desktop study shortcuts |
@@ -93,7 +93,8 @@ This is a presentation-layer migration, not a Next.js migration.
 - [x] Results Analytics and Score Report.
 - [x] Error Log and Vocabulary.
 - [x] Shared assignment, test-selection, and announcement overlays.
-- [x] Add Question Bank selection to test authoring and the Admin-managed Student Roadmap.
+- [x] Add Question Bank selection to test authoring and the Admin Roadmap builder.
+- [ ] Resume the Student Roadmap route and milestone practice flow after the screen is completed.
 
 ### Phase 4 — Consolidation
 

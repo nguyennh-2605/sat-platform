@@ -48,6 +48,7 @@ const getTeacherTodos = async userId => {
       classId: true,
       title: true,
       createdAt: true,
+      activity: { select: { activity: { select: { type: true } } } },
       class: { select: { name: true } },
       test: {
         select: {
@@ -77,7 +78,8 @@ const getTeacherTodos = async userId => {
   const items = [];
   for (const delivery of deliveries) {
     for (const submission of firstCompletedByStudent(delivery.submissions)) {
-      const key = `teacher-result:${delivery.id}:${submission.userId}`;
+      const activityType = delivery.activity?.activity?.type === 'QUIZ' ? 'QUIZ' : 'TEST';
+      const key = `teacher-${activityType.toLowerCase()}-result:${delivery.id}:${submission.userId}`;
       if (handled.has(key)) continue;
       const totalQuestions = questionCount(delivery.test);
       const durationMs = delivery.test.mode === 'EXAM' && submission.beganAt && submission.endTime
@@ -85,7 +87,7 @@ const getTeacherTodos = async userId => {
         : null;
       items.push({
         key,
-        type: 'TEST_RESULT',
+        type: activityType === 'QUIZ' ? 'QUIZ_RESULT' : 'TEST_RESULT',
         classId: delivery.classId,
         className: delivery.class.name,
         title: `Review ${submission.user.name || submission.user.email}'s result`,
@@ -143,6 +145,7 @@ const getStudentTodos = async userId => {
         classId: true,
         createdAt: true,
         dueAt: true,
+        activity: { select: { activity: { select: { type: true } } } },
         class: { select: { name: true } },
         test: {
           select: {
@@ -214,13 +217,14 @@ const getStudentTodos = async userId => {
   for (const delivery of deliveries) {
     if (hasCompletedSubmission(delivery.submissions)) continue;
     const doing = delivery.submissions.some(submission => submission.status === 'DOING');
+    const activityType = delivery.activity?.activity?.type === 'QUIZ' ? 'QUIZ' : 'TEST';
     items.push({
-      key: `student-test:${delivery.id}`,
-      type: 'TEST',
+      key: `student-${activityType.toLowerCase()}:${delivery.id}`,
+      type: activityType,
       classId: delivery.classId,
       className: delivery.class.name,
       title: delivery.test.title,
-      description: `${questionCount(delivery.test)} questions · ${delivery.test.mode === 'EXAM' ? 'Test mode' : 'Practice mode'}`,
+      description: `${questionCount(delivery.test)} questions · ${activityType === 'QUIZ' ? 'Quiz' : delivery.test.mode === 'EXAM' ? 'Test mode' : 'Practice mode'}`,
       createdAt: delivery.createdAt,
       dueAt: delivery.dueAt,
       priority: priorityFor(delivery.dueAt),
@@ -269,7 +273,7 @@ exports.acknowledgeTodo = async ({ itemKey, userId, userRole }) => {
   const normalizedKey = String(itemKey || '').trim();
   const todos = await exports.getTodos({ userId: currentUserId, userRole });
   const item = todos.find(todo => todo.key === normalizedKey);
-  if (!item || !['ANNOUNCEMENT', 'TEST_RESULT'].includes(item.type)) {
+  if (!item || !['ANNOUNCEMENT', 'TEST_RESULT', 'QUIZ_RESULT'].includes(item.type)) {
     throw new ApiError(404, { error: 'To Do item not found.' });
   }
   await prisma.userTodoState.upsert({

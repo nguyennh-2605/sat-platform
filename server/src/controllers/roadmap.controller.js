@@ -9,9 +9,7 @@ const handle = (res, error, fallback) => {
 
 exports.list = async (req, res) => {
   try {
-    return res.json(req.user.role === 'ADMIN'
-      ? await roadmapService.listAdminRoadmaps()
-      : await roadmapService.getStudentRoadmap({ userId: req.user.userId }));
+    return res.json(await roadmapService.listAdminRoadmaps());
   } catch (error) { return handle(res, error, 'Unable to load the roadmap.'); }
 };
 

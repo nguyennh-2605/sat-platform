@@ -35,7 +35,7 @@ exports.listClassActivities = async ({ classId, userId, userRole }) => {
   const activities = await prisma.classActivity.findMany({
     where: {
       classId: String(classId),
-      type: { in: ['TEST', 'HOMEWORK'] },
+      type: { in: ['TEST', 'QUIZ', 'HOMEWORK'] },
       ...(canManage ? {} : {
         status: 'PUBLISHED',
         assignees: { some: { studentId: intId(userId), excusedAt: null } },
@@ -143,7 +143,7 @@ exports.listClassResults = async params => {
       createdAt: activity.createdAt,
       lesson: activity.lesson,
     };
-    if (activity.type === 'TEST') {
+    if (activity.type === 'TEST' || activity.type === 'QUIZ') {
       return {
         ...base,
         testResult: {

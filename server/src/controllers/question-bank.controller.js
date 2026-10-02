@@ -38,3 +38,10 @@ exports.createRandomQuiz = async (req, res) => {
     return res.status(201).json(quiz);
   } catch (error) { return handle(res, error, 'Unable to create a random quiz.'); }
 };
+
+exports.createAssignedQuiz = async (req, res) => {
+  try {
+    const quiz = await questionBankService.createAssignedQuiz({ userId: req.user.userId, userRole: req.user.role, payload: req.body });
+    return res.status(201).json(quiz);
+  } catch (error) { return handle(res, error, 'Unable to create this quiz.'); }
+};

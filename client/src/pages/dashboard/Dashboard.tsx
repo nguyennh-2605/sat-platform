@@ -60,7 +60,7 @@ const navigation = [
   { to: '/dashboard/practice-test', label: 'Practice Center', icon: BookOpenCheck },
   { to: '/dashboard/classes', label: 'Classroom', icon: GraduationCap, activePrefixes: ['/dashboard/class/'] },
   { to: '/dashboard/vocabulary', label: 'Vocabulary', icon: BookA },
-  { to: '/dashboard/roadmap', label: 'Roadmap', icon: MapIcon, roles: ['STUDENT', 'ADMIN'] },
+  { to: '/dashboard/roadmap', label: 'Roadmap', icon: MapIcon, roles: ['ADMIN'] },
   { to: '/dashboard/question-bank', label: 'Question Bank', icon: Database, roles: ['TEACHER', 'ADMIN'] },
   { to: '/dashboard/error-log', label: 'Error Log', icon: AlertCircle },
   { to: '/dashboard/results-analytics', label: 'Results & Analytics', icon: BarChart3 },

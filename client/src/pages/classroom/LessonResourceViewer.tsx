@@ -5,6 +5,7 @@ import { Modal } from '@/components/ui/AppUI';
 import { Button } from '@/components/ui/button';
 import axiosClient from '@/lib/axios';
 import { LoadingSpinner } from '@/components/ui/loading';
+import { cn } from '@/lib/utils';
 
 type ResourceKind = 'FILE' | 'VIDEO' | 'LINK' | 'EMBED';
 
@@ -106,6 +107,8 @@ export function LessonResourceViewer({ block, canManage, onClose, onProgress }: 
   const canPreviewDocument = isInlineDocument(mimeType);
   const unsupportedFile = resource.kind === 'FILE' && !loading && !loadError && sourceUrl && !canPreviewImage && !canPreviewDocument;
   const externalOnly = (resource.kind === 'LINK' || resource.kind === 'EMBED') && !embedUrl;
+  const hasWidePreview = Boolean(embedUrl || canPreviewImage || canPreviewDocument);
+  const previewNeedsFullHeight = canPreviewImage || canPreviewDocument;
 
   const openOriginal = () => {
     if (!sourceUrl) return;
@@ -137,7 +140,11 @@ export function LessonResourceViewer({ block, canManage, onClose, onProgress }: 
     open
     closeOnBackdrop
     presentation="content-dialog"
-    className="h-[min(820px,calc(100vh-2rem))] max-w-5xl"
+    className={cn(
+      'max-h-[calc(100vh-2rem)]',
+      embedUrl ? 'max-w-[min(80rem,calc(100vw-2rem),calc(177.78vh-17.56rem))]' : hasWidePreview ? 'max-w-7xl' : 'max-w-2xl',
+      previewNeedsFullHeight && 'h-[min(900px,calc(100vh-2rem))]',
+    )}
     onClose={onClose}
     title={resource.name}
     subtitle={[resource.kind === 'VIDEO' ? 'Video' : resource.kind === 'LINK' ? 'External link' : resource.kind === 'EMBED' ? 'Embedded activity' : mimeType || 'File', access?.asset.sizeBytes ? formatBytes(access.asset.sizeBytes) : null].filter(Boolean).join(' · ')}
@@ -148,11 +155,14 @@ export function LessonResourceViewer({ block, canManage, onClose, onProgress }: 
       <Button variant={canManage || block.completed || resource.kind === 'LINK' ? 'default' : 'ghost'} onClick={onClose}>Close</Button>
     </>}
   >
-    <div className="flex h-full min-h-0 items-center justify-center overflow-hidden rounded-control border border-ui-border bg-muted/25">
+    <div className={cn(
+      'flex min-h-0 w-full items-center justify-center overflow-hidden rounded-control border border-ui-border bg-muted/25',
+      previewNeedsFullHeight ? 'h-full' : embedUrl ? 'aspect-video' : 'min-h-80',
+    )}>
       {loading ? <ViewerMessage icon={<LoadingSpinner size="md" />} title="Preparing preview…" description="Creating a secure, temporary viewer link." />
         : loadError ? <ViewerMessage icon={<TriangleAlert />} title="Preview unavailable" description={loadError} />
-          : embedUrl ? <div className="aspect-video w-full max-w-5xl overflow-hidden bg-black"><iframe src={embedUrl} title={resource.name} className="size-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen sandbox="allow-scripts allow-same-origin allow-presentation allow-popups" referrerPolicy="strict-origin-when-cross-origin" /></div>
-            : canPreviewImage ? <img src={sourceUrl} alt={resource.name} className="max-h-full max-w-full object-contain" />
+          : embedUrl ? <iframe src={embedUrl} title={resource.name} className="size-full bg-black" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen sandbox="allow-scripts allow-same-origin allow-presentation allow-popups" referrerPolicy="strict-origin-when-cross-origin" />
+            : canPreviewImage ? <img src={sourceUrl} alt={resource.name} className="size-full object-contain" />
               : canPreviewDocument ? <iframe src={sourceUrl} title={resource.name} className="size-full bg-white" />
                 : unsupportedFile ? <ViewerMessage icon={<FileText />} title="Preview is not available for this file type" description="Download the file or open the original to view it in a compatible app." />
                   : externalOnly ? <ViewerMessage icon={<ExternalLink />} title="This resource opens on another website" description="For security, general links are not embedded inside the learning workspace." />

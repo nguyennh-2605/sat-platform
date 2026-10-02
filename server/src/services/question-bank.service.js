@@ -3,11 +3,17 @@ const ApiError = require('../utils/ApiError');
 const { isAnswerCorrect } = require('../utils/grading');
 const { validateClassification } = require('../utils/question-taxonomy');
 const { firstMathContentError, isValidSprAnswer } = require('../utils/math-content-validation');
+const { createDeliveriesWithDb } = require('./test-delivery.service');
 
 const VALID_STATUSES = new Set(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 const VALID_DIFFICULTIES = new Set(['EASY', 'MEDIUM', 'HARD']);
 const VALID_TYPES = new Set(['MCQ', 'SPR']);
 const VALID_SUBJECTS = new Set(['RW', 'MATH']);
+
+const queryValues = value => [...new Set((Array.isArray(value) ? value : [value])
+  .flatMap(item => String(item || '').split(','))
+  .map(item => item.trim())
+  .filter(Boolean))];
 
 const normalizeChoices = (value, type) => {
   if (type === 'SPR') return [];
@@ -116,12 +122,15 @@ const serializeItem = ({ item, includeSolution, solutionLocked = false }) => {
   };
 };
 
-const listWhere = ({ userId, userRole, source, status, subject, domainCode, skillCode, difficulty, search }) => {
+const listWhere = ({ userId, userRole, source, status, subject, domainCode, domainCodes, skillCode, skillCodes, difficulty, difficulties, search }) => {
+  const requestedDomains = queryValues(domainCodes ?? domainCode);
+  const requestedSkills = queryValues(skillCodes ?? skillCode);
+  const requestedDifficulties = queryValues(difficulties ?? difficulty).filter(value => VALID_DIFFICULTIES.has(value));
   const filters = {
     ...(VALID_SUBJECTS.has(subject) ? { subject } : {}),
-    ...(domainCode ? { domainCode: String(domainCode) } : {}),
-    ...(skillCode ? { skillCode: String(skillCode) } : {}),
-    ...(VALID_DIFFICULTIES.has(difficulty) ? { difficulty } : {}),
+    ...(requestedDomains.length ? { domainCode: { in: requestedDomains } } : {}),
+    ...(requestedSkills.length ? { skillCode: { in: requestedSkills } } : {}),
+    ...(requestedDifficulties.length ? { difficulty: { in: requestedDifficulties } } : {}),
     ...(search ? { versions: { some: { questionText: { contains: String(search).trim(), mode: 'insensitive' } } } } : {}),
   };
   if (userRole === 'ADMIN') {
@@ -302,6 +311,91 @@ exports.hydrateBankQuestions = async ({ sections, userId, userRole, db = prisma 
   }));
 };
 
+exports.createAssignedQuiz = async ({ userId, userRole, payload }) => {
+  const title = String(payload?.title || '').trim().replace(/\s+/g, ' ');
+  const subject = VALID_SUBJECTS.has(payload?.subject) ? payload.subject : null;
+  const duration = Number.parseInt(payload?.duration, 10);
+  const selections = Array.isArray(payload?.questions) ? payload.questions : [];
+  const uniqueIds = new Set(selections.map(item => String(item?.sourceBankQuestionId || '')).filter(Boolean));
+  if (!title) throw new ApiError(400, { error: 'Enter a quiz title.' });
+  if (title.length > 160) throw new ApiError(400, { error: 'Quiz title must be 160 characters or fewer.' });
+  if (!subject) throw new ApiError(400, { error: 'Choose Reading & Writing or Math.' });
+  if (!Number.isInteger(duration) || duration < 1 || duration > 180) throw new ApiError(400, { error: 'Quiz duration must be between 1 and 180 minutes.' });
+  if (!selections.length || selections.length > 60 || uniqueIds.size !== selections.length) {
+    throw new ApiError(400, { error: 'Select between 1 and 60 unique questions.' });
+  }
+
+  return prisma.$transaction(async tx => {
+    const [section] = await exports.hydrateBankQuestions({
+      sections: [{ name: 'Quiz', order: 1, questions: selections }],
+      userId,
+      userRole,
+      db: tx,
+    });
+    const domainCodes = [...new Set(section.questions.map(question => question.domainCode))];
+    const domains = await tx.questionDomain.findMany({ where: { code: { in: domainCodes } }, select: { code: true, subject: true } });
+    if (domains.length !== domainCodes.length || domains.some(domain => domain.subject !== subject)) {
+      throw new ApiError(400, { error: 'Every quiz question must match the selected subject.' });
+    }
+
+    const quiz = await tx.test.create({
+      data: {
+        title,
+        duration,
+        subject,
+        mode: 'PRACTICE',
+        category: 'CLASS',
+        scope: 'PERSONAL',
+        status: 'PUBLISHED',
+        isPublic: false,
+        isDiscoverable: false,
+        authorId: Number(userId),
+        sections: {
+          create: {
+            name: 'Quiz',
+            order: 1,
+            duration,
+            questions: {
+              create: section.questions.map((question, index) => ({
+                order: index + 1,
+                type: question.type,
+                blocks: question.blocks,
+                questionText: question.questionText,
+                choices: question.choices,
+                correctAnswer: question.correctAnswer,
+                explanation: question.explanation,
+                domainCode: question.domainCode,
+                skillCode: question.skillCode,
+                sourceBankQuestionId: question.sourceBankQuestionId,
+                sourceBankVersionId: question.sourceBankVersionId,
+              })),
+            },
+          },
+        },
+      },
+      select: { id: true, title: true, duration: true, subject: true },
+    });
+
+    const deliveries = await createDeliveriesWithDb({
+      db: tx,
+      classIds: [payload.classId],
+      testIds: [quiz.id],
+      studentIds: payload.studentIds,
+      lessonId: payload.lessonId,
+      lessonPhase: payload.lessonPhase,
+      title,
+      availableAt: payload.availableAt,
+      dueAt: payload.dueAt,
+      maxAttempts: payload.maxAttempts,
+      scorePolicy: payload.scorePolicy,
+      activityType: 'QUIZ',
+      userId,
+      userRole,
+    });
+    return { quiz: { ...quiz, questionCount: section.questions.length }, delivery: deliveries[0] };
+  });
+};
+
 exports.createRandomQuiz = async ({ userId, payload }) => {
   const subject = VALID_SUBJECTS.has(payload.subject) ? payload.subject : null;
   if (!subject) throw new ApiError(400, { error: 'Choose Reading & Writing or Math.' });
@@ -419,3 +513,4 @@ exports.answerRoadmapQuestion = async ({ userId, milestoneId, questionId, select
 exports.activeLockedQuestionIds = activeLockedQuestionIds;
 exports.serializeItem = serializeItem;
 exports.normalizeContent = normalizeContent;
+exports.listWhere = listWhere;

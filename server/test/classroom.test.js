@@ -10,6 +10,9 @@ test('class names are trimmed and internal whitespace is normalized', () => {
 
 test('class colors only accept the controlled accessible palette', () => {
   assert.equal(isAllowedClassColor(CLASS_COLORS[0]), true);
+  assert.equal(isAllowedClassColor('#7C3AED'), true);
+  assert.equal(isAllowedClassColor('#0E7490'), true);
+  assert.equal(isAllowedClassColor('#BE123C'), true);
   assert.equal(isAllowedClassColor('#FFFFFF'), false);
   assert.equal(isAllowedClassColor('red'), false);
 });
