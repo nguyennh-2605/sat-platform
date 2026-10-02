@@ -1,6 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { _private } = require('../src/services/vocabulary.service');
+
+// Prisma model delegates are proxy properties; use a test-local database double.
+const prismaPath = require.resolve('../src/config/prisma');
+const prisma = {
+  vocabularySet: {
+    findUnique() {},
+    delete() {},
+  },
+};
+require.cache[prismaPath] = { id: prismaPath, filename: prismaPath, loaded: true, exports: prisma };
+
+const vocabularyService = require('../src/services/vocabulary.service');
+const { _private } = vocabularyService;
 
 test('vocabulary words are normalized for duplicate detection', () => {
   assert.equal(_private.normalizeWord('  Take   Part  '), 'take part');
@@ -111,4 +123,48 @@ test('flashcard self-rating cannot promote a learning word to mastered', () => {
     correct: true,
     mode: 'FLASHCARD',
   }), { mastery: 'LEARNING', correctStreak: 1 });
+});
+
+test('administrators can delete system vocabulary sets', () => {
+  assert.equal(_private.canDeleteSet({ scope: 'SYSTEM', ownerId: null }, 7, 'ADMIN'), true);
+  assert.equal(_private.canDeleteSet({ scope: 'SYSTEM', ownerId: null }, 7, 'TEACHER'), false);
+  assert.equal(_private.canDeleteSet({ scope: 'SYSTEM', ownerId: null }, 7, 'STUDENT'), false);
+});
+
+test('personal vocabulary sets can only be deleted by their owner or an administrator', () => {
+  const set = { scope: 'PERSONAL', ownerId: 7 };
+  assert.equal(_private.canDeleteSet(set, 7, 'TEACHER'), true);
+  assert.equal(_private.canDeleteSet(set, 8, 'TEACHER'), false);
+  assert.equal(_private.canDeleteSet(set, 8, 'ADMIN'), true);
+});
+
+test('an administrator can delete an unused system vocabulary set', async t => {
+  let deletedId = null;
+  t.mock.method(prisma.vocabularySet, 'findUnique', async () => ({
+    id: 'system-set',
+    scope: 'SYSTEM',
+    ownerId: null,
+    _count: { activities: 0 },
+  }));
+  t.mock.method(prisma.vocabularySet, 'delete', async ({ where }) => { deletedId = where.id; });
+
+  assert.deepEqual(await vocabularyService.deleteSet({ setId: 'system-set', userId: 7, userRole: 'ADMIN' }), { deleted: true });
+  assert.equal(deletedId, 'system-set');
+});
+
+test('a non-admin cannot delete a system vocabulary set', async t => {
+  let deleteCalled = false;
+  t.mock.method(prisma.vocabularySet, 'findUnique', async () => ({
+    id: 'system-set',
+    scope: 'SYSTEM',
+    ownerId: null,
+    _count: { activities: 0 },
+  }));
+  t.mock.method(prisma.vocabularySet, 'delete', async () => { deleteCalled = true; });
+
+  await assert.rejects(
+    vocabularyService.deleteSet({ setId: 'system-set', userId: 7, userRole: 'TEACHER' }),
+    error => error.statusCode === 403 && /permission/.test(error.body.error),
+  );
+  assert.equal(deleteCalled, false);
 });

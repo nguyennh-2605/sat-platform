@@ -31,7 +31,7 @@ interface SetSummary {
   id: string; title: string; description?: string | null; scope: 'SYSTEM' | 'PERSONAL'; status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'; termCount: number; studiedCount: number; learningCount: number; masteredCount: number; lastStudiedAt?: string | null; activeFlashcardSession?: ActiveStudySession | null; activeQuizSession?: ActiveStudySession | null; ownerId?: number | null; createdAt: string; updatedAt: string; assignedActivityId?: string;
 }
 interface Term { id?: string; sourceTermId?: string | null; word: string; meaning: string; translation: string; exampleSentence?: string | null; progress?: { mastery: string; seenCount?: number; lastReviewedAt?: string | null } | null }
-interface SetDetail extends SetSummary { canEdit: boolean; version: number; terms: Term[] }
+interface SetDetail extends SetSummary { canEdit: boolean; canDelete: boolean; version: number; terms: Term[] }
 interface StudyQuestion { id: string; sourceTermId?: string | null; prompt: string; order: number; sourceOrder?: number | null; options: string[]; selectedMeaning?: string | null; isCorrect?: boolean | null; meaning?: string; translation?: string; exampleSentence?: string | null }
 interface StudySession { id: string; setId: string; activityId?: string | null; mode: 'FLASHCARD' | 'QUIZ'; status: 'IN_PROGRESS' | 'COMPLETED'; totalItems: number; answeredCount: number; correctCount: number; score: number; rangeStart?: number | null; rangeEnd?: number | null; shuffle: boolean; startedAt: string; lastActivityAt: string; questions: StudyQuestion[] }
 interface InlineTermDraft { word: string; meaning: string; translation: string; exampleSentence: string }
@@ -347,7 +347,7 @@ function CollectionCard({ set, active, onClick }: { set: SetSummary; active: boo
 function SelectedSetSummary({ set, activity, role, canQuiz, onReview, onStudyOptions, onQuiz, onQuizOptions, onAssign, onEdit, onDelete }: { set: SetDetail; activity: VocabularyActivity | null; role: UserRole; canQuiz: boolean; onReview: () => void; onStudyOptions: () => void; onQuiz: () => void; onQuizOptions: () => void; onAssign: () => void; onEdit: () => void; onDelete: () => void }) {
   const canAssign = (role === 'TEACHER' || role === 'ADMIN') && set.status === 'PUBLISHED' && !activity;
   const canManage = set.canEdit && (set.scope !== 'SYSTEM' || role === 'ADMIN');
-  const canDelete = set.scope === 'PERSONAL' && !activity;
+  const canDelete = set.canDelete && !activity;
   const hasContextActions = !activity || canAssign || canManage || canDelete;
   const studiedCount = set.studiedCount ?? set.terms.filter(term => term.progress && term.progress.mastery !== 'NOT_STUDIED').length;
   const learningCount = set.learningCount ?? set.terms.filter(term => term.progress?.mastery === 'LEARNING').length;
@@ -407,7 +407,7 @@ function DeleteCollectionDialog({ target, onClose, onDeleted }: { target: SetSum
     } catch (error) { appToast.error(errorMessage(error, 'Unable to delete the vocabulary collection.')); }
     finally { setDeleting(false); }
   };
-  return <Modal open={Boolean(target)} onClose={onClose} closeOnBackdrop title="Delete collection?" subtitle="This permanently removes the collection, its words, and your study progress." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={() => void remove()}><Trash2 size={15} />{deleting ? 'Deleting…' : 'Delete collection'}</Button></>}><p className="text-body text-muted-foreground">You’re about to delete <strong className="font-semibold text-foreground">{target?.title}</strong>. This action cannot be undone.</p></Modal>;
+  return <Modal open={Boolean(target)} onClose={onClose} closeOnBackdrop title="Delete collection?" subtitle="This permanently removes the collection, its words, and all related study progress." footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={() => void remove()}><Trash2 size={15} />{deleting ? 'Deleting…' : 'Delete collection'}</Button></>}><p className="text-body text-muted-foreground">You’re about to delete <strong className="font-semibold text-foreground">{target?.title}</strong>. This action cannot be undone.</p></Modal>;
 }
 
 const masteryDetails = (term: Term) => {

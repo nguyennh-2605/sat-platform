@@ -53,6 +53,9 @@ const validateTerms = rawTerms => {
 const canManageSet = (set, userId, userRole) => userRole === 'ADMIN'
   || (set.scope === 'PERSONAL' && set.ownerId === intId(userId));
 
+const canDeleteSet = (set, userId, userRole) => userRole === 'ADMIN'
+  || (set.scope === 'PERSONAL' && set.ownerId === intId(userId));
+
 const getAccessibleSet = async ({ setId, userId, userRole, activityId, includeTerms = true }) => {
   const set = await prisma.vocabularySet.findUnique({
     where: { id: String(setId) },
@@ -201,6 +204,7 @@ exports.getSet = async ({ setId, userId, userRole, activityId }) => {
       activeSessions.find(session => session.mode === 'QUIZ'),
     ),
     canEdit: canManageSet(set, userId, userRole),
+    canDelete: canDeleteSet(set, userId, userRole),
     terms: set.terms.map(term => ({ ...term, progress: progressByTerm.get(term.id) || null })),
   };
 };
@@ -279,13 +283,13 @@ exports.updateTerm = async ({ setId, termId, data, userId, userRole }) => {
   return exports.getSet({ setId, userId, userRole });
 };
 
-exports.deleteSet = async ({ setId, userId }) => {
+exports.deleteSet = async ({ setId, userId, userRole }) => {
   const set = await prisma.vocabularySet.findUnique({
     where: { id: String(setId) },
     select: { id: true, scope: true, ownerId: true, _count: { select: { activities: true } } },
   });
   if (!set) throw new ApiError(404, { error: 'Vocabulary set not found.' });
-  if (set.scope !== 'PERSONAL' || set.ownerId !== intId(userId)) throw new ApiError(403, { error: 'You can only delete your own personal vocabulary sets.' });
+  if (!canDeleteSet(set, userId, userRole)) throw new ApiError(403, { error: 'You do not have permission to delete this vocabulary set.' });
   if (set._count.activities > 0) throw new ApiError(409, { error: 'This collection is used by a classroom activity and cannot be deleted.' });
   await prisma.vocabularySet.delete({ where: { id: set.id } });
   return { deleted: true };
@@ -694,4 +698,4 @@ exports.getActivityPerformance = async ({ activityId, userId, userRole }) => {
   };
 };
 
-exports._private = { validateTerms, normalizeWord, shuffle, rangeSourceItems, selectSourceItemsById, nextTermMastery };
+exports._private = { validateTerms, normalizeWord, shuffle, rangeSourceItems, selectSourceItemsById, nextTermMastery, canDeleteSet };
