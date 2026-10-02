@@ -9,6 +9,7 @@ import { invalidatePracticeCenterCache } from '../practice-test/practiceCenterCa
 import QuestionHeader from '../../features/quiz/QuestionHeader';
 import AnswerOption from '../../features/quiz/AnswerOption';
 import BlockRenderer from '../../components/content/BlockRenderer';
+import { isChoiceVisualPlaceholder, splitChoiceVisuals } from '../../components/content/choiceVisuals';
 import ToolsHeader from '../../components/ui/ToolsHeader';
 import InteractiveText from '../../features/quiz/InteractiveText';
 import ReviewScreen from '../../features/quiz/ReviewModule';
@@ -937,6 +938,7 @@ function ExamRoom() {
 
   // --- BIẾN CHO CÂU HỎI HIỆN TẠI ---
   const currentQ = questions[currentQuestionIndex]; 
+  const { promptBlocks, choiceBlocks } = splitChoiceVisuals(currentQ.blocks || []);
   const sidebarOffset = phase === 'MODULE_2' ? splitIndex : 0;
   const moduleAdvanceLocked = phase === 'REVIEW_1'
     && testMode === 'EXAM'
@@ -953,8 +955,8 @@ function ExamRoom() {
         </div>
       );
     } 
-    if (currentQ.blocks && currentQ.blocks.length > 0) {
-      return <BlockRenderer blocks={currentQ.blocks} subject={TestInfo.subject} variant="exam"/>
+    if (promptBlocks.length > 0) {
+      return <BlockRenderer blocks={promptBlocks} subject={TestInfo.subject} variant="exam"/>
     }
     return null;
   };
@@ -977,9 +979,9 @@ function ExamRoom() {
             {renderLeftContent()}
           </div>
         )} 
-        {TestInfo.subject === 'MATH' && currentQ.type !== 'MCQ' && currentQ.blocks && currentQ.blocks.length > 0 && (
+        {TestInfo.subject === 'MATH' && currentQ.type !== 'MCQ' && promptBlocks.length > 0 && (
           <div className="my-0"> 
-            <BlockRenderer blocks={currentQ.blocks} subject={TestInfo.subject} variant="exam"/>
+            <BlockRenderer blocks={promptBlocks} subject={TestInfo.subject} variant="exam"/>
           </div>
         )}
         <div className="exam-content font-normal text-[#1a1a1a]">
@@ -1029,7 +1031,8 @@ function ExamRoom() {
                 <AnswerOption
                   key={index}
                   label={charLabel}
-                  content={opt.text}
+                   content={choiceBlocks[opt.id]?.length && isChoiceVisualPlaceholder(opt.text, opt.id) ? '' : opt.text}
+                   blocks={choiceBlocks[opt.id] || []}
                   isSelected={answers[currentQ.id] === charLabel}
                   isEliminated={!!isEliminated}
                   isStrikeMode={isStrikeMode}

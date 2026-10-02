@@ -159,7 +159,7 @@ exports.cleanupAssets = async ({
   const assets = await db.fileAsset.findMany({
     where: { OR: [
       { status: 'PENDING_UPLOAD', createdAt: { lt: olderThan } },
-      { status: 'READY', createdAt: { lt: olderThan }, items: { none: {} }, lessonFile: null, testImages: { none: {} } },
+      { status: 'READY', createdAt: { lt: olderThan }, items: { none: {} }, lessonFile: null, testImages: { none: {} }, bankQuestions: { none: {} } },
       { status: 'PENDING_DELETE' },
     ] },
     take: batchSize,

@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import BlockRenderer from '@/components/content/BlockRenderer';
 import FormattedTextRenderer from '@/components/content/TextRenderer';
+import { isChoiceVisualPlaceholder, splitChoiceVisuals } from '@/components/content/choiceVisuals';
 import { Badge, Modal } from '@/components/ui/AppUI';
 import { Button } from '@/components/ui/button';
 import InteractiveText from '@/features/quiz/InteractiveText';
@@ -17,6 +18,7 @@ export function QuestionPreviewModal({ question, questions, onQuestionChange, on
   const questionIndex = questions.findIndex(item => item.id === question.id);
   const previousQuestion = questionIndex > 0 ? questions[questionIndex - 1] : null;
   const nextQuestion = questionIndex >= 0 && questionIndex < questions.length - 1 ? questions[questionIndex + 1] : null;
+  const { promptBlocks, choiceBlocks } = splitChoiceVisuals(question.blocks);
   return <Modal
     open
     onClose={onClose}
@@ -30,11 +32,13 @@ export function QuestionPreviewModal({ question, questions, onQuestionChange, on
     <div key={question.id} className="grid h-full min-h-0 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
       <section className="space-y-5 rounded-card border border-ui-border bg-surface p-4 sm:p-5" aria-label="Question and answers">
         <div className="flex flex-wrap items-center gap-2"><Badge tone="neutral">{question.type === 'MCQ' ? 'Multiple choice' : 'Student-produced response'}</Badge><QuestionDifficultyBadge difficulty={question.difficulty} /><Badge tone={question.status === 'PUBLISHED' ? 'success' : question.status === 'ARCHIVED' ? 'neutral' : 'warning'}>{question.status.toLowerCase()}</Badge></div>
-        {question.blocks.length > 0 && <BlockRenderer blocks={question.blocks} subject={question.subject} readOnly variant="exam" />}
+        {promptBlocks.length > 0 && <BlockRenderer blocks={promptBlocks} subject={question.subject} readOnly variant="exam" />}
         <div className="exam-content font-medium text-foreground"><QuestionContent text={question.questionText} subject={question.subject} /></div>
         {question.type === 'MCQ' && question.choices.length > 0 && <div className="space-y-2" aria-label="Answer choices">{question.choices.map(choice => {
           const correct = choice.id === question.correctAnswer;
-          return <div key={choice.id} className={`flex gap-3 rounded-control border p-3 ${correct ? 'border-success/40 bg-success-soft' : 'border-ui-border bg-surface'}`}><span className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-caption font-semibold ${correct ? 'border-success text-success' : 'border-ui-border text-muted-foreground'}`}>{choice.id}</span><div className="min-w-0 flex-1 exam-content"><QuestionContent text={choice.text} subject={question.subject} /></div>{correct && <CheckCircle2 className="size-5 shrink-0 text-success" aria-label="Correct answer" />}</div>;
+          const visuals = choiceBlocks[choice.id] || [];
+          const showText = !visuals.length || !isChoiceVisualPlaceholder(choice.text, choice.id);
+          return <div key={choice.id} className={`flex gap-3 rounded-control border p-3 ${correct ? 'border-success/40 bg-success-soft' : 'border-ui-border bg-surface'}`}><span className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-caption font-semibold ${correct ? 'border-success text-success' : 'border-ui-border text-muted-foreground'}`}>{choice.id}</span><div className="min-w-0 flex-1 exam-content">{showText && <QuestionContent text={choice.text} subject={question.subject} />}{visuals.length > 0 && <BlockRenderer blocks={visuals} subject={question.subject} readOnly variant="exam" />}</div>{correct && <CheckCircle2 className="size-5 shrink-0 text-success" aria-label="Correct answer" />}</div>;
         })}</div>}
         {question.type === 'SPR' && <div className="flex items-center justify-between gap-3 rounded-control border border-success/30 bg-success-soft p-3"><span className="text-body text-muted-foreground">Correct answer</span><span className="font-semibold text-success">{question.correctAnswer || '—'}</span></div>}
       </section>

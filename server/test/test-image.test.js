@@ -57,6 +57,30 @@ test('saving a test rejects images owned by another account', async () => {
   assert.deepEqual(await service.assertUsableImages({ sections, userId: 7, existingTestId: 42, db }), [assetId]);
 });
 
+test('saving a test accepts an image from the selected published bank question', async () => {
+  const bankSections = [{ questions: [{ sourceBankQuestionId: 'bank-question-1', blocks: [imageBlock] }] }];
+  const db = { fileAsset: { findMany: async () => [{
+    id: assetId,
+    ownerId: 8,
+    testImages: [],
+    bankQuestions: [{
+      questionId: 'bank-question-1',
+      question: { ownerId: 8, scope: 'SYSTEM', status: 'PUBLISHED' },
+    }],
+  }] } };
+  assert.deepEqual(await service.assertUsableImages({ sections: bankSections, userId: 7, userRole: 'TEACHER', db }), [assetId]);
+});
+
+test('question bank images are linked without removing immutable version assets', async () => {
+  let createInput;
+  const db = { questionBankImageUsage: { createMany: async input => { createInput = input; } } };
+  await service.linkQuestionBankImages({ db, questionId: 'bank-question-1', assetIds: [assetId] });
+  assert.deepEqual(createInput, {
+    data: [{ questionId: 'bank-question-1', fileAssetId: assetId }],
+    skipDuplicates: true,
+  });
+});
+
 test('test copies retain shared image references and removed images become cleanup candidates', async () => {
   const calls = [];
   const db = { testImageUsage: {
@@ -83,4 +107,18 @@ test('image access requires a linked readable test or the uploader', async () =>
   assert.equal(result.url, 'https://example.test/read');
   assert.equal(accessWhere.images.some.fileAssetId, assetId);
   assert.equal(accessWhere.OR[2].deliveries.some.status, 'PUBLISHED');
+});
+
+test('published system bank questions grant managed image access', async () => {
+  let bankWhere;
+  const db = {
+    fileAsset: { findUnique: async () => ({ id: assetId, purpose: 'TEST_IMAGE', status: 'READY', ownerId: 7, storageKey: 'image-key', originalName: 'graph.png' }) },
+    test: { findFirst: async () => null },
+    questionBankItem: { findFirst: async ({ where }) => { bankWhere = where; return { id: 'bank-question-1' }; } },
+  };
+  const result = await service.getAccessUrl({ fileAssetId: assetId, userId: 9, userRole: 'STUDENT' }, { db, storageFactory: () => ({ createReadUrl: async () => 'https://example.test/read' }) });
+  assert.equal(result.url, 'https://example.test/read');
+  assert.equal(bankWhere.images.some.fileAssetId, assetId);
+  assert.equal(bankWhere.scope, 'SYSTEM');
+  assert.equal(bankWhere.status, 'PUBLISHED');
 });

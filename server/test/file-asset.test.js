@@ -185,6 +185,7 @@ test('cleanup excludes managed images referenced by a test', async () => {
   db.fileAsset.findMany = async input => { where = input.where; return []; };
   await fileAssetService.cleanupAssets({ db, clock: () => 0 });
   assert.deepEqual(where.OR[1].testImages, { none: {} });
+  assert.deepEqual(where.OR[1].bankQuestions, { none: {} });
 });
 
 test('cleanup uses bounded concurrency instead of deleting the whole batch at once', async () => {

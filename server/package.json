@@ -15,6 +15,7 @@
     "db:seed:teacher-overview": "node scripts/seed-teacher-overview.js",
     "storage:cleanup": "node scripts/cleanup-file-assets.js",
     "storage:backfill-test-images": "node scripts/backfill-test-images.js",
+    "storage:backfill-question-bank-images": "node scripts/backfill-question-bank-images.js",
     "storage:smoke": "node scripts/storage-smoke-test.js",
     "admin:create": "node scripts/admin-cli.js create",
     "admin:promote": "node scripts/admin-cli.js promote",

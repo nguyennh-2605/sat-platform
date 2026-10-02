@@ -1,10 +1,13 @@
 import React from 'react';
 import InteractiveText from './InteractiveText';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
+import BlockRenderer from '../../components/content/BlockRenderer';
+import type { ContentBlock } from '../../types/quiz';
 
 interface AnswerProps {
   label: string;         // Ví dụ: "A", "B", "C"
   content: string;       // Nội dung đáp án
+  blocks?: ContentBlock[];
   isSelected: boolean;   // Selected đáp án này chưa?
   isEliminated: boolean; // Đáp án này có bị gạch không?
   isStrikeMode: boolean; // Chế độ gạch đang BẬT hay TẮT
@@ -15,7 +18,7 @@ interface AnswerProps {
 }
 
 const AnswerOption: React.FC<AnswerProps> = ({ 
-  label, content, isSelected, isEliminated, isStrikeMode, onSelect, onEliminate, currentSubject, annotationKey
+  label, content, blocks = [], isSelected, isEliminated, isStrikeMode, onSelect, onEliminate, currentSubject, annotationKey
 }) => {
 
   // Logic: Hiển thị cột bên phải khi đang bật chế độ Strike HOẶC đáp án này đã bị gạch (để hiện nút Undo)
@@ -48,11 +51,12 @@ const AnswerOption: React.FC<AnswerProps> = ({
       </div>
 
       {/* 2. NỘI DUNG ĐÁP ÁN */}
-      <span className="exam-content min-w-0 font-normal text-[#1a1a1a]">
-        {currentSubject === 'RW' 
+      <span className="exam-content min-w-0 flex-1 font-normal text-[#1a1a1a]">
+        {content && (currentSubject === 'RW'
           ? <InteractiveText content={content} inheritTypography annotationKey={annotationKey} />
           : <FormattedTextRenderer text={content} inheritTypography latexOnly />
-        }
+        )}
+        {blocks.length > 0 && <BlockRenderer blocks={blocks} subject={currentSubject} readOnly variant="exam" disableImageActions />}
       </span>
 
       <div className={`

@@ -48,21 +48,50 @@ const imageDimensions = (buffer, mimeType) => {
   return null;
 };
 
+const questionBlocks = question => [
+  ...(Array.isArray(question?.blocks) ? question.blocks : []),
+  ...(Array.isArray(question?.choices) ? question.choices.flatMap(choice => Array.isArray(choice?.blocks) ? choice.blocks : []) : []),
+];
+
+const questionImageAssetIds = question => [...new Set(questionBlocks(question)
+  .filter(block => block?.type === 'image' && block.assetId)
+  .map(block => String(block.assetId)))];
+
 const imageAssetIds = sections => [...new Set((sections || []).flatMap(section =>
-  (section.questions || []).flatMap(question =>
-    (question.blocks || []).filter(block => block?.type === 'image' && block.assetId).map(block => String(block.assetId)),
-  ),
+  (section.questions || []).flatMap(questionImageAssetIds),
 ))];
 
-const assertUsableImages = async ({ sections, userId, existingTestId = null, db = prisma }) => {
+const bankQuestionIds = sections => [...new Set((sections || []).flatMap(section =>
+  (section.questions || []).map(question => String(question?.sourceBankQuestionId || '')).filter(Boolean),
+))];
+
+const assertUsableImages = async ({ sections, userId, userRole, existingTestId = null, db = prisma }) => {
   const ids = imageAssetIds(sections);
   if (!ids.length) return ids;
+  const sourceQuestionIds = new Set(bankQuestionIds(sections));
   if (ids.some(id => !UUID.test(id))) throw new ApiError(422, { error: 'A question has an invalid image reference.' });
   const assets = await db.fileAsset.findMany({
     where: { id: { in: ids }, purpose: 'TEST_IMAGE', status: 'READY' },
-    select: { id: true, ownerId: true, testImages: { select: { testId: true } } },
+    select: {
+      id: true,
+      ownerId: true,
+      testImages: { select: { testId: true } },
+      bankQuestions: { select: { questionId: true, question: { select: { ownerId: true, scope: true, status: true } } } },
+    },
   });
-  if (assets.length !== ids.length || assets.some(asset => asset.ownerId !== Number(userId) && !asset.testImages.some(usage => usage.testId === existingTestId))) {
+  const canReadBankUsage = usage => sourceQuestionIds.has(usage.questionId) && (
+    (userRole === 'ADMIN' && usage.question.scope === 'SYSTEM' && usage.question.status !== 'ARCHIVED')
+    || (userRole === 'TEACHER' && (
+      (usage.question.scope === 'SYSTEM' && usage.question.status === 'PUBLISHED')
+      || (usage.question.scope === 'PERSONAL' && usage.question.ownerId === Number(userId) && usage.question.status !== 'ARCHIVED')
+    ))
+    || (userRole === 'STUDENT' && usage.question.scope === 'SYSTEM' && usage.question.status === 'PUBLISHED')
+  );
+  if (assets.length !== ids.length || assets.some(asset => (
+    asset.ownerId !== Number(userId)
+    && !(asset.testImages || []).some(usage => usage.testId === existingTestId)
+    && !(asset.bankQuestions || []).some(canReadBankUsage)
+  ))) {
     throw new ApiError(422, { error: 'An image is unavailable or does not belong to this test.' });
   }
   return ids;
@@ -71,6 +100,31 @@ const assertUsableImages = async ({ sections, userId, existingTestId = null, db 
 const syncTestImages = async ({ db, testId, assetIds }) => {
   await db.testImageUsage.deleteMany({ where: assetIds.length ? { testId, fileAssetId: { notIn: assetIds } } : { testId } });
   if (assetIds.length) await db.testImageUsage.createMany({ data: assetIds.map(fileAssetId => ({ testId, fileAssetId })), skipDuplicates: true });
+};
+
+const assertUsableBankImages = async ({ blocks, choices, userId, existingQuestionId = null, db = prisma }) => {
+  const ids = questionImageAssetIds({ blocks, choices });
+  if (!ids.length) return ids;
+  if (ids.some(id => !UUID.test(id))) throw new ApiError(422, { error: 'A question has an invalid image reference.' });
+  const assets = await db.fileAsset.findMany({
+    where: { id: { in: ids }, purpose: 'TEST_IMAGE', status: 'READY' },
+    select: { id: true, ownerId: true, bankQuestions: { select: { questionId: true } } },
+  });
+  if (assets.length !== ids.length || assets.some(asset => (
+    asset.ownerId !== Number(userId)
+    && !(asset.bankQuestions || []).some(usage => usage.questionId === existingQuestionId)
+  ))) {
+    throw new ApiError(422, { error: 'An image is unavailable or does not belong to this question.' });
+  }
+  return ids;
+};
+
+const linkQuestionBankImages = async ({ db, questionId, assetIds }) => {
+  if (!assetIds.length) return;
+  await db.questionBankImageUsage.createMany({
+    data: assetIds.map(fileAssetId => ({ questionId, fileAssetId })),
+    skipDuplicates: true,
+  });
 };
 
 exports.createUpload = async ({ ownerId, userRole, originalName, mimeType, sizeBytes }, dependencies = {}) => {
@@ -152,11 +206,26 @@ exports.getAccessUrl = async ({ fileAssetId, userId, userRole }, dependencies = 
           { scope: 'SYSTEM', status: 'PUBLISHED' },
           { submissions: { some: { userId: requesterId } } },
           { deliveries: { some: { status: 'PUBLISHED', assignees: { some: { studentId: requesterId, excusedAt: null } } } } },
+          { scope: 'PERSONAL', authorId: requesterId },
         ] }),
       },
       select: { id: true },
     });
-    if (!accessibleTest) throw new ApiError(403, { error: 'You cannot access this image.' });
+    const bankWhere = userRole === 'ADMIN'
+      ? { scope: 'SYSTEM', status: { not: 'ARCHIVED' } }
+      : userRole === 'TEACHER'
+        ? { OR: [
+          { scope: 'SYSTEM', status: 'PUBLISHED' },
+          { scope: 'PERSONAL', ownerId: requesterId, status: { not: 'ARCHIVED' } },
+        ] }
+        : { scope: 'SYSTEM', status: 'PUBLISHED' };
+    const accessibleBankQuestion = !accessibleTest && db.questionBankItem?.findFirst
+      ? await db.questionBankItem.findFirst({
+        where: { images: { some: { fileAssetId } }, ...bankWhere },
+        select: { id: true },
+      })
+      : null;
+    if (!accessibleTest && !accessibleBankQuestion) throw new ApiError(403, { error: 'You cannot access this image.' });
   }
   return { url: await storageFactory().createReadUrl({ storageKey: asset.storageKey, downloadName: asset.originalName }), expiresInSeconds: 300 };
 };
@@ -164,4 +233,7 @@ exports.getAccessUrl = async ({ fileAssetId, userId, userRole }, dependencies = 
 exports.assertUsableImages = assertUsableImages;
 exports.imageAssetIds = imageAssetIds;
 exports.syncTestImages = syncTestImages;
+exports.questionImageAssetIds = questionImageAssetIds;
+exports.assertUsableBankImages = assertUsableBankImages;
+exports.linkQuestionBankImages = linkQuestionBankImages;
 exports._imageHelpers = { imageDimensions, MAX_IMAGE_BYTES };

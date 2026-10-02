@@ -184,21 +184,22 @@ model HomeworkSubmissionItem {
 }
 
 model FileAsset {
-  id           String                   @id @default(uuid())
-  ownerId      Int
-  provider     String
-  storageKey   String                   @unique
-  originalName String
-  mimeType     String
-  sizeBytes    Int
-  status       FileAssetStatus          @default(PENDING_UPLOAD)
-  purpose      FileAssetPurpose         @default(GENERAL)
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
-  owner        User                     @relation("FileAssetOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  items        HomeworkSubmissionItem[]
-  lessonFile   LessonFile?
-  testImages   TestImageUsage[]
+  id            String                   @id @default(uuid())
+  ownerId       Int
+  provider      String
+  storageKey    String                   @unique
+  originalName  String
+  mimeType      String
+  sizeBytes     Int
+  status        FileAssetStatus          @default(PENDING_UPLOAD)
+  purpose       FileAssetPurpose         @default(GENERAL)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  owner         User                     @relation("FileAssetOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  items         HomeworkSubmissionItem[]
+  lessonFile    LessonFile?
+  testImages    TestImageUsage[]
+  bankQuestions QuestionBankImageUsage[]
 
   @@index([ownerId, status, createdAt])
   @@index([status, createdAt])
@@ -211,6 +212,16 @@ model TestImageUsage {
   asset       FileAsset @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
 
   @@id([testId, fileAssetId])
+  @@index([fileAssetId])
+}
+
+model QuestionBankImageUsage {
+  questionId  String
+  fileAssetId String
+  question    QuestionBankItem @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  asset       FileAsset        @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, fileAssetId])
   @@index([fileAssetId])
 }
 
@@ -358,6 +369,7 @@ model QuestionBankItem {
   snapshots  Question[]                    @relation("QuestionBankSnapshots")
   progress   StudentBankQuestionProgress[]
   attempts   BankQuestionAttempt[]
+  images     QuestionBankImageUsage[]
 
   @@index([scope, status, subject, domainCode, skillCode])
   @@index([ownerId, status, updatedAt])

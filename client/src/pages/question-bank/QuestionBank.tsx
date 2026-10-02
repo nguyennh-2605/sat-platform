@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Archive, BookCopy, Edit3, Plus } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Archive, BookCopy, Edit3, Eye, ImagePlus, Plus, Trash2 } from 'lucide-react';
 import axiosClient from '@/lib/axios';
+import BlockRenderer from '@/components/content/BlockRenderer';
 import { appToast } from '@/components/ui/toast';
 import { Badge, EmptyState, Modal, PageHeader } from '@/components/ui/AppUI';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { QuestionDifficultyBadge, QuestionPreviewModal } from '@/features/questi
 import { questionIdLabel } from '@/features/question-bank/question-bank.utils';
 import type { TaxonomyDomain } from '@/features/test-creation/create-test.types';
 import type { BankChoice, BankQuestion, BankQuestionDifficulty, BankQuestionPage, BankQuestionStatus, BankQuestionType, BankSubject } from '@/features/question-bank/question-bank.types';
+import type { ContentBlock } from '@/types/quiz';
 
 interface EditorDraft {
   subject: BankSubject;
@@ -24,6 +26,7 @@ interface EditorDraft {
   domainCode: string;
   skillCode: string;
   questionText: string;
+  blocks: ContentBlock[];
   choices: BankChoice[];
   correctAnswer: string;
   explanation: string;
@@ -31,7 +34,7 @@ interface EditorDraft {
 
 const emptyDraft = (): EditorDraft => ({
   subject: 'RW', type: 'MCQ', difficulty: 'MEDIUM', status: 'DRAFT', domainCode: '', skillCode: '', questionText: '',
-  choices: 'ABCD'.split('').map(id => ({ id, text: '' })), correctAnswer: 'A', explanation: '',
+  blocks: [], choices: 'ABCD'.split('').map(id => ({ id, text: '' })), correctAnswer: 'A', explanation: '',
 });
 
 const errorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
@@ -56,6 +59,8 @@ export default function QuestionBank() {
   const [editorVisible, setEditorVisible] = useState(false);
   const [draft, setDraft] = useState<EditorDraft>(emptyDraft);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,6 +99,7 @@ export default function QuestionBank() {
       subject: question.subject, type: question.type, difficulty: question.difficulty,
       status: question.status === 'ARCHIVED' ? 'DRAFT' : question.status,
       domainCode: question.domain.code, skillCode: question.skill.code, questionText: question.questionText,
+      blocks: question.blocks,
       choices: question.choices.length ? question.choices : 'ABCD'.split('').map(id => ({ id, text: '' })),
       correctAnswer: question.correctAnswer || '', explanation: question.explanation || '',
     });
@@ -103,7 +109,7 @@ export default function QuestionBank() {
   const save = async () => {
     setSaving(true);
     try {
-      const payload = { ...draft, blocks: [], choices: draft.type === 'MCQ' ? draft.choices : [] };
+      const payload = { ...draft, choices: draft.type === 'MCQ' ? draft.choices : [] };
       if (editing) await axiosClient.put(`/api/question-bank/${editing.id}`, payload);
       else await axiosClient.post('/api/question-bank', payload);
       appToast.success(editing ? 'Question updated' : 'Question created');
@@ -111,6 +117,31 @@ export default function QuestionBank() {
       await load();
     } catch (requestError) { appToast.error(errorMessage(requestError, 'Unable to save this question.')); }
     finally { setSaving(false); }
+  };
+  const uploadImage = async (file: File) => {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size < 1 || file.size > 5 * 1024 * 1024) {
+      appToast.error('Choose a PNG, JPEG, or WebP image up to 5 MB');
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const prepared = await axiosClient.post<{ success: boolean; data: { asset: { id: string }; uploadUrl: string; headers: Record<string, string> } }>('/api/test-images/uploads', {
+        originalName: file.name, mimeType: file.type, sizeBytes: file.size,
+      });
+      const upload = await fetch(prepared.data.uploadUrl, { method: 'PUT', headers: prepared.data.headers, body: file });
+      if (!upload.ok) throw new Error('Image upload failed');
+      await axiosClient.post(`/api/test-images/${prepared.data.asset.id}/complete`);
+      setDraft(current => ({
+        ...current,
+        blocks: [...current.blocks, { type: 'image', assetId: prepared.data.asset.id, alt: file.name.replace(/\.[^.]+$/, '') || 'Question graph' }],
+      }));
+      appToast.success('Image added');
+    } catch (requestError) {
+      appToast.error(errorMessage(requestError, 'Unable to upload this image.'));
+    } finally {
+      setUploadingImage(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    }
   };
   const archive = async (question: BankQuestion) => {
     try {
@@ -150,13 +181,13 @@ export default function QuestionBank() {
           {isAdmin ? <TableCell><p className="text-body text-foreground">{question.domain.name}</p><p className="text-caption text-muted-foreground">{question.skill.name}</p></TableCell> : <><TableCell className="max-w-56 text-body text-foreground">{question.domain.name}</TableCell><TableCell className="max-w-64 text-body text-foreground">{question.skill.name}</TableCell></>}
           <TableCell><QuestionDifficultyBadge difficulty={question.difficulty} /></TableCell>
           <TableCell><Badge tone={question.status === 'PUBLISHED' ? 'success' : question.status === 'ARCHIVED' ? 'neutral' : 'warning'}>{question.status.toLowerCase()}</Badge></TableCell>
-          {showActions && <TableCell><div className="flex justify-end gap-1"><Button variant="ghost" size="icon-sm" aria-label="Edit question" onClick={() => openEdit(question)}><Edit3 aria-hidden="true" /></Button>{question.status !== 'ARCHIVED' && <Button variant="ghost" size="icon-sm" aria-label="Archive question" onClick={() => void archive(question)}><Archive aria-hidden="true" /></Button>}</div></TableCell>}
+          {showActions && <TableCell><div className="flex justify-end gap-1"><Button variant="ghost" size="icon-sm" aria-label="Preview question" onClick={() => setViewing(question)}><Eye aria-hidden="true" /></Button><Button variant="ghost" size="icon-sm" aria-label="Edit question" onClick={() => openEdit(question)}><Edit3 aria-hidden="true" /></Button>{question.status !== 'ARCHIVED' && <Button variant="ghost" size="icon-sm" aria-label="Archive question" onClick={() => void archive(question)}><Archive aria-hidden="true" /></Button>}</div></TableCell>}
         </TableRow>)}
       </TableBody></Table></DataTableViewport>
       {data && data.pagination.totalPages > 1 && <DataPagination><p className="text-caption text-muted-foreground">Page {data.pagination.page} of {data.pagination.totalPages}</p><div className="flex gap-2"><Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(value => value - 1)}>Previous</Button><Button variant="outline" size="sm" disabled={page >= data.pagination.totalPages} onClick={() => setPage(value => value + 1)}>Next</Button></div></DataPagination>}
     </DataSurface>
-    {!isAdmin && <QuestionPreviewModal question={viewing} questions={data?.items || []} onQuestionChange={setViewing} onClose={() => setViewing(null)} />}
-    <Modal open={editorVisible} onClose={closeEditor} presentation="content-dialog" title={editing ? 'Edit question' : 'New question'} subtitle="Each save creates an immutable content version." className="max-w-3xl!" footer={<><Button variant="outline" disabled={saving} onClick={closeEditor}>Cancel</Button><Button disabled={saving} onClick={() => void save()}>{saving ? 'Saving…' : editing ? 'Save new version' : 'Create question'}</Button></>}>
+    <QuestionPreviewModal question={viewing} questions={data?.items || []} onQuestionChange={setViewing} onClose={() => setViewing(null)} />
+    <Modal open={editorVisible} onClose={closeEditor} presentation="content-dialog" title={editing ? 'Edit question' : 'New question'} subtitle="Each save creates an immutable content version." className="max-w-3xl!" footer={<><Button variant="outline" disabled={saving || uploadingImage} onClick={closeEditor}>Cancel</Button><Button disabled={saving || uploadingImage} onClick={() => void save()}>{saving ? 'Saving…' : editing ? 'Save new version' : 'Create question'}</Button></>}>
       <div className="grid max-h-[68vh] gap-5 overflow-y-auto pr-1 sm:grid-cols-2">
         <Field><FieldLabel>Subject</FieldLabel><Select value={draft.subject} onValueChange={value => setDraft(current => ({ ...current, subject: value as BankSubject, type: value === 'RW' ? 'MCQ' : current.type, domainCode: '', skillCode: '' }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="RW">Reading & Writing</SelectItem><SelectItem value="MATH">Math</SelectItem></SelectContent></Select></Field>
         <Field><FieldLabel>Question type</FieldLabel><Select value={draft.type} disabled={draft.subject === 'RW'} onValueChange={value => setDraft(current => ({ ...current, type: value as BankQuestionType, correctAnswer: value === 'MCQ' ? 'A' : '' }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">Multiple choice</SelectItem><SelectItem value="SPR">Student-produced response</SelectItem></SelectContent></Select></Field>
@@ -165,6 +196,7 @@ export default function QuestionBank() {
         <Field><FieldLabel>Difficulty</FieldLabel><Select value={draft.difficulty} onValueChange={value => setDraft(current => ({ ...current, difficulty: value as BankQuestionDifficulty }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent></Select></Field>
         <Field><FieldLabel>Publication</FieldLabel><Select value={draft.status} onValueChange={value => setDraft(current => ({ ...current, status: value as 'DRAFT' | 'PUBLISHED' }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="DRAFT">Draft</SelectItem><SelectItem value="PUBLISHED">Published</SelectItem></SelectContent></Select></Field>
         <Field className="sm:col-span-2"><FieldLabel>Question</FieldLabel><Textarea className="min-h-28" value={draft.questionText} onChange={event => setDraft(current => ({ ...current, questionText: event.target.value }))} /></Field>
+        <Field className="sm:col-span-2"><div className="flex flex-wrap items-center justify-between gap-2"><div><FieldLabel>Question visuals</FieldLabel><p className="mt-1 text-caption text-muted-foreground">Graphs and figures appear before the question prompt.</p></div><Button type="button" variant="outline" size="sm" disabled={uploadingImage} onClick={() => imageInputRef.current?.click()}><ImagePlus aria-hidden="true" />{uploadingImage ? 'Uploading…' : 'Upload image'}</Button></div><input ref={imageInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadImage(file); }} />{draft.blocks.length > 0 ? <div className="mt-3 space-y-3 rounded-card border border-ui-border bg-muted/20 p-3">{draft.blocks.map((block, index) => <div key={`${block.type}-${index}`} className="relative rounded-control border border-ui-border bg-surface p-3"><BlockRenderer blocks={[block]} subject={draft.subject} readOnly variant="preview" />{block.type === 'image' && <Button type="button" variant="ghost" size="icon-sm" className="absolute right-2 top-2 bg-surface" aria-label={`Remove image ${index + 1}`} onClick={() => setDraft(current => ({ ...current, blocks: current.blocks.filter((_, blockIndex) => blockIndex !== index) }))}><Trash2 aria-hidden="true" /></Button>}</div>)}</div> : <p className="mt-3 rounded-control border border-dashed border-ui-border p-3 text-caption text-muted-foreground">No supporting graph or figure.</p>}</Field>
         {draft.type === 'MCQ' && <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">{draft.choices.map((choice, index) => <Field key={choice.id}><FieldLabel>Choice {choice.id}</FieldLabel><Input value={choice.text} onChange={event => setDraft(current => ({ ...current, choices: current.choices.map((item, choiceIndex) => choiceIndex === index ? { ...item, text: event.target.value } : item) }))} /></Field>)}</div>}
         <Field><FieldLabel>Correct answer</FieldLabel>{draft.type === 'MCQ' ? <Select value={draft.correctAnswer} onValueChange={value => setDraft(current => ({ ...current, correctAnswer: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{'ABCD'.split('').map(id => <SelectItem key={id} value={id}>{id}</SelectItem>)}</SelectContent></Select> : <Input value={draft.correctAnswer} onChange={event => setDraft(current => ({ ...current, correctAnswer: event.target.value }))} />}</Field>
         <Field className="sm:col-span-2"><FieldLabel>Explanation <span className="font-normal text-muted-foreground">(optional)</span></FieldLabel><Textarea className="min-h-24" value={draft.explanation} onChange={event => setDraft(current => ({ ...current, explanation: event.target.value }))} /></Field>

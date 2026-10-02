@@ -11,7 +11,7 @@ const getManagedImageUrl = async (assetId: string) => {
   return response.data.url;
 };
 
-function ManagedImage({ assetId, alt }: { assetId: string; alt: string }) {
+function ManagedImage({ assetId, alt, disableActions = false }: { assetId: string; alt: string; disableActions?: boolean }) {
   const [result, setResult] = useState<{ key: string; url?: string; failed?: boolean } | null>(null);
   const [retry, setRetry] = useState(0);
   const key = `${assetId}:${retry}`;
@@ -28,12 +28,12 @@ function ManagedImage({ assetId, alt }: { assetId: string; alt: string }) {
 
   const url = result?.key === key ? result.url : '';
   const failed = result?.key === key && result.failed;
-  if (failed) return <div role="alert" className="rounded-lg border border-border p-3 text-sm text-muted-foreground">Image unavailable. <Button type="button" variant="outline" size="sm" onClick={() => setRetry(value => value + 1)}>Retry</Button></div>;
+  if (failed) return <div role="alert" className="rounded-lg border border-border p-3 text-sm text-muted-foreground">Image unavailable.{!disableActions && <> <Button type="button" variant="outline" size="sm" onClick={() => setRetry(value => value + 1)}>Retry</Button></>}</div>;
   if (!url) return <div role="status" className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground">Loading image…</div>;
-  return <img src={url} alt={alt} onError={() => {
+  return <img src={url} alt={alt} loading="lazy" decoding="async" onError={() => {
     if (retry % 2 === 0) setRetry(value => value + 1);
     else setResult({ key, failed: true });
-  }} className="max-w-lg max-h-80 w-auto h-auto object-contain rounded-md shadow-xs border border-gray-200" />;
+  }} className="h-auto max-h-[32rem] w-auto max-w-full rounded-control border border-ui-border bg-surface object-contain shadow-xs" />;
 }
 
 interface Props {
@@ -41,6 +41,7 @@ interface Props {
   subject: string;
   readOnly?: boolean;
   variant?: 'default' | 'preview' | 'exam';
+  disableImageActions?: boolean;
 }
 
 // --- 1. Component hiển thị Bảng (Table) ---
@@ -180,7 +181,7 @@ const NotesRenderer = ({ lines, isMath, readOnly, preview, exam }: { lines: stri
   );
 };
 
-const BlockRenderer: React.FC<Props> = ({ blocks, subject, readOnly = false, variant = 'default' }) => {
+const BlockRenderer: React.FC<Props> = ({ blocks, subject, readOnly = false, variant = 'default', disableImageActions = false }) => {
   if (!blocks || !Array.isArray(blocks)) return null;
   const isMath = subject === 'MATH';
   const preview = variant === 'preview';
@@ -210,8 +211,8 @@ const BlockRenderer: React.FC<Props> = ({ blocks, subject, readOnly = false, var
             return (
               <div key={index} className="flex flex-col items-center justify-center my-4">
                 {block.assetId
-                  ? <ManagedImage assetId={block.assetId} alt={block.alt || 'Question image'} />
-                  : block.src ? <img src={block.src} alt={block.alt || 'Question image'} className="max-w-lg max-h-80 w-auto h-auto object-contain rounded-md shadow-xs border border-gray-200" /> : null}
+                  ? <ManagedImage assetId={block.assetId} alt={block.alt || 'Question image'} disableActions={disableImageActions} />
+                  : block.src ? <img src={block.src} alt={block.alt || 'Question image'} loading="lazy" decoding="async" className="h-auto max-h-[32rem] w-auto max-w-full rounded-control border border-ui-border bg-surface object-contain shadow-xs" /> : null}
                 {block.caption && <div className="mt-2 max-w-lg text-center text-sm text-gray-500">{isMath ? <InteractiveText content={block.caption} isMath readOnly={readOnly} inheritTypography /> : block.caption}</div>}
               </div>
             );

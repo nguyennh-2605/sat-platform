@@ -343,7 +343,7 @@ const normalizeChoices = (choices) => (Array.isArray(choices) ? choices : [])
   .map(choice => ({ id: String(choice?.id || '').trim().toUpperCase(), text: String(choice?.text || '').trim() }))
   .filter(choice => choice.id && choice.text);
 
-const validateBlocks = ({ blocks, moduleOrder, questionNumber, status }) => {
+const validateBlocks = ({ blocks, moduleOrder, questionNumber, status, allowLegacyInlineImages = false }) => {
   const normalized = Array.isArray(blocks) ? blocks : [];
   for (const block of normalized) {
     if (!block || !['text', 'table', 'poem', 'note', 'image'].includes(block.type)) {
@@ -356,7 +356,8 @@ const validateBlocks = ({ blocks, moduleOrder, questionNumber, status }) => {
         throw new ApiError(422, { error: `Question ${questionNumber} in Module ${moduleOrder} has a table with inconsistent columns.` });
       }
     }
-    if (status === 'PUBLISHED' && block.type === 'image' && !block.assetId) {
+    const legacyInlineImage = allowLegacyInlineImages && typeof block.src === 'string' && block.src.startsWith('data:image/');
+    if (status === 'PUBLISHED' && block.type === 'image' && !block.assetId && !legacyInlineImage) {
       throw new ApiError(422, { error: `Question ${questionNumber} in Module ${moduleOrder} needs a platform-hosted image before publishing.` });
     }
   }
@@ -436,6 +437,7 @@ const validateSections = ({ sections, subject, status = 'DRAFT' }) => {
           moduleOrder: order,
           questionNumber: questionIndex + 1,
           status,
+          allowLegacyInlineImages: Boolean(question?.sourceBankQuestionId),
         });
         const normalizedQuestion = {
           questionText,
@@ -491,7 +493,7 @@ exports.createTest = async ({ title, duration, subject, mode, sections, testDate
   const hydratedSections = await questionBankService.hydrateBankQuestions({ sections, userId, userRole });
   const validatedSections = validateSections({ sections: hydratedSections, subject, status: finalStatus });
   assertOfficialTestShape({ sections: validatedSections, subject, duration: normalizedDuration, category: finalCategory, status: finalStatus });
-  const imageIds = await assertUsableImages({ sections: validatedSections, userId });
+  const imageIds = await assertUsableImages({ sections: validatedSections, userId, userRole });
   let normalizedSections;
   try {
     const durations = allocateModuleDurations(normalizedDuration, validatedSections.length);
@@ -739,7 +741,7 @@ exports.updateTest = async ({ testId, title, duration, subject, mode, sections, 
   const hydratedSections = await questionBankService.hydrateBankQuestions({ sections, userId, userRole });
   const validatedSections = validateSections({ sections: hydratedSections, subject, status: finalStatus });
   assertOfficialTestShape({ sections: validatedSections, subject, duration: normalizedDuration, category: finalCategory, status: finalStatus });
-  const imageIds = await assertUsableImages({ sections: validatedSections, userId, existingTestId: existing.id });
+  const imageIds = await assertUsableImages({ sections: validatedSections, userId, userRole, existingTestId: existing.id });
   let normalizedSections;
   try {
     const durations = allocateModuleDurations(normalizedDuration, validatedSections.length);
@@ -816,7 +818,7 @@ exports.updateTestStatus = async ({ testId, status, userId, userRole }) => {
       category: test.category,
       status: normalizedStatus,
     });
-    await assertUsableImages({ sections: validatedSections, userId, existingTestId: test.id });
+    await assertUsableImages({ sections: validatedSections, userId, userRole, existingTestId: test.id });
   }
   return prisma.$transaction(async tx => {
     const updated = await tx.test.update({

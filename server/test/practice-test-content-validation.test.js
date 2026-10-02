@@ -42,6 +42,14 @@ test('drafts may keep image placeholders but published tests require managed ass
   );
 });
 
+test('published bank snapshots may temporarily retain imported inline images', () => {
+  const question = rwQuestion({
+    sourceBankQuestionId: 'bank-question-1',
+    blocks: [{ type: 'image', src: 'data:image/png;base64,legacy' }],
+  });
+  assert.doesNotThrow(() => validateSections({ sections: [{ order: 1, questions: [question] }], subject: 'RW', status: 'PUBLISHED' }));
+});
+
 test('published official tests enforce canonical module counts and duration', () => {
   const sections = [{ order: 1, questions: Array.from({ length: 27 }, () => rwQuestion()) }];
   assert.throws(

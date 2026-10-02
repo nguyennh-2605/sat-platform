@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import BlockRenderer from '../../components/content/BlockRenderer';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
+import { isChoiceVisualPlaceholder, splitChoiceVisuals } from '../../components/content/choiceVisuals';
 import InteractiveText from '../../features/quiz/InteractiveText';
 import type { QuestionResult } from './score-report.types';
 
@@ -30,6 +31,7 @@ export function QuestionReviewDialog({
   if (!data) return null;
   const classification = [data.domain?.name, data.skill?.name].filter(Boolean).join(' · ') || 'Unclassified';
   const status = data.isCorrect ? 'Correct' : data.isOmitted ? 'Omitted' : 'Incorrect';
+  const { promptBlocks, choiceBlocks } = splitChoiceVisuals(data.blocks);
 
   return (
     <Modal
@@ -57,7 +59,7 @@ export function QuestionReviewDialog({
             <span className="text-caption text-muted-foreground">{formatQuestionDuration(data.activeDurationMs)}</span>
           </div>
 
-          {data.blocks.length > 0 && <BlockRenderer blocks={data.blocks} subject={examSubject} readOnly variant="exam" />}
+          {promptBlocks.length > 0 && <BlockRenderer blocks={promptBlocks} subject={examSubject} readOnly variant="exam" />}
           <div className="exam-content font-medium text-foreground">
             <QuestionText text={data.questionText} subject={examSubject} />
           </div>
@@ -68,10 +70,12 @@ export function QuestionReviewDialog({
                 const label = String.fromCharCode(65 + index);
                 const correct = data.correctAnswer != null && [label, choice.id, choice.text].includes(data.correctAnswer);
                 const selected = data.userAnswer != null && [label, choice.id, choice.text].includes(data.userAnswer);
+                const visuals = choiceBlocks[choice.id] || choiceBlocks[label] || [];
+                const showText = !visuals.length || !isChoiceVisualPlaceholder(choice.text, choice.id || label);
                 return (
                   <div key={`${choice.id}-${index}`} className={`flex gap-3 rounded-control border p-3 ${correct ? 'border-success/40 bg-success-soft' : selected ? 'border-danger/40 bg-danger-soft' : 'border-ui-border bg-surface'}`}>
                     <span className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-caption font-semibold ${correct ? 'border-success text-success' : selected ? 'border-danger text-danger' : 'border-ui-border text-muted-foreground'}`}>{label}</span>
-                    <div className="min-w-0 flex-1 exam-content"><QuestionText text={choice.text} subject={examSubject} /></div>
+                    <div className="min-w-0 flex-1 exam-content">{showText && <QuestionText text={choice.text} subject={examSubject} />}{visuals.length > 0 && <BlockRenderer blocks={visuals} subject={examSubject} readOnly variant="exam" />}</div>
                     {correct ? <CheckCircle2 className="size-5 shrink-0 text-success" aria-label="Correct answer" /> : selected ? <XCircle className="size-5 shrink-0 text-danger" aria-label="Your answer" /> : null}
                   </div>
                 );

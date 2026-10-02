@@ -4,6 +4,12 @@ const { isAnswerCorrect } = require('../utils/grading');
 const { validateClassification } = require('../utils/question-taxonomy');
 const { firstMathContentError, isValidSprAnswer } = require('../utils/math-content-validation');
 const { createDeliveriesWithDb } = require('./test-delivery.service');
+const {
+  assertUsableBankImages,
+  imageAssetIds,
+  linkQuestionBankImages,
+  syncTestImages,
+} = require('./test-image.service');
 
 const VALID_STATUSES = new Set(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 const VALID_DIFFICULTIES = new Set(['EASY', 'MEDIUM', 'HARD']);
@@ -182,6 +188,12 @@ exports.createQuestion = async ({ userId, userRole, payload }) => {
   const status = payload.status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
   const scope = userRole === 'ADMIN' ? 'SYSTEM' : 'PERSONAL';
   return prisma.$transaction(async tx => {
+    const assetIds = await assertUsableBankImages({
+      blocks: content.blocks,
+      choices: content.choices,
+      userId,
+      db: tx,
+    });
     const item = await tx.questionBankItem.create({
       data: {
         ownerId: Number(userId), scope, status, difficulty,
@@ -198,6 +210,7 @@ exports.createQuestion = async ({ userId, userRole, payload }) => {
         skill: { select: { code: true, name: true } }, versions: { orderBy: { version: 'desc' }, take: 1 },
       },
     });
+    await linkQuestionBankImages({ db: tx, questionId: item.id, assetIds });
     return serializeItem({ item, includeSolution: true });
   });
 };
@@ -227,6 +240,13 @@ exports.updateQuestion = async ({ questionId, userId, userRole, payload }) => pr
     correctAnswer: payload.correctAnswer ?? current.correctAnswer,
     explanation: payload.explanation ?? current.explanation,
   });
+  const assetIds = await assertUsableBankImages({
+    blocks: content.blocks,
+    choices: content.choices,
+    userId,
+    existingQuestionId: existing.id,
+    db: tx,
+  });
   const item = await tx.questionBankItem.update({
     where: { id: existing.id },
     data: {
@@ -249,6 +269,7 @@ exports.updateQuestion = async ({ questionId, userId, userRole, payload }) => pr
       skill: { select: { code: true, name: true } }, versions: { orderBy: { version: 'desc' }, take: 1 },
     },
   });
+  await linkQuestionBankImages({ db: tx, questionId: item.id, assetIds });
   return serializeItem({ item, includeSolution: true });
 });
 
@@ -375,6 +396,7 @@ exports.createAssignedQuiz = async ({ userId, userRole, payload }) => {
       },
       select: { id: true, title: true, duration: true, subject: true },
     });
+    await syncTestImages({ db: tx, testId: quiz.id, assetIds: imageAssetIds([section]) });
 
     const deliveries = await createDeliveriesWithDb({
       db: tx,
@@ -422,31 +444,33 @@ exports.createRandomQuiz = async ({ userId, payload }) => {
     [available[index], available[randomIndex]] = [available[randomIndex], available[index]];
   }
   const selected = available.slice(0, count);
-  const test = await prisma.test.create({
-    data: {
-      title: `Random ${subject === 'MATH' ? 'Math' : 'Reading & Writing'} practice`,
-      duration: Math.max(10, count * 2), subject, mode: 'PRACTICE', category: 'PRACTICE',
-      scope: 'PERSONAL', status: 'PUBLISHED', isPublic: false, isDiscoverable: false, authorId: Number(userId),
-      sections: {
-        create: {
-          name: 'Practice', order: 1, duration: Math.max(10, count * 2),
-          questions: {
-            create: selected.map((source, index) => {
-              const version = source.versions[0];
-              return {
-                order: index + 1, type: source.type, blocks: version.blocks, questionText: version.questionText,
-                choices: version.choices, correctAnswer: version.correctAnswer, explanation: version.explanation,
-                domainCode: source.domainCode, skillCode: source.skillCode,
-                sourceBankQuestionId: source.id, sourceBankVersionId: version.id,
-              };
-            }),
+  return prisma.$transaction(async tx => {
+    const questions = selected.map((source, index) => {
+      const version = source.versions[0];
+      return {
+        order: index + 1, type: source.type, blocks: version.blocks, questionText: version.questionText,
+        choices: version.choices, correctAnswer: version.correctAnswer, explanation: version.explanation,
+        domainCode: source.domainCode, skillCode: source.skillCode,
+        sourceBankQuestionId: source.id, sourceBankVersionId: version.id,
+      };
+    });
+    const test = await tx.test.create({
+      data: {
+        title: `Random ${subject === 'MATH' ? 'Math' : 'Reading & Writing'} practice`,
+        duration: Math.max(10, count * 2), subject, mode: 'PRACTICE', category: 'PRACTICE',
+        scope: 'PERSONAL', status: 'PUBLISHED', isPublic: false, isDiscoverable: false, authorId: Number(userId),
+        sections: {
+          create: {
+            name: 'Practice', order: 1, duration: Math.max(10, count * 2),
+            questions: { create: questions },
           },
         },
       },
-    },
-    select: { id: true, title: true },
+      select: { id: true, title: true },
+    });
+    await syncTestImages({ db: tx, testId: test.id, assetIds: imageAssetIds([{ questions }]) });
+    return { ...test, questionCount: selected.length };
   });
-  return { ...test, questionCount: selected.length };
 };
 
 exports.recordProgressWithDb = async ({ db, userId, question, selectedChoice, isCorrect }) => {
