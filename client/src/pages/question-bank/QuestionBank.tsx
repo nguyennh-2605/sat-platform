@@ -70,13 +70,13 @@ export default function QuestionBank() {
       if (search.trim()) params.set('search', search.trim());
       if (subject !== 'ALL') params.set('subject', subject);
       if (status !== 'ALL') params.set('status', status);
-      if (!isAdmin && domainCode !== 'ALL') params.set('domainCode', domainCode);
-      if (!isAdmin && skillCode !== 'ALL') params.set('skillCode', skillCode);
+      if (domainCode !== 'ALL') params.set('domainCode', domainCode);
+      if (skillCode !== 'ALL') params.set('skillCode', skillCode);
       setData(await axiosClient.get<BankQuestionPage, BankQuestionPage>(`/api/question-bank?${params}`));
     } catch (requestError) {
       setError(errorMessage(requestError, 'Unable to load the question bank.'));
     } finally { setLoading(false); }
-  }, [domainCode, isAdmin, page, search, skillCode, source, status, subject]);
+  }, [domainCode, page, search, skillCode, source, status, subject]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => { void load(); }, search.trim() ? 300 : 0);
@@ -86,9 +86,12 @@ export default function QuestionBank() {
     void axiosClient.get<TaxonomyDomain[], TaxonomyDomain[]>(`/api/tests/taxonomy?subject=${draft.subject}`).then(setTaxonomy).catch(() => setTaxonomy([]));
   }, [draft.subject]);
   useEffect(() => {
-    if (isAdmin || subject === 'ALL') return;
+    if (subject === 'ALL') {
+      setFilterTaxonomy([]);
+      return;
+    }
     void axiosClient.get<TaxonomyDomain[], TaxonomyDomain[]>(`/api/tests/taxonomy?subject=${subject}`).then(setFilterTaxonomy).catch(() => setFilterTaxonomy([]));
-  }, [isAdmin, subject]);
+  }, [subject]);
 
   const selectedDomain = taxonomy.find(item => item.code === draft.domainCode);
   const selectedFilterDomain = filterTaxonomy.find(item => item.code === domainCode);
@@ -150,10 +153,10 @@ export default function QuestionBank() {
       await load();
     } catch (requestError) { appToast.error(errorMessage(requestError, 'Unable to archive this question.')); }
   };
-  const hasFilters = Boolean(search || (isAdmin && subject !== 'ALL') || status !== 'ALL' || domainCode !== 'ALL' || skillCode !== 'ALL');
+  const hasFilters = Boolean(search || subject !== 'ALL' || status !== 'ALL' || domainCode !== 'ALL' || skillCode !== 'ALL');
   const title = isAdmin ? 'System Question Bank' : source === 'SYSTEM' ? 'System Question Bank' : 'My Question Bank';
   const showActions = isAdmin || source === 'MINE';
-  const tableColumnCount = isAdmin ? 5 : showActions ? 6 : 5;
+  const tableColumnCount = showActions ? 6 : 5;
   const changeSubject = (value: 'ALL' | BankSubject) => {
     setSubject(value);
     setDomainCode('ALL');
@@ -169,16 +172,16 @@ export default function QuestionBank() {
         <DataToolbarGroup className="w-full lg:w-auto">
           {!isAdmin && <Select value={source} onValueChange={value => { setSource(value as 'MINE' | 'SYSTEM'); setPage(1); }}><SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MINE">My questions</SelectItem><SelectItem value="SYSTEM">System questions</SelectItem></SelectContent></Select>}
           <Select value={subject} onValueChange={value => changeSubject(value as 'ALL' | BankSubject)}><SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger><SelectContent>{isAdmin && <SelectItem value="ALL">All subjects</SelectItem>}<SelectItem value="RW">Reading & Writing</SelectItem><SelectItem value="MATH">Math</SelectItem></SelectContent></Select>
-          {!isAdmin && <Select value={domainCode} onValueChange={value => { setDomainCode(value); setSkillCode('ALL'); setPage(1); }}><SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="All domains" /></SelectTrigger><SelectContent><SelectItem value="ALL">All domains</SelectItem>{filterTaxonomy.map(domain => <SelectItem key={domain.code} value={domain.code}>{domain.name}</SelectItem>)}</SelectContent></Select>}
-          {!isAdmin && <Select value={skillCode} onValueChange={value => { setSkillCode(value); setPage(1); }} disabled={domainCode === 'ALL'}><SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="All skills" /></SelectTrigger><SelectContent><SelectItem value="ALL">All skills</SelectItem>{selectedFilterDomain?.skills.map(skill => <SelectItem key={skill.code} value={skill.code}>{skill.name}</SelectItem>)}</SelectContent></Select>}
+          <Select value={domainCode} onValueChange={value => { setDomainCode(value); setSkillCode('ALL'); setPage(1); }} disabled={subject === 'ALL'}><SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="All domains" /></SelectTrigger><SelectContent><SelectItem value="ALL">All domains</SelectItem>{filterTaxonomy.map(domain => <SelectItem key={domain.code} value={domain.code}>{domain.name}</SelectItem>)}</SelectContent></Select>
+          <Select value={skillCode} onValueChange={value => { setSkillCode(value); setPage(1); }} disabled={subject === 'ALL' || domainCode === 'ALL'}><SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="All skills" /></SelectTrigger><SelectContent><SelectItem value="ALL">All skills</SelectItem>{selectedFilterDomain?.skills.map(skill => <SelectItem key={skill.code} value={skill.code}>{skill.name}</SelectItem>)}</SelectContent></Select>
           <Select value={status} onValueChange={value => { setStatus(value as 'ALL' | BankQuestionStatus); setPage(1); }} disabled={!isAdmin && source === 'SYSTEM'}><SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Active</SelectItem><SelectItem value="DRAFT">Draft</SelectItem><SelectItem value="PUBLISHED">Published</SelectItem><SelectItem value="ARCHIVED">Archived</SelectItem></SelectContent></Select>
         </DataToolbarGroup>
         <DataToolbarActions><Badge tone="neutral">{data?.pagination.total ?? '—'} questions</Badge></DataToolbarActions>
       </DataToolbar>
-      <DataTableViewport><Table><TableHeader><TableRow><TableHead>{isAdmin ? 'Question' : 'Question ID'}</TableHead>{isAdmin ? <TableHead>Classification</TableHead> : <><TableHead>Domain</TableHead><TableHead>Skill</TableHead></>}<TableHead>Difficulty</TableHead><TableHead>Status</TableHead>{showActions && <TableHead className="w-28 text-right">Actions</TableHead>}</TableRow></TableHeader><TableBody>
+      <DataTableViewport><Table><TableHeader><TableRow><TableHead>Question ID</TableHead><TableHead>Domain</TableHead><TableHead>Skill</TableHead><TableHead>Difficulty</TableHead><TableHead>Status</TableHead>{showActions && <TableHead className="w-28 text-right">Actions</TableHead>}</TableRow></TableHeader><TableBody>
         {loading ? Array.from({ length: 5 }, (_, index) => <TableRow key={index}><TableCell colSpan={tableColumnCount}><Skeleton className="h-10 w-full" /></TableCell></TableRow>) : error ? <DataStateRow colSpan={tableColumnCount}><EmptyState title="Question bank unavailable" description={error} action={<Button variant="outline" onClick={() => void load()}>Retry</Button>} /></DataStateRow> : !data?.items.length ? <DataStateRow colSpan={tableColumnCount}><EmptyState icon={<BookCopy aria-hidden="true" />} title={hasFilters ? 'No matching questions' : 'No questions yet'} description={hasFilters ? 'Change or clear the current filters.' : 'Create the first reusable question for this collection.'} /></DataStateRow> : data.items.map(question => <TableRow key={question.id}>
-          {isAdmin ? <TableCell className="max-w-xl"><p className="line-clamp-2 text-body font-medium text-foreground">{question.questionText}</p><p className="mt-1 text-caption text-muted-foreground">{question.subject === 'RW' ? 'Reading & Writing' : 'Math'} · {question.type} · Version {question.version}</p></TableCell> : <TableCell><Button variant="link" size="sm" className="h-auto px-0 font-mono text-caption font-semibold" title={question.id} onClick={() => setViewing(question)}>{questionIdLabel(question.id)}</Button></TableCell>}
-          {isAdmin ? <TableCell><p className="text-body text-foreground">{question.domain.name}</p><p className="text-caption text-muted-foreground">{question.skill.name}</p></TableCell> : <><TableCell className="max-w-56 text-body text-foreground">{question.domain.name}</TableCell><TableCell className="max-w-64 text-body text-foreground">{question.skill.name}</TableCell></>}
+          <TableCell><Button variant="link" size="sm" className="h-auto px-0 font-mono text-caption font-semibold" title={question.id} onClick={() => setViewing(question)}>{questionIdLabel(question.id)}</Button></TableCell>
+          <TableCell className="max-w-56 text-body text-foreground">{question.domain.name}</TableCell><TableCell className="max-w-64 text-body text-foreground">{question.skill.name}</TableCell>
           <TableCell><QuestionDifficultyBadge difficulty={question.difficulty} /></TableCell>
           <TableCell><Badge tone={question.status === 'PUBLISHED' ? 'success' : question.status === 'ARCHIVED' ? 'neutral' : 'warning'}>{question.status.toLowerCase()}</Badge></TableCell>
           {showActions && <TableCell><div className="flex justify-end gap-1"><Button variant="ghost" size="icon-sm" aria-label="Preview question" onClick={() => setViewing(question)}><Eye aria-hidden="true" /></Button><Button variant="ghost" size="icon-sm" aria-label="Edit question" onClick={() => openEdit(question)}><Edit3 aria-hidden="true" /></Button>{question.status !== 'ARCHIVED' && <Button variant="ghost" size="icon-sm" aria-label="Archive question" onClick={() => void archive(question)}><Archive aria-hidden="true" /></Button>}</div></TableCell>}
