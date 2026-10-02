@@ -11,6 +11,7 @@
     "test": "node --test test/*.test.js",
     "test:deploy": "node scripts/deploy-smoke-test.js",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:import:question-bank": "node scripts/import-question-bank-production.js",
     "db:seed:vocabulary": "node prisma/seed-vocabulary.js",
     "db:seed:teacher-overview": "node scripts/seed-teacher-overview.js",
     "storage:cleanup": "node scripts/cleanup-file-assets.js",
