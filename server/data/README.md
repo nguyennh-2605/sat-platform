@@ -20,7 +20,7 @@ Imported questions use `SYSTEM` scope and start in `DRAFT` status so an administ
 
 ## Reading and Writing graph repair
 
-`eqb-rw-graph-assets-v1.json.gz` contains the 62 College Board Reading and Writing graphs that are inline SVGs in the source Question Bank. The bundle stores lossless 2× PNGs, accessible descriptions, the corrected block layout, and checksums for the legacy blocks and every image. Bundle SHA-256: `f5f50b593006bc5cc648ce62dd3b0ec18508508c2bcd4fe654c46742266ba5f7`.
+`eqb-rw-graph-assets-v1.json.gz` contains the 62 College Board Reading and Writing graphs that are inline SVGs in the source Question Bank. The bundle stores lossless 2× PNGs, accessible image descriptions, the corrected visible block layout without duplicated screen-reader-only graph transcripts, and checksums for the legacy and previous repaired blocks plus every image. Bundle SHA-256: `148b75670d742f2be0f579fc7346bdff18951c341071f8aa0b8d5c3bb5a4f2e4`.
 
 Build the bundle from a local `sat-eqb-downloader` JSONL export:
 

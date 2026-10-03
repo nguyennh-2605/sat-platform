@@ -46,6 +46,9 @@ const htmlToText = rawHtml => {
     .trim();
 };
 
+const removeScreenReaderOnlyMarkup = rawHtml => String(rawHtml || '')
+  .replace(/<(div|span|p)\b(?=[^>]*\bclass=(?:"[^"]*\bsr-only\b[^"]*"|'[^']*\bsr-only\b[^']*'))[^>]*>[\s\S]*?<\/\1>/gi, '');
+
 const attributeValue = (markup, name) => {
   const match = new RegExp(`\\b${name}=(?:"([^"]*)"|'([^']*)')`, 'i').exec(markup);
   return sanitizeHtml(match?.[1] || match?.[2] || '', { allowedTags: [], allowedAttributes: {} }).trim();
@@ -120,8 +123,15 @@ const main = async () => {
   const outputPath = argumentValue('--output', DEFAULT_OUTPUT_PATH);
   const dataset = readDataset(datasetPath);
   const sourceGraphs = await readSourceGraphs(sourcePath);
-  const browser = await puppeteer.launch({ headless: true, timeout: 120_000 });
-  const page = await browser.newPage();
+  const previousRows = fs.existsSync(outputPath)
+    ? new Map(JSON.parse(zlib.gunzipSync(fs.readFileSync(outputPath)).toString('utf8')).rows.map(row => [row.questionId, row]))
+    : new Map();
+  const requiresRendering = sourceGraphs.some(source => {
+    const questionId = `eqb-${sha256(source.record.question_key).slice(0, 32)}`;
+    return !previousRows.get(questionId)?.image;
+  });
+  const browser = requiresRendering ? await puppeteer.launch({ headless: true, timeout: 120_000 }) : null;
+  const page = browser ? await browser.newPage() : null;
   const rows = [];
   try {
     for (const [index, source] of sourceGraphs.entries()) {
@@ -130,9 +140,17 @@ const main = async () => {
       if (!legacy || legacy.subject !== 'RW' || legacy.blocks.some(block => block?.type === 'image')) {
         throw new Error(`Legacy Reading and Writing row is unavailable for ${questionId}.`);
       }
-      const { png, width, height } = await renderSvg({ page, svg: source.svg });
+      const previousRow = previousRows.get(questionId);
+      const rendered = previousRow?.image
+        ? {
+          png: Buffer.from(previousRow.image.bytesBase64, 'base64'),
+          width: previousRow.image.width,
+          height: previousRow.image.height,
+        }
+        : await renderSvg({ page, svg: source.svg });
+      const { png, width, height } = rendered;
       const imageSha256 = sha256(png);
-      const promptWithoutFigure = source.promptHtml.replace(source.figureHtml, '');
+      const promptWithoutFigure = removeScreenReaderOnlyMarkup(source.promptHtml.replace(source.figureHtml, ''));
       const passage = htmlToText(promptWithoutFigure);
       const replacementBlocks = [
         { type: 'image', imageSha256, alt: graphAlt(source.figureHtml) || 'Question graph' },
@@ -142,6 +160,9 @@ const main = async () => {
         questionId,
         sourceQuestionId: source.record.metadata.question_id,
         expectedLegacyBlocksSha256: canonicalHash(legacy.blocks),
+        ...(previousRow ? {
+          previousReplacementBlocks: previousRow.previousReplacementBlocks || previousRow.replacementBlocks,
+        } : {}),
         replacementBlocks,
         image: {
           sha256: imageSha256,
@@ -154,11 +175,11 @@ const main = async () => {
       process.stdout.write(`Rendered ${index + 1}/${sourceGraphs.length}\r`);
     }
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
   }
 
   rows.sort((left, right) => left.questionId.localeCompare(right.questionId));
-  const payload = { schemaVersion: 1, sourceCount: rows.length, rows };
+  const payload = { schemaVersion: 2, sourceCount: rows.length, rows };
   const compressed = zlib.gzipSync(Buffer.from(JSON.stringify(payload)), { level: 9, mtime: 0 });
   fs.writeFileSync(outputPath, compressed);
   process.stdout.write('\n');

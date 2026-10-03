@@ -6,7 +6,7 @@ const { getObjectStorage } = require('../storage/object-storage');
 const { _imageHelpers } = require('./test-image.service');
 
 const EXPECTED_GRAPH_COUNT = 62;
-const EXPECTED_BUNDLE_SHA256 = 'f5f50b593006bc5cc648ce62dd3b0ec18508508c2bcd4fe654c46742266ba5f7';
+const EXPECTED_BUNDLE_SHA256 = '148b75670d742f2be0f579fc7346bdff18951c341071f8aa0b8d5c3bb5a4f2e4';
 const DEFAULT_BUNDLE_PATH = path.resolve(__dirname, '../../data/eqb-rw-graph-assets-v1.json.gz');
 const REPAIR_LOCK_KEY = 2_026_100_302;
 
@@ -22,18 +22,23 @@ const canonicalJson = value => {
 
 const canonicalHash = value => sha256(canonicalJson(value));
 
-const desiredBlocks = (row, assetId) => row.replacementBlocks.map(block => {
+const materializeBlocks = (row, blocks, assetId) => blocks.map(block => {
   if (block.type !== 'image') return block;
   const { imageSha256, ...imageBlock } = block;
   if (imageSha256 !== row.image.sha256) throw new Error(`Image checksum reference mismatch for ${row.questionId}.`);
   return { ...imageBlock, assetId };
 });
 
+const desiredBlocks = (row, assetId) => materializeBlocks(row, row.replacementBlocks, assetId);
+
 const validateRow = row => {
   if (!row || !/^eqb-[a-f0-9]{32}$/.test(row.questionId || '')) return 'Invalid question id';
   if (!/^[a-f0-9]{64}$/.test(row.expectedLegacyBlocksSha256 || '')) return 'Invalid legacy blocks checksum';
   if (!Array.isArray(row.replacementBlocks) || row.replacementBlocks.length < 1) return 'Replacement blocks are required';
   if (row.replacementBlocks.filter(block => block?.type === 'image').length !== 1) return 'Exactly one image block is required';
+  if (!Array.isArray(row.previousReplacementBlocks) || row.previousReplacementBlocks.filter(block => block?.type === 'image').length !== 1) {
+    return 'Previous replacement blocks are required';
+  }
   if (row.image?.mimeType !== 'image/png' || !/^[a-f0-9]{64}$/.test(row.image?.sha256 || '')) return 'Invalid PNG metadata';
   let bytes;
   try { bytes = Buffer.from(row.image.bytesBase64, 'base64'); }
@@ -41,7 +46,10 @@ const validateRow = row => {
   if (!bytes.length || bytes.length > _imageHelpers.MAX_IMAGE_BYTES || sha256(bytes) !== row.image.sha256) return 'PNG checksum or size mismatch';
   const dimensions = _imageHelpers.imageDimensions(bytes, 'image/png');
   if (!dimensions || dimensions[0] !== row.image.width || dimensions[1] !== row.image.height) return 'PNG dimensions mismatch';
-  try { desiredBlocks(row, '00000000-0000-0000-0000-000000000000'); }
+  try {
+    desiredBlocks(row, '00000000-0000-0000-0000-000000000000');
+    materializeBlocks(row, row.previousReplacementBlocks, '00000000-0000-0000-0000-000000000000');
+  }
   catch (error) { return error.message; }
   return null;
 };
@@ -59,7 +67,7 @@ const readQuestionBankRwGraphBundle = ({
   let payload;
   try { payload = JSON.parse(zlib.gunzipSync(compressed).toString('utf8')); }
   catch (error) { throw new Error(`Reading and Writing graph bundle could not be decoded: ${error.message}`); }
-  if (payload?.schemaVersion !== 1 || payload?.sourceCount !== expectedCount || payload?.rows?.length !== expectedCount) {
+  if (payload?.schemaVersion !== 2 || payload?.sourceCount !== expectedCount || payload?.rows?.length !== expectedCount) {
     throw new Error(`Reading and Writing graph bundle must contain exactly ${expectedCount} rows.`);
   }
   const seenQuestions = new Set();
@@ -95,8 +103,11 @@ const inspectQuestion = async ({ db, row }) => {
   if (asset && canonicalHash(latest.blocks) === canonicalHash(desiredBlocks(row, asset.id))) {
     return { state: 'repaired', item, latest, asset };
   }
+  if (asset && canonicalHash(latest.blocks) === canonicalHash(materializeBlocks(row, row.previousReplacementBlocks, asset.id))) {
+    return { state: 'pending', item, latest, asset };
+  }
   if (canonicalHash(latest.blocks) !== row.expectedLegacyBlocksSha256) {
-    return { state: 'conflict', reason: 'Latest blocks differ from both the legacy and repaired content', item, latest, asset };
+    return { state: 'conflict', reason: 'Latest blocks differ from the legacy, previous repaired, and cleaned content', item, latest, asset };
   }
   return { state: 'pending', item, latest, asset };
 };
@@ -216,5 +227,5 @@ module.exports = {
   EXPECTED_GRAPH_COUNT,
   readQuestionBankRwGraphBundle,
   repairQuestionBankRwGraphs,
-  _helpers: { canonicalHash, desiredBlocks, inspectQuestionBankRwGraphs, storageKeyFor, validateRow },
+  _helpers: { canonicalHash, desiredBlocks, inspectQuestionBankRwGraphs, materializeBlocks, storageKeyFor, validateRow },
 };

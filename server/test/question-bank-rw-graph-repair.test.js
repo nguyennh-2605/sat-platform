@@ -24,8 +24,15 @@ test('bundled Reading and Writing graphs pass checksum and image validation', ()
   assert.deepEqual(municipalityGraph.replacementBlocks.map(block => block.type), ['image', 'text']);
   assert.match(municipalityGraph.replacementBlocks[0].alt, /Municipalities’ Responses to Inquiries/);
   assert.match(municipalityGraph.replacementBlocks[1].content, /^In the United States, firms often seek incentives/);
+  assert.doesNotMatch(municipalityGraph.replacementBlocks[1].content, /For each data category|The data for the/i);
   assert.ok(municipalityGraph.image.width >= 800);
   assert.ok(municipalityGraph.image.height >= 1_100);
+
+  const policyGraph = bundle.rows.find(row => row.questionId === 'eqb-fedeaa836af2f81543567e8987d86c3f');
+  assert.ok(policyGraph);
+  assert.match(policyGraph.previousReplacementBlocks[1].content, /^For each data category/);
+  assert.match(policyGraph.replacementBlocks[1].content, /^High levels of public uncertainty/);
+  assert.doesNotMatch(policyGraph.replacementBlocks[1].content, /Tax and public spending policy: 98/);
 });
 
 test('desired graph blocks replace build-only checksums with managed asset ids', () => {
@@ -58,6 +65,11 @@ test('repair inspection accepts legacy blocks and recognizes an idempotent repai
   const pending = await _helpers.inspectQuestionBankRwGraphs({ prisma, bundle: { rows: [row] } });
   assert.equal(pending.pending.length, 1);
   assert.equal(pending.conflicts.length, 0);
+
+  latestBlocks = _helpers.materializeBlocks(row, row.previousReplacementBlocks, asset.id);
+  const previousRepair = await _helpers.inspectQuestionBankRwGraphs({ prisma, bundle: { rows: [row] } });
+  assert.equal(previousRepair.pending.length, 1);
+  assert.equal(previousRepair.conflicts.length, 0);
 
   latestBlocks = _helpers.desiredBlocks(row, asset.id);
   const repaired = await _helpers.inspectQuestionBankRwGraphs({ prisma, bundle: { rows: [row] } });
