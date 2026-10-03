@@ -40,4 +40,15 @@ Apply the idempotent repair on Render:
 npm run db:repair-question-bank-rw-graphs -- --apply --require-render
 ```
 
+`eqb-math-graph-assets-v1.json.gz` contains all 272 College Board Math SVG graphs and diagrams used by 250 questions, including graph-based answer choices. It stores lossless 2× PNGs, accessible descriptions, cleaned prompt/choice text, immutable replacement content, and checksums for conflict-safe repair. Bundle SHA-256: `c2fee648d986e1e22222acfce3dbc604070451a89f3982ca21e0d13b95c5755d`.
+
+Build, inspect, and apply it with:
+
+```bash
+npm run data:build-question-bank-math-graphs
+npm run db:repair-question-bank-math-graphs
+npm run db:repair-question-bank-math-graphs -- --apply --require-render
+npm run db:audit-question-bank-images -- --require-render
+```
+
 The repair uploads PNGs under deterministic SHA-256 storage keys, creates a new immutable question version, and links each asset through `QuestionBankImageUsage`. Existing test snapshots continue to reference their original versions.

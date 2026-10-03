@@ -425,7 +425,7 @@ Folder ──1:N── Test
 
 **Question**: `id`, `sectionId`, `type` (MCQ | SPR), `blocks` (JSON content), `questionText`, `choices` (JSON), `correctAnswer`, `explanation`, `order`, optional `sourceBankQuestionId` and `sourceBankVersionId`. Test questions remain independent snapshots even when their source bank item is edited or archived.
 
-**QuestionBankItem / QuestionBankVersion**: stable reusable identity plus immutable authored versions. Items own scope, lifecycle, SAT classification, subject/type, and difficulty; versions own content, choices, answer, explanation, creator, and version number.
+**QuestionBankItem / QuestionBankVersion**: stable reusable identity plus immutable authored versions. Items own scope, lifecycle, SAT classification, subject/type, and difficulty; versions own content, choices, answer, explanation, creator, and version number. College Board SVG visuals are rasterized into checksum-addressed managed PNG assets in private object storage; repair jobs create new immutable versions for all Reading and Writing graphs and Math graphs/diagram answer choices instead of depending on Render's ephemeral filesystem.
 
 **Roadmap / RoadmapMilestone**: Admin-owned ordered curriculum. A milestone stores theory JSON, a required distinct-question count, and skill links; its practice pool is all currently Published System bank questions matching those skills. `StudentMilestoneProgress`, `StudentBankQuestionProgress`, and `BankQuestionAttempt` store review/completion and unlimited retry history.
 
