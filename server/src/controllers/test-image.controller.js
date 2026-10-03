@@ -22,5 +22,7 @@ exports.completeUpload = handle(async (req, res) => {
 
 exports.getAccessUrl = handle(async (req, res) => {
   const data = await service.getAccessUrl({ fileAssetId: req.params.fileAssetId, userId: req.user.userId || req.user.id, userRole: req.user.role });
+  res.set('Cache-Control', 'private, max-age=240, stale-while-revalidate=30');
+  res.set('Vary', 'Authorization');
   return res.json({ success: true, data });
 });

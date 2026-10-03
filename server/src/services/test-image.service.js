@@ -192,12 +192,36 @@ exports.completeUpload = async ({ fileAssetId, ownerId }, dependencies = {}) => 
 exports.getAccessUrl = async ({ fileAssetId, userId, userRole }, dependencies = {}) => {
   const db = dependencies.db || prisma;
   const storageFactory = dependencies.storageFactory || getObjectStorage;
-  const asset = await db.fileAsset.findUnique({ where: { id: fileAssetId } });
+  const asset = await db.fileAsset.findUnique({
+    where: { id: fileAssetId },
+    select: {
+      id: true,
+      ownerId: true,
+      purpose: true,
+      status: true,
+      storageKey: true,
+      originalName: true,
+      bankQuestions: {
+        select: {
+          question: { select: { ownerId: true, scope: true, status: true } },
+        },
+      },
+    },
+  });
   if (!asset || asset.purpose !== 'TEST_IMAGE' || asset.status !== 'READY') throw new ApiError(404, { error: 'Image not found.' });
   const requesterId = Number(userId);
   const isUploader = asset.ownerId === requesterId && ['TEACHER', 'ADMIN'].includes(userRole);
   if (!isUploader) {
-    const accessibleTest = await db.test.findFirst({
+    const canReadBankQuestion = ({ question }) => (
+      (userRole === 'ADMIN' && question.scope === 'SYSTEM' && question.status !== 'ARCHIVED')
+      || (userRole === 'TEACHER' && (
+        (question.scope === 'SYSTEM' && question.status === 'PUBLISHED')
+        || (question.scope === 'PERSONAL' && question.ownerId === requesterId && question.status !== 'ARCHIVED')
+      ))
+      || (userRole === 'STUDENT' && question.scope === 'SYSTEM' && question.status === 'PUBLISHED')
+    );
+    const accessibleBankQuestion = (asset.bankQuestions || []).some(canReadBankQuestion);
+    const accessibleTest = accessibleBankQuestion ? null : await db.test.findFirst({
       where: {
         images: { some: { fileAssetId } },
         ...(userRole === 'ADMIN' ? {} : userRole === 'TEACHER' ? { OR: [
@@ -211,20 +235,6 @@ exports.getAccessUrl = async ({ fileAssetId, userId, userRole }, dependencies = 
       },
       select: { id: true },
     });
-    const bankWhere = userRole === 'ADMIN'
-      ? { scope: 'SYSTEM', status: { not: 'ARCHIVED' } }
-      : userRole === 'TEACHER'
-        ? { OR: [
-          { scope: 'SYSTEM', status: 'PUBLISHED' },
-          { scope: 'PERSONAL', ownerId: requesterId, status: { not: 'ARCHIVED' } },
-        ] }
-        : { scope: 'SYSTEM', status: 'PUBLISHED' };
-    const accessibleBankQuestion = !accessibleTest && db.questionBankItem?.findFirst
-      ? await db.questionBankItem.findFirst({
-        where: { images: { some: { fileAssetId } }, ...bankWhere },
-        select: { id: true },
-      })
-      : null;
     if (!accessibleTest && !accessibleBankQuestion) throw new ApiError(403, { error: 'You cannot access this image.' });
   }
   return { url: await storageFactory().createReadUrl({ storageKey: asset.storageKey, downloadName: asset.originalName }), expiresInSeconds: 300 };

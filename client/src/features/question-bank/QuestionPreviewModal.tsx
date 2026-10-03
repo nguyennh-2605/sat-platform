@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import BlockRenderer from '@/components/content/BlockRenderer';
+import { preloadManagedImageAssets } from '@/components/content/managedImageAccess';
 import FormattedTextRenderer from '@/components/content/TextRenderer';
 import { isChoiceVisualPlaceholder, splitChoiceVisuals } from '@/components/content/choiceVisuals';
 import { Badge, Modal } from '@/components/ui/AppUI';
@@ -14,10 +16,16 @@ export function QuestionDifficultyBadge({ difficulty }: { difficulty: BankQuesti
 }
 
 export function QuestionPreviewModal({ question, questions, onQuestionChange, onClose }: { question: BankQuestion | null; questions: BankQuestion[]; onQuestionChange: (question: BankQuestion) => void; onClose: () => void }) {
-  if (!question) return null;
-  const questionIndex = questions.findIndex(item => item.id === question.id);
+  const questionIndex = question ? questions.findIndex(item => item.id === question.id) : -1;
   const previousQuestion = questionIndex > 0 ? questions[questionIndex - 1] : null;
   const nextQuestion = questionIndex >= 0 && questionIndex < questions.length - 1 ? questions[questionIndex + 1] : null;
+  useEffect(() => {
+    void preloadManagedImageAssets([
+      ...(previousQuestion?.blocks || []),
+      ...(nextQuestion?.blocks || []),
+    ]);
+  }, [nextQuestion, previousQuestion]);
+  if (!question) return null;
   const { promptBlocks, choiceBlocks } = splitChoiceVisuals(question.blocks);
   return <Modal
     open
@@ -27,7 +35,7 @@ export function QuestionPreviewModal({ question, questions, onQuestionChange, on
     title={`Question ${questionIdLabel(question.id)}`}
     subtitle={`${question.subject === 'RW' ? 'Reading & Writing' : 'Math'} · ${question.domain.name} · ${question.skill.name}`}
     className="h-[calc(100vh-2rem)] max-w-6xl!"
-    footer={<div className="flex w-full flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><Button variant="outline" disabled={!previousQuestion} onClick={() => previousQuestion && onQuestionChange(previousQuestion)}><ArrowLeft />Previous</Button><Button variant="outline" disabled={!nextQuestion} onClick={() => nextQuestion && onQuestionChange(nextQuestion)}>Next<ArrowRight /></Button></div><Button variant="outline" onClick={onClose}>Close</Button></div>}
+    footer={<div className="flex w-full flex-wrap items-center justify-end gap-2"><Button variant="outline" disabled={!previousQuestion} onClick={() => previousQuestion && onQuestionChange(previousQuestion)}><ArrowLeft />Previous</Button><Button variant="outline" disabled={!nextQuestion} onClick={() => nextQuestion && onQuestionChange(nextQuestion)}>Next<ArrowRight /></Button></div>}
   >
     <div key={question.id} className="grid h-full min-h-0 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
       <section className="space-y-5 rounded-card border border-ui-border bg-surface p-4 sm:p-5" aria-label="Question and answers">

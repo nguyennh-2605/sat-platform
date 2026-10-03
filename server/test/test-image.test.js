@@ -110,15 +110,20 @@ test('image access requires a linked readable test or the uploader', async () =>
 });
 
 test('published system bank questions grant managed image access', async () => {
-  let bankWhere;
+  let testQueries = 0;
   const db = {
-    fileAsset: { findUnique: async () => ({ id: assetId, purpose: 'TEST_IMAGE', status: 'READY', ownerId: 7, storageKey: 'image-key', originalName: 'graph.png' }) },
-    test: { findFirst: async () => null },
-    questionBankItem: { findFirst: async ({ where }) => { bankWhere = where; return { id: 'bank-question-1' }; } },
+    fileAsset: { findUnique: async () => ({
+      id: assetId,
+      purpose: 'TEST_IMAGE',
+      status: 'READY',
+      ownerId: 7,
+      storageKey: 'image-key',
+      originalName: 'graph.png',
+      bankQuestions: [{ question: { ownerId: 7, scope: 'SYSTEM', status: 'PUBLISHED' } }],
+    }) },
+    test: { findFirst: async () => { testQueries += 1; return null; } },
   };
   const result = await service.getAccessUrl({ fileAssetId: assetId, userId: 9, userRole: 'STUDENT' }, { db, storageFactory: () => ({ createReadUrl: async () => 'https://example.test/read' }) });
   assert.equal(result.url, 'https://example.test/read');
-  assert.equal(bankWhere.images.some.fileAssetId, assetId);
-  assert.equal(bankWhere.scope, 'SYSTEM');
-  assert.equal(bankWhere.status, 'PUBLISHED');
+  assert.equal(testQueries, 0);
 });

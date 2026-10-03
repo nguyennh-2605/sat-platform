@@ -2,14 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import type { ContentBlock, TableBlock, PoemBlock } from '../../types/quiz';
 import InteractiveText from '../../features/quiz/InteractiveText';
-import axiosClient from '../../lib/axios';
 import { Button } from '../ui/button';
 import { splitReadingParagraphs } from './readingTextFormat';
-
-const getManagedImageUrl = async (assetId: string) => {
-  const response = await axiosClient.get<{ success: boolean; data: { url: string; expiresInSeconds: number } }>(`/api/test-images/${encodeURIComponent(assetId)}/access`);
-  return response.data.url;
-};
+import { getManagedImageUrl } from './managedImageAccess';
 
 function ManagedImage({ assetId, alt, disableActions = false }: { assetId: string; alt: string; disableActions?: boolean }) {
   const [result, setResult] = useState<{ key: string; url?: string; failed?: boolean } | null>(null);
