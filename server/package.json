@@ -12,6 +12,8 @@
     "test:deploy": "node scripts/deploy-smoke-test.js",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:import:question-bank": "node scripts/import-question-bank-production.js",
+    "db:repair-question-bank-rw-graphs": "node scripts/repair-question-bank-rw-graphs.js",
+    "data:build-question-bank-rw-graphs": "node scripts/build-question-bank-rw-graph-bundle.js",
     "db:seed:vocabulary": "node prisma/seed-vocabulary.js",
     "db:seed:teacher-overview": "node scripts/seed-teacher-overview.js",
     "storage:cleanup": "node scripts/cleanup-file-assets.js",
@@ -58,7 +60,8 @@
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.15.0",
     "nodemon": "^3.1.11",
-    "prisma-erd-generator": "^2.4.2"
+    "prisma-erd-generator": "^2.4.2",
+    "puppeteer": "^25.11.0"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

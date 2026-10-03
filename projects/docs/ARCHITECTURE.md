@@ -349,7 +349,7 @@ Teacher Overview only exposes classes owned by the authenticated teacher. Core w
 
 Managed file records store object keys, never signed URLs. `HomeworkSubmissionContent` separates the student's private `DRAFT` from the official `SUBMITTED` snapshot; teachers only read the latter. External links remain `HomeworkSubmissionItem(kind=LINK)` and do not become managed files.
 
-Question image blocks store a managed `assetId`; the shared renderer resolves short-lived read URLs on demand. `TestImageUsage` retains assets used by tests, including duplicates and copies. Legacy external `src` image blocks remain readable during Cloudinary migration. Unattached test images are removed by the existing storage cleanup job.
+Question image blocks store a managed `assetId`; the shared renderer resolves short-lived read URLs on demand. `TestImageUsage` retains assets used by tests, including duplicates and copies, while `QuestionBankImageUsage` retains assets used by immutable Question Bank versions. The Reading and Writing graph repair rasterizes the trusted College Board SVG source to lossless 2× PNGs, uploads them under deterministic SHA-256 keys, and creates a new bank version without changing existing test snapshots. Legacy external `src` image blocks remain readable during migration. Unattached test images are removed by the existing storage cleanup job.
 
 Storage maintenance uses `npm run storage:cleanup`; real bucket verification uses the explicitly gated `npm run storage:smoke`. Environment separation, Render Cron setup, R2 lifecycle guidance, and operational response are documented in `projects/docs/STORAGE_OPERATIONS.md`.
 
