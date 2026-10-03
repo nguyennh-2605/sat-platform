@@ -60,7 +60,7 @@
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.15.0",
     "nodemon": "^3.1.11",
-    "prisma-erd-generator": "^2.4.2",
+    "prisma-erd-generator": "^3.2.1",
     "puppeteer": "^25.11.0"
   },
   "prisma": {
