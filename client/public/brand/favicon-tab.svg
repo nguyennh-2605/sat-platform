@@ -1,9 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Sonder SAT cat head">
-  <path fill="#34363b" stroke="#a5a7ae" stroke-width="1" stroke-linejoin="round" d="M3 43c0-9 4-16 9-21l3-13c.5-2.5 2.5-3.5 4.5-1.5L27 14a43 43 0 0 1 10 0l7.5-6.5c2-2 4-1 4.5 1.5l3 13c5 5 9 12 9 21v4c0 3-5 6-12 7v2c0 1.5-1 2-2.5 2H43c-1.5 0-2.5-.5-2.5-2v-1a86 86 0 0 1-8.5.5C17 55.5 3 52 3 47Z"/>
-  <path fill="#ef4444" d="M3.5 43c15 5 42 5 57 0v4c0 2.7-5 5-12 6.3v2.5c0 1-.5 1.5-1.5 1.5h-3.5c-1 0-1.5-.5-1.5-1.5v-1.6c-3 .4-6.2.7-10 .7-14.5 0-28.5-3.3-28.5-7.9Z"/>
-  <path fill="none" stroke="#b92f38" stroke-width="1.2" stroke-linecap="round" d="M42.5 48.5v5.7"/>
-  <circle cx="22" cy="34" r="2.5" fill="#fff"/>
-  <circle cx="42" cy="34" r="2.5" fill="#fff"/>
-  <path fill="#fff" d="m30.4 37 1.6 1.4 1.6-1.4Z"/>
-  <path fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" d="M32 38.3c-1.2 1-2.7 1.2-4 .5m4-.5c1.2 1 2.7 1.2 4 .5"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 452 452" role="img" aria-label="Sonder SAT cat with glasses">
+  <style>
+    .tile { fill: #ffffff; }
+    .mark { fill: #202124; }
+    .glasses { fill: none; stroke: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #202124; }
+      .mark { fill: #ffffff; }
+      .glasses { stroke: #202124; }
+    }
+  </style>
+  <rect class="tile" width="452" height="452" rx="68" />
+  <path class="mark" d="M57 256C60 243 65 230 70 220C68 175 75 114 87 89C90 81 94 79 100 82C127 95 153 118 173 142C207 132 245 132 280 142C300 118 326 95 353 82C359 79 363 81 366 89C378 114 385 175 383 220C388 230 393 243 396 256C411 341 363 399 226 399C89 399 42 341 57 256Z" />
+  <path class="glasses" d="M51 263H80M372 263H401M199 261C216 253 236 253 253 261" stroke-width="12" />
+  <circle class="glasses" cx="142" cy="275" r="58.5" stroke-width="12" />
+  <circle class="glasses" cx="308" cy="275" r="58.5" stroke-width="12" />
 </svg>
