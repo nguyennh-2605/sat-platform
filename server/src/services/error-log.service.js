@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const { SOLUTION_DELIVERY_SELECT, isSubmissionSolutionLocked } = require('../utils/solution-access');
 const { parsePagination, paginationMeta } = require('../utils/pagination');
 const { findDomain, findSkill, skills } = require('../utils/question-taxonomy');
 const { sanitizeReflection, isRichTextEmpty, richTextToPlainText } = require('../utils/error-log-rich-text');
@@ -30,7 +31,8 @@ const ERROR_LOG_READ_SELECT = {
   ...ERROR_LOG_SELECT,
   submission: {
     select: {
-      delivery: { select: { status: true, dueAt: true } },
+      status: true,
+      delivery: { select: SOLUTION_DELIVERY_SELECT },
     },
   },
 };
@@ -39,11 +41,7 @@ const serializeErrorLog = (entry) => {
   if (!entry) return entry;
   if (!Object.prototype.hasOwnProperty.call(entry, 'submission')) return entry;
   const delivery = entry.submission?.delivery;
-  const solutionLocked = Boolean(
-    delivery
-    && delivery.status === 'PUBLISHED'
-    && (!delivery.dueAt || new Date(delivery.dueAt) > new Date())
-  );
+  const solutionLocked = isSubmissionSolutionLocked(entry.submission);
   const { submission: _submission, ...publicEntry } = entry;
   if (!solutionLocked) return publicEntry;
   return { ...publicEntry, correctAnswer: null, solutionLocked: true, solutionAvailableAt: delivery?.dueAt?.toISOString() || null };
@@ -347,7 +345,7 @@ exports.getErrorLogFacets = async ({ userId, query = {} }) => {
 exports.getErrorLogQuestion = async ({ id, userId }) => {
   const entry = await prisma.errorLog.findFirst({ where: { id, userId }, select: {
     questionSnapshot: true,
-    submission: { select: { delivery: { select: { status: true, dueAt: true } } } },
+    submission: { select: { status: true, delivery: { select: SOLUTION_DELIVERY_SELECT } } },
     question: { select: {
       type: true, blocks: true, questionText: true, choices: true, explanation: true, order: true,
       section: { select: { name: true, order: true, test: { select: { title: true, subject: true } } } },
@@ -355,7 +353,7 @@ exports.getErrorLogQuestion = async ({ id, userId }) => {
   } });
   if (!entry) throw new ApiError(404, { message: 'Error log entry not found.' });
   const delivery = entry.submission?.delivery;
-  const solutionLocked = Boolean(delivery && delivery.status === 'PUBLISHED' && (!delivery.dueAt || delivery.dueAt > new Date()));
+  const solutionLocked = isSubmissionSolutionLocked(entry.submission);
   const question = normalizeQuestionForClient(entry.questionSnapshot || entry.question);
   if (!solutionLocked) return { question };
   return {
@@ -393,7 +391,7 @@ const publicErrorLog = (entry) => {
   if (!entry) return entry;
   const selected = Object.fromEntries(Object.keys(ERROR_LOG_SELECT).map(field => [field, entry[field]]));
   const delivery = entry.submission?.delivery;
-  const solutionLocked = Boolean(delivery && delivery.status === 'PUBLISHED' && (!delivery.dueAt || new Date(delivery.dueAt) > new Date()));
+  const solutionLocked = isSubmissionSolutionLocked(entry.submission);
   return solutionLocked
     ? { ...selected, correctAnswer: null, solutionLocked: true, solutionAvailableAt: delivery?.dueAt?.toISOString() || null }
     : selected;

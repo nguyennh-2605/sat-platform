@@ -522,7 +522,7 @@ Folder ──1:N── Test
 4. The unfinished Student Roadmap route, navigation entry, and milestone practice endpoints are temporarily disabled. The data model and implementation remain available for future work.
 5. A random student quiz selects only System questions that student has never answered, creates a hidden Personal Test snapshot, and uses the normal Exam Room and Submission pipeline.
 6. Teacher-created assigned quizzes do not filter out questions students may already have encountered.
-7. While a published delivery using a bank question is still open for a student, roadmap feedback, Score Report, Error Log, and Error Log export suppress the correct answer and explanation. Submission does not release solutions early; the delivery deadline or explicit close does.
+7. Assigned Quiz solutions are released to the student immediately after their submission is COMPLETED, including the submit response, Score Report, Error Log, and Error Log export; no deadline or teacher close is required. Unsubmitted Quizzes and other open Test deliveries retain the deadline/close embargo. Bank-question feedback excludes Quizzes completed by that student from the embargo, but another open delivery containing the same question can still withhold bank feedback.
 ```
 
 ### 8.4 Admin Test Management

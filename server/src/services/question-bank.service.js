@@ -87,6 +87,12 @@ const activeLockedQuestionIds = async ({ userId, questionIds, db = prisma }) => 
               status: 'PUBLISHED',
               OR: [{ dueAt: null }, { dueAt: { gt: now } }],
               assignees: { some: { studentId: Number(userId), excusedAt: null } },
+              // A completed Quiz no longer withholds solutions for this student.
+              // Other open deliveries containing the same question still do.
+              NOT: {
+                activity: { is: { activity: { type: 'QUIZ' } } },
+                submissions: { some: { userId: Number(userId), status: 'COMPLETED' } },
+              },
             },
           },
         },

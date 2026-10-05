@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const { SOLUTION_DELIVERY_SELECT, isSubmissionSolutionLocked } = require('../utils/solution-access');
 const { corsOptions } = require('../config/cors');
 const { richTextToSheetText } = require('../utils/error-log-rich-text');
 const { skills } = require('../utils/question-taxonomy');
@@ -345,14 +346,13 @@ const loadExportEntries = async (userId) => {
       whyRight: true,
       questionId: true,
       createdAt: true,
-      submission: { select: { delivery: { select: { status: true, dueAt: true } } } },
+      submission: { select: { status: true, delivery: { select: SOLUTION_DELIVERY_SELECT } } },
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
   const now = new Date();
   return entries.map(({ submission, ...entry }) => {
-    const delivery = submission?.delivery;
-    const solutionLocked = Boolean(delivery && delivery.status === 'PUBLISHED' && (!delivery.dueAt || delivery.dueAt > now));
+    const solutionLocked = isSubmissionSolutionLocked(submission, now);
     return solutionLocked ? { ...entry, correctAnswer: null } : entry;
   });
 };
@@ -444,6 +444,7 @@ module.exports = {
     normalizeGoogleAccessToken,
     normalizePlatformOrigin,
     mapGoogleError,
+    loadExportEntries,
     richTextCell,
   },
 };

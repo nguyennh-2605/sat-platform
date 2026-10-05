@@ -2,6 +2,7 @@ const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
 const { gradeQuestions } = require('../utils/grading');
+const { SOLUTION_DELIVERY_SELECT, isSubmissionSolutionLocked } = require('../utils/solution-access');
 const testDeliveryService = require('./test-delivery.service');
 const errorLogService = require('./error-log.service');
 const { normalizeQuestionTimingSnapshot, timingRowsFromSnapshot } = require('../utils/question-timing');
@@ -820,9 +821,9 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
   if (submission.deliveryId) {
     const delivery = await prisma.testDelivery.findUnique({
       where: { id: submission.deliveryId },
-      select: { status: true, dueAt: true },
+      select: SOLUTION_DELIVERY_SELECT,
     });
-    solutionsLocked = Boolean(delivery && delivery.status === 'PUBLISHED' && (!delivery.dueAt || delivery.dueAt > new Date()));
+    solutionsLocked = isSubmissionSolutionLocked({ ...transactionResult.submission, delivery });
     solutionAvailableAt = solutionsLocked ? delivery?.dueAt || null : null;
   }
 
