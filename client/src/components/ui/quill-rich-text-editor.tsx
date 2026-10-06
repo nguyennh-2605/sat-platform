@@ -123,7 +123,7 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
       'overflow-hidden rounded-control border border-input bg-background transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50',
       '[&_.ql-toolbar.ql-snow]:border-0 [&_.ql-toolbar.ql-snow]:border-b [&_.ql-toolbar.ql-snow]:border-ui-border [&_.ql-toolbar.ql-snow]:bg-muted/20',
       '[&_.ql-container.ql-snow]:border-0 [&_.ql-editor]:min-h-40 [&_.ql-editor]:font-sans [&_.ql-editor]:text-sm [&_.ql-editor]:leading-6 [&_.ql-editor]:text-foreground',
-      '[&_.ql-editor.ql-blank:before]:text-muted-foreground [&_.ql-editor.ql-blank:before]:not-italic [&_.ql-stroke]:stroke-muted-foreground [&_.ql-fill]:fill-muted-foreground',
+      '[&_.ql-editor.ql-blank:before]:text-muted-foreground! [&_.ql-editor.ql-blank:before]:not-italic! [&_.ql-stroke]:stroke-muted-foreground [&_.ql-fill]:fill-muted-foreground',
       disabled && 'pointer-events-none opacity-60',
       compact && !fill && '[&_.ql-editor]:min-h-24 [&_.ql-editor]:max-h-60 [&_.ql-editor]:overflow-y-auto [&_.ql-toolbar]:p-1',
       expanded && !fill && '[&_.ql-editor]:min-h-72 [&_.ql-editor]:max-h-96 [&_.ql-editor]:overflow-y-auto',

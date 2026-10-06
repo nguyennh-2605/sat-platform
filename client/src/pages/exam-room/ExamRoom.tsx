@@ -1052,7 +1052,7 @@ function ExamRoom() {
 
   return (
     <DictionaryLookup enabled={testMode === 'PRACTICE' && TestInfo.subject === 'RW' && phase !== 'REVIEW_1' && phase !== 'REVIEW_2'} contentKey={currentQ.id}>
-    <div className="flex flex-col h-screen bg-gray-50 font-sans relative overflow-hidden">
+    <div className="flex flex-col h-screen bg-gray-50 text-gray-800 font-sans relative overflow-hidden">
       {/* COMPONENT LOADING */}
       {isTransitioning && (
         <LoadingState

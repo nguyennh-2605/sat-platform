@@ -263,7 +263,7 @@ const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, read
   
   if (readOnly) {
     return (
-      <div data-dictionary-text className={`whitespace-pre-wrap select-text text-gray-800 ${inheritTypography ? '' : 'text-[16px] leading-relaxed'}`}>
+      <div data-dictionary-text className={`whitespace-pre-wrap select-text text-inherit ${inheritTypography ? '' : 'text-[16px] leading-relaxed'}`}>
         <ReadingText content={content} />
       </div>
     );
@@ -281,7 +281,7 @@ const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, read
         data-dictionary-annotations="true"
         onMouseUp={handleMouseUp}
         onClick={handleContainerClick}
-        className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} whitespace-pre-wrap select-text text-gray-800 ${cursorClass}`}
+        className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} whitespace-pre-wrap select-text text-inherit ${cursorClass}`}
       >
         {parse(htmlContent)}
       </div>

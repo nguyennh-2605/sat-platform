@@ -129,7 +129,7 @@ const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, cla
   // while all newly imported Math content is validated as raw strict LaTeX.
   if (latexOnly && hasLegacyMathDelimiters(text)) {
     return (
-      <div className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} lining-nums text-gray-800 space-y-3 ${className}`}>
+      <div className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} lining-nums text-inherit space-y-3 ${className}`}>
         <ReactMarkdown
           remarkPlugins={[remarkMath]}
           rehypePlugins={[[rehypeKatex, { macros: { '\\frac': '\\dfrac' }, strict: false }]]}
@@ -155,7 +155,7 @@ const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, cla
         .filter(Boolean);
 
       return (
-        <div className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} max-w-full space-y-2 text-gray-800 ${className}`}>
+        <div className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} max-w-full space-y-2 text-inherit ${className}`}>
           {noteLines.map((line, index) => (
             <div key={index} className="whitespace-normal wrap-break-word leading-relaxed">
               {renderWrappedLatex(line)}
@@ -166,14 +166,14 @@ const FormattedTextRenderer: React.FC<FormattedTextRendererProps> = ({ text, cla
     }
 
     return (
-      <div className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} max-w-full whitespace-normal wrap-break-word text-gray-800 ${className}`}>
+      <div className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} max-w-full whitespace-normal wrap-break-word text-inherit ${className}`}>
         {renderWrappedLatex(normalizedLatex)}
       </div>
     );
   }
 
   return (
-    <div className={`${inheritTypography ? '' : 'font-serif text-[16px] leading-relaxed'} lining-nums text-gray-800 space-y-3 ${className}`}>
+    <div className={`${inheritTypography ? '' : 'font-serif text-[16px] leading-relaxed'} lining-nums text-inherit space-y-3 ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[

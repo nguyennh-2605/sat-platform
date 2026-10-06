@@ -535,6 +535,15 @@
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
+  /* Status surfaces must remain dark when their content uses theme foreground. */
+  --ui-success: #34d399;
+  --ui-success-soft: color-mix(in srgb, var(--ui-success) 14%, var(--card));
+  --ui-warning: #fbbf24;
+  --ui-warning-soft: color-mix(in srgb, var(--ui-warning) 14%, var(--card));
+  --ui-danger: #fca5a5;
+  --ui-danger-soft: color-mix(in srgb, var(--ui-danger) 14%, var(--card));
+  --ui-info: #93c5fd;
+  --ui-info-soft: color-mix(in srgb, var(--ui-info) 14%, var(--card));
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);

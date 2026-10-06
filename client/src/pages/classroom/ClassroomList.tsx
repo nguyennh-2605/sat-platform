@@ -122,8 +122,8 @@ export default function ClassroomList() {
               <EmptyState
                 icon={<GraduationCap className="size-5" />}
                 title="No classes yet"
-                description={canCreate ? 'Create your first class to organize students, assignments, and progress.' : 'Classes will appear here after a teacher adds you.'}
-                action={canCreate ? <Button onClick={() => setEditor({ mode: 'create' })}><Plus aria-hidden="true" />Create class</Button> : undefined}
+                description={canCreate ? 'Create your first class to organize students, assignments, and progress.' : 'Ask your teacher to add your account to a class. You can practice on your own while you wait.'}
+                action={canCreate ? <Button onClick={() => setEditor({ mode: 'create' })}><Plus aria-hidden="true" />Create class</Button> : <Button onClick={() => navigate('/dashboard/practice-test')}>Explore practice tests</Button>}
               />
             ) : visibleClasses.length === 0 ? <EmptyState icon={<Search className="size-5" />} title="No matching classrooms" description="Try another class name or clear the search." action={<Button variant="outline" size="sm" onClick={() => setSearch('')}>Clear search</Button>} /> : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -25,7 +25,7 @@ export function QuestionPanel({ entry }: { entry: ErrorEntry }) {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [entryId, entryOrigin, retry]);
-  return <DictionaryLookup enabled={question?.section?.test?.subject !== 'MATH'} contentKey={entryId}><div data-question-context>
+  return <DictionaryLookup enabled={question?.section?.test?.subject !== 'MATH'} contentKey={entryId}><div data-question-context className="text-foreground">
         {entryOrigin !== 'SYSTEM_QUESTION' ? <p className="text-muted-foreground">No linked question is available for this manual entry.</p> : loading ? <LoadingState label="Loading question…" /> : error ? <div role="alert">Unable to load the question. <Button variant="outline" onClick={() => { setLoading(true); setError(false); setRetry(value => value + 1); }}>Retry</Button></div> : question ? <>
           <QuestionContext entry={entry} question={question} />
           {question.explanation && <section className="mt-5"><h3 className="mb-2 font-medium">Explanation</h3><InteractiveText content={question.explanation} isMath={question.section?.test?.subject === 'MATH'} readOnly inheritTypography /></section>}
@@ -39,7 +39,7 @@ function QuestionContext({ entry, question }: { entry: ErrorEntry; question: Err
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground"><Badge variant="outline">{subject === 'RW' ? 'Reading & Writing' : 'Math'}</Badge><span>{sectionLabel}</span>{question.order ? <><span aria-hidden="true">·</span><span>Question {question.order}</span></> : null}</div>
-      {question.blocks?.length > 0 && <BlockRenderer blocks={question.blocks} subject={subject} readOnly variant="exam" />}
+      {question.blocks?.length > 0 && <BlockRenderer blocks={question.blocks} subject={subject} readOnly variant="exam" appearance="theme" />}
       <div className="exam-content font-medium text-foreground"><InteractiveText content={question.questionText} isMath={subject === 'MATH'} readOnly inheritTypography /></div>
       {question.type === 'MCQ' && question.choices?.length > 0 && (
         <div className="space-y-2" aria-label="Answer choices">

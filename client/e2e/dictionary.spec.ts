@@ -1,4 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { QuestionData } from '../src/types/quiz';
+
+type ReviewQuestion = Pick<QuestionData, 'id' | 'type' | 'blocks' | 'questionText' | 'choices'> & { explanation: string };
 
 const token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.';
 const question = { id: 10, type: 'MCQ', blocks: [{ type: 'text', content: 'The ambivalent researcher considered the evidence.' }], questionText: 'Which conclusion is plausible?', choices: [{ id: 'A', text: 'An ambiguous result' }, { id: 'B', text: 'A clear result' }], explanation: 'The evidence is compelling.' };
@@ -27,19 +30,21 @@ async function selectWord(locator: Locator, word: string, mouseUp = false) {
   if (mouseUp) await locator.dispatchEvent('mouseup');
 }
 
-async function setup(page: Page, options: { mode?: 'PRACTICE' | 'EXAM'; subject?: 'RW' | 'MATH'; failure?: boolean; missing?: boolean; legacyLocked?: boolean } = {}) {
+async function setup(page: Page, options: { mode?: 'PRACTICE' | 'EXAM'; subject?: 'RW' | 'MATH'; failure?: boolean; missing?: boolean; legacyLocked?: boolean; theme?: 'light' | 'dark'; question?: ReviewQuestion } = {}) {
   const lookups: string[] = [];
   const writes: Record<string, unknown>[] = [];
   let failed = false;
   const entry = { id: '00000000-0000-4000-8000-000000000001', version: 1, origin: 'SYSTEM_QUESTION', source: 'Dictionary test', category: 'Information and Ideas', userAnswer: 'A', correctAnswer: 'B', whyWrong: null, whyRight: null, reviewedAt: null, questionId: 10, submissionId: 1, createdAt: '2026-10-07T00:00:00Z', updatedAt: '2026-10-07T00:00:00Z' };
   const mode = options.mode ?? 'PRACTICE';
   const subject = options.subject ?? 'RW';
-  await page.addInitScript(accessToken => {
+  const content = options.question ?? question;
+  await page.addInitScript(({ accessToken, theme }) => {
     localStorage.setItem('token', accessToken);
     localStorage.setItem('userId', '10');
     localStorage.setItem('userRole', 'STUDENT');
     localStorage.setItem('userName', 'Dictionary test');
-  }, token);
+    localStorage.setItem('dashboardTheme', theme);
+  }, { accessToken: token, theme: options.theme ?? 'light' });
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     if (url.pathname.includes('/dictionary/en/')) {
@@ -51,14 +56,14 @@ async function setup(page: Page, options: { mode?: 'PRACTICE' | 'EXAM'; subject?
     if (url.pathname === '/api/auth/refresh') return route.fulfill({ json: { accessToken: token, user: { id: 10, name: 'Dictionary test', role: 'STUDENT' } } });
     if (url.pathname === '/api/results-analytics/submission/1') {
       const summary = { total: 1, correct: 0, incorrect: 1, omitted: 0, activeDurationMs: 30000, timedQuestions: 1, accuracy: 0, timingCoverage: 100 };
-      return route.fulfill({ json: { submissionId: 1, examTitle: 'Dictionary review', subject, mode, solutionsLocked: options.legacyLocked, attemptNo: 1, date: '2026-10-07T00:00:00Z', startedAt: '2026-10-07T00:00:00Z', completedAt: '2026-10-07T00:01:00Z', duration: '1 min', elapsedDurationMs: 60000, activeDurationMs: 30000, summary, modules: [{ ...summary, id: 1, name: 'Module 1', order: 1 }], domains: [], pacing: { activeDurationMs: 30000, averageActiveDurationMs: 30000, timedQuestions: 1, totalQuestions: 1, timingCoverage: 100, slowestQuestion: null }, classificationCoverage: { classified: 0, total: 1, percentage: 0 }, questions: [{ ...question, questionNumber: 1, module: { id: 1, name: 'Module 1', order: 1 }, correctAnswer: 'B', userAnswer: 'A', isCorrect: false, isOmitted: false, domain: null, skill: null, activeDurationMs: 30000, errorLogId: entry.id }] } });
+      return route.fulfill({ json: { submissionId: 1, examTitle: 'Dictionary review', subject, mode, solutionsLocked: options.legacyLocked, attemptNo: 1, date: '2026-10-07T00:00:00Z', startedAt: '2026-10-07T00:00:00Z', completedAt: '2026-10-07T00:01:00Z', duration: '1 min', elapsedDurationMs: 60000, activeDurationMs: 30000, summary, modules: [{ ...summary, id: 1, name: 'Module 1', order: 1 }], domains: [], pacing: { activeDurationMs: 30000, averageActiveDurationMs: 30000, timedQuestions: 1, totalQuestions: 1, timingCoverage: 100, slowestQuestion: null }, classificationCoverage: { classified: 0, total: 1, percentage: 0 }, questions: [{ ...content, questionNumber: 1, module: { id: 1, name: 'Module 1', order: 1 }, correctAnswer: 'B', userAnswer: 'A', isCorrect: false, isOmitted: false, domain: null, skill: null, activeDurationMs: 30000, errorLogId: entry.id }] } });
     }
     if (url.pathname === '/api/test/1/setup') return route.fulfill({ json: { id: 1, title: 'Dictionary practice', subject, questionCount: 2, standardDurationSeconds: 1920, standardModuleDurationSeconds: [1920], defaultMode: mode, canCustomize: false, activeAttempt: { submissionId: 1, attemptMode: mode, timingPreset: 'STANDARD', allowedDurationSeconds: 1920 } } });
-    if (url.pathname === '/api/test/1/start') return route.fulfill({ json: { title: 'Dictionary practice', subject, duration: 32, mode, sections: [{ order: 1, questions: [question, { ...question, id: 11, questionText: 'A different question.' }] }], session: { submissionId: 1, attemptMode: mode, timingPreset: 'STANDARD', moduleDurationSeconds: [1920], currentModule: 1, currentQuestionIndex: 0, timeLeft: 1920, savedAnswers: {} } } });
+    if (url.pathname === '/api/test/1/start') return route.fulfill({ json: { title: 'Dictionary practice', subject, duration: 32, mode, sections: [{ order: 1, questions: [content, { ...content, id: 11, questionText: 'A different question.' }] }], session: { submissionId: 1, attemptMode: mode, timingPreset: 'STANDARD', moduleDurationSeconds: [1920], currentModule: 1, currentQuestionIndex: 0, timeLeft: 1920, savedAnswers: {} } } });
     if (url.pathname === '/api/test/1/begin') return route.fulfill({ json: { serverTime: new Date().toISOString(), moduleExpiresAt: new Date(Date.now() + 1920000).toISOString(), timeLeft: 1920, currentQuestionIndex: 0 } });
     if (url.pathname === '/api/error-logs/facets') return route.fulfill({ json: { all: 1, needsReview: 1, reviewed: 0, categories: ['Information and Ideas'] } });
     if (url.pathname === '/api/error-logs') return route.fulfill({ json: { items: [entry], nextCursor: null } });
-    if (url.pathname.endsWith('/question')) return route.fulfill({ json: { question: { ...question, section: { name: 'Module 1', test: { subject } } } } });
+    if (url.pathname.endsWith('/question')) return route.fulfill({ json: { question: { ...content, section: { name: 'Module 1', test: { subject } } } } });
     if (url.pathname.includes('/api/error-logs/')) {
       if (route.request().method() === 'PATCH') {
         const body = route.request().postDataJSON();
@@ -201,3 +206,86 @@ test('Math question review does not offer word lookup', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Look up', exact: true })).toHaveCount(0);
   expect(lookups).toEqual([]);
 });
+
+// Check the colors the browser actually paints, including translucent panels.
+async function expectReadable(locator: Locator, pseudoElement?: string) {
+  const contrast = await locator.evaluate((element, pseudo) => {
+    const context = document.createElement('canvas').getContext('2d')!;
+    const rgba = (color: string) => {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+      return Array.from(context.getImageData(0, 0, 1, 1).data);
+    };
+    let background = [255, 255, 255];
+    const ancestors: Element[] = [];
+    for (let node: Element | null = element; node; node = node.parentElement) ancestors.unshift(node);
+    for (const node of ancestors) {
+      const color = rgba(getComputedStyle(node).backgroundColor);
+      const alpha = color[3] / 255;
+      background = background.map((value, index) => color[index] * alpha + value * (1 - alpha));
+    }
+    const luminance = (color: number[]) => color.slice(0, 3).map(value => {
+      const channel = value / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+    const foregroundLuminance = luminance(rgba(getComputedStyle(element, pseudo).color));
+    const backgroundLuminance = luminance(background);
+    return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+  }, pseudoElement);
+  expect(contrast, `Text contrast: ${await locator.textContent()}`).toBeGreaterThanOrEqual(4.5);
+}
+
+const themedQuestion = (subject: 'RW' | 'MATH'): ReviewQuestion => {
+  const text = (value: string) => subject === 'MATH' ? `\\text{${value}}` : value;
+  return {
+    ...question,
+    questionText: subject === 'MATH' ? '\\text{Solve } x^2=4.' : 'Which conclusion is plausible?',
+    blocks: [
+      { type: 'text', content: text('The ambivalent researcher considered the evidence.') },
+      { type: 'table', title: text('Observations'), headers: [text('Group'), text('Score')], rows: [[text('Research group'), '42']], note: text('Scores are rounded.') },
+      { type: 'poem', title: text('Morning'), lines: [text('A quiet morning follows.')], author: text('Sample author') },
+      { type: 'note', lines: [text('Research notes:'), text('The researcher recorded a result.')] },
+    ],
+    choices: [{ id: 'A', text: text('An ambiguous result') }, { id: 'B', text: text('A clear result') }],
+    explanation: subject === 'MATH' ? '\\text{The evidence is compelling: } x=2.' : question.explanation,
+  };
+};
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const subject of ['RW', 'MATH'] as const) {
+    for (const view of ['Score Report', 'Error Log'] as const) {
+      test(`${view} ${subject} content stays readable in ${theme} mode`, async ({ page }) => {
+        await page.setViewportSize({ width: 1600, height: 1000 });
+        await setup(page, { theme, subject, question: themedQuestion(subject) });
+        if (view === 'Score Report') {
+          await page.goto('/dashboard/score-report/1');
+          await page.getByRole('button', { name: 'Review question 1', exact: true }).click();
+        } else {
+          await page.goto('/dashboard/error-log');
+          await page.getByRole('button', { name: 'Dictionary test', exact: true }).click();
+        }
+        const context = view === 'Score Report' ? page.getByRole('dialog') : page.locator('[data-question-context]');
+        await expect(context.getByText('Research group', { exact: true })).toBeVisible();
+        for (const text of ['ambivalent researcher', 'Observations', 'Group', 'Research group', 'Scores are rounded', 'A quiet morning', 'Sample author', 'researcher recorded', subject === 'MATH' ? 'Solve' : 'Which conclusion', 'ambiguous result', 'clear result', 'evidence is compelling']) {
+          await expectReadable(context.getByText(text, { exact: false }).last());
+        }
+        if (subject === 'MATH') await expectReadable(context.locator('.katex').last());
+        if (view === 'Error Log') await expectReadable(page.locator('[data-reflection-editor] .ql-editor'), '::before');
+        if (theme === 'dark' && subject === 'RW') await page.screenshot({ path: `../tmp/${view.replaceAll(' ', '-').toLowerCase()}-dark.png` });
+      });
+    }
+  }
+}
+
+for (const subject of ['RW', 'MATH'] as const) {
+  test(`Practice ${subject} retains readable paper colors with a dark dashboard theme`, async ({ page }) => {
+    await setup(page, { theme: 'dark', subject, question: themedQuestion(subject) });
+    await page.goto('/test/1');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await expect(page.getByText('Research group', { exact: true })).toBeVisible();
+    for (const text of ['ambivalent researcher', 'Research group', 'A quiet morning', 'researcher recorded', 'ambiguous result']) {
+      await expectReadable(page.getByText(text, { exact: false }).last());
+    }
+  });
+}

@@ -61,7 +61,7 @@ export function QuestionReviewDialog({
             <span className="text-caption text-muted-foreground">{formatQuestionDuration(data.activeDurationMs)}</span>
           </div>
 
-          {promptBlocks.length > 0 && <BlockRenderer blocks={promptBlocks} subject={examSubject} readOnly variant="exam" />}
+          {promptBlocks.length > 0 && <BlockRenderer blocks={promptBlocks} subject={examSubject} readOnly variant="exam" appearance="theme" />}
           <div className="exam-content font-medium text-foreground">
             <QuestionText text={data.questionText} subject={examSubject} />
           </div>
@@ -77,7 +77,7 @@ export function QuestionReviewDialog({
                 return (
                   <div key={`${choice.id}-${index}`} className={`flex gap-3 rounded-control border p-3 ${correct ? 'border-success/40 bg-success-soft' : selected ? 'border-danger/40 bg-danger-soft' : 'border-ui-border bg-surface'}`}>
                     <span className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-caption font-semibold ${correct ? 'border-success text-success' : selected ? 'border-danger text-danger' : 'border-ui-border text-muted-foreground'}`}>{label}</span>
-                    <div className="min-w-0 flex-1 exam-content">{showText && <QuestionText text={choice.text} subject={examSubject} />}{visuals.length > 0 && <BlockRenderer blocks={visuals} subject={examSubject} readOnly variant="exam" />}</div>
+                    <div className="min-w-0 flex-1 exam-content text-foreground">{showText && <QuestionText text={choice.text} subject={examSubject} />}{visuals.length > 0 && <BlockRenderer blocks={visuals} subject={examSubject} readOnly variant="exam" appearance="theme" />}</div>
                     {correct ? <CheckCircle2 className="size-5 shrink-0 text-success" aria-label="Correct answer" /> : selected ? <XCircle className="size-5 shrink-0 text-danger" aria-label="Your answer" /> : null}
                   </div>
                 );
