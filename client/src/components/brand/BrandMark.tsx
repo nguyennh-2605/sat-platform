@@ -27,7 +27,7 @@ export function BrandMark({ size = 'md', label, className, ...props }: BrandMark
       {...accessibilityProps}
       {...props}
     >
-      <img src={dark ? '/brand/favicon-dark.svg' : '/brand/favicon.svg'} alt="" width="64" height="64" className="size-full" />
+      <img src="/brand/favicon-tab.svg?v=4" alt="" width="64" height="64" className="size-full" style={{ colorScheme: dark ? 'dark' : 'light' }} />
     </span>
   );
 }

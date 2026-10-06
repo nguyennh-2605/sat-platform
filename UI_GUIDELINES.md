@@ -134,6 +134,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - `Input` và `Select`: cao `36px`, focus ring primary; label/helper/error nằm ngoài control và dùng typography chuẩn.
 - `RichTextEditor`: dùng shared Quill wrapper với toolbar tối thiểu theo domain; Announcement MVP chỉ gồm paragraph, bold, italic, ordered/bullet list, link và clear formatting. `RichTextContent` sở hữu sanitizer và style render tường minh cho cùng format; backend vẫn áp dụng content-length limit.
 - `Modal`: dùng `presentation="content-dialog"` trong dashboard; có title, nút đóng, Escape, focus trap và restore focus. Không tự dựng overlay.
+- Mọi popup modal/dialog phải đóng được khi click hoặc tap vào vùng ngoài nội dung (backdrop); shared `Modal` bật hành vi này mặc định. Dùng cùng close handler với nút đóng và Escape để giữ xác nhận thay đổi chưa lưu, không tự bỏ dữ liệu. Click bên trong modal hoặc control con không được đóng modal. Chỉ được tạm chặn đóng trong lúc đang lưu/gửi dữ liệu, không tắt click-outside thường trực.
 - `Tabs`: bắt buộc cho chuyển đổi panel cùng trang; có `tablist/tab/tabpanel`, Arrow keys, Home/End. Link điều hướng sang route khác không phải Tabs.
 - `Collapsible`: dùng cho outline có nhiều section được mở đồng thời; trigger phải có accessible name và controlled state khi page có Expand/Collapse All.
 - `Card`: surface nội dung mặc định. Không biến mọi section thành card nếu hierarchy không cần.
@@ -395,6 +396,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - [ ] Dùng đúng font, màu, radius và spacing trong tài liệu này.
 - [ ] Không thêm hex, arbitrary radius, arbitrary shadow hoặc type size cục bộ khi token hiện có đáp ứng được.
 - [ ] Không tự dựng lại Button/Input/Select/Modal/Tabs/Card/Table/Badge/Toast/EmptyState.
+- [ ] Popup modal/dialog đóng được bằng click/tap bên ngoài; thao tác bên trong không đóng popup và vẫn giữ xác nhận thay đổi chưa lưu.
 - [ ] Không còn primary indigo/purple/SAT green hoặc radius quá lớn ngoài trường hợp có chủ ý trong neutral pass.
 - [ ] Nội dung hiển thị là tiếng Anh.
 - [ ] Không thêm feature hay dữ liệu giả ngoài yêu cầu.

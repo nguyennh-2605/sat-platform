@@ -32,6 +32,7 @@ Before changing code, read the documents relevant to the task:
 - Keep `AppUI.tsx` as a compatibility facade during migration. Do not force unrelated screens to migrate in the same change.
 - Keep page components focused on composition; place complex screen-specific sections in the owning page or feature directory.
 - Every changed screen must handle relevant loading, empty, error, disabled, overflow, mobile, keyboard, and focus states.
+- Every popup modal/dialog must support closing by clicking or tapping outside its content. Route outside dismissal through the same close handler as the close button and Escape so unsaved-change confirmations and in-flight save protections are preserved; do not disable outside dismissal permanently.
 - Exam Room content and Math/LaTeX rules in `UI_GUIDELINES.md` are product constraints and override dashboard reference styling.
 - User-facing interface copy is English.
 

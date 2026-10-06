@@ -234,7 +234,7 @@ interface ModalProps {
   showBackdrop?: boolean;
 }
 
-export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false, children, footer, className, presentation = 'dialog', showBackdrop = true }: ModalProps) {
+export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, children, footer, className, presentation = 'dialog', showBackdrop = true }: ModalProps) {
   const titleId = useId();
   const subtitleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -298,7 +298,7 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = false,
         : isContentDialog
           ? `fixed inset-0 z-200 flex min-h-0 min-w-0 items-center justify-center p-4 ${showBackdrop ? 'bg-(--ui-overlay)' : 'bg-transparent'}`
           : `fixed inset-0 z-200 flex items-center justify-center p-4 ${showBackdrop ? 'bg-(--ui-overlay)' : 'bg-transparent'}`}
-      onMouseDown={event => { if (!isContentPanel && closeOnBackdrop && event.target === event.currentTarget) onClose(); }}
+      onPointerDown={event => { if (!isContentPanel && closeOnBackdrop && event.target === event.currentTarget) onClose(); }}
     >
       <div
         ref={dialogRef}
