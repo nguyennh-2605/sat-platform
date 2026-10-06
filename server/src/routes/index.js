@@ -25,6 +25,7 @@ const studySessionRoutes = require('./study-session.routes');
 const accountRoutes = require('./account.routes');
 const questionBankRoutes = require('./question-bank.routes');
 const roadmapRoutes = require('./roadmap.routes');
+const dictionaryRoutes = require('./dictionary.routes');
 
 // Mount routes
 router.use('/classes', classRoutes);
@@ -50,5 +51,6 @@ router.use('/study-sessions', studySessionRoutes);
 router.use('/account', accountRoutes);
 router.use('/question-bank', questionBankRoutes);
 router.use('/roadmaps', roadmapRoutes);
+router.use('/dictionary', dictionaryRoutes);
 
 module.exports = router;

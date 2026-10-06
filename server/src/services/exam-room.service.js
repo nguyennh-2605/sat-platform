@@ -2,7 +2,6 @@ const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
 const { sendNotificationToUser } = require('./notification.service');
 const { gradeQuestions } = require('../utils/grading');
-const { SOLUTION_DELIVERY_SELECT, isSubmissionSolutionLocked } = require('../utils/solution-access');
 const testDeliveryService = require('./test-delivery.service');
 const errorLogService = require('./error-log.service');
 const { normalizeQuestionTimingSnapshot, timingRowsFromSnapshot } = require('../utils/question-timing');
@@ -816,28 +815,15 @@ exports.submitTest = async ({ userId, submissionId, answers, violationCount, tes
     }
   }
 
-  let solutionsLocked = false;
-  let solutionAvailableAt = null;
-  if (submission.deliveryId) {
-    const delivery = await prisma.testDelivery.findUnique({
-      where: { id: submission.deliveryId },
-      select: SOLUTION_DELIVERY_SELECT,
-    });
-    solutionsLocked = isSubmissionSolutionLocked({ ...transactionResult.submission, delivery });
-    solutionAvailableAt = solutionsLocked ? delivery?.dueAt || null : null;
-  }
-
   return {
     score: correctCount,
     total: totalQuestions,
     totalQuestions,
     submissionId: transactionResult.submission.id,
     submittedAt: transactionResult.submission.endTime,
-    solutionsLocked,
-    solutionAvailableAt,
-    details: solutionsLocked
-      ? responseDetails.map(detail => ({ ...detail, correctOption: null, isCorrect: null }))
-      : responseDetails,
+    solutionsLocked: false,
+    solutionAvailableAt: null,
+    details: responseDetails,
     message: "Nộp bài và lưu kết quả thành công"
   };
 };

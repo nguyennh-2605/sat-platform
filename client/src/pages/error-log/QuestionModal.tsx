@@ -3,15 +3,15 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import { LoadingState } from '@/components/ui/loading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Modal } from '@/components/ui/AppUI';
 import BlockRenderer from '../../components/content/BlockRenderer';
 import InteractiveText from '../../features/quiz/InteractiveText';
+import { DictionaryLookup } from '../../features/dictionary/DictionaryLookup';
 import axiosClient from '../../lib/axios';
 import type { ErrorEntry, ErrorQuestion } from './types';
 
-export function QuestionModal({ entry, onClose }: { entry: ErrorEntry | null; onClose: () => void }) {
-  const entryId = entry?.id;
-  const entryOrigin = entry?.origin ?? (entry?.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
+export function QuestionPanel({ entry }: { entry: ErrorEntry }) {
+  const entryId = entry.id;
+  const entryOrigin = entry.origin ?? (entry.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
   const [question, setQuestion] = useState<ErrorQuestion | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -25,22 +25,19 @@ export function QuestionModal({ entry, onClose }: { entry: ErrorEntry | null; on
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [entryId, entryOrigin, retry]);
-  return <Modal open={Boolean(entry)} onClose={onClose} presentation="content-dialog" title="Question context" subtitle={entry?.source || undefined} className="h-[calc(100vh-2rem)] max-w-5xl!">
-      <div className="h-full min-h-0 overflow-y-auto">
-        {!entry || entryOrigin !== 'SYSTEM_QUESTION' ? <p className="text-muted-foreground">No linked question is available for this manual entry.</p> : loading ? <LoadingState label="Loading question…" /> : error ? <div role="alert">Unable to load the question. <Button variant="outline" onClick={() => { setLoading(true); setError(false); setRetry(value => value + 1); }}>Retry</Button></div> : question ? <>
-          {entry.solutionLocked && <p className="mb-4 rounded-control border border-warning/30 bg-warning-soft p-3 text-body text-foreground">The correct answer and explanation are locked while the assigned quiz is open.</p>}
+  return <DictionaryLookup enabled={question?.section?.test?.subject !== 'MATH'} contentKey={entryId}><div data-question-context>
+        {entryOrigin !== 'SYSTEM_QUESTION' ? <p className="text-muted-foreground">No linked question is available for this manual entry.</p> : loading ? <LoadingState label="Loading question…" /> : error ? <div role="alert">Unable to load the question. <Button variant="outline" onClick={() => { setLoading(true); setError(false); setRetry(value => value + 1); }}>Retry</Button></div> : question ? <>
           <QuestionContext entry={entry} question={question} />
           {question.explanation && <section className="mt-5"><h3 className="mb-2 font-medium">Explanation</h3><InteractiveText content={question.explanation} isMath={question.section?.test?.subject === 'MATH'} readOnly inheritTypography /></section>}
         </> : <p className="text-muted-foreground">The original question is no longer available.</p>}
-      </div>
-  </Modal>;
+      </div></DictionaryLookup>;
 }
 
 function QuestionContext({ entry, question }: { entry: ErrorEntry; question: ErrorQuestion }) {
   const subject = question.section?.test?.subject === 'MATH' ? 'MATH' : 'RW';
   const sectionLabel = question.section?.name || (question.section?.order ? `Module ${question.section.order}` : 'Question snapshot');
   return (
-    <div className="space-y-5 rounded-card border border-ui-border bg-surface p-4 sm:p-5">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground"><Badge variant="outline">{subject === 'RW' ? 'Reading & Writing' : 'Math'}</Badge><span>{sectionLabel}</span>{question.order ? <><span aria-hidden="true">·</span><span>Question {question.order}</span></> : null}</div>
       {question.blocks?.length > 0 && <BlockRenderer blocks={question.blocks} subject={subject} readOnly variant="exam" />}
       <div className="exam-content font-medium text-foreground"><InteractiveText content={question.questionText} isMath={subject === 'MATH'} readOnly inheritTypography /></div>

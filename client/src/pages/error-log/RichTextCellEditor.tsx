@@ -31,8 +31,8 @@ export function RichTextCellEditor({ entryId, field, label, persistedValue, acti
 
   return <div
     className={cn(
-      'relative min-h-16 rounded-control px-2 py-2 transition-colors hover:bg-muted/20',
-      active && 'z-10 bg-background ring-2 ring-ring ring-inset',
+      'relative min-h-16 px-2 py-2 transition-colors hover:bg-muted/20',
+      active && 'bg-background',
       draft?.status === 'error' && !active && 'ring-1 ring-danger/60 ring-inset',
     )}
   >

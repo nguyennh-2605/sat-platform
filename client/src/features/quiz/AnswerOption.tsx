@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useContext } from 'react';
+import { DictionaryContext } from '../dictionary/dictionary-context';
 import InteractiveText from './InteractiveText';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
 import BlockRenderer from '../../components/content/BlockRenderer';
@@ -23,13 +24,19 @@ const AnswerOption: React.FC<AnswerProps> = ({
 
   // Logic: Hiển thị cột bên phải khi đang bật chế độ Strike HOẶC đáp án này đã bị gạch (để hiện nút Undo)
   const showActionColumn = isStrikeMode || isEliminated;
+  const dictionary = useContext(DictionaryContext);
 
   return (
     <div className="flex items-start gap-4 w-full group">
       <button
       type="button"
       disabled={isEliminated}
-      onClick={onSelect}
+      onClick={event => {
+        const selection = window.getSelection();
+        // Selecting choice text to look it up must not change the student's answer.
+        if (dictionary && selection && !selection.isCollapsed && event.currentTarget.contains(selection.anchorNode)) return;
+        onSelect();
+      }}
       aria-pressed={isSelected}
       className={`
         relative flex-1 flex items-start gap-5 overflow-hidden rounded-xl border bg-white p-2 text-left

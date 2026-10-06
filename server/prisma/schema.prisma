@@ -8,6 +8,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Dictionary data is shared across users, separate from personal Vocabulary progress.
+model DictionaryCache {
+  language  String   @default("en") @db.VarChar(8)
+  word      String   @db.VarChar(64)
+  found     Boolean
+  payload   Json
+  fetchedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@id([language, word])
+  @@index([expiresAt])
+}
+
 model User {
   id                         Int                           @id @default(autoincrement())
   email                      String                        @unique

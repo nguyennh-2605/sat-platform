@@ -50,7 +50,7 @@ export function ExpandableReflectionPreview({ dataKey, html, label, active, expa
         tabIndex={0}
         aria-label={`${label}. ${html ? 'Press Enter to edit.' : 'Add reflection.'}`}
         aria-pressed={active}
-        className="cursor-text rounded-control outline-none focus-visible:ring-1 focus-visible:ring-ring/60"
+        className="cursor-text outline-none focus-visible:ring-2 focus-visible:ring-foreground/70 focus-visible:ring-inset"
         onClick={event => {
           if (!(event.target as HTMLElement).closest('a, button')) onActivate();
         }}

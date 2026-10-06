@@ -17,12 +17,10 @@ import { appToast } from '@/components/ui/toast';
 import axiosClient from '../../lib/axios';
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { useDebounce } from '../../hooks/useDebounce';
-import { useIsMobile } from '../../hooks/use-mobile';
 import { ErrorLogDesktopRow, ErrorLogMobileCard, type ActivePreviewSnapshot, type ErrorLogRowActions } from './ErrorLogRows';
 import { ErrorLogToolbar, type ErrorLogFacets } from './ErrorLogToolbar';
 import { ExpandedReflectionEditor, type ActiveReflection } from './ExpandedReflectionEditor';
 import { GoogleSheetsExportButton } from './GoogleSheetsExportButton';
-import { QuestionModal } from './QuestionModal';
 import { cellKey, useReflectionDrafts, type EditableField } from './useReflectionDrafts';
 import { usePreviewExpansionStore } from './usePreviewExpansionStore';
 import { type ErrorEntry, type ReviewStatus } from './types';
@@ -37,7 +35,9 @@ const statusPreferenceKey = 'error-log-review-status';
 const errorLogIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const tableComponents: TableComponents<ErrorEntry> = {
   Table: props => <Table {...props} unwrapped className="w-full table-fixed border-separate border-spacing-0" />,
-  TableHead: TableHeader,
+  // Retain Virtuoso's header measurements while allowing the header to scroll
+  // naturally with the page instead of pinning it above the rows.
+  TableHead: ({ style, ...props }) => <TableHeader {...props} style={{ ...style, position: 'static' }} />,
   TableBody,
   TableRow: props => <TableRow {...props} className="[&>td]:border-b [&>td]:border-ui-border/60" />,
 };
@@ -58,8 +58,9 @@ const sameFormats = (left: RichTextFormats, right: RichTextFormats) => left.bold
 export default function ErrorLog() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedEntryId = searchParams.get('entry');
-  const isMobile = useIsMobile();
   const [compactLayout, setCompactLayout] = useState(false);
+  const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
+  const [editorContainer, setEditorContainer] = useState<HTMLElement | null>(null);
   const [logs, setLogs] = useState<ErrorEntry[]>([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ReviewStatus>(() => requestedEntryId ? 'ALL' : initialStatus(searchParams.get('status')));
@@ -71,7 +72,7 @@ export default function ErrorLog() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
-  const [questionEntry, setQuestionEntry] = useState<ErrorEntry | null>(null);
+  const [showQuestion, setShowQuestion] = useState(false);
   const [manualEntry, setManualEntry] = useState<ErrorEntry | 'new' | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ErrorEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -122,12 +123,17 @@ export default function ErrorLog() {
   useLayoutEffect(() => {
     const surface = dataSurface.current;
     if (!surface) return;
+    setEditorContainer(surface.closest<HTMLElement>('#dashboard-content'));
     const update = (width: number) => setCompactLayout(width < 900);
     update(surface.getBoundingClientRect().width);
     const observer = new ResizeObserver(entries => update(entries[0]?.contentRect.width ?? surface.getBoundingClientRect().width));
     observer.observe(surface);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    scrollParent?.scrollTo({ top: 0 });
+  }, [filterKey, scrollParent]);
 
   const load = useCallback((cursor: string | null, replace = false): Promise<ErrorPage | null> => {
     if (loadPromise.current && !replace) return loadPromise.current;
@@ -220,12 +226,14 @@ export default function ErrorLog() {
   }, [loading, requestedEntryId, scrollToRow]);
 
   const activate = useCallback((key: string, previewValue: string) => {
+    if (active === key) return;
     if (active && active !== key) {
       const [id, field] = active.split(':');
       flush(id, field as EditableField);
     }
     setActivePreview({ key, value: previewValue });
     setActiveFormats(EMPTY_FORMATS);
+    setLinkRequest(0);
     setActive(key);
     activeKeyRef.current = key;
     const [entryId] = key.split(':');
@@ -242,6 +250,8 @@ export default function ErrorLog() {
     setActive(null);
     setActivePreview(null);
     setActiveFormats(EMPTY_FORMATS);
+    setShowQuestion(false);
+    setLinkRequest(0);
     activeKeyRef.current = null;
     if (!restoreFocus || !closingKey) return;
     const [entryId] = closingKey.split(':');
@@ -279,6 +289,7 @@ export default function ErrorLog() {
         ?? targetEntry?.[targetField as EditableField]
         ?? '';
       setActiveFormats(EMPTY_FORMATS);
+      setLinkRequest(0);
       setActivePreview({ key: target, value: previewValue });
       setActive(target);
       activeKeyRef.current = target;
@@ -332,13 +343,17 @@ export default function ErrorLog() {
   const openSource = useCallback((entry: ErrorEntry) => {
     const origin = entry.origin ?? (entry.questionId ? 'SYSTEM_QUESTION' : 'MANUAL');
     if (origin === 'SYSTEM_QUESTION') {
-      setQuestionEntry(entry);
+      if (!active?.startsWith(`${entry.id}:`)) {
+        const key = cellKey(entry.id, 'whyWrong');
+        activate(key, draftStore.getDraft(key)?.value ?? entry.whyWrong ?? '');
+      }
+      setShowQuestion(true);
       return;
     }
     if (entry.sourceUrl) {
       window.open(entry.sourceUrl, '_blank', 'noopener,noreferrer');
     }
-  }, []);
+  }, [active, activate, draftStore]);
 
   const rowActions = useMemo<ErrorLogRowActions>(() => ({
     activate,
@@ -382,29 +397,25 @@ export default function ErrorLog() {
     <TableHead className="w-[4%] px-1"><span className="sr-only">Actions</span></TableHead>
   </TableRow>;
 
-  return <main className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-6">
+  return <main ref={setScrollParent} data-error-log-scroll className="h-full overflow-y-auto">
+    <div className="flex min-h-full flex-col gap-4 p-4 md:p-6">
     <PageHeader title="Error Log" description="Reflect on mistakes and explain the reasoning that leads to the correct answer." actions={<div className="flex flex-wrap items-center justify-end gap-2"><GoogleSheetsExportButton draftStore={draftStore} /><Button onClick={() => setManualEntry('new')}><Plus />Add entry</Button></div>} />
-    <DataSurface ref={dataSurface} className="relative flex min-h-0 flex-1 flex-col">
+    <DataSurface ref={dataSurface} className="relative shrink-0">
       <ErrorLogToolbar
         search={search}
         status={status}
         category={category}
         facets={facets}
         facetsLoaded={facetsLoaded}
-        active={Boolean(active)}
-        formats={activeFormats}
-        editor={activeEditor}
-        draftStore={draftStore}
-        linkRequest={linkRequest}
         onSearchChange={value => { deactivate(); setSearch(value); }}
         onStatusChange={changeStatus}
         onCategoryChange={value => { deactivate(); setCategory(value); }}
         onReset={clearFilters}
       />
-      <div className="relative flex min-h-0 flex-1 flex-col">{logs.length ? compactLayout ? <Virtuoso
+      <div>{logs.length ? compactLayout ? <Virtuoso
         ref={mobileRef}
         key={filterKey}
-        className="min-h-0 flex-1"
+        customScrollParent={scrollParent ?? undefined}
         data={logs}
         computeItemKey={(_index, entry) => entry.id}
         increaseViewportBy={300}
@@ -413,7 +424,7 @@ export default function ErrorLog() {
       /> : <TableVirtuoso
         ref={tableRef}
         key={filterKey}
-        className="min-h-0 flex-1"
+        customScrollParent={scrollParent ?? undefined}
         data={logs}
         components={tableComponents}
         computeItemKey={(_index, entry) => entry.id}
@@ -424,11 +435,15 @@ export default function ErrorLog() {
       /> : loading ? <LoadingRows mobile={compactLayout} headers={headers} /> : <div className="flex flex-1 items-center justify-center p-6">{error
         ? <div className="space-y-3 text-center" role="alert"><p>Unable to load your error log.</p><Button variant="outline" onClick={() => void load(null, true)}>Retry</Button></div>
         : <EmptyState icon={<CircleDashed />} title={hasFilters ? 'No matching entries' : 'No mistakes to review'} description={hasFilters ? 'Adjust your search or filters.' : 'Wrong answers from submitted tests appear here automatically.'} action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Clear filters</Button> : undefined} />}</div>}
-      {logs.length > 0 && loading && <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ui-border bg-surface px-3 py-1.5 text-xs text-muted-foreground shadow-sm" role="status"><LoadingSpinner size="xs" />Loading more…</div>}
-      {logs.length > 0 && error && <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-control border border-danger/30 bg-surface px-3 py-1.5 text-xs text-danger shadow-sm" role="alert"><span>More entries could not be loaded.</span><Button variant="ghost" size="sm" onClick={() => void load(nextCursor)}>Retry</Button></div>}</div>
+      {logs.length > 0 && loading && <div className="flex items-center justify-center gap-2 border-t border-ui-border px-3 py-2 text-xs text-muted-foreground" role="status"><LoadingSpinner size="xs" />Loading more…</div>}
+      {logs.length > 0 && error && <div className="flex flex-wrap items-center justify-center gap-2 border-t border-ui-border px-3 py-2 text-xs text-danger" role="alert"><span>More entries could not be loaded.</span><Button variant="ghost" size="sm" onClick={() => void load(nextCursor)}>Retry</Button></div>}</div>
       {activeReflection && <ExpandedReflectionEditor
         active={activeReflection}
-        isMobile={isMobile}
+        compactLayout={compactLayout}
+        portalContainer={editorContainer}
+        showQuestion={showQuestion}
+        formats={activeFormats}
+        linkRequest={linkRequest}
         navigationPending={navigationPending}
         draftStore={draftStore}
         editorRef={activeEditor}
@@ -436,12 +451,17 @@ export default function ErrorLog() {
         onFlush={() => flush(activeReflection.entry.id, activeReflection.field)}
         onClose={deactivate}
         onNavigate={navigate}
+        onSelectField={field => {
+          const key = cellKey(activeReflection.entry.id, field);
+          activate(key, draftStore.getDraft(key)?.value ?? activeReflection.entry[field] ?? '');
+        }}
+        onQuestionToggle={() => setShowQuestion(value => !value)}
         onResolveConflict={resolution => resolveConflict(activeReflection.entry.id, activeReflection.field, resolution)}
         onFormatChange={formatChange}
         onFormatCommand={command}
       />}
     </DataSurface>
-    <QuestionModal key={questionEntry?.id || 'closed'} entry={questionEntry} onClose={() => setQuestionEntry(null)} />
+    </div>
     {manualEntry && <ManualEntryDialog entry={manualEntry} onClose={() => setManualEntry(null)} onSaved={() => { setManualEntry(null); setReload(value => value + 1); }} />}
     <Modal open={Boolean(deleteTarget)} onClose={() => { if (!deleting) setDeleteTarget(null); }} presentation="content-dialog" title="Delete error entry?" className="max-w-md!" footer={<><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={() => void deleteEntry()}>Delete entry</Button></>}><p>This permanently removes this study note.</p></Modal>
   </main>;

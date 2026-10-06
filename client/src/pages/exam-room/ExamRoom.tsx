@@ -12,6 +12,7 @@ import BlockRenderer from '../../components/content/BlockRenderer';
 import { isChoiceVisualPlaceholder, splitChoiceVisuals } from '../../components/content/choiceVisuals';
 import ToolsHeader from '../../components/ui/ToolsHeader';
 import InteractiveText from '../../features/quiz/InteractiveText';
+import { DictionaryLookup } from '../../features/dictionary/DictionaryLookup';
 import ReviewScreen from '../../features/quiz/ReviewModule';
 import type { QuestionData } from '../../types/quiz';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
@@ -1050,6 +1051,7 @@ function ExamRoom() {
   };
 
   return (
+    <DictionaryLookup enabled={testMode === 'PRACTICE' && TestInfo.subject === 'RW' && phase !== 'REVIEW_1' && phase !== 'REVIEW_2'} contentKey={currentQ.id}>
     <div className="flex flex-col h-screen bg-gray-50 font-sans relative overflow-hidden">
       {/* COMPONENT LOADING */}
       {isTransitioning && (
@@ -1532,6 +1534,7 @@ function ExamRoom() {
       />
     )}
     </div>
+    </DictionaryLookup>
   );
 }
 

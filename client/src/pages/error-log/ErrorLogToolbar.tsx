@@ -4,7 +4,7 @@ import { LoadingSpinner } from '@/components/ui/loading';
 
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
-import { DataToolbar, DataToolbarActions, DataToolbarGroup, DataToolbarSearch } from '@/components/ui/data-surface';
+import { DataToolbar, DataToolbarGroup, DataToolbarSearch } from '@/components/ui/data-surface';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import type { RichTextEditorHandle, RichTextFormats } from '@/components/ui/rich-text-editor';
@@ -25,11 +25,6 @@ interface ErrorLogToolbarProps {
   category: string;
   facets: ErrorLogFacets;
   facetsLoaded: boolean;
-  active: boolean;
-  formats: RichTextFormats;
-  editor: RefObject<RichTextEditorHandle | null>;
-  draftStore: ReflectionDraftStore;
-  linkRequest: number;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: ReviewStatus) => void;
   onCategoryChange: (value: string) => void;
@@ -38,11 +33,11 @@ interface ErrorLogToolbarProps {
 
 const allCategories: ComboboxOption = { value: '', label: 'All categories' };
 
-export function ErrorLogToolbar({ search, status, category, facets, facetsLoaded, active, formats, editor, draftStore, linkRequest, onSearchChange, onStatusChange, onCategoryChange, onReset }: ErrorLogToolbarProps) {
+export function ErrorLogToolbar({ search, status, category, facets, facetsLoaded, onSearchChange, onStatusChange, onCategoryChange, onReset }: ErrorLogToolbarProps) {
   const categoryOptions = useMemo(() => facets.categories.map(value => ({ value, label: value })), [facets.categories]);
   const hasFilters = Boolean(search || category || status !== 'ALL');
 
-  return <DataToolbar data-error-log-toolbar className="sticky top-0 z-20 bg-surface lg:flex-col lg:items-stretch 2xl:flex-row 2xl:items-center">
+  return <DataToolbar data-error-log-toolbar className="bg-surface lg:flex-col lg:items-stretch 2xl:flex-row 2xl:items-center">
     <DataToolbarGroup className="flex-1">
       <DataToolbarSearch label="Search error log" placeholder="Search errors…" value={search} onChange={event => onSearchChange(event.target.value)} />
       <div role="group" aria-label="Review status" className="flex items-center gap-1 rounded-control border border-ui-border bg-background p-0.5">
@@ -62,10 +57,6 @@ export function ErrorLogToolbar({ search, status, category, facets, facetsLoaded
       />
       {hasFilters && <Button variant="ghost" size="sm" onClick={onReset}>Reset</Button>}
     </DataToolbarGroup>
-    <DataToolbarActions className="min-w-0 lg:ml-0 2xl:ml-auto">
-      <FormattingControls editor={editor} active={active} formats={formats} linkRequest={linkRequest} />
-      <DraftSaveIndicator store={draftStore} />
-    </DataToolbarActions>
   </DataToolbar>;
 }
 
@@ -75,7 +66,7 @@ function StatusButton({ label, count, selected, onClick }: { label: string; coun
   </Button>;
 }
 
-function FormattingControls({ editor, active, formats, linkRequest }: { editor: RefObject<RichTextEditorHandle | null>; active: boolean; formats: RichTextFormats; linkRequest: number }) {
+export function FormattingControls({ editor, active, formats, linkRequest, actions }: { editor: RefObject<RichTextEditorHandle | null>; active: boolean; formats: RichTextFormats; linkRequest: number; actions?: ReactNode }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState('');
   const [linkError, setLinkError] = useState('');
@@ -129,7 +120,9 @@ function FormattingControls({ editor, active, formats, linkRequest }: { editor: 
   };
 
   return <TooltipProvider>
-    <div data-reflection-toolbar role="toolbar" aria-label="Reflection formatting" className="flex min-w-0 flex-wrap items-center gap-1">
+    <div data-reflection-toolbar className="min-w-0">
+      <div className="flex min-w-0 items-center gap-2">
+        <div role="toolbar" aria-label="Reflection formatting" className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
       <FormatButton label="Bold" shortcut="Ctrl/Cmd+B" active={formats.bold} disabled={!active} onPress={() => editor.current?.toggleInline('bold')}><Bold /></FormatButton>
       <FormatButton label="Italic" shortcut="Ctrl/Cmd+I" active={formats.italic} disabled={!active} onPress={() => editor.current?.toggleInline('italic')}><Italic /></FormatButton>
       <FormatButton label="Underline" shortcut="Ctrl/Cmd+U" active={formats.underline} disabled={!active} onPress={() => editor.current?.toggleInline('underline')}><Underline /></FormatButton>
@@ -138,7 +131,10 @@ function FormattingControls({ editor, active, formats, linkRequest }: { editor: 
       <FormatButton label="Bulleted list" shortcut="Ctrl/Cmd+Shift+8" active={formats.list === 'bullet'} disabled={!active} onPress={() => editor.current?.toggleList('bullet')}><List /></FormatButton>
       <FormatButton label="Add or edit link" shortcut="Ctrl/Cmd+K" active={Boolean(formats.link)} disabled={!active} onPress={() => openLink(true)}><Link2 /></FormatButton>
       <FormatButton label="Clear formatting" disabled={!active} onPress={() => editor.current?.clearFormatting()}><RemoveFormatting /></FormatButton>
-      {linkOpen && <div role="group" aria-label="Edit reflection link" className="flex w-full min-w-0 flex-wrap items-start gap-2 border-t border-ui-border pt-2 sm:w-auto sm:flex-nowrap sm:border-l sm:border-t-0 sm:pl-2 sm:pt-0">
+        </div>
+        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      </div>
+      {linkOpen && <div role="group" aria-label="Edit reflection link" className="flex w-full min-w-0 flex-wrap items-start gap-2 border-t border-ui-border pt-2">
         <Field className="min-w-32 flex-1 sm:w-64 sm:flex-none">
           <FieldLabel htmlFor="reflection-link" className="sr-only">Link</FieldLabel>
           <Input ref={linkInput} id="reflection-link" type="url" value={linkValue} onChange={event => setLinkValue(event.target.value)} onKeyDown={event => {
@@ -168,10 +164,10 @@ function Shortcut({ children }: { children: ReactNode }) {
   return <span className="rounded-sm bg-background/15 px-1 py-0.5 font-mono text-xs">{children}</span>;
 }
 
-function DraftSaveIndicator({ store }: { store: ReflectionDraftStore }) {
+export function DraftSaveIndicator({ store }: { store: ReflectionDraftStore }) {
   const summary = useDraftSummary(store);
 
-  return <div className="hidden w-20 shrink-0 justify-end text-xs text-muted-foreground sm:flex" aria-live="polite">
+  return <div className="flex shrink-0 justify-end text-xs text-muted-foreground" aria-live="polite">
     {summary.status === 'saving' ? <span className="flex items-center gap-1"><LoadingSpinner size="xs" />Saving…</span>
       : summary.status === 'error' ? <span className="text-danger">Save issue</span>
         : summary.status === 'saved' ? <span className="flex items-center gap-1"><Check className="size-3 text-success" aria-hidden="true" />Saved</span>

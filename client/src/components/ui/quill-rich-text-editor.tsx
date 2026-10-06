@@ -27,7 +27,7 @@ const getInlineFormatShortcut = (event: { altKey: boolean; code: string; ctrlKey
   return null;
 };
 
-const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function QuillRichTextEditor({ id, labelledBy, value, onChange, placeholder, disabled = false, className, compact = false, expanded = false, autoFocus = false, hideToolbar = false, onFormatChange, onShortcut }, forwardedRef) {
+const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function QuillRichTextEditor({ id, labelledBy, value, onChange, placeholder, disabled = false, className, compact = false, expanded = false, fill = false, autoFocus = false, hideToolbar = false, onFormatChange, onShortcut }, forwardedRef) {
   const rootRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<ReactQuill>(null);
   const lastSelection = useRef<{ index: number; length: number } | null>(null);
@@ -95,7 +95,7 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
         });
       });
     },
-    focus() { quillRef.current?.getEditor().focus(); },
+    focus() { withEditor(() => {}); },
   }));
 
   useEffect(() => () => {
@@ -104,7 +104,9 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
   }, []);
 
   useEffect(() => {
-    if (autoFocus) rootRef.current?.querySelector<HTMLElement>('.ql-editor')?.focus();
+    const selection = window.getSelection();
+    // Lazy loading must not steal a word selection the student already made in the question pane.
+    if (autoFocus && (!selection || selection.isCollapsed || rootRef.current?.contains(selection.anchorNode))) rootRef.current?.querySelector<HTMLElement>('.ql-editor')?.focus();
   }, [autoFocus]);
 
   useEffect(() => {
@@ -123,8 +125,11 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
       '[&_.ql-container.ql-snow]:border-0 [&_.ql-editor]:min-h-40 [&_.ql-editor]:font-sans [&_.ql-editor]:text-sm [&_.ql-editor]:leading-6 [&_.ql-editor]:text-foreground',
       '[&_.ql-editor.ql-blank:before]:text-muted-foreground [&_.ql-editor.ql-blank:before]:not-italic [&_.ql-stroke]:stroke-muted-foreground [&_.ql-fill]:fill-muted-foreground',
       disabled && 'pointer-events-none opacity-60',
-      compact && '[&_.ql-editor]:min-h-24 [&_.ql-editor]:max-h-60 [&_.ql-editor]:overflow-y-auto [&_.ql-toolbar]:p-1',
-      expanded && '[&_.ql-editor]:min-h-72 [&_.ql-editor]:max-h-96 [&_.ql-editor]:overflow-y-auto',
+      compact && !fill && '[&_.ql-editor]:min-h-24 [&_.ql-editor]:max-h-60 [&_.ql-editor]:overflow-y-auto [&_.ql-toolbar]:p-1',
+      expanded && !fill && '[&_.ql-editor]:min-h-72 [&_.ql-editor]:max-h-96 [&_.ql-editor]:overflow-y-auto',
+      // Override the legacy fixed container height and Quill's unlayered
+      // theme border only when the editor fills its owning surface.
+      fill && 'flex min-h-0 flex-1 flex-col [&_.ql-container.ql-snow]:flex [&_.ql-container.ql-snow]:h-auto! [&_.ql-container.ql-snow]:border-0! [&_.ql-container.ql-snow]:min-h-0 [&_.ql-container.ql-snow]:flex-1 [&_.ql-container.ql-snow]:flex-col [&_.ql-editor]:h-auto [&_.ql-editor]:min-h-0 [&_.ql-editor]:flex-1 [&_.ql-editor]:overflow-y-auto',
       className,
     )}
     onKeyDownCapture={event => {
@@ -170,6 +175,7 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
   >
     <ReactQuill
       ref={quillRef}
+      className={fill ? 'flex min-h-0 flex-1 flex-col' : undefined}
       id={id}
       theme="snow"
       value={value}

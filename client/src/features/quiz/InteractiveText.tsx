@@ -1,10 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import parse from 'html-react-parser';
 import { useQuizTool } from '../../context/quiz-tool-context';
 import toast from 'react-hot-toast';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
 import ReadingText from '../../components/content/ReadingText';
 import { readingTextToHtml } from '../../components/content/readingTextFormat';
+import { DictionaryContext } from '../dictionary/dictionary-context';
+import { Button } from '@/components/ui/button';
+import { Search } from 'lucide-react';
 
 interface Props {
   content: string;
@@ -40,6 +43,7 @@ const readAnnotation = (content: string, key?: string) => {
 
 const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, readOnly = false, inheritTypography = false, annotationKey }) => {
   const { isHighlightMode } = useQuizTool();
+  const dictionary = useContext(DictionaryContext);
   const contentRef = useRef<HTMLDivElement>(null);
   const initialAnnotation = readAnnotation(content, annotationKey);
 
@@ -259,7 +263,7 @@ const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, read
   
   if (readOnly) {
     return (
-      <div className={`whitespace-pre-wrap text-gray-800 ${inheritTypography ? '' : 'text-[16px] leading-relaxed'}`}>
+      <div data-dictionary-text className={`whitespace-pre-wrap select-text text-gray-800 ${inheritTypography ? '' : 'text-[16px] leading-relaxed'}`}>
         <ReadingText content={content} />
       </div>
     );
@@ -273,6 +277,8 @@ const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, read
       <div 
         key={renderKey}
         ref={contentRef}
+        data-dictionary-text
+        data-dictionary-annotations="true"
         onMouseUp={handleMouseUp}
         onClick={handleContainerClick}
         className={`${inheritTypography ? '' : 'text-[16px] leading-relaxed'} whitespace-pre-wrap select-text text-gray-800 ${cursorClass}`}
@@ -287,6 +293,7 @@ const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, read
           style={{ top: toolbar.y, left: toolbar.x }}
           onMouseDown={(e) => e.preventDefault()} // Ngăn mất focus làm mất selection
         >
+          {dictionary?.selectedWord && <Button variant="ghost" size="sm" onClick={() => { dictionary.lookUp(); setToolbar(null); }}><Search aria-hidden="true" />Look up</Button>}
           {/* Nút Vàng */}
           <button 
             onClick={() => applyFormat('highlight', 'bg-[rgba(253,224,71,0.6)]')} // Vàng

@@ -87,10 +87,9 @@ const activeLockedQuestionIds = async ({ userId, questionIds, db = prisma }) => 
               status: 'PUBLISHED',
               OR: [{ dueAt: null }, { dueAt: { gt: now } }],
               assignees: { some: { studentId: Number(userId), excusedAt: null } },
-              // A completed Quiz no longer withholds solutions for this student.
+              // A completed delivery no longer withholds solutions for this student.
               // Other open deliveries containing the same question still do.
               NOT: {
-                activity: { is: { activity: { type: 'QUIZ' } } },
                 submissions: { some: { userId: Number(userId), status: 'COMPLETED' } },
               },
             },
@@ -530,13 +529,14 @@ exports.answerRoadmapQuestion = async ({ userId, milestoneId, questionId, select
     update: { ...(completed ? { completedAt: new Date() } : {}) },
     create: { userId: Number(userId), milestoneId: milestone.id, ...(completed ? { completedAt: new Date() } : {}) },
   });
-  const locked = await activeLockedQuestionIds({ userId, questionIds: [question.id], db: tx });
   return {
     questionId: question.id,
     answeredCount: distinctAnswered.length,
     completed,
-    solutionLocked: locked.has(question.id),
-    ...(!locked.has(question.id) ? { isCorrect, correctAnswer: version.correctAnswer, explanation: version.explanation } : {}),
+    solutionLocked: false,
+    isCorrect,
+    correctAnswer: version.correctAnswer,
+    explanation: version.explanation,
   };
 });
 

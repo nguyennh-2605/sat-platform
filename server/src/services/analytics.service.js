@@ -1,6 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
-const { SOLUTION_DELIVERY_SELECT, isSubmissionSolutionLocked } = require('../utils/solution-access');
+const { SOLUTION_DELIVERY_SELECT } = require('../utils/solution-access');
 const { buildStudentAnalyticsPayload, isTimingEligible, sourceOf } = require('../utils/analytics-transform');
 const { domains: taxonomyDomains, skills: taxonomySkills } = require('../utils/question-taxonomy');
 
@@ -326,7 +326,6 @@ const getSubmissionDetailWithDb = async ({ db, id, userId }) => {
   if (!submission) {
     throw new ApiError(404, { message: 'Completed submission not found.' });
   }
-  const solutionsLocked = isSubmissionSolutionLocked({ status: 'COMPLETED', delivery: submission.delivery });
 
   const elapsedDurationMs = submission.endTime
     ? Math.max(0, new Date(submission.endTime).getTime() - new Date(submission.beganAt || submission.startedAt).getTime())
@@ -497,11 +496,9 @@ const getSubmissionDetailWithDb = async ({ db, id, userId }) => {
         ? Number(((classifiedQuestionCount / questions.length) * 100).toFixed(1))
         : null,
     },
-    solutionsLocked,
-    solutionAvailableAt: solutionsLocked ? submission.delivery?.dueAt?.toISOString() || null : null,
-    questions: solutionsLocked
-      ? questions.map(question => ({ ...question, correctAnswer: null, explanation: null, isCorrect: null }))
-      : questions,
+    solutionsLocked: false,
+    solutionAvailableAt: null,
+    questions,
   };
 };
 

@@ -255,6 +255,9 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, 
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      // A nested popover owns the first Escape, including selection popovers
+      // that deliberately leave focus in the question content.
+      if (event.defaultPrevented || (event.key === 'Escape' && document.querySelector('[data-slot="popover-content"][data-state="open"]'))) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         onCloseRef.current();

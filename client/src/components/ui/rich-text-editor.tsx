@@ -16,6 +16,7 @@ interface RichTextEditorProps {
   className?: string;
   compact?: boolean;
   expanded?: boolean;
+  fill?: boolean;
   autoFocus?: boolean;
   hideToolbar?: boolean;
   onFormatChange?: (formats: RichTextFormats) => void;
@@ -61,12 +62,12 @@ const EMPTY_FORMATS: RichTextFormats = { bold: false, italic: false, underline: 
 const LazyQuillRichTextEditor = lazy(() => import('@/components/ui/quill-rich-text-editor'));
 
 const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function QuillRichTextEditor(props, forwardedRef) {
-  return <Suspense fallback={<Skeleton className="min-h-24 border border-input" role="status" aria-label="Loading editor" />}>
+  return <Suspense fallback={<Skeleton className={props.fill ? 'min-h-0 flex-1' : 'min-h-24 border border-input'} role="status" aria-label="Loading editor" />}>
     <LazyQuillRichTextEditor ref={forwardedRef} {...props} />
   </Suspense>;
 });
 
-const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function NativeRichTextEditor({ id, labelledBy, value, onChange, placeholder, disabled = false, className, compact = false, expanded = false, autoFocus = false, hideToolbar = false, onFormatChange, onShortcut }, forwardedRef) {
+const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function NativeRichTextEditor({ id, labelledBy, value, onChange, placeholder, disabled = false, className, compact = false, expanded = false, fill = false, autoFocus = false, hideToolbar = false, onFormatChange, onShortcut }, forwardedRef) {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastSelection = useRef<Range | null>(null);
   const lastEmittedValue = useRef(value);
@@ -138,7 +139,8 @@ const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProp
   }, [value]);
 
   useEffect(() => {
-    if (autoFocus) editorRef.current?.focus();
+    const selection = window.getSelection();
+    if (autoFocus && (!selection || selection.isCollapsed || editorRef.current?.contains(selection.anchorNode))) editorRef.current?.focus();
   }, [autoFocus]);
 
   const pastePlainOrSafeHtml = (event: ClipboardEvent<HTMLDivElement>) => {
@@ -156,6 +158,7 @@ const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProp
     className={cn(
       'overflow-hidden rounded-lg border border-input bg-background transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50',
       disabled && 'pointer-events-none opacity-60',
+      fill && 'flex min-h-0 flex-1 flex-col',
       className,
     )}
     onKeyDownCapture={event => {
@@ -185,8 +188,9 @@ const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProp
       data-placeholder={placeholder}
       className={cn(
         'min-h-40 px-3 py-2 font-sans text-sm leading-6 text-foreground outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]',
-        compact && 'min-h-24 max-h-80 overflow-y-auto',
-        expanded && 'min-h-72 max-h-96 overflow-y-auto',
+        compact && !fill && 'min-h-24 max-h-80 overflow-y-auto',
+        expanded && !fill && 'min-h-72 max-h-96 overflow-y-auto',
+        fill && 'min-h-0 flex-1 overflow-y-auto',
       )}
       dangerouslySetInnerHTML={{ __html: sanitizeRichText(value) }}
       onInput={emitValue}

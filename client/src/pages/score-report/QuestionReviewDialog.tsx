@@ -7,6 +7,7 @@ import BlockRenderer from '../../components/content/BlockRenderer';
 import FormattedTextRenderer from '../../components/content/TextRenderer';
 import { isChoiceVisualPlaceholder, splitChoiceVisuals } from '../../components/content/choiceVisuals';
 import InteractiveText from '../../features/quiz/InteractiveText';
+import { DictionaryLookup } from '../../features/dictionary/DictionaryLookup';
 import type { QuestionResult } from './score-report.types';
 
 interface QuestionReviewDialogProps {
@@ -51,6 +52,7 @@ export function QuestionReviewDialog({
         </div>
       )}
     >
+      <DictionaryLookup enabled={examSubject === 'RW'} contentKey={data.questionNumber}>
       <div className="grid h-full min-h-0 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
         <section className="space-y-5 rounded-card border border-ui-border bg-surface p-4 sm:p-5" aria-label="Question and answers">
           <div className="flex flex-wrap items-center gap-2">
@@ -100,6 +102,7 @@ export function QuestionReviewDialog({
           )}
         </section>
       </div>
+      </DictionaryLookup>
     </Modal>
   );
 }
