@@ -57,7 +57,7 @@
     "pdf-extraction": "^1.0.2",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
-    "prisma": "^5.22.0",
+    "prisma": "^7.10.0",
     "sanitize-html": "^2.17.7",
     "stream": "^0.0.3",
     "ts-fsrs": "5.4.2"
