@@ -22,8 +22,7 @@ const requireIntent = (req, res, expected) => {
 
 const register = async (req, res) => {
   try {
-    const { email, password, name, role } = req.body;
-    return sendAuthResult(res, 201, await authService.register({ email, password, name, role }));
+    return sendAuthResult(res, 201, await authService.register());
   } catch (error) {
     return sendError(res, error, 'Lỗi Server');
   }
@@ -31,8 +30,7 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    return sendAuthResult(res, 200, await authService.login({ email, password }));
+    return sendAuthResult(res, 200, await authService.login());
   } catch (error) {
     return sendError(res, error, 'Lỗi Server');
   }
@@ -42,7 +40,7 @@ const googleLogin = async (req, res) => {
   try {
     return sendAuthResult(res, 200, await authService.googleLogin({ token: req.body.token }));
   } catch (error) {
-    return sendError(res, error, 'Google login failed', 400);
+    return sendError(res, error, 'Google sign-in is temporarily unavailable. Please try again shortly.');
   }
 };
 

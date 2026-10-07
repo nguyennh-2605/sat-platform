@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const {
   parseArgs,
   normalizeEmail,
-  validatePassword,
   resolveEnvironment,
   validateProductionGoogleAccount,
 } = require('../scripts/admin-cli');
@@ -20,11 +19,6 @@ test('admin CLI normalizes email addresses', () => {
   assert.equal(normalizeEmail('  Admin@Example.COM '), 'admin@example.com');
 });
 
-test('admin CLI enforces bcrypt-safe strong password length', () => {
-  assert.throws(() => validatePassword('short'), /at least 14/);
-  assert.throws(() => validatePassword('😀'.repeat(19)), /72 UTF-8 bytes/);
-  assert.doesNotThrow(() => validatePassword('a-long-local-password-2026'));
-});
 
 test('admin CLI refuses to label a remote database as local', () => {
   assert.throws(() => resolveEnvironment({ requested: 'local', databaseUrl: 'postgresql://user:pass@db.example.com:5432/app' }), /remote host/);

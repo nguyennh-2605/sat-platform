@@ -12,6 +12,12 @@ export default defineConfig({
     },
   },
   server: {
+    port: 5173,
+    strictPort: true,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+      'Referrer-Policy': 'no-referrer-when-downgrade',
+    },
     proxy: {
       // Khi bạn gọi axios.post('/api/ai-parser'), Vite sẽ chuyển hướng nó
       '/api': {

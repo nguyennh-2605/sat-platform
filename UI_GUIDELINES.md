@@ -54,6 +54,8 @@ Sử dụng các token đã định nghĩa trong `client/src/index.css` và comp
 
 Không viết hex trực tiếp trong feature mới. Chỉ được dùng inline color cho dữ liệu trực quan động như chart series hoặc avatar palette đã kiểm soát. Nếu thiếu màu, bổ sung semantic token tại nguồn thay vì thêm màu cục bộ.
 
+Public landing và welcome panel của auth có ngoại lệ trang trí được duyệt: dùng `--ui-landing-rose`, `--ui-landing-cool` và `--ui-landing-warm` trong `client/src/index.css` cho gradient tĩnh ở hero, CTA, ánh sáng sau screenshot và auth welcome panel. Các token có bản light/dark, không dùng làm primary hay trạng thái semantic, không áp dụng cho dashboard. Giữ surface screenshot/auth form opaque và chữ phụ đủ tương phản; không dùng blur filter hoặc animation nền liên tục.
+
 ### 2.2 Spacing
 
 - Dùng thang Tailwind theo lưới `4px`: `1=4px`, `2=8px`, `3=12px`, `4=16px`, `5=20px`, `6=24px`, `8=32px`.
@@ -137,6 +139,7 @@ Không tạo lại button, input, select, modal, tabs, card, table shell, badge,
 - Mọi popup modal/dialog phải đóng được khi click hoặc tap vào vùng ngoài nội dung (backdrop); shared `Modal` bật hành vi này mặc định. Dùng cùng close handler với nút đóng và Escape để giữ xác nhận thay đổi chưa lưu, không tự bỏ dữ liệu. Click bên trong modal hoặc control con không được đóng modal. Chỉ được tạm chặn đóng trong lúc đang lưu/gửi dữ liệu, không tắt click-outside thường trực.
 - `Tabs`: bắt buộc cho chuyển đổi panel cùng trang; có `tablist/tab/tabpanel`, Arrow keys, Home/End. Link điều hướng sang route khác không phải Tabs.
 - `Collapsible`: dùng cho outline có nhiều section được mở đồng thời; trigger phải có accessible name và controlled state khi page có Expand/Collapse All.
+- `Sheet`: dùng shared primitive cho mobile navigation và drawer. `SheetContent` hỗ trợ `overlayClassName` để page tùy chỉnh overlay (ví dụ bỏ blur và tôn trọng reduced motion) mà không tự tạo backdrop; mặc định vẫn giữ outside dismissal, Escape và focus restoration.
 - `Card`: surface nội dung mặc định. Không biến mọi section thành card nếu hierarchy không cần.
 - `Table`: management table luôn nằm trong `DataSurface`; `Table` tự chịu horizontal overflow; dùng các table primitives cho header/row/cell. `TableShell` chỉ là compatibility alias trong thời gian migration.
 - `Badge`: chỉ thể hiện metadata/status, không dùng thay button.

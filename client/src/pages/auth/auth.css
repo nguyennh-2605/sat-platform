@@ -1,0 +1,6 @@
+.auth-welcome {
+  background:
+    radial-gradient(ellipse 85% 55% at 0% 15%, var(--ui-landing-rose), transparent 90%),
+    radial-gradient(ellipse 85% 60% at 100% 85%, var(--ui-landing-cool), transparent 90%),
+    var(--ui-landing-warm);
+}

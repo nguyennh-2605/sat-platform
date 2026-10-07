@@ -7,6 +7,8 @@ node_modules/
 
 # Bỏ qua file môi trường chứa mật khẩu DB (BẢO MẬT)
 .env
+.env.*
+!.env.example
 
 # Bỏ qua file build của frontend
 dist/
@@ -39,5 +41,6 @@ Digital SAT Tests/
 .codex-main-sync-files/
 
 # Local upstream visual reference; pinned in projects/docs/DESIGN_MIGRATION.md
+/tmp/
 tmp/next-shadcn-admin-dashboard/
 tmp/sat-eqb-downloader/

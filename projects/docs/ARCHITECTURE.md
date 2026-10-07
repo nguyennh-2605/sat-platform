@@ -128,9 +128,9 @@ Express Server (index.js → app.js)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/register` | None | Register new user (email, password, name, role) |
-| `POST` | `/api/login` | None | Login with email + password, returns JWT |
-| `POST` | `/api/auth/google-login` | None | Login with Google OAuth token, returns JWT |
+| `POST` | `/api/register` | None | Retired: returns 410 `GOOGLE_SIGN_IN_REQUIRED`; cannot self-register a role |
+| `POST` | `/api/login` | None | Retired: returns 410 `GOOGLE_SIGN_IN_REQUIRED` |
+| `POST` | `/api/auth/google-login` | None | Verify Google ID token audience/email/sub; sign in or create a STUDENT; preserve existing roles and data |
 
 ### 5.1.1 Account profile
 
@@ -138,6 +138,12 @@ Express Server (index.js → app.js)
 |---|---|---|---|
 | `GET` | `/api/account/profile` | JWT | Read the authenticated user's display-safe profile and sign-in method |
 | `PATCH` | `/api/account/profile` | JWT | Update the authenticated user's display name |
+| `GET` | `/api/account/teacher-access` | JWT | Read own request and current database role |
+| `POST` | `/api/account/teacher-access` | JWT + Google-linked STUDENT | Submit one pending teacher access request; resubmit after rejection |
+| `GET` | `/api/admin/teacher-access` | JWT + current ADMIN | List requests by status with bounded cursor pagination |
+| `PATCH` | `/api/admin/teacher-access/:requestId` | JWT + current ADMIN | Atomically approve/reject a pending request; approval promotes only a STUDENT to TEACHER |
+
+Google-only auth uses verified stable `googleSubject`; new users are always students. Existing teachers/admins retain their roles. Authoritative Gmail/Workspace identities can link matching legacy accounts while keeping user IDs and study data, clearing the application password and revoking legacy refresh sessions. External-email legacy links require owner verification. Password access/refresh/upgrade sessions cannot bypass Google-only sign-in. Access tokens carry `authMethod: GOOGLE`; Settings refreshes the session immediately after teacher approval. See `GOOGLE_AUTH_SETUP.md` for Google Cloud, migration, and admin bootstrap steps.
 
 ### 5.2 Classes
 

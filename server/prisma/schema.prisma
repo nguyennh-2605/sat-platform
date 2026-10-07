@@ -70,6 +70,30 @@ model User {
   bankQuestionAttempts       BankQuestionAttempt[]
   createdRoadmaps            Roadmap[]                     @relation("RoadmapCreator")
   roadmapProgress            StudentMilestoneProgress[]
+  teacherAccessRequest       TeacherAccessRequest?         @relation("TeacherAccessApplicant")
+  reviewedTeacherRequests    TeacherAccessRequest[]        @relation("TeacherAccessReviewer")
+}
+
+enum TeacherAccessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TeacherAccessRequest {
+  id           String              @id @default(uuid())
+  userId       Int                 @unique
+  reason       String              @db.VarChar(1000)
+  status       TeacherAccessStatus @default(PENDING)
+  reviewNote   String?             @db.VarChar(1000)
+  reviewedById Int?
+  reviewedAt   DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  user         User                @relation("TeacherAccessApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy   User?               @relation("TeacherAccessReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt, id])
 }
 
 model RefreshSession {

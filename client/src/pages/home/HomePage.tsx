@@ -1,93 +1,139 @@
-import { useSyncExternalStore } from 'react';
-import { ArrowRight, BarChart3, BookOpenCheck, CheckCircle2, GraduationCap } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { useState, useSyncExternalStore } from 'react';
+import { ArrowDown, ArrowRight, Menu } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { BrandMark } from '@/components/brand/BrandMark';
-import { Mascot } from '@/components/brand/Mascot';
-import { Button, Card } from '../../components/ui/AppUI';
-import { getAuthStatus, logoutAuthSession, subscribeAuthSession } from '../../lib/authSession';
+import { SonderCat } from '@/components/brand/SonderCat';
+import { Button } from '@/components/ui/button';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { appToast } from '@/components/ui/toast';
+import { getAuthStatus, logoutAuthSession, subscribeAuthSession } from '@/lib/authSession';
+import { ClassroomSection, FaqSection, LearningCycle } from './LandingSections';
+import { ProductScreenshot, ProductShowcase } from './ProductShowcase';
+import { ScrollReveal } from './ScrollReveal';
+import './landing.css';
 
-const features = [
-  { icon: BookOpenCheck, title: 'Focused SAT practice', description: 'Move from full tests to targeted review without losing your place.' },
-  { icon: GraduationCap, title: 'Connected classroom', description: 'Assignments, announcements, and learning materials stay in one workspace.' },
-  { icon: BarChart3, title: 'Actionable analytics', description: 'See patterns in your attempts and know what to study next.' },
-] as const;
+const navigation = [
+  { href: '#how-it-works', label: 'How it works' },
+  { href: '#workspace', label: 'The workspace' },
+  { href: '#faq', label: 'FAQ' },
+];
 
 export default function HomePage() {
-  const navigate = useNavigate();
   const authStatus = useSyncExternalStore(subscribeAuthSession, getAuthStatus, getAuthStatus);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const isLoggedIn = authStatus === 'authenticated';
-  const userName = localStorage.getItem('userName') || 'Student';
+  const isCheckingSession = authStatus === 'loading';
+  const startHref = isLoggedIn ? '/dashboard' : '/auth?mode=register';
+  const startLabel = isLoggedIn ? 'Open dashboard' : 'Get started';
 
   const handleLogout = async () => {
-    await logoutAuthSession();
-    toast('Signed out');
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await logoutAuthSession();
+      appToast.success('Signed out');
+    } catch {
+      // The session helper clears the local session even if the server is offline.
+      appToast.error('Signed out on this device. Unable to reach the server.');
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
-  return <div className="min-h-screen overflow-hidden bg-background text-foreground">
-    <a href="#main-content" className="fixed left-3 top-3 z-50 -translate-y-20 rounded-control bg-surface px-4 py-2 text-body font-semibold text-primary shadow-elevated transition-transform focus:translate-y-0">Skip to content</a>
-    <header className="relative z-20 border-b border-ui-border bg-surface/90 backdrop-blur-sm">
-      <div className="mx-auto flex min-h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2.5 rounded-control">
-          <BrandMark size="lg" />
-          <span className="text-body font-semibold tracking-[0.04em]">SONDER SAT</span>
-        </Link>
-        <nav className="flex items-center gap-2" aria-label="Account">
-          {isLoggedIn ? <>
-            <span className="hidden text-body text-muted-foreground sm:inline">Hello, {userName}</span>
-            <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>Log out</Button>
-            <Button size="sm" onClick={() => navigate('/dashboard')}>Dashboard <ArrowRight size={15} aria-hidden="true" /></Button>
-          </> : <>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>Log in</Button>
-            <Button size="sm" onClick={() => navigate('/auth?mode=register')}>Create account</Button>
-          </>}
-        </nav>
-      </div>
-    </header>
+  const startAction = (className?: string) => isCheckingSession ? (
+    <Button size="lg" disabled className={className} aria-busy="true">
+      <LoadingSpinner /> Checking session
+    </Button>
+  ) : (
+    <Button size="lg" asChild className={className}>
+      <Link to={startHref}>{startLabel}<ArrowRight aria-hidden="true" /></Link>
+    </Button>
+  );
 
-    <main id="main-content">
-      <section className="relative isolate px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_80%_20%,rgba(27,122,90,0.16),transparent_32%),radial-gradient(circle_at_15%_70%,rgba(232,192,64,0.14),transparent_28%)]" />
-        <div className="mx-auto grid max-w-[1280px] items-center gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(24rem,0.9fr)]">
-          <div className="max-w-3xl">
-            <span className="inline-flex rounded-full border border-primary/25 bg-primary-soft px-3 py-1 text-caption font-semibold uppercase tracking-widest text-primary">Digital SAT preparation</span>
-            <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.035em] text-foreground sm:text-5xl lg:text-6xl lg:leading-[1.08]">A calmer, clearer path to your target SAT score.</h1>
-            <p className="mt-6 max-w-2xl text-body-lg leading-7 text-subtle-foreground sm:text-lg sm:leading-8">Practice, learn from mistakes, build vocabulary, and follow your progress in one focused learning workspace.</p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" onClick={() => navigate(isLoggedIn ? '/dashboard' : '/auth')} className="px-6">{isLoggedIn ? 'Open dashboard' : 'Start learning'} <ArrowRight size={18} aria-hidden="true" /></Button>
-              {!isLoggedIn && <Button variant="outline" size="lg" onClick={() => navigate('/auth?mode=register')} className="px-6">Create free account</Button>}
+  return (
+    <div className="landing-page min-h-svh bg-background text-foreground">
+      <a href="#main-content" className="fixed left-4 top-4 z-50 -translate-y-24 rounded-control bg-background px-4 py-3 text-sm font-medium ring-2 ring-ring focus:translate-y-0">Skip to content</a>
+      <header className="sticky top-0 z-40 border-b border-border bg-background">
+        <div className="mx-auto flex min-h-20 max-w-6xl items-center justify-between gap-3 px-5 sm:px-8">
+          <Link to="/" aria-label="Sonder SAT home" className="flex shrink-0 items-center gap-2.5 rounded-control text-base font-semibold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <BrandMark /> Sonder SAT
+          </Link>
+          <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
+            {navigation.map(item => <Button key={item.href} variant="ghost" size="lg" asChild><a href={item.href}>{item.label}</a></Button>)}
+          </nav>
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 sm:flex">
+              {!isCheckingSession && (isLoggedIn ? (
+                <Button variant="ghost" size="lg" disabled={isSigningOut} onClick={() => void handleLogout()}>{isSigningOut ? <><LoadingSpinner /> Signing out</> : 'Log out'}</Button>
+              ) : <Button variant="ghost" size="lg" asChild><Link to="/auth">Log in</Link></Button>)}
+              {startAction('px-4')}
             </div>
-            <ul className="mt-8 flex flex-col gap-3 text-body text-subtle-foreground sm:flex-row sm:gap-6">
-              {['Reading & Writing', 'Math', 'Instant review'].map(item => <li key={item} className="flex items-center gap-2"><CheckCircle2 size={17} className="text-primary" aria-hidden="true" />{item}</li>)}
-            </ul>
-          </div>
-
-          <div className="relative mx-auto w-full max-w-lg" aria-label="Sonder SAT workspace preview">
-            <div className="absolute -inset-8 -z-10 rounded-full bg-primary/10 blur-3xl" />
-            <Card className="overflow-hidden border-primary/20 p-0 shadow-elevated">
-              <div className="flex items-center justify-between border-b border-ui-border bg-surface-subtle px-5 py-4"><span className="text-body font-semibold">Today’s focus</span><span className="rounded-full bg-primary-soft px-2.5 py-1 text-caption font-semibold text-primary">Study plan</span></div>
-              <div className="space-y-3 p-5">
-                <PreviewRow number="01" title="Targeted Reading practice" meta="12 questions · 18 min" active />
-                <PreviewRow number="02" title="Review vocabulary" meta="24 words" />
-                <PreviewRow number="03" title="Analyze recent mistakes" meta="5 entries" />
-              </div>
-              <div className="flex items-center justify-between gap-4 border-t border-ui-border bg-sidebar py-3 pl-5 pr-3 text-sidebar-foreground"><div><p className="text-caption uppercase tracking-widest text-sidebar-muted">One workspace</p><p className="mt-2 text-heading font-semibold">Practice → Review → Improve</p></div><Mascot state="idle" size="sm" animated eager /></div>
-            </Card>
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetTrigger asChild><Button variant="outline" size="icon-lg" className="size-10 lg:hidden" aria-label="Open navigation"><Menu aria-hidden="true" /></Button></SheetTrigger>
+              <SheetContent overlayClassName="motion-reduce:animate-none! motion-reduce:transition-none! supports-backdrop-filter:backdrop-blur-none" className="w-80 max-w-[calc(100%-2rem)] [&>button[data-slot=sheet-close]]:size-10 motion-reduce:animate-none! motion-reduce:transition-none!">
+                <SheetHeader>
+                  <SheetTitle>Sonder SAT</SheetTitle>
+                  <SheetDescription>Your SAT learning workspace.</SheetDescription>
+                </SheetHeader>
+                <nav aria-label="Mobile navigation" className="flex flex-col gap-2 px-4">
+                  {navigation.map(item => <SheetClose asChild key={item.href}><Button variant="ghost" size="lg" asChild className="justify-start"><a href={item.href}>{item.label}</a></Button></SheetClose>)}
+                </nav>
+                <div className="mt-2 flex flex-col gap-3 border-t border-border p-4">
+                  {isCheckingSession ? <Button disabled size="lg"><LoadingSpinner /> Checking session</Button> : (
+                    <>
+                      <SheetClose asChild><Button asChild size="lg"><Link to={startHref}>{startLabel}<ArrowRight aria-hidden="true" /></Link></Button></SheetClose>
+                      {isLoggedIn ? <Button variant="outline" size="lg" disabled={isSigningOut} onClick={() => void handleLogout()}>{isSigningOut ? 'Signing out…' : 'Log out'}</Button> : <SheetClose asChild><Button variant="outline" size="lg" asChild><Link to="/auth">Log in</Link></Button></SheetClose>}
+                    </>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
-      </section>
+      </header>
 
-      <section className="border-y border-ui-border bg-surface px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="features-title">
-        <div className="mx-auto max-w-[1280px]">
-          <div className="max-w-2xl"><p className="text-caption font-semibold uppercase tracking-widest text-primary">Built for focused progress</p><h2 id="features-title" className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Everything you need, without the noise.</h2></div>
-          <div className="mt-8 grid gap-4 md:grid-cols-3">{features.map(({ icon: Icon, title, description }) => <Card key={title} className="p-6"><span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary-soft text-primary"><Icon size={20} aria-hidden="true" /></span><h3 className="mt-4 text-title font-semibold">{title}</h3><p className="mt-2 text-body leading-6 text-muted-foreground">{description}</p></Card>)}</div>
-        </div>
-      </section>
-    </main>
-    <footer className="bg-sidebar px-4 py-8 text-sidebar-foreground sm:px-6 lg:px-8"><div className="mx-auto flex max-w-[1280px] flex-col justify-between gap-3 text-caption sm:flex-row"><span className="font-semibold">SONDER SAT</span><span>Focused preparation for the Digital SAT.</span></div></footer>
-  </div>;
-}
+      <main id="main-content" tabIndex={-1} className="outline-none">
+        <section aria-labelledby="hero-title" className="landing-hero">
+          <div className="mx-auto max-w-6xl px-5 pb-12 pt-12 sm:px-8 sm:pb-16 sm:pt-20">
+          <ScrollReveal className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">A little focus. A lot of possibility.</p>
+            <h1 id="hero-title" className="mt-6 text-4xl font-medium leading-tight tracking-tight sm:text-6xl sm:leading-tight lg:text-7xl">Small steps.<br /><span className="text-muted-foreground">A clearer SAT journey.</span></h1>
+            <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-muted-foreground">Practice with purpose, make mistakes useful, and build what comes next. Your study tools, together in one focused workspace.</p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              {startAction('h-11 px-5')}
+              <Button variant="ghost" size="lg" asChild className="h-11 px-4"><a href="#workspace">Explore the workspace<ArrowDown aria-hidden="true" /></a></Button>
+            </div>
+          </ScrollReveal>
+          <ScrollReveal delay={80} className="mx-auto mt-10 max-w-5xl sm:mt-14">
+            <ProductScreenshot featureId="practice" eager hero />
+          </ScrollReveal>
+          <div className="mx-auto mt-4 flex max-w-5xl flex-col items-center justify-between gap-4 sm:flex-row">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground"><span>Built for Digital SAT</span><span aria-hidden="true">/</span><span>Reading &amp; Writing</span><span aria-hidden="true">/</span><span>Math</span></div>
+            <div className="flex items-center gap-3"><SonderCat className="size-16" /><p className="text-xs leading-5 text-muted-foreground">A tiny cat for a bigger journey.<br /><span className="font-medium text-foreground">One step at a time.</span></p></div>
+          </div>
+          </div>
+        </section>
 
-function PreviewRow({ number, title, meta, active = false }: { number: string; title: string; meta: string; active?: boolean }) {
-  return <div className={`flex items-center gap-4 rounded-control border p-4 ${active ? 'border-primary/30 bg-primary-soft' : 'border-ui-border bg-surface'}`}><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-control text-caption font-semibold ${active ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>{number}</span><span className="min-w-0"><span className="block truncate text-body font-semibold text-foreground">{title}</span><span className="mt-0.5 block text-caption text-muted-foreground">{meta}</span></span></div>;
+        <LearningCycle />
+        <ProductShowcase />
+        <ClassroomSection />
+        <FaqSection />
+
+        <section id="start-learning" aria-labelledby="start-title" className="landing-start scroll-mt-24 border-y border-border">
+          <ScrollReveal className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-5 py-12 sm:px-8 md:flex-row md:items-center md:py-16">
+            <div><p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Your next chapter</p><h2 id="start-title" className="mt-3 text-3xl font-medium tracking-tight sm:text-4xl">Start small. Keep going.</h2><p className="mt-3 text-sm leading-6 text-muted-foreground">Your next practice, your next insight, your next step.</p></div>
+            {startAction('h-11 px-5')}
+          </ScrollReveal>
+        </section>
+      </main>
+
+      <footer className="mx-auto flex max-w-6xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        <Link to="/" className="flex w-fit items-center gap-2 rounded-control text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><BrandMark size="sm" />Sonder SAT</Link>
+        <p className="text-xs leading-5 text-muted-foreground">A focused workspace for your Digital SAT journey.</p>
+        <Button variant="ghost" size="lg" asChild className="w-fit"><a href="#main-content">Back to top<ArrowRight className="-rotate-90" aria-hidden="true" /></a></Button>
+      </footer>
+    </div>
+  );
 }

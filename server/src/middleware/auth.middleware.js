@@ -25,6 +25,9 @@ const authenticateToken = (req, res, next) => {
       });
     }
     
+    if (user.authMethod !== 'GOOGLE') {
+      return res.status(401).json({ code: 'GOOGLE_SIGN_IN_REQUIRED', error: 'Sign in with Google to continue.' });
+    }
     // Nếu OK, lưu thông tin user (id, email, role) vào biến req.user
     // Để các hàm phía sau (Controller) có thể dùng được.
     req.user = user;

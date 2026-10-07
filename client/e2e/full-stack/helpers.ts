@@ -1,13 +1,14 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 export const API_URL = process.env.E2E_API_URL || 'http://127.0.0.1:5000';
-export const E2E_PASSWORD = 'E2ePilot!2026';
 
 export type TestUser = {
   id: number;
   name: string;
   email: string;
-  password: string;
+  refreshToken: string;
   role: 'STUDENT' | 'TEACHER';
   accessToken: string;
 };
@@ -27,12 +28,15 @@ export async function registerUser(
   const suffix = crypto.randomUUID();
   const email = `e2e.${label}.${suffix}@example.test`;
   const name = uniqueName(`E2E ${label}`);
-  const response = await request.post(`${API_URL}/api/register`, {
-    data: { email, password: E2E_PASSWORD, name, role },
+  void request;
+  const databaseUrl = process.env.E2E_DATABASE_URL || process.env.DATABASE_URL || '';
+  const fixtureScript = fileURLToPath(new URL('../../../server/scripts/e2e-google-session.js', import.meta.url));
+  const output = execFileSync(process.execPath, [fixtureScript, email, name, role], {
+    env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: databaseUrl, JWT_SECRET: process.env.JWT_SECRET || 'e2e-only-secret-with-sufficient-entropy-do-not-use-in-production' },
+    encoding: 'utf8', timeout: 30000,
   });
-  if (!response.ok()) throw new Error(`POST /api/register: ${await responseBody(response)}`);
-  const payload = await response.json() as { accessToken: string; user: { id: number; name: string; email: string; role: TestUser['role'] } };
-  return { ...payload.user, password: E2E_PASSWORD, accessToken: payload.accessToken };
+  const payload = JSON.parse(output) as { accessToken: string; refreshToken: string; user: { id: number; name: string; email: string; role: TestUser['role'] } };
+  return { ...payload.user, refreshToken: payload.refreshToken, accessToken: payload.accessToken };
 }
 
 export async function apiJson<T>(
@@ -51,11 +55,10 @@ export async function apiJson<T>(
 }
 
 export async function loginThroughUi(page: Page, user: TestUser) {
+  await page.context().addCookies([{ name: 'refresh_token', value: user.refreshToken, domain: new URL(API_URL).hostname, path: '/api/auth', httpOnly: true, secure: API_URL.startsWith('https:'), sameSite: 'Lax' }]);
   await page.goto('/auth');
-  await page.getByLabel('Email').fill(user.email);
-  await page.getByLabel('Password', { exact: true }).fill(user.password);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard(?:\/|$)/);
+  user.refreshToken = (await page.context().cookies(`${API_URL}/api/auth/refresh`)).find(cookie => cookie.name === 'refresh_token')?.value || user.refreshToken;
 }
 
 export async function createClassWithStudent(

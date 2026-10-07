@@ -3,6 +3,10 @@ const prisma = require('../config/prisma');
 
 const AUDIT_ACTIONS = Object.freeze({
   USER_REGISTERED: 'USER_REGISTERED',
+  USER_GOOGLE_LINKED: 'USER_GOOGLE_LINKED',
+  TEACHER_ACCESS_REQUESTED: 'TEACHER_ACCESS_REQUESTED',
+  TEACHER_ACCESS_APPROVED: 'TEACHER_ACCESS_APPROVED',
+  TEACHER_ACCESS_REJECTED: 'TEACHER_ACCESS_REJECTED',
   TEST_CREATED: 'TEST_CREATED',
   TEST_PUBLISHED: 'TEST_PUBLISHED',
   TEST_ARCHIVED: 'TEST_ARCHIVED',
@@ -18,6 +22,10 @@ const AUDIT_ACTIONS = Object.freeze({
 
 const actionDefinitions = Object.freeze({
   [AUDIT_ACTIONS.USER_REGISTERED]: { category: 'ACCOUNT', label: 'Registered an account', metadataKeys: ['authMethod'] },
+  [AUDIT_ACTIONS.USER_GOOGLE_LINKED]: { category: 'ACCOUNT', label: 'Switched to Google sign-in', metadataKeys: [] },
+  [AUDIT_ACTIONS.TEACHER_ACCESS_REQUESTED]: { category: 'ACCOUNT', label: 'Requested teacher access', metadataKeys: [] },
+  [AUDIT_ACTIONS.TEACHER_ACCESS_APPROVED]: { category: 'ACCOUNT', label: 'Approved teacher access', metadataKeys: [] },
+  [AUDIT_ACTIONS.TEACHER_ACCESS_REJECTED]: { category: 'ACCOUNT', label: 'Rejected teacher access', metadataKeys: [] },
   [AUDIT_ACTIONS.TEST_CREATED]: { category: 'CONTENT', label: 'Created a test', metadataKeys: ['scope', 'status', 'sourceTestId'] },
   [AUDIT_ACTIONS.TEST_PUBLISHED]: { category: 'CONTENT', label: 'Published a test', metadataKeys: ['scope'] },
   [AUDIT_ACTIONS.TEST_ARCHIVED]: { category: 'CONTENT', label: 'Archived a test', metadataKeys: ['scope'] },
@@ -103,6 +111,7 @@ const decodeCursor = value => {
 };
 
 const eventHref = event => {
+  if (event.entityType === 'TEACHER_ACCESS_REQUEST') return '/dashboard/teacher-access';
   if (event.action === AUDIT_ACTIONS.TEST_ASSIGNED) return `/dashboard/class/${event.entityId}?tab=activities`;
   if (event.entityType === 'CLASS' && event.action !== AUDIT_ACTIONS.CLASS_DELETED) return `/dashboard/class/${event.entityId}`;
   if (event.entityType === 'TEST' && event.action !== AUDIT_ACTIONS.TEST_DELETED) {

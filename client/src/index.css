@@ -498,6 +498,10 @@
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
+  /* Decorative landing/auth welcome surfaces; dashboard and controls stay neutral. */
+  --ui-landing-rose: oklch(0.95 0.035 18);
+  --ui-landing-cool: oklch(0.95 0.03 245);
+  --ui-landing-warm: oklch(0.99 0.008 80);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -535,6 +539,9 @@
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
+  --ui-landing-rose: oklch(0.30 0.055 18);
+  --ui-landing-cool: oklch(0.29 0.045 245);
+  --ui-landing-warm: oklch(0.16 0.005 80);
   /* Status surfaces must remain dark when their content uses theme foreground. */
   --ui-success: #34d399;
   --ui-success-soft: color-mix(in srgb, var(--ui-success) 14%, var(--card));

@@ -18,5 +18,6 @@ test('access tokens are short lived and contain the authenticated identity', () 
   const payload = jwt.verify(token, process.env.JWT_SECRET);
   assert.equal(payload.userId, 7);
   assert.equal(payload.role, 'STUDENT');
+  assert.equal(payload.authMethod, 'GOOGLE');
   assert.ok(payload.exp - payload.iat <= 15 * 60);
 });

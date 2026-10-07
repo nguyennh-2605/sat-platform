@@ -1,0 +1,105 @@
+/* Static gradients add depth without blur filters or continuously moving layers. */
+.landing-hero {
+  background:
+    radial-gradient(ellipse 52% 42% at 12% 12%, var(--ui-landing-rose), transparent 90%),
+    radial-gradient(ellipse 52% 48% at 92% 26%, var(--ui-landing-cool), transparent 90%),
+    linear-gradient(to bottom, var(--ui-landing-warm), var(--ui-background) 90%);
+}
+
+.landing-start {
+  background:
+    radial-gradient(ellipse 50% 140% at 0% 100%, var(--ui-landing-rose), transparent 85%),
+    radial-gradient(ellipse 50% 140% at 100% 0%, var(--ui-landing-cool), transparent 85%),
+    var(--ui-landing-warm);
+}
+
+/* Keep small supporting copy clear against the tinted surfaces. */
+.landing-hero .text-muted-foreground,
+.landing-start .text-muted-foreground {
+  color: var(--ui-subtle-foreground);
+}
+
+.landing-preview {
+  position: relative;
+  isolation: isolate;
+}
+
+.landing-preview-rose::before,
+.landing-preview-cool::before {
+  content: '';
+  position: absolute;
+  inset: -2rem;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, var(--landing-preview-color), transparent 70%);
+}
+
+.landing-preview-rose {
+  --landing-preview-color: var(--ui-landing-rose);
+}
+
+.landing-preview-cool {
+  --landing-preview-color: var(--ui-landing-cool);
+}
+
+@media (max-width: 639px) {
+  .landing-hero {
+    background:
+      radial-gradient(ellipse 90% 35% at 0% 10%, var(--ui-landing-rose), transparent 90%),
+      radial-gradient(ellipse 90% 40% at 100% 38%, var(--ui-landing-cool), transparent 90%),
+      linear-gradient(to bottom, var(--ui-landing-warm), var(--ui-background) 90%);
+  }
+
+  .landing-preview-rose::before,
+  .landing-preview-cool::before {
+    inset: -1rem;
+  }
+}
+
+/* Reveal once, using only composited opacity and a small vertical translation. */
+.scroll-reveal {
+  transition: opacity 560ms ease, transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scroll-reveal[data-reveal-pending='true'] {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  .scroll-reveal:focus-within {
+    opacity: 1;
+    transform: none;
+    transition-delay: 0ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.landing-page) {
+    scroll-behavior: auto;
+  }
+
+  .scroll-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+@media print {
+  .landing-hero,
+  .landing-start {
+    background: var(--ui-background);
+  }
+
+  .landing-preview::before {
+    display: none;
+  }
+
+  .scroll-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none;
+  }
+}

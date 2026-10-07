@@ -87,6 +87,8 @@ After restore:
 
 ## Required manual configuration
 
+Google-only authentication and admin-approved teacher access are documented in [GOOGLE_AUTH_SETUP.md](GOOGLE_AUTH_SETUP.md). Frontend and backend Google Client IDs must match; apply the teacher-access migration before deploying this auth revision.
+
 Repository files cannot create provider projects, domains, OAuth callbacks, production databases, backup policies, alert recipients, or secrets. Track those manual items with the release checklist in this document and verify them after every provider change.
 
 ## Known dependency advisory

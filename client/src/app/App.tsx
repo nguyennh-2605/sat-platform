@@ -28,6 +28,7 @@ const CreateTestWizard = lazy(() => import('../features/test-creation/CreateTest
 const AssignmentDetail = lazy(() => import('../features/assignment/AssignmentDetail'));
 const Vocabulary = lazy(() => import('../pages/vocabulary/Vocabulary'));
 const ProfileSettings = lazy(() => import('../pages/profile/ProfileSettings'));
+const TeacherAccessReview = lazy(() => import('../pages/teacher-access/TeacherAccessReview'));
 const QuestionBank = lazy(() => import('../pages/question-bank/QuestionBank'));
 const Roadmap = lazy(() => import('../pages/roadmap/Roadmap'));
 
@@ -50,7 +51,7 @@ function App() {
 
   return (
     <QuizToolProvider>
-      <GoogleOAuthProvider clientId={googleClientId}>
+      <GoogleOAuthProvider clientId={googleClientId} locale="en">
         <Toaster position="top-right" reverseOrder={false} gutter={8} toastOptions={APP_TOAST_OPTIONS} />
         <Router>
           <AuthSessionGuard />
@@ -66,6 +67,7 @@ function App() {
                 <Route path="classes" element={<ClassroomList />} />
                 <Route path="vocabulary" element={<Vocabulary />} />
                 <Route path="profile" element={<ProfileSettings />} />
+                <Route path="teacher-access" element={<RequireRole roles={['ADMIN']}><TeacherAccessReview /></RequireRole>} />
                 <Route path="question-bank" element={<RequireRole roles={['TEACHER', 'ADMIN']}><QuestionBank /></RequireRole>} />
                 <Route path="roadmap" element={<RequireRole roles={['ADMIN']}><Roadmap /></RequireRole>} />
                 <Route path="class/:classId" element={<Classroom />} />
