@@ -47,12 +47,12 @@ const testFocus = (submission, progress) => ({
 
 const vocabularyFocus = session => ({
   type: 'VOCABULARY',
-  title: `Continue ${session.set.title}`,
-  description: `${session.mode === 'QUIZ' ? 'Vocabulary quiz' : 'Flashcards'} · ${session.totalItems} words`,
+  title: session.isDaily ? 'Continue daily vocabulary practice' : `Continue ${session.set?.title || 'vocabulary'}`,
+  description: `${session.isDaily ? 'Daily recall' : session.mode === 'QUIZ' ? 'Vocabulary quiz' : 'Flashcards'} · ${session.totalItems} words`,
   actionLabel: 'Continue studying',
   href: session.activityId
     ? `/dashboard/vocabulary?activity=${session.activityId}`
-    : `/dashboard/vocabulary?set=${session.setId}`,
+    : session.isDaily ? '/dashboard/vocabulary' : `/dashboard/vocabulary?set=${session.setId}`,
   source: session.activityId ? 'CLASSROOM' : 'SELF_STUDY',
 });
 
@@ -188,7 +188,7 @@ async function getOverviewWithDb({ db, userId, now = new Date(), getTodos = clas
     db.vocabularyStudySession.findFirst({
       where: { userId: currentUserId, status: 'IN_PROGRESS' },
       orderBy: { startedAt: 'desc' },
-      select: { id: true, setId: true, activityId: true, mode: true, totalItems: true, set: { select: { title: true } } },
+      select: { id: true, setId: true, isDaily: true, activityId: true, mode: true, totalItems: true, set: { select: { title: true } } },
     }),
     db.class.count({ where: { students: { some: { id: currentUserId } } } }),
     getTodos({ userId: currentUserId, userRole: 'STUDENT' }).catch(error => {

@@ -25,11 +25,17 @@ test('vocabulary words are normalized for duplicate detection', () => {
   );
 });
 
-test('a vocabulary term requires word, English meaning, and translation', () => {
+test('a vocabulary term requires word and English meaning; translation is optional', () => {
   assert.throws(
     () => _private.validateTerms([{ word: 'Infer', meaning: '', translation: 'Suy luận' }]),
-    error => error.statusCode === 400 && /requires a word, meaning, and translation/.test(error.body.error),
+    error => error.statusCode === 400 && /requires a word and meaning/.test(error.body.error),
   );
+});
+
+test('a word can be saved without translation or original sentence', () => {
+  const [term] = _private.validateTerms([{ word: 'infer', meaning: 'Draw a conclusion' }]);
+  assert.equal(term.translation, '');
+  assert.equal(term.exampleSentence, null);
 });
 
 test('term validation trims values, preserves an optional sentence, and assigns stable order', () => {

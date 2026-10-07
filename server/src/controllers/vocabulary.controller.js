@@ -1,5 +1,6 @@
 const ApiError = require('../utils/ApiError');
 const vocabularyService = require('../services/vocabulary.service');
+const practiceService = require('../services/vocabulary-practice.service');
 
 const auth = req => ({ userId: req.user?.userId || req.user?.id, userRole: req.user?.role });
 const handle = (res, error, fallback) => {
@@ -29,3 +30,7 @@ exports.assignSet = action(req => vocabularyService.assignSet({ data: req.body, 
 exports.listClassActivities = action(req => vocabularyService.listClassActivities({ classId: req.params.classId, ...auth(req) }), 'Unable to load vocabulary activities.');
 exports.getActivity = action(req => vocabularyService.getActivity({ activityId: req.params.activityId, ...auth(req) }), 'Unable to load the vocabulary activity.');
 exports.performance = action(req => vocabularyService.getActivityPerformance({ activityId: req.params.activityId, ...auth(req) }), 'Unable to load vocabulary performance.');
+exports.practiceOverview = action(req => practiceService.overview({ timezone: req.query.timezone, ...auth(req) }), 'Unable to load today’s practice.');
+exports.startDaily = action(req => practiceService.startDaily({ focus: req.body.focus, ...auth(req) }), 'Unable to start daily practice.', 201);
+exports.saveWord = action(req => practiceService.saveWord({ word: req.body.word, setId: req.body.setId, ...auth(req) }), 'Unable to save this word.', 201);
+exports.undoSave = action(req => practiceService.undoSave({ termId: req.params.termId, ...auth(req) }), 'Unable to undo this saved word.');

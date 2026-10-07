@@ -16,6 +16,13 @@ const baseFocusInput = {
   practice: [],
 };
 
+test('student focus resumes daily vocabulary spanning multiple collections', () => {
+  const focus = selectFocus({ ...baseFocusInput, vocabularySession: { isDaily: true, setId: null, set: null, mode: 'QUIZ', totalItems: 30 } });
+  assert.equal(focus.title, 'Continue daily vocabulary practice');
+  assert.equal(focus.href, '/dashboard/vocabulary');
+  assert.equal(focus.source, 'SELF_STUDY');
+});
+
 test('student focus prioritizes urgent classroom work over self-study work', () => {
   const focus = selectFocus({
     ...baseFocusInput,

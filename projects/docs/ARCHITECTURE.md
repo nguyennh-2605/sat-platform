@@ -630,7 +630,9 @@ Folder ──1:N── Test
 2. POST /api/vocabulary/sets/:setId/sessions resumes the latest matching in-progress session unless restart is explicit.
 3. Personal/System study sessions may select a one-based range, mastery group, or validated sourceTermIds review queue; assigned activities always use the teacher-owned activity snapshot and question scope.
 4. Flashcard display order and Shuffle state are persisted on the session. Disabling Shuffle restores sourceOrder; reloading does not silently change the order.
-5. Flashcard self-ratings update progress but do not equate Got it with Mastered. Quiz recall remains the canonical path to Mastered.
+5. Recall self-ratings and server-graded quizzes update FSRS scheduling atomically with progress and immutable review logs; Forgot/wrong = Again, Remembered/correct = Good. Legacy counters are preserved; first new answers initialize memory without invented history.
+6. GET /api/vocabulary/practice reports due/new words and learner-local reviews today. POST /api/vocabulary/practice/sessions creates/resumes an isDaily session spanning accessible collections, prioritizing 20 due and 10 new words per batch.
+7. POST /api/vocabulary/saved-words saves a word and definition in a learner-owned Personal collection (default Saved words), without original sentences or passage/source context. Duplicate saves are idempotent; unused saves support Undo. See VOCABULARY_FSRS.md for API and deployment details.
 ```
 
 ### 8.12 Error Log Review Flow

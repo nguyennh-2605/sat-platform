@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const ApiError = require('../utils/ApiError');
+const { scheduleProgress, lockVocabularyUser } = require('./vocabulary-scheduler.service');
 
 const intId = value => Number.parseInt(value, 10);
 const clean = (value, max = 500) => String(value || '').trim().slice(0, max);
@@ -42,7 +43,7 @@ const validateTerms = rawTerms => {
     const meaning = clean(raw.meaning, 500);
     const translation = clean(raw.translation, 300);
     const exampleSentence = clean(raw.exampleSentence, 500) || null;
-    if (!word || !meaning || !translation) throw new ApiError(400, { error: `Term ${order + 1} requires a word, meaning, and translation.` });
+    if (!word || !meaning) throw new ApiError(400, { error: `Term ${order + 1} requires a word and meaning.` });
     if (seen.has(normalizedWord)) throw new ApiError(400, { error: `The word “${word}” appears more than once in this set.` });
     seen.add(normalizedWord);
     const id = clean(raw.id, 80) || undefined;
@@ -99,6 +100,7 @@ const setSummary = (set, progress = [], activeFlashcardSession = null, activeQui
     title: set.title,
     description: set.description,
     scope: set.scope,
+    autoKey: set.autoKey || null,
     status: set.status,
     sourceLanguage: set.sourceLanguage,
     translationLanguage: set.translationLanguage,
@@ -336,6 +338,7 @@ const sourceItemsForSession = async ({ set, activityId, userId, mode }) => {
 const sessionResponse = session => ({
   id: session.id,
   setId: session.setId,
+  isDaily: session.isDaily || false,
   activityId: session.activityId,
   mode: session.mode,
   status: session.status,
@@ -353,12 +356,14 @@ const sessionResponse = session => ({
     id: question.id,
     sourceTermId: question.sourceTermId,
     prompt: question.prompt,
+    dictionaryDefinition: question.dictionaryDefinition || false,
     order: question.order,
     sourceOrder: question.sourceOrder,
     options: question.options,
+    nextDueAt: question.reviewLog?.nextDueAt || null,
     selectedMeaning: question.selectedMeaning,
     isCorrect: question.isCorrect,
-    ...(session.mode === 'FLASHCARD' || question.answeredAt || session.status === 'COMPLETED' ? {
+    ...(session.mode === 'FLASHCARD' || (session.isDaily && question.options.length === 0) || question.answeredAt || session.status === 'COMPLETED' ? {
       meaning: question.correctMeaning,
       translation: question.translation,
       exampleSentence: question.exampleSentence,
@@ -427,6 +432,7 @@ exports.createSession = async ({ setId, activityId, mode, questionCount, startIn
             correctMeaning: item.meaning,
             translation: item.translation,
             exampleSentence: item.exampleSentence || null,
+            dictionaryDefinition: item.dictionaryDefinition || false,
             options: normalizedMode === 'QUIZ' ? shuffle([item.meaning, ...distractors]) : [],
             order,
             sourceOrder: item.sourceOrder,
@@ -439,10 +445,10 @@ exports.createSession = async ({ setId, activityId, mode, questionCount, startIn
   return sessionResponse(session);
 };
 
-exports.getSession = async ({ sessionId, userId }) => {
-  const session = await prisma.vocabularyStudySession.findFirst({
+exports.getSession = async ({ sessionId, userId }, db = prisma) => {
+  const session = await db.vocabularyStudySession.findFirst({
     where: { id: String(sessionId), userId: intId(userId) },
-    include: { questions: { orderBy: { order: 'asc' } } },
+    include: { questions: { orderBy: { order: 'asc' }, include: { reviewLog: { select: { nextDueAt: true } } } } },
   });
   if (!session) throw new ApiError(404, { error: 'Study session not found.' });
   return sessionResponse(session);
@@ -492,15 +498,17 @@ const nextTermMastery = ({ existing, correct, mode }) => {
   };
 };
 
-const updateTermProgress = async (tx, { userId, termId, correct, mode }) => {
+const updateTermProgress = async (tx, { userId, termId, questionId, correct, mode, reviewedAt }) => {
   if (!termId) return;
   const existing = await tx.vocabularyTermProgress.findUnique({ where: { userId_termId: { userId, termId } } });
-  const { mastery, correctStreak } = nextTermMastery({ existing, correct, mode });
+  const { correctStreak } = nextTermMastery({ existing, correct, mode });
+  const { data: memory, log } = scheduleProgress(existing, correct, reviewedAt);
   await tx.vocabularyTermProgress.upsert({
     where: { userId_termId: { userId, termId } },
-    update: { mastery, correctStreak, seenCount: { increment: 1 }, correctCount: { increment: correct ? 1 : 0 }, incorrectCount: { increment: correct ? 0 : 1 }, lastReviewedAt: new Date() },
-    create: { userId, termId, mastery, correctStreak, seenCount: 1, correctCount: correct ? 1 : 0, incorrectCount: correct ? 0 : 1, lastReviewedAt: new Date() },
+    update: { ...memory, correctStreak, seenCount: { increment: 1 }, correctCount: { increment: correct ? 1 : 0 }, incorrectCount: { increment: correct ? 0 : 1 }, lastReviewedAt: reviewedAt },
+    create: { userId, termId, ...memory, correctStreak, seenCount: 1, correctCount: correct ? 1 : 0, incorrectCount: correct ? 0 : 1, lastReviewedAt: reviewedAt },
   });
+  await tx.vocabularyReviewLog.create({ data: { userId, termId, questionId, ...log } });
 };
 
 const finishSessionIfReady = async (tx, sessionId) => {
@@ -536,8 +544,9 @@ const finishSessionIfReady = async (tx, sessionId) => {
   });
 };
 
-exports.answerQuestion = async ({ sessionId, questionId, selectedMeaning, mastery, userId }) => {
-  await prisma.$transaction(async tx => {
+exports.answerQuestion = async ({ sessionId, questionId, selectedMeaning, mastery, userId }, db = prisma) => {
+  await db.$transaction(async tx => {
+    await lockVocabularyUser(tx, intId(userId));
     const session = await tx.vocabularyStudySession.findFirst({
       where: { id: String(sessionId), userId: intId(userId), status: 'IN_PROGRESS' },
     });
@@ -545,20 +554,21 @@ exports.answerQuestion = async ({ sessionId, questionId, selectedMeaning, master
     const question = await tx.vocabularySessionQuestion.findFirst({ where: { id: String(questionId), sessionId: session.id } });
     if (!question) throw new ApiError(404, { error: 'Study question not found.' });
     if (question.answeredAt) throw new ApiError(409, { error: 'This question has already been answered.' });
-    const answer = session.mode === 'FLASHCARD' ? String(mastery || '').toUpperCase() : clean(selectedMeaning, 500);
-    if (session.mode === 'FLASHCARD' && !['KNOW', 'LEARNING'].includes(answer)) throw new ApiError(400, { error: 'Choose Know or Still learning.' });
-    if (session.mode === 'QUIZ' && !(question.options || []).includes(answer)) throw new ApiError(400, { error: 'Choose one of the provided meanings.' });
-    const correct = session.mode === 'FLASHCARD' ? answer === 'KNOW' : answer === question.correctMeaning;
+    const selfRated = session.mode === 'FLASHCARD' || (session.isDaily && question.options.length === 0);
+    const answer = selfRated ? String(mastery || '').toUpperCase() : clean(selectedMeaning, 500);
+    if (selfRated && !['KNOW', 'LEARNING'].includes(answer)) throw new ApiError(400, { error: 'Choose Remembered or Forgot.' });
+    if (!selfRated && !(question.options || []).includes(answer)) throw new ApiError(400, { error: 'Choose one of the provided meanings.' });
+    const correct = selfRated ? answer === 'KNOW' : answer === question.correctMeaning;
     const answeredAt = new Date();
     await tx.vocabularySessionQuestion.update({
       where: { id: question.id },
       data: { selectedMeaning: answer, isCorrect: correct, answeredAt },
     });
     await tx.vocabularyStudySession.update({ where: { id: session.id }, data: { lastActivityAt: answeredAt } });
-    await updateTermProgress(tx, { userId: intId(userId), termId: question.sourceTermId, correct, mode: session.mode });
+    await updateTermProgress(tx, { userId: intId(userId), termId: question.sourceTermId, questionId: question.id, correct, mode: session.mode, reviewedAt: answeredAt });
     await finishSessionIfReady(tx, session.id);
   });
-  return exports.getSession({ sessionId, userId });
+  return exports.getSession({ sessionId, userId }, db);
 };
 
 const assertClassManager = async ({ classId, userId, userRole }) => {
@@ -620,6 +630,7 @@ exports.assignSet = async ({ data, userId, userRole }) => {
               meaning: term.meaning,
               translation: term.translation,
               exampleSentence: term.exampleSentence,
+              dictionaryDefinition: term.dictionaryDefinition,
               order: term.order,
             })),
           },
@@ -698,4 +709,4 @@ exports.getActivityPerformance = async ({ activityId, userId, userRole }) => {
   };
 };
 
-exports._private = { validateTerms, normalizeWord, shuffle, rangeSourceItems, selectSourceItemsById, nextTermMastery, canDeleteSet };
+exports._private = { validateTerms, normalizeWord, shuffle, rangeSourceItems, selectSourceItemsById, nextTermMastery, canDeleteSet, sessionResponse };

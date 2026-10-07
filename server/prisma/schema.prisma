@@ -1181,6 +1181,7 @@ model VocabularySet {
   translationLanguage String                   @default("vi")
   version             Int                      @default(1)
   ownerId             Int?
+  autoKey             String?                  @db.VarChar(40)
   createdById         Int
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -1193,6 +1194,7 @@ model VocabularySet {
 
   @@index([scope, status, publishedAt])
   @@index([ownerId, updatedAt])
+  @@unique([ownerId, autoKey])
 }
 
 model VocabularyTerm {
@@ -1203,6 +1205,7 @@ model VocabularyTerm {
   meaning          String
   translation      String
   exampleSentence  String?
+  dictionaryDefinition Boolean                 @default(false)
   order            Int
   createdAt        DateTime                    @default(now())
   updatedAt        DateTime                    @updatedAt
@@ -1225,11 +1228,40 @@ model VocabularyTermProgress {
   incorrectCount Int               @default(0)
   correctStreak  Int               @default(0)
   lastReviewedAt DateTime?
+  dueAt          DateTime?
+  fsrsStability  Float             @default(0)
+  fsrsDifficulty Float             @default(0)
+  fsrsState      Int               @default(0)
+  fsrsReps       Int               @default(0)
+  fsrsLapses     Int               @default(0)
+  fsrsLearningSteps Int            @default(0)
+  fsrsScheduledDays Int            @default(0)
+  fsrsElapsedDays Int              @default(0)
+  fsrsLastReview DateTime?
+  reviewLogs     VocabularyReviewLog[]
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   term           VocabularyTerm    @relation(fields: [termId], references: [id], onDelete: Cascade)
 
   @@id([userId, termId])
   @@index([userId, mastery])
+  @@index([userId, dueAt])
+}
+
+model VocabularyReviewLog {
+  id            String                  @id @default(uuid())
+  userId        Int
+  termId        String
+  questionId    String?                 @unique
+  rating        Int
+  reviewedAt    DateTime
+  nextDueAt     DateTime
+  previousState Json
+  nextState     Json
+  progress      VocabularyTermProgress @relation(fields: [userId, termId], references: [userId, termId], onDelete: Cascade)
+  question      VocabularySessionQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, reviewedAt])
+  @@index([userId, termId, reviewedAt])
 }
 
 model AdminAuditLog {
@@ -1400,6 +1432,7 @@ model VocabularyActivityItem {
   meaning         String
   translation     String
   exampleSentence String?
+  dictionaryDefinition Boolean       @default(false)
   order           Int
   activity        VocabularyActivity @relation(fields: [activityId], references: [activityId], onDelete: Cascade)
   sourceTerm      VocabularyTerm?    @relation(fields: [sourceTermId], references: [id], onDelete: SetNull)
@@ -1411,7 +1444,8 @@ model VocabularyActivityItem {
 model VocabularyStudySession {
   id             String                      @id @default(uuid())
   userId         Int
-  setId          String
+  setId          String?
+  isDaily        Boolean                     @default(false)
   activityId     String?
   mode           VocabularyStudyMode
   status         VocabularySessionStatus     @default(IN_PROGRESS)
@@ -1424,12 +1458,13 @@ model VocabularyStudySession {
   lastActivityAt DateTime                    @default(now())
   completedAt    DateTime?
   user           User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  set            VocabularySet               @relation(fields: [setId], references: [id], onDelete: Cascade)
+  set            VocabularySet?              @relation(fields: [setId], references: [id], onDelete: Cascade)
   activity       ClassActivity?              @relation(fields: [activityId], references: [id], onDelete: SetNull)
   questions      VocabularySessionQuestion[]
 
   @@index([userId, status, startedAt])
   @@index([userId, setId, mode, status, lastActivityAt])
+  @@index([userId, isDaily, status, lastActivityAt], map: "VocabularyStudySession_daily_active_idx")
   @@index([activityId, userId])
 }
 
@@ -1441,6 +1476,7 @@ model VocabularySessionQuestion {
   correctMeaning  String
   translation     String
   exampleSentence String?
+  dictionaryDefinition Boolean          @default(false)
   options         Json
   order           Int
   sourceOrder     Int?
@@ -1449,6 +1485,7 @@ model VocabularySessionQuestion {
   answeredAt      DateTime?
   session         VocabularyStudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   sourceTerm      VocabularyTerm?        @relation(fields: [sourceTermId], references: [id], onDelete: SetNull)
+  reviewLog       VocabularyReviewLog?
 
   @@unique([sessionId, order])
   @@index([sourceTermId])

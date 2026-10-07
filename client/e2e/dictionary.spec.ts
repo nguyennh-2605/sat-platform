@@ -108,6 +108,23 @@ test('Practice looks up passage and choice text without changing answers; highli
   expect(lookups).toEqual(['ambivalent', 'ambiguous', 'ambivalent']);
 });
 
+test('Practice saves a looked-up word without copying its passage or selecting an answer', async ({ page }) => {
+  await setup(page);
+  let saved: unknown;
+  await page.route('**/api/vocabulary/saved-words', async route => {
+    saved = route.request().postDataJSON();
+    return route.fulfill({ json: { termId: 'saved', setId: 'mine', setTitle: 'Saved words', word: 'ambivalent', created: true } });
+  });
+  await page.goto('/test/1');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await selectWord(reading(page, 'ambivalent'), 'ambivalent');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await lookup(page).getByRole('button', { name: 'Save word', exact: true }).click();
+  await expect(lookup(page)).toContainText('Added to Saved words.');
+  expect(saved).toEqual({ word: 'ambivalent' });
+  await expect(page.locator('button[aria-pressed="true"]').filter({ hasText: 'ambiguous' })).toHaveCount(0);
+});
+
 test('Error Log keeps reflection mounted and saves its draft while looking up a question', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   const { writes } = await setup(page);

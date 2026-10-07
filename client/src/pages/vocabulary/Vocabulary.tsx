@@ -18,6 +18,11 @@ import { DataPagination, DataSurface, DataToolbar, DataToolbarActions, DataToolb
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PracticePanel } from './PracticePanel';
+import { VocabularyQuestion } from './VocabularyQuestion';
+import { DailyPracticeWorkspace } from './DailyPracticeWorkspace';
+import { DictionaryDefinitionCredit } from '@/features/dictionary/DictionaryDefinitionCredit';
+import { formatNextReview, type DailySession } from './practice.types';
 
 type DetailTab = 'TERMS' | 'FLASHCARDS' | 'QUIZ';
 type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
@@ -30,9 +35,9 @@ interface ActiveStudySession { id: string; mode: 'FLASHCARD' | 'QUIZ'; answeredC
 interface SetSummary {
   id: string; title: string; description?: string | null; scope: 'SYSTEM' | 'PERSONAL'; status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'; termCount: number; studiedCount: number; learningCount: number; masteredCount: number; lastStudiedAt?: string | null; activeFlashcardSession?: ActiveStudySession | null; activeQuizSession?: ActiveStudySession | null; ownerId?: number | null; createdAt: string; updatedAt: string; assignedActivityId?: string;
 }
-interface Term { id?: string; sourceTermId?: string | null; word: string; meaning: string; translation: string; exampleSentence?: string | null; progress?: { mastery: string; seenCount?: number; lastReviewedAt?: string | null } | null }
+interface Term { id?: string; sourceTermId?: string | null; word: string; meaning: string; translation: string; dictionaryDefinition?: boolean; exampleSentence?: string | null; progress?: { mastery: string; seenCount?: number; lastReviewedAt?: string | null; dueAt?: string | null } | null }
 interface SetDetail extends SetSummary { canEdit: boolean; canDelete: boolean; version: number; terms: Term[] }
-interface StudyQuestion { id: string; sourceTermId?: string | null; prompt: string; order: number; sourceOrder?: number | null; options: string[]; selectedMeaning?: string | null; isCorrect?: boolean | null; meaning?: string; translation?: string; exampleSentence?: string | null }
+interface StudyQuestion { id: string; sourceTermId?: string | null; prompt: string; order: number; sourceOrder?: number | null; options: string[]; selectedMeaning?: string | null; isCorrect?: boolean | null; meaning?: string; translation?: string; exampleSentence?: string | null; dictionaryDefinition?: boolean; nextDueAt?: string | null }
 interface StudySession { id: string; setId: string; activityId?: string | null; mode: 'FLASHCARD' | 'QUIZ'; status: 'IN_PROGRESS' | 'COMPLETED'; totalItems: number; answeredCount: number; correctCount: number; score: number; rangeStart?: number | null; rangeEnd?: number | null; shuffle: boolean; startedAt: string; lastActivityAt: string; questions: StudyQuestion[] }
 interface InlineTermDraft { word: string; meaning: string; translation: string; exampleSentence: string }
 interface ClassInfo { id: string; name: string }
@@ -91,6 +96,7 @@ export default function Vocabulary() {
   const [selectedWord, setSelectedWord] = useState<Term | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [setsError, setSetsError] = useState('');
   const [selected, setSelected] = useState<SetDetail | null>(null);
   const [activity, setActivity] = useState<VocabularyActivity | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('TERMS');
@@ -102,6 +108,9 @@ export default function Vocabulary() {
   const [studyConfig, setStudyConfig] = useState<StudyConfig | null>(null);
   const [quizSetupOpen, setQuizSetupOpen] = useState(false);
   const [quizConfig, setQuizConfig] = useState<QuizConfig | null>(null);
+  const [dailySession, setDailySession] = useState<DailySession | null>(null);
+  const [collectionScope, setCollectionScope] = useState('ALL');
+  const [collectionQuery, setCollectionQuery] = useState('');
   const requestIdRef = useRef(0);
   const currentCollectionKeyRef = useRef('');
 
@@ -135,12 +144,17 @@ export default function Vocabulary() {
         setCurrentSet(null);
         setCurrentActivity(null);
       }
-      setHasLoaded(true);
-    } catch (error) { appToast.error(errorMessage(error, 'Unable to load vocabulary sets.')); }
+      setHasLoaded(true); setSetsError('');
+    } catch (error) { if (requestId === requestIdRef.current) setSetsError(errorMessage(error, 'Unable to load vocabulary collections.')); }
     finally { if (requestId === requestIdRef.current) setLoading(false); }
   }, [requestedSetId, role]);
 
   useEffect(() => { void loadSets(); }, [loadSets]);
+  useEffect(() => {
+    const changed = () => { void loadSets(true); };
+    window.addEventListener('vocabulary:changed', changed);
+    return () => window.removeEventListener('vocabulary:changed', changed);
+  }, [loadSets]);
 
   useEffect(() => {
     const activityId = searchParams.get('activity');
@@ -253,6 +267,7 @@ export default function Vocabulary() {
   );
 
   const choices = useMemo(() => [...systemSets, ...personalSets, ...assignedSets], [assignedSets, personalSets, systemSets]);
+  const collectionChoices = choices.filter(set => (collectionScope === 'ALL' || (collectionScope === 'MINE' ? set.scope === 'PERSONAL' && !set.assignedActivityId : collectionScope === 'ASSIGNED' ? Boolean(set.assignedActivityId) : set.scope === 'SYSTEM' && !set.assignedActivityId)) && set.title.toLowerCase().includes(collectionQuery.trim().toLowerCase()));
   const currentKey = currentActivity ? `activity:${currentActivity.id}` : currentSet ? `set:${currentSet.id}` : '';
   const distinctMeanings = useMemo(() => new Set(currentSet?.terms.map(term => term.meaning.trim().toLocaleLowerCase('en-US')) || []).size, [currentSet?.terms]);
   const canQuiz = distinctMeanings >= 4;
@@ -272,48 +287,51 @@ export default function Vocabulary() {
   if (creatingSet) return <CollectionEditorScreen key="new-set" role={role} onBack={() => setCreatingSet(false)} onSaved={async detail => { currentCollectionKeyRef.current = `set:${detail.id}`; setCurrentSet(detail); setCurrentActivity(null); setCreatingSet(false); await loadSets(true); }} />;
   if (selected) return <SetWorkspace set={selected} activity={activity} tab={detailTab} onTab={setDetailTab} role={role} studyConfig={studyConfig} quizConfig={quizConfig} onBack={closeDetail} onEdit={() => setEditingSet(selected)} onTermSaved={detail => { setSelected(detail); setCurrentSet(detail); invalidateQueryCache('/api/vocabulary'); }} onAssign={() => setAssignOpen(true)} onRefresh={async () => { const refreshed = await loadCollection({ ...selected, assignedActivityId: activity?.id }, true); setSelected(refreshed.detail); setCurrentSet(refreshed.detail); }} assigner={<AssignDialog open={assignOpen} set={selected} initialClassId={assignToClassId} onClose={closeAssignDialog} />} />;
 
+  if (dailySession) return <DailyPracticeWorkspace initialSession={dailySession} onBack={() => { setDailySession(null); invalidateQueryCache('/api/vocabulary'); void loadSets(true); }} />;
+
   return <div className={ui.page}>
     <main className="relative min-h-0 flex-1 overflow-y-auto"><LoadingBar active={loading} /><div className={ui.content}>
-      <PageHeader title="Vocabulary" description="Build vocabulary through review and retrieval practice." />
-      {!hasLoaded && loading ? <VocabularyHomeSkeleton /> : !currentSet ? <EmptyState icon={<BookOpen size={20} />} title="No vocabulary sets available" description="Create a personal set or ask an administrator to publish a system set." action={<Button variant="outline" onClick={() => setCreatingSet(true)}><Plus size={15} />New set</Button>} /> : <>
+      <PageHeader title="Vocabulary" description="Learn a few words. Review at the right time. Make them stick." />
+      <PracticePanel onStart={setDailySession} />
+      {setsError && <div role="alert" className="mt-6 flex flex-wrap items-center gap-3 rounded-lg border p-4 text-sm"><span className="text-danger">{setsError}</span><Button variant="outline" size="sm" onClick={() => void loadSets(true)}>Reload collections</Button></div>}
+      {!hasLoaded && setsError ? null : !hasLoaded && loading ? <VocabularyHomeSkeleton /> : !currentSet ? <EmptyState icon={<BookOpen size={20} />} title="No vocabulary sets available" description="Create a personal set or ask an administrator to publish a system set." action={<Button variant="outline" onClick={() => setCreatingSet(true)}><Plus size={15} />New set</Button>} /> : <>
         <section aria-labelledby="vocabulary-sets-heading" className="mt-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-baseline gap-2"><h2 id="vocabulary-sets-heading" className="text-heading font-semibold text-foreground">Vocabulary sets</h2><span className="text-caption font-normal text-muted-foreground">{choices.length}</span></div>
-            <Button variant="outline" size="sm" onClick={() => setCreatingSet(true)}><Plus size={15} />New set</Button>
+          <div className="flex items-baseline gap-2"><h2 id="vocabulary-sets-heading" className="text-heading font-semibold text-foreground">Your collections</h2><span className="text-caption font-normal text-muted-foreground">{choices.length}</span></div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <Tabs items={[{ value: 'ALL', label: 'All' }, { value: 'MINE', label: 'Personal' }, { value: 'SYSTEM', label: 'Library' }, ...(role === 'STUDENT' ? [{ value: 'ASSIGNED', label: 'Assigned' }] : [])]} value={collectionScope} onValueChange={setCollectionScope} ariaLabel="Filter collections" className="max-w-full overflow-x-auto" />
+            <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto"><label className="relative min-w-0 flex-1 sm:w-56"><Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input type="search" aria-label="Search collections" placeholder="Find a collection…" className="pl-8" value={collectionQuery} onChange={event => setCollectionQuery(event.target.value)} /></label><Button variant="outline" size="sm" className="shrink-0" onClick={() => setCreatingSet(true)}><Plus size={15} />New collection</Button></div>
           </div>
-          <CollectionGrid sets={choices} currentKey={currentKey} onSelect={selectCollection} />
+          {collectionChoices.length ? <CollectionGrid sets={collectionChoices} currentKey={currentKey} onSelect={selectCollection} /> : <div className="mt-4"><EmptyState compact title="No collections found" description="Try another search or create your own collection." /></div>}
         </section>
 
-        <SelectedSetSummary
-          set={currentSet}
-          activity={currentActivity}
-          role={role}
-          canQuiz={canQuiz}
-          onReview={openFlashcards}
-          onStudyOptions={() => setStudySetupOpen(true)}
-          onQuiz={openQuiz}
-          onQuizOptions={() => setQuizSetupOpen(true)}
-          onAssign={() => setAssignOpen(true)}
-          onEdit={() => setEditingSet(currentSet)}
-          onDelete={() => setDeleteTarget(currentSet)}
-        />
+        <DataSurface className="@container mt-6" aria-label={`${currentSet.title} collection words`}>
+          <SelectedSetSummary
+            set={currentSet}
+            activity={currentActivity}
+            role={role}
+            canQuiz={canQuiz}
+            onReview={openFlashcards}
+            onStudyOptions={() => setStudySetupOpen(true)}
+            onQuiz={openQuiz}
+            onQuizOptions={() => setQuizSetupOpen(true)}
+            onAssign={() => setAssignOpen(true)}
+            onEdit={() => setEditingSet(currentSet)}
+            onDelete={() => setDeleteTarget(currentSet)}
+          />
 
-        <section aria-labelledby="set-words-heading" className="mt-10">
-          <div className="mb-3 flex items-baseline gap-2"><h2 id="set-words-heading" className="text-heading font-semibold text-foreground">Words</h2><span className="text-caption font-normal text-muted-foreground">{currentSet.termCount}</span></div>
-          <DataSurface>
-            <DataToolbar>
-              <DataToolbarGroup className="flex-1">
-                <DataToolbarSearch value={wordQuery} onChange={event => { setWordQuery(event.target.value); setWordPage(1); }} placeholder="Search words…" label="Search words" />
-              </DataToolbarGroup>
-              <DataToolbarActions>
-                <ProgressFilterMenu value={progressFilter} onChange={value => { setProgressFilter(value); setWordPage(1); }} />
-              </DataToolbarActions>
-            </DataToolbar>
-            {visibleTerms.length > 0 && <div className="hidden grid-cols-[minmax(0,1.05fr)_minmax(0,1.55fr)_12rem] gap-6 border-b border-ui-border bg-muted/20 px-5 py-2.5 text-caption font-medium text-muted-foreground md:grid" aria-hidden="true"><span>Word</span><span>Definition</span><span className="text-right">Progress</span></div>}
-            {visibleTerms.length ? <WordList terms={visibleTerms} onSelect={setSelectedWord} /> : <div className="px-4 py-8"><EmptyState compact surface={false} icon={<Search size={19} />} title={currentSet.terms.length ? 'No matching words' : 'No words in this set'} description={currentSet.terms.length ? 'Try another word, meaning, translation, or progress filter.' : 'Add words to this set before starting a review.'} action={currentSet.terms.length ? <Button variant="outline" size="sm" onClick={() => { setWordQuery(''); setProgressFilter('ALL'); }}>Clear filters</Button> : undefined} /></div>}
-            <DataPagination><p className="text-caption text-muted-foreground">{filteredTerms.length ? `Showing ${(safeWordPage - 1) * PAGE_SIZE + 1}–${Math.min(safeWordPage * PAGE_SIZE, filteredTerms.length)} of ${filteredTerms.length} words` : 'Showing 0 words'}</p><Pagination page={safeWordPage} pageCount={pageCount} onChange={setWordPage} /></DataPagination>
-          </DataSurface>
-        </section>
+          <div className="flex items-baseline gap-2 px-4 pt-3 sm:px-5"><h3 id="set-words-heading" className="text-sm font-semibold text-foreground">Words</h3><span className="text-caption text-muted-foreground">{currentSet.termCount}</span></div>
+          <DataToolbar>
+            <DataToolbarGroup className="flex-1">
+              <DataToolbarSearch containerClassName="lg:w-full lg:flex-1" value={wordQuery} onChange={event => { setWordQuery(event.target.value); setWordPage(1); }} placeholder="Search words…" label="Search words" />
+            </DataToolbarGroup>
+            <DataToolbarActions>
+              <ProgressFilterMenu value={progressFilter} onChange={value => { setProgressFilter(value); setWordPage(1); }} />
+            </DataToolbarActions>
+          </DataToolbar>
+          {visibleTerms.length > 0 && <div className="hidden grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.6fr)_7rem] gap-4 border-b border-ui-border bg-muted/40 px-5 py-2 text-xs font-medium text-muted-foreground @[640px]:grid" aria-hidden="true"><span>Word</span><span>Vietnamese meaning</span><span>English definition</span><span>Progress</span></div>}
+          {visibleTerms.length ? <WordList terms={visibleTerms} onSelect={setSelectedWord} /> : <div className="px-4 py-8"><EmptyState compact surface={false} icon={<Search size={19} />} title={currentSet.terms.length ? 'No matching words' : 'No words in this set'} description={currentSet.terms.length ? 'Try another word, meaning, translation, or progress filter.' : 'Add words to this set before starting a review.'} action={currentSet.terms.length ? <Button variant="outline" size="sm" onClick={() => { setWordQuery(''); setProgressFilter('ALL'); }}>Clear filters</Button> : undefined} /></div>}
+          <DataPagination><p className="text-caption text-muted-foreground">{filteredTerms.length ? `Showing ${(safeWordPage - 1) * PAGE_SIZE + 1}–${Math.min(safeWordPage * PAGE_SIZE, filteredTerms.length)} of ${filteredTerms.length} words` : 'Showing 0 words'}</p><Pagination page={safeWordPage} pageCount={pageCount} onChange={setWordPage} /></DataPagination>
+        </DataSurface>
       </>}
     </div></main>
     <DeleteCollectionDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={async deletedId => { if (currentSet?.id === deletedId) currentCollectionKeyRef.current = ''; setDeleteTarget(null); invalidateQueryCache('/api/vocabulary'); await loadSets(true); }} />
@@ -332,11 +350,10 @@ function CollectionCard({ set, active, onClick }: { set: SetSummary; active: boo
   const studiedCount = set.studiedCount || 0;
   const coverage = set.termCount ? Math.round((studiedCount / set.termCount) * 100) : 0;
   const lastStudied = formatStudyDate(set.lastStudiedAt);
-  return <Card className={`group relative min-h-28 overflow-hidden p-0 shadow-none transition-colors hover:bg-muted/40 ${active ? 'border-ui-border-strong bg-muted ring-1 ring-border' : 'border-ui-border bg-surface'}`}>
+  return <Card className={`group relative min-h-28 overflow-hidden p-0 shadow-none transition-colors ${active ? 'border-foreground/80 bg-surface ring-2 ring-foreground/80' : 'border-ui-border bg-surface hover:bg-muted/40'}`}>
     <Button variant="ghost" onClick={onClick} aria-pressed={active} className="absolute inset-0 z-10 h-auto w-full rounded-card bg-transparent p-0 shadow-none hover:bg-transparent" aria-label={`Select ${set.title}`}><span className="sr-only">Select {set.title}</span></Button>
     <div className="pointer-events-none flex min-h-28 min-w-0 flex-col p-4 text-left">
       <span className="flex min-w-0 items-start justify-between gap-3"><span className="line-clamp-2 text-title font-semibold leading-5">{set.title}</span>{set.scope === 'SYSTEM' && !set.assignedActivityId && <Badge tone="neutral">System</Badge>}{set.assignedActivityId && <Badge tone="gold">Assigned</Badge>}</span>
-      {set.description && <span className="mt-1.5 line-clamp-2 whitespace-normal text-caption font-normal leading-4 text-muted-foreground">{set.description}</span>}
       <span className="mt-auto flex items-center justify-between gap-3 pt-4 text-caption font-normal text-muted-foreground"><span>{studiedCount.toLocaleString()} / {set.termCount.toLocaleString()} studied</span><span>{coverage}%</span></span>
       <Progress value={coverage} aria-label={`${coverage}% of words studied`} className="mt-2" />
       <span className="mt-2 text-caption font-normal text-muted-foreground">{set.masteredCount.toLocaleString()} mastered{lastStudied ? ` · Last studied ${lastStudied}` : ''}</span>
@@ -365,20 +382,15 @@ function SelectedSetSummary({ set, activity, role, canQuiz, onReview, onStudyOpt
   const StudyIcon = activeStudy || notStudiedCount === 0 ? RotateCcw : Play;
   const lastStudied = formatStudyDate(set.lastStudiedAt);
   const rangeLabel = activeStudy?.rangeStart && activeStudy.rangeEnd ? `Words ${activeStudy.rangeStart}–${activeStudy.rangeEnd}` : null;
-  return <Card className="mt-6 p-5 shadow-none sm:p-6">
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-      <div className="min-w-0 max-w-3xl">
+  return <div className="flex flex-col gap-4 border-b border-ui-border p-4 sm:px-5 @[640px]:flex-row @[640px]:items-start @[640px]:justify-between">
+      <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-semibold tracking-tight text-foreground">{set.title}</h2>{activity ? <Badge tone="gold">Assigned</Badge> : set.scope === 'SYSTEM' ? <Badge tone="neutral">System</Badge> : null}{set.status !== 'PUBLISHED' && <Badge tone="warning">{set.status === 'DRAFT' ? 'Draft' : 'Archived'}</Badge>}</div>
-        <p className="mt-2 text-caption font-medium text-muted-foreground">{set.termCount.toLocaleString()} words{lastStudied ? ` · Last studied ${lastStudied}` : ''}{activity ? ` · ${activity.class.name}` : ''}</p>
-        <div className="mt-4 max-w-xl" aria-label={`${set.masteredCount} mastered, ${learningCount} learning, ${notStudiedCount} not studied`} role="img">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-caption"><span className="font-medium text-foreground">Learning progress</span><span className="text-muted-foreground">{set.masteredCount} mastered · {learningCount} learning · {studiedCount}/{set.termCount} studied</span></div>
-          <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted"><span className="bg-primary" style={{ width: `${set.termCount ? (set.masteredCount / set.termCount) * 100 : 0}%` }} /><span className="bg-muted-foreground/60" style={{ width: `${set.termCount ? (learningCount / set.termCount) * 100 : 0}%` }} /></div>
-        </div>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{set.termCount.toLocaleString()} words{activity ? ` · ${activity.class.name}` : ''}{lastStudied ? ` · Last studied ${lastStudied}` : ''}</p>
         {activeStudy && <p className="mt-2 text-caption text-foreground">Continue: {activeStudy.answeredCount} of {activeStudy.totalItems} cards studied{!activeStudy.shuffle && activeStudy.nextSourceOrder ? ` · Resume at word ${activeStudy.nextSourceOrder}` : ''}{rangeLabel ? ` · ${rangeLabel}` : ''}</p>}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={onReview} disabled={set.termCount === 0} title={set.termCount === 0 ? 'Add words before starting a study session.' : undefined}><StudyIcon />{studyLabel}</Button>
-        <Button variant="outline" onClick={onQuiz} disabled={!canQuiz} title={!canQuiz ? 'A quiz needs at least four distinct meanings.' : undefined}><ClipboardCheck size={16} />{set.activeQuizSession ? 'Continue quiz' : 'Take quiz'}</Button>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" onClick={onReview} disabled={set.termCount === 0} title={set.termCount === 0 ? 'Add words before starting a study session.' : undefined}><StudyIcon />{studyLabel}</Button>
+        <Button variant="ghost" size="sm" onClick={onQuiz} disabled={!canQuiz} title={!canQuiz ? 'A quiz needs at least four distinct meanings.' : undefined}><ClipboardCheck size={16} />{set.activeQuizSession ? 'Continue quiz' : 'Take quiz'}</Button>
         {hasContextActions && <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="shadow-none" aria-label={`More actions for ${set.title}`}><MoreHorizontal size={18} /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
@@ -391,8 +403,7 @@ function SelectedSetSummary({ set, activity, role, canQuiz, onReview, onStudyOpt
           </DropdownMenuContent>
         </DropdownMenu>}
       </div>
-    </div>
-  </Card>;
+  </div>;
 }
 
 function DeleteCollectionDialog({ target, onClose, onDeleted }: { target: SetSummary | null; onClose: () => void; onDeleted: (setId: string) => Promise<void> }) {
@@ -431,17 +442,17 @@ function ProgressFilterMenu({ value, onChange }: { value: ProgressFilter; onChan
 }
 
 const WordList = memo(function WordList({ terms, onSelect }: { terms: Term[]; onSelect: (term: Term) => void }) {
-  return <div className="divide-y divide-ui-border/60">{terms.map((term, index) => <WordListRow key={term.id || `${term.word}-${index}`} term={term} onSelect={() => onSelect(term)} />)}</div>;
+  return <div>{terms.map((term, index) => <div key={term.id || `${term.word}-${index}`} className="border-b border-ui-border last:border-b-0"><WordListRow term={term} onSelect={() => onSelect(term)} /></div>)}</div>;
 });
 
 const WordListRow = memo(function WordListRow({ term, onSelect }: { term: Term; onSelect: () => void }) {
   const { label, tone } = masteryDetails(term);
-  const reviewed = term.progress?.lastReviewedAt ? new Date(term.progress.lastReviewedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
-  return <Button variant="ghost" onClick={onSelect} className="h-auto min-h-20 w-full justify-start rounded-none px-4 py-3 text-left shadow-none hover:bg-muted/30 sm:px-5">
-    <span className="grid min-w-0 flex-1 gap-3 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1.55fr)_12rem] md:items-center md:gap-6">
-      <span className="min-w-0"><span className="block truncate text-body font-semibold text-foreground">{term.word}</span><span className="mt-1 block truncate text-caption font-normal text-foreground/80">{term.translation}</span></span>
-      <span className="line-clamp-2 whitespace-normal text-body font-normal leading-5 text-muted-foreground">{term.meaning}</span>
-      <span className="flex flex-wrap items-center gap-2 md:justify-end"><Badge tone={tone}>{label}</Badge>{reviewed && <span className="text-[11px] font-normal text-muted-foreground">Reviewed {reviewed}</span>}</span>
+  return <Button variant="ghost" onClick={onSelect} aria-label={`View ${term.word}`} className="h-auto min-h-14 w-full justify-start rounded-none! px-4 py-3 text-left shadow-none hover:bg-muted/40 sm:px-5 @[640px]:py-2.5">
+    <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 @[640px]:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.6fr)_7rem] @[640px]:items-center @[640px]:gap-4">
+      <span className="min-w-0 break-words whitespace-normal text-sm font-semibold text-foreground">{term.word}</span>
+      <span className="col-span-2 min-w-0 break-words whitespace-normal text-sm font-normal leading-5 text-foreground/80 @[640px]:col-span-1"><span className="mb-0.5 block text-xs text-muted-foreground @[640px]:hidden">Vietnamese meaning</span>{term.translation || <span className="text-muted-foreground" aria-label="No Vietnamese meaning">—</span>}</span>
+      <span className="col-span-2 min-w-0 break-words whitespace-normal text-sm font-normal leading-5 text-muted-foreground @[640px]:col-span-1"><span className="mb-0.5 block text-xs @[640px]:hidden">English definition</span>{term.meaning}</span>
+      <span className="col-start-2 row-start-1 flex items-center justify-end @[640px]:col-start-auto @[640px]:row-start-auto @[640px]:justify-start"><Badge tone={tone}>{label}</Badge></span>
     </span>
   </Button>;
 });
@@ -452,7 +463,7 @@ function WordDetailSheet({ term, onOpenChange }: { term: Term | null; onOpenChan
     ? new Date(term.progress.lastReviewedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : 'Not reviewed yet';
   return <Sheet open={Boolean(term)} onOpenChange={onOpenChange}>
-    <SheetContent className="w-full gap-0 sm:max-w-md">
+    <SheetContent overlayClassName="bg-transparent supports-backdrop-filter:backdrop-blur-none" className="w-full gap-0 shadow-none sm:max-w-md">
       <SheetHeader className="border-b border-ui-border px-5 py-5 pr-14">
         <SheetTitle className="text-xl font-semibold tracking-tight">{term?.word || 'Word details'}</SheetTitle>
         <SheetDescription className="text-sm text-foreground/80">{term?.translation}</SheetDescription>
@@ -460,7 +471,9 @@ function WordDetailSheet({ term, onOpenChange }: { term: Term | null; onOpenChan
       {term && <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
         <dl className="space-y-6">
           <div><dt className="text-caption font-medium text-muted-foreground">Definition</dt><dd className="mt-2 text-body leading-6 text-foreground">{term.meaning}</dd></div>
-          <div><dt className="text-caption font-medium text-muted-foreground">Example</dt><dd className="mt-2 text-body leading-6 text-foreground">{term.exampleSentence ? <span className="italic">“{term.exampleSentence}”</span> : <span className="text-muted-foreground">No example sentence yet.</span>}</dd></div>
+          {term.dictionaryDefinition && <DictionaryDefinitionCredit word={term.word} />}
+          {term.exampleSentence && <div><dt className="text-caption font-medium text-muted-foreground">Example</dt><dd className="mt-2 text-body leading-6 text-foreground"><span className="italic">“{term.exampleSentence}”</span></dd></div>}
+          <div><dt className="text-caption font-medium text-muted-foreground">Next review</dt><dd className="mt-2 text-body">{term.progress?.dueAt ? formatNextReview(term.progress.dueAt) : 'Ready for daily practice'}</dd></div>
           <div className="grid grid-cols-2 gap-4 border-t border-ui-border pt-5">
             <div><dt className="text-caption font-medium text-muted-foreground">Progress</dt><dd className="mt-2">{progress && <Badge tone={progress.tone}>{progress.label}</Badge>}</dd></div>
             <div><dt className="text-caption font-medium text-muted-foreground">Last reviewed</dt><dd className="mt-2 text-body text-foreground">{lastReviewed}</dd></div>
@@ -648,7 +661,7 @@ function FlashcardWorkspace({ set, activityId, config, canEdit, onBack, onTermSa
   const cancelTermEdit = () => { setEditingQuestionId(null); setTermDraft(null); };
   const updateTermDraft = (field: keyof InlineTermDraft, value: string) => setTermDraft(current => current ? { ...current, [field]: value } : current);
   const saveTermEdit = async () => {
-    if (!editingQuestionId || !termDraft || savingTerm || !termDraft.word.trim() || !termDraft.meaning.trim() || !termDraft.translation.trim()) return;
+    if (!editingQuestionId || !termDraft || savingTerm || !termDraft.word.trim() || !termDraft.meaning.trim()) return;
     setSavingTerm(true);
     try {
       const detail = await axiosClient.patch<SetDetail, SetDetail>(`/api/vocabulary/sets/${set.id}/terms/${editingQuestionId}`, termDraft);
@@ -709,8 +722,10 @@ function FlashcardWorkspace({ set, activityId, config, canEdit, onBack, onTermSa
             <Button variant="ghost" size="icon" className="hidden h-12 w-12 sm:inline-flex" disabled={index === orderedQuestions.length - 1} onClick={() => goTo(index + 1)} aria-label="Next flashcard"><ChevronRight size={25} /></Button>
           </div>
 
-          <div className="mx-auto mt-5 flex max-w-[820px] flex-wrap items-center justify-between gap-3"><div className="flex gap-2 sm:hidden"><Button variant="outline" size="icon" disabled={index === 0} onClick={() => goTo(index - 1)} aria-label="Previous flashcard"><ChevronLeft size={20} /></Button><Button variant="outline" size="icon" disabled={index === orderedQuestions.length - 1} onClick={() => goTo(index + 1)} aria-label="Next flashcard"><ChevronRight size={20} /></Button></div><div className="flex gap-2"><Button variant={shuffled ? 'secondary' : 'outline'} aria-pressed={shuffled} disabled={reordering} onClick={() => void toggleShuffle()} title={shuffled ? 'Restore the original set order' : 'Shuffle cards randomly'}><Shuffle size={16} />{reordering ? 'Updating…' : 'Shuffle'}</Button><Button variant={autoplay ? 'default' : 'outline'} onClick={() => setAutoplay(value => !value)}>{autoplay ? <Pause size={16} /> : <Play size={16} />}{autoplay ? 'Pause' : 'Autoplay'}</Button></div>{flipped ? current.selectedMeaning ? <Badge tone={current.selectedMeaning === 'KNOW' ? 'success' : 'warning'}>{current.selectedMeaning === 'KNOW' ? 'Got it' : 'Still learning'}</Badge> : <div className="flex gap-2"><Button variant="outline" disabled={saving} onClick={() => void answer('LEARNING')}>Still learning</Button><Button disabled={saving} onClick={() => void answer('KNOW')}><Check size={16} />Got it</Button></div> : <p className="hidden text-caption text-muted-foreground md:block">Flip the card to rate your recall</p>}</div>
-          <p className="mx-auto mt-3 hidden max-w-[820px] text-center text-caption text-muted-foreground md:block"><kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">Space</kbd> flip · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">←</kbd> <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">→</kbd> move · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">1</kbd> still learning · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">2</kbd> got it · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">P</kbd> pronounce</p>
+          <div className="mx-auto mt-5 flex max-w-[820px] flex-wrap items-center justify-between gap-3"><div className="flex gap-2 sm:hidden"><Button variant="outline" size="icon" disabled={index === 0} onClick={() => goTo(index - 1)} aria-label="Previous flashcard"><ChevronLeft size={20} /></Button><Button variant="outline" size="icon" disabled={index === orderedQuestions.length - 1} onClick={() => goTo(index + 1)} aria-label="Next flashcard"><ChevronRight size={20} /></Button></div><div className="flex gap-2"><Button variant={shuffled ? 'secondary' : 'outline'} aria-pressed={shuffled} disabled={reordering} onClick={() => void toggleShuffle()} title={shuffled ? 'Restore the original set order' : 'Shuffle cards randomly'}><Shuffle size={16} />{reordering ? 'Updating…' : 'Shuffle'}</Button><Button variant={autoplay ? 'default' : 'outline'} onClick={() => setAutoplay(value => !value)}>{autoplay ? <Pause size={16} /> : <Play size={16} />}{autoplay ? 'Pause' : 'Autoplay'}</Button></div>{flipped ? current.selectedMeaning ? <Badge tone={current.selectedMeaning === 'KNOW' ? 'success' : 'warning'}>{current.selectedMeaning === 'KNOW' ? 'Got it' : 'Still learning'}</Badge> : <div className="flex gap-2"><Button variant="outline" disabled={saving} onClick={() => void answer('LEARNING')}>Forgot</Button><Button disabled={saving} onClick={() => void answer('KNOW')}><Check size={16} />Remembered</Button></div> : <p className="hidden text-caption text-muted-foreground md:block">Flip the card to rate your recall</p>}</div>
+          {flipped && current.dictionaryDefinition && <div className="mx-auto mt-3 max-w-[820px]"><DictionaryDefinitionCredit word={current.prompt} /></div>}
+          {current.selectedMeaning && current.nextDueAt && <p className="mt-3 text-center text-xs text-muted-foreground">Next review: {formatNextReview(current.nextDueAt)}</p>}
+          <p className="mx-auto mt-3 hidden max-w-[820px] text-center text-caption text-muted-foreground md:block"><kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">Space</kbd> flip · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">←</kbd> <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">→</kbd> move · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">1</kbd> forgot · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">2</kbd> remembered · <kbd className="rounded-sm border border-ui-border bg-muted px-1.5 py-0.5 font-mono text-foreground">P</kbd> pronounce</p>
         </section>
 
         <section aria-labelledby="terms-in-set-heading" className="mt-16"><div className="flex items-end justify-between gap-4"><div><h2 id="terms-in-set-heading" className="text-display font-semibold text-foreground">Terms in this set</h2><p className="mt-1 text-body text-muted-foreground">Review every term and its complete definition.</p></div><div className="flex items-center gap-2">{!canEdit && <Badge tone="neutral">Read only</Badge>}<Badge tone="neutral">{orderedQuestions.length} terms</Badge>{session?.status === 'COMPLETED' && <Badge tone="success">Session complete · {session.score}%</Badge>}</div></div><div className="mt-5 space-y-4">{orderedQuestions.map(question => <InlineEditableTermCard key={question.id} question={question} canEdit={canEdit} editing={editingQuestionId === question.id} draft={editingQuestionId === question.id ? termDraft : null} saving={savingTerm} onEdit={() => beginTermEdit(question)} onCancel={cancelTermEdit} onChange={updateTermDraft} onSave={() => void saveTermEdit()} />)}</div></section>
@@ -731,7 +746,7 @@ function FlashcardCompleteScreen({ session, loading, canReviewStillLearning, onR
 
 const InlineEditableTermCard = memo(function InlineEditableTermCard({ question, canEdit, editing, draft, saving, onEdit, onCancel, onChange, onSave }: { question: StudyQuestion; canEdit: boolean; editing: boolean; draft: InlineTermDraft | null; saving: boolean; onEdit: () => void; onCancel: () => void; onChange: (field: keyof InlineTermDraft, value: string) => void; onSave: () => void }) {
   if (editing && draft) {
-    const valid = Boolean(draft.word.trim() && draft.meaning.trim() && draft.translation.trim());
+    const valid = Boolean(draft.word.trim() && draft.meaning.trim());
     return <Card className="overflow-hidden border-primary shadow-raised ring-2 ring-primary/10">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary/15 bg-primary-soft/60 px-4 py-3 sm:px-5">
         <div className="flex items-center gap-2 text-caption font-semibold text-primary"><Edit3 size={15} />Editing term</div>
@@ -741,7 +756,7 @@ const InlineEditableTermCard = memo(function InlineEditableTermCard({ question, 
         <label className="text-caption font-medium text-foreground">Word <span className="text-danger">*</span><Input autoFocus className="mt-2 w-full" value={draft.word} onChange={event => onChange('word', event.target.value)} placeholder="Enter the word" /></label>
         <div className="grid gap-4 border-ui-border-strong sm:border-l-2 sm:pl-6">
           <label className="text-caption font-medium text-foreground">English meaning <span className="text-danger">*</span><Input className="mt-2 w-full" value={draft.meaning} onChange={event => onChange('meaning', event.target.value)} placeholder="Enter the English meaning" /></label>
-          <label className="text-caption font-medium text-foreground">Translation <span className="text-danger">*</span><Input className="mt-2 w-full" value={draft.translation} onChange={event => onChange('translation', event.target.value)} placeholder="Enter the translation" /></label>
+          <label className="text-caption font-medium text-foreground">Translation <span className="font-normal text-muted-foreground">(optional)</span><Input className="mt-2 w-full" value={draft.translation} onChange={event => onChange('translation', event.target.value)} placeholder="Enter the translation" /></label>
           <label className="text-caption font-medium text-foreground">Example sentence <span className="font-normal text-muted-foreground">(optional)</span><Input className="mt-2 w-full" value={draft.exampleSentence} onChange={event => onChange('exampleSentence', event.target.value)} placeholder="Use the word in a sentence" /></label>
         </div>
       </div>
@@ -868,10 +883,7 @@ function QuizWorkspace({ set, activityId, config }: { set: SetDetail; activityId
   return <div className={ui.page}>
     <main className="relative min-h-0 flex-1 overflow-y-auto"><LoadingBar active={loading || saving} /><div className={`${ui.content} !max-w-[980px] !pt-5`}>
       <div className="flex min-h-9 items-center justify-center"><h1 className="hidden text-title font-semibold text-foreground sm:block">{set.title}</h1></div>
-      {loading ? <Skeleton className="mt-8 h-[520px]" /> : !current || !session ? <EmptyState icon={<ClipboardCheck size={20} />} title="Quiz unavailable" description="There are not enough matching words for this quiz." /> : <section aria-labelledby="quiz-question-heading" className="mt-6"><div className="flex items-center justify-between gap-4"><p className="text-caption font-semibold uppercase tracking-wide text-primary">Question {index + 1} of {session.totalItems}</p><p className="text-caption text-muted-foreground">Choose one answer</p></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${((index + 1) / session.totalItems) * 100}%` }} /></div>
-        <Card className="mt-7 overflow-hidden"><div className="border-b border-ui-border bg-muted/40 px-6 py-5 text-center"><p className="text-caption font-medium uppercase tracking-[0.16em] text-muted-foreground">Target word</p><h2 id="quiz-question-heading" className="mt-4 text-[clamp(2rem,5vw,3.25rem)] font-semibold leading-tight text-foreground">{current.prompt}</h2>{current.translation && answered && <p className="mt-3 text-title font-medium text-primary">{current.translation}</p>}</div><div className="p-5 sm:p-7"><p className="text-title font-semibold text-foreground">Which meaning best matches this word?</p><div className="mt-5 grid gap-3">{current.options.map((option, optionIndex) => { const selected = selectedAnswer === option; const correct = answered && option === current.meaning; const incorrect = answered && selected && !current.isCorrect; return <button key={option} type="button" disabled={answered || saving} onClick={() => setSelectedAnswer(option)} className={`flex min-h-16 items-center gap-4 rounded-control border px-4 py-3 text-left transition-colors ${correct ? 'border-success bg-success-soft text-success' : incorrect ? 'border-danger bg-danger-soft text-danger' : selected ? 'border-primary bg-primary-soft ring-1 ring-primary/20' : 'border-ui-border bg-surface text-foreground hover:border-primary/45 hover:bg-primary-soft/40'}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-caption font-semibold ${correct ? 'bg-success text-white' : incorrect ? 'bg-danger text-white' : selected ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>{String.fromCharCode(65 + optionIndex)}</span><span className="flex-1 text-body font-medium">{option}</span>{correct && <Check size={19} />}{incorrect && <X size={19} />}</button>; })}</div>{answered && <div className={`mt-5 rounded-control border p-4 ${current.isCorrect ? 'border-success/25 bg-success-soft' : 'border-danger/20 bg-danger-soft'}`}><p className="font-semibold text-foreground">{current.isCorrect ? 'Correct — well done.' : 'Not quite — review the correct meaning.'}</p>{current.exampleSentence && <p className="mt-1 text-caption italic text-muted-foreground">“{current.exampleSentence}”</p>}</div>}</div></Card>
-        <div className="mt-5 flex justify-end"><Button size="lg" className="min-w-40" disabled={saving || (!answered && !selectedAnswer)} onClick={() => answered ? next() : void submit()}>{answered ? 'Next question' : 'Check answer'}<ChevronRight size={18} /></Button></div>
-      </section>}
+      {loading ? <Skeleton className="mt-8 h-[520px]" /> : !current || !session ? <EmptyState icon={<ClipboardCheck size={20} />} title="Quiz unavailable" description="There are not enough matching words for this quiz." /> : <VocabularyQuestion question={current} index={index} totalItems={session.totalItems} selectedAnswer={selectedAnswer} saving={saving} onSelect={setSelectedAnswer} onSubmit={() => void submit()} onNext={next} />}
     </div></main>
   </div>;
 }
@@ -884,7 +896,7 @@ function QuizCompleteScreen({ session, elapsedSeconds, retrying, onRetry }: { se
     <PageHeader title="Quiz complete" description="Vocabulary practice results." />
     <section className="text-center"><Mascot state="success" size="lg" animated className="mx-auto" /><h1 className="mt-3 text-display font-semibold text-foreground">Quiz complete</h1><p className="mt-2 text-title text-muted-foreground">{mistakes.length ? `${mistakes.length} ${mistakes.length === 1 ? 'word needs' : 'words need'} another review.` : 'Excellent work — every answer was correct.'}</p></section>
     <section aria-label="Quiz results" className="mt-8 grid gap-4 md:grid-cols-3"><Card className="relative overflow-hidden p-6"><Target size={70} className="absolute -right-3 -top-3 text-primary opacity-[0.08]" /><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Final score</p><p className="mt-4 text-display font-semibold text-primary">{session.correctCount}<span className="text-heading font-medium text-muted-foreground"> / {session.totalItems}</span></p><p className="mt-3 text-caption font-medium text-success">{session.score >= 80 ? 'Strong performance' : 'Keep building recall'}</p></Card><Card className="p-6"><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Accuracy</p><div className="mt-4 flex items-center gap-4"><div className="relative flex h-20 w-20 items-center justify-center rounded-full" style={{ background: `conic-gradient(var(--ui-primary) ${session.score}%, var(--ui-muted) 0)` }}><span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface text-title font-semibold">{session.score}%</span></div><p className="text-caption text-muted-foreground">{session.correctCount} correct<br />{mistakes.length} incorrect</p></div></Card><Card className="p-6"><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Total time</p><div className="mt-4 flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary"><Clock3 size={20} /></span><p className="text-heading font-semibold text-foreground">{minutes}m {String(seconds).padStart(2, '0')}s</p></div><p className="mt-4 text-caption text-muted-foreground">Completed {session.totalItems} questions</p></Card></section>
-    <section id="quiz-mistakes" aria-labelledby="quiz-review-heading" className="mt-8"><Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border px-5 py-4 sm:px-6"><div><h2 id="quiz-review-heading" className="text-heading font-semibold text-foreground">Words to review</h2><p className="mt-1 text-caption text-muted-foreground">Review incorrect answers before your next attempt.</p></div><Badge tone={mistakes.length ? 'danger' : 'success'}>{mistakes.length} {mistakes.length === 1 ? 'mistake' : 'mistakes'}</Badge></div>{mistakes.length ? <div className="divide-y divide-ui-border">{mistakes.map(question => <div key={question.id} className="grid gap-4 p-5 sm:grid-cols-[0.65fr_1fr_1fr] sm:p-6"><div><p className="font-semibold text-foreground">{question.prompt}</p><p className="mt-1 text-caption font-medium text-primary">{question.translation}</p></div><div><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Your answer</p><p className="mt-2 text-body text-danger">{question.selectedMeaning}</p></div><div><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Correct meaning</p><p className="mt-2 text-body text-success">{question.meaning}</p></div></div>)}</div> : <div className="p-8 text-center"><Check size={24} className="mx-auto text-success" /><p className="mt-3 font-semibold text-foreground">Nothing to review</p><p className="mt-1 text-caption text-muted-foreground">You answered every question correctly.</p></div>}</Card></section>
+    <section id="quiz-mistakes" aria-labelledby="quiz-review-heading" className="mt-8"><Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border px-5 py-4 sm:px-6"><div><h2 id="quiz-review-heading" className="text-heading font-semibold text-foreground">Words to review</h2><p className="mt-1 text-caption text-muted-foreground">Review incorrect answers before your next attempt.</p></div><Badge tone={mistakes.length ? 'danger' : 'success'}>{mistakes.length} {mistakes.length === 1 ? 'mistake' : 'mistakes'}</Badge></div>{mistakes.length ? <div className="divide-y divide-ui-border">{mistakes.map(question => <div key={question.id} className="grid gap-4 p-5 sm:grid-cols-[0.65fr_1fr_1fr] sm:p-6"><div><p className="font-semibold text-foreground">{question.prompt}</p><p className="mt-1 text-caption font-medium text-primary">{question.translation}</p></div><div><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Your answer</p><p className="mt-2 text-body text-danger">{question.selectedMeaning}</p></div><div><p className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">Correct meaning</p><p className="mt-2 text-body text-success">{question.meaning}</p>{question.dictionaryDefinition && <DictionaryDefinitionCredit word={question.prompt} />}</div></div>)}</div> : <div className="p-8 text-center"><Check size={24} className="mx-auto text-success" /><p className="mt-3 font-semibold text-foreground">Nothing to review</p><p className="mt-1 text-caption text-muted-foreground">You answered every question correctly.</p></div>}</Card></section>
     <div className="mt-7 flex flex-wrap justify-end gap-3">{mistakes.length > 0 && <Button variant="outline" size="lg" onClick={() => document.getElementById('quiz-mistakes')?.scrollIntoView({ behavior: 'smooth' })}>Review mistakes</Button>}<Button variant="outline" size="lg" disabled={retrying} onClick={onRetry}><RotateCcw size={17} />{retrying ? 'Starting…' : 'Retry quiz'}</Button></div>
   </div></main></div>;
 }
@@ -904,7 +916,7 @@ function CollectionEditorScreen({ role, set, onBack, onSaved }: { role: UserRole
   const updateTerm = useCallback((index: number, field: keyof Term, value: string) => setTerms(current => current.map((term, termIndex) => termIndex === index ? { ...term, [field]: value } : term)), []);
   const removeTerm = useCallback((index: number) => setTerms(current => current.length === 1 ? current : current.filter((_, termIndex) => termIndex !== index)), []);
   const addTerm = useCallback(() => setTerms(current => [...current, createDraftTerm()]), []);
-  const canSave = Boolean(title.trim()) && terms.length > 0 && terms.every(term => term.word.trim() && term.meaning.trim() && term.translation.trim());
+  const canSave = Boolean(title.trim()) && terms.length > 0 && terms.every(term => term.word.trim() && term.meaning.trim());
   const save = async () => {
     if (!canSave || saving) return;
     setSaving(true);
@@ -952,7 +964,7 @@ const VocabularyTermEditor = memo(function VocabularyTermEditor({ index, term, c
     <div className="grid gap-4 p-5 sm:p-6 md:grid-cols-2">
       <label className="text-caption font-medium text-foreground">Word <span className="text-danger">*</span><Input className="mt-2 h-10 w-full" value={term.word} onChange={event => onUpdate(index, 'word', event.target.value)} placeholder="Enter a word" /></label>
       <label className="text-caption font-medium text-foreground">English meaning <span className="text-danger">*</span><Input className="mt-2 h-10 w-full" value={term.meaning} onChange={event => onUpdate(index, 'meaning', event.target.value)} placeholder="Enter the definition" /></label>
-      <label className="text-caption font-medium text-foreground">Translation <span className="text-danger">*</span><Input className="mt-2 h-10 w-full" value={term.translation} onChange={event => onUpdate(index, 'translation', event.target.value)} placeholder="Enter the translation" /></label>
+      <label className="text-caption font-medium text-foreground">Translation <span className="font-normal text-muted-foreground">(optional)</span><Input className="mt-2 h-10 w-full" value={term.translation} onChange={event => onUpdate(index, 'translation', event.target.value)} placeholder="Enter the translation" /></label>
       <label className="text-caption font-medium text-foreground">Example sentence <span className="font-normal text-muted-foreground">(optional)</span><Input className="mt-2 h-10 w-full" value={term.exampleSentence || ''} onChange={event => onUpdate(index, 'exampleSentence', event.target.value)} placeholder="Use the word in context" /></label>
     </div>
   </Card>;

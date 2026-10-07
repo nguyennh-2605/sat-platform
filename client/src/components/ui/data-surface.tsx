@@ -69,11 +69,12 @@ function DataDock({ className, placement = 'inline', ...props }: DataDockProps) 
 
 interface DataToolbarSearchProps extends Omit<React.ComponentProps<typeof Input>, 'type'> {
   label?: string;
+  containerClassName?: string;
 }
 
-function DataToolbarSearch({ className, label = 'Search', ...props }: DataToolbarSearchProps) {
+function DataToolbarSearch({ className, containerClassName, label = 'Search', ...props }: DataToolbarSearchProps) {
   return (
-    <label className="relative block w-full min-w-0 lg:w-64 lg:shrink-0">
+    <label className={cn('relative block w-full min-w-0 lg:w-64 lg:shrink-0', containerClassName)}>
       <span className="sr-only">{label}</span>
       <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
       <Input type="search" aria-label={label} className={cn('pl-8', className)} {...props} />

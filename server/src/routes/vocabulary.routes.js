@@ -1,11 +1,16 @@
 const express = require('express');
 const controller = require('../controllers/vocabulary.controller');
 const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
+const { createRateLimiter } = require('../middleware/rate-limit.middleware');
 
 const router = express.Router();
 const staffOnly = authorizeRole(['TEACHER', 'ADMIN']);
 
 router.use(authenticateToken);
+router.get('/practice', controller.practiceOverview);
+router.post('/practice/sessions', controller.startDaily);
+router.post('/saved-words', createRateLimiter({ windowMs: 60_000, max: 30, key: req => String(req.user.userId), message: 'Too many saved words. Please try again shortly.' }), controller.saveWord);
+router.delete('/saved-words/:termId', controller.undoSave);
 router.get('/sets', controller.listSets);
 router.post('/sets', controller.createSet);
 router.get('/sets/:setId', controller.getSet);

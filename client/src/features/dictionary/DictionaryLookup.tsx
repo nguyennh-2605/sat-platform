@@ -5,6 +5,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { QuizToolContext } from '@/context/quiz-tool-context';
 import axiosClient from '@/lib/axios';
 import { DictionaryContext, normalizeSelectedWord } from './dictionary-context';
+import { SaveVocabularyWord } from './SaveVocabularyWord';
 
 interface SelectionState { word: string; rect: DOMRect; annotations: boolean; mode: 'action' | 'definition' }
 interface DictionarySense { definition: string; examples: string[]; synonyms: string[]; tags: string[] }
@@ -135,6 +136,7 @@ function Definition({ word, onClose }: { word: string; onClose: () => void }) {
         {total > 4 && <Button variant="ghost" size="sm" onClick={() => setExpanded(value => !value)}>{expanded ? 'Show less' : 'Show more'}</Button>}
       </div>}
     </div>
+    {result?.found && <div className="border-t border-ui-border p-4"><SaveVocabularyWord word={word} /></div>}
     {result && <div className="border-t border-ui-border px-4 py-2 text-caption text-muted-foreground">
       <a className="underline underline-offset-2" href={result.sourceUrl} target="_blank" rel="noopener noreferrer">Wiktionary</a>{' via '}<a className="underline underline-offset-2" href="https://freedictionaryapi.com/" target="_blank" rel="noopener noreferrer">FreeDictionaryAPI.com</a>{' · '}<a className="underline underline-offset-2" href={result.licenseUrl} target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>
     </div>}

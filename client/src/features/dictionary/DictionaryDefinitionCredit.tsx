@@ -1,0 +1,3 @@
+export function DictionaryDefinitionCredit({ word }: { word: string }) {
+  return <p className="text-xs leading-5 text-muted-foreground">Definition from <a className="rounded-control underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring" href={`https://en.wiktionary.org/wiki/${encodeURIComponent(word)}#English`} target="_blank" rel="noopener noreferrer">Wiktionary</a> via FreeDictionaryAPI.com · <a className="rounded-control underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring" href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>.</p>;
+}
