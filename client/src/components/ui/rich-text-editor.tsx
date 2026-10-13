@@ -32,6 +32,7 @@ interface RichTextFormats {
 }
 
 interface RichTextEditorHandle {
+  preserveSelection: () => void;
   toggleInline: (format: 'bold' | 'italic' | 'underline') => void;
   toggleList: (list: 'ordered' | 'bullet') => void;
   setLink: (href: string | null) => void;
@@ -124,6 +125,7 @@ const NativeRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProp
   };
 
   useImperativeHandle(forwardedRef, () => ({
+    preserveSelection() { rememberSelection(); },
     toggleInline(format) { runCommand(format); },
     toggleList(list) { runCommand(list === 'ordered' ? 'insertOrderedList' : 'insertUnorderedList'); },
     setLink(href) { runCommand(href ? 'createLink' : 'unlink', href || undefined); },

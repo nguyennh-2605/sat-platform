@@ -31,6 +31,7 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
   const rootRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<ReactQuill>(null);
   const lastSelection = useRef<{ index: number; length: number } | null>(null);
+  const preservedSelection = useRef<{ index: number; length: number } | null>(null);
   const lastFormats = useRef<RichTextFormats>(emptyFormats);
   const formatFrame = useRef<number | null>(null);
   const compositionFrame = useRef<number | null>(null);
@@ -64,7 +65,8 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
   const withEditor = (callback: (editor: ReturnType<ReactQuill['getEditor']>, selection: { index: number; length: number }) => void) => {
     const editor = quillRef.current?.getEditor();
     if (!editor) return;
-    const selection = editor.getSelection() || lastSelection.current || { index: editor.getLength() - 1, length: 0 };
+    const selection = preservedSelection.current || editor.getSelection() || lastSelection.current || { index: editor.getLength() - 1, length: 0 };
+    preservedSelection.current = null;
     editor.setSelection(selection.index, selection.length, 'silent');
     editor.focus();
     callback(editor, selection);
@@ -74,6 +76,12 @@ const QuillRichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps
   };
 
   useImperativeHandle(forwardedRef, () => ({
+    preserveSelection() {
+      // Capture synchronously before a link input takes focus. Quill's delayed
+      // selection-change events can otherwise replace the selected text with a caret.
+      const selection = quillRef.current?.getEditor().getSelection() || lastSelection.current;
+      preservedSelection.current = selection ? { ...selection } : null;
+    },
     toggleInline(format) {
       withEditor((editor, selection) => editor.format(format, !editor.getFormat(selection)[format], 'user'));
     },

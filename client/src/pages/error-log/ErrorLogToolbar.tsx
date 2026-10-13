@@ -93,6 +93,7 @@ export function FormattingControls({ editor, active, formats, linkRequest, actio
   }, [active]);
 
   const openLink = (open: boolean) => {
+    if (open) editor.current?.preserveSelection();
     setLinkOpen(open);
     setLinkError('');
     if (open) setLinkValue(formats.link || '');

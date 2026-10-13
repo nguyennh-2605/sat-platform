@@ -64,17 +64,26 @@ const editor = (page: Page) => page.locator('[data-reflection-editor] .ql-editor
 const savedText = (html: string | null) => html?.replaceAll('&nbsp;', ' ') ?? '';
 
 async function expectFullReflectionSurface(page: Page) {
-  const bold = await page.getByRole('button', { name: 'Bold', exact: true }).boundingBox();
-  const question = await page.getByRole('button', { name: /^(View|Hide) question$/ }).boundingBox();
-  const close = await page.getByRole('button', { name: 'Close reflection editor', exact: true }).boundingBox();
-  expect(bold!.y + bold!.height / 2).toBeCloseTo(question!.y + question!.height / 2, 0);
-  expect(bold!.y + bold!.height / 2).toBeCloseTo(close!.y + close!.height / 2, 0);
   await expect(page.locator('[data-reflection-body] [data-slot="rich-text-editor"]')).toHaveCSS('border-width', '0px');
-  const body = await page.locator('[data-reflection-body]').boundingBox();
-  const editable = await editor(page).boundingBox();
-  expect(editable!.height).toBeGreaterThan(200);
-  expect(editable!.width).toBeCloseTo(body!.width, 0);
-  expect(editable!.y + editable!.height).toBeCloseTo(body!.y + body!.height, 0);
+  // Read all bounds in one frame and wait for the dialog's opening animation to settle.
+  // Separate boundingBox calls can compare controls at different points in the animation.
+  await expect.poll(() => page.locator('[data-reflection-editor]').evaluate(surface => {
+    const bounds = (selector: string) => surface.querySelector(selector)!.getBoundingClientRect();
+    const bold = bounds('[aria-label="Bold"]');
+    const question = bounds('[data-reflection-toolbar] button[aria-expanded]');
+    const close = bounds('[aria-label="Close reflection editor"]');
+    const body = bounds('[data-reflection-body]');
+    const editable = bounds('.ql-editor');
+    const center = (rect: DOMRect) => rect.y + rect.height / 2;
+    return {
+      settled: surface.getAnimations().every(animation => animation.playState !== 'running'),
+      questionAligned: Math.abs(center(bold) - center(question)) < 0.5,
+      closeAligned: Math.abs(center(bold) - center(close)) < 0.5,
+      fillsWidth: Math.abs(editable.width - body.width) < 0.5,
+      fillsHeight: Math.abs(editable.bottom - body.bottom) < 0.5,
+      usableHeight: editable.height > 200,
+    };
+  })).toEqual({ settled: true, questionAligned: true, closeAligned: true, fillsWidth: true, fillsHeight: true, usableHeight: true });
 }
 
 test('page scrolling moves the toolbar and column headers away and loads the next cursor', async ({ page }) => {
@@ -216,11 +225,22 @@ test('formatting and link shortcuts stay with the editor when question context i
   await expect(page.getByRole('group', { name: 'Edit reflection link', exact: true })).toBeVisible();
   await page.getByRole('textbox', { name: 'Link', exact: true }).press('Escape');
   await expect(page.getByRole('group', { name: 'Edit reflection link', exact: true })).toHaveCount(0);
-  await expect(editor(page)).toBeVisible();
+  await expect(editor(page)).toBeFocused();
+  await expect.poll(() => editor(page).evaluate(element => {
+    const selection = window.getSelection();
+    return selection?.anchorNode && element.contains(selection.anchorNode) ? selection.toString() : '';
+  })).toBe('phân tích evidence');
   await editor(page).press('Control+k');
   await page.getByRole('textbox', { name: 'Link', exact: true }).fill('https://example.com/evidence');
   await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(editor(page).locator('a')).toHaveAttribute('href', 'https://example.com/evidence');
+  await expect(editor(page).locator('a')).toHaveText('phân tích evidence');
+  await editor(page).press('Control+a');
+  await page.getByRole('button', { name: 'Add or edit link', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Link', exact: true }).fill('https://example.com/revised');
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(editor(page).locator('a')).toHaveAttribute('href', 'https://example.com/revised');
+  await expect(editor(page).locator('a')).toHaveText('phân tích evidence');
   await page.getByRole('button', { name: 'Why answer is right', exact: true }).click();
   await editor(page).press('Control+k');
   await expect(page.getByRole('group', { name: 'Edit reflection link', exact: true })).toBeVisible();

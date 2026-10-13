@@ -322,6 +322,7 @@ export default function ErrorLog() {
   }, []);
   const command = useCallback((next: Extract<RichTextShortcut, 'bold' | 'italic' | 'underline' | 'ordered-list' | 'bullet-list' | 'link'>) => {
     if (next === 'link') {
+      activeEditor.current?.preserveSelection();
       setLinkRequest(value => value + 1);
       return;
     }

@@ -1,7 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.';
-const dayKey = (offset = 0) => { const date = new Date(); date.setDate(date.getDate() + offset); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
+// After midnight in the study timezone, while a UTC CI runner is still on the previous day.
+const studyClock = new Date('2026-10-13T18:30:00Z');
+const dayKey = (offset = 0) => {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(studyClock);
+  const date = new Date(`${today}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+};
+test.use({ timezoneId: 'UTC' });
 const task = { key: 'personal:one', id: 'one', source: 'PERSONAL', type: 'PERSONAL', title: 'Review algebra', description: 'Work through saved problems', className: null, classId: null, testId: null, createdAt: new Date().toISOString(), dueAt: null as string | null, plannedDate: null as string | null, plannedStartMinutes: null as number | null, plannedEndMinutes: null as number | null, completedAt: null as string | null, completed: false, completionMode: 'USER', priority: 'NORMAL', position: 1, href: null, canEdit: true, canDelete: true, canComplete: true };
 
 async function chooseStudyDay(page: Page, value: string) {
@@ -14,6 +22,7 @@ async function chooseStudyDay(page: Page, value: string) {
 }
 
 async function setup(page: Page, { width = 1440, theme = 'light', failSchedule = false, failCreate = false, failPractice = false, failComplete = false, dense = false, planned = false, lowerTitle = false, emptyPractice = false, longPracticeTitle = false } = {}) {
+  await page.clock.setFixedTime(studyClock);
   await page.setViewportSize({ width, height: 1000 });
   await page.addInitScript(({ token, theme }) => { localStorage.setItem('token', token); localStorage.setItem('userId', '7'); localStorage.setItem('userRole', 'STUDENT'); localStorage.setItem('userName', 'Alex Student'); localStorage.setItem('dashboardTheme', theme); }, { token, theme });
   let items = [
@@ -88,6 +97,23 @@ test('overview keeps its original sections and opens the selected calendar date'
   await expect(page.locator('[data-study-date]')).toHaveAttribute('data-study-date', dayKey(1));
   await expect(page.getByRole('tab', { name: 'Day', exact: true })).toHaveAttribute('data-state', 'active');
   await expect(page.getByRole('heading', { name: 'Unscheduled' })).toHaveCount(0);
+});
+
+test.describe('study dates in the Vietnamese browser timezone', () => {
+  test.use({ timezoneId: 'Asia/Ho_Chi_Minh' });
+
+  test('Today and Tomorrow agree with the UTC browser after platform midnight', async ({ page }) => {
+    await setup(page, { planned: true });
+    await expect(eventButton(page, 'Review algebra')).toBeVisible();
+    await openPlanner(page);
+    await expect(page.locator('[data-study-date]')).toHaveAttribute('data-study-date', '2026-10-14');
+    await expect(timeSlot(page, '2026-10-14', 570)).toHaveCount(1);
+    await page.goto('/dashboard');
+    await page.getByRole('combobox', { name: 'Task view' }).click();
+    await page.getByRole('option', { name: 'Tomorrow', exact: true }).click();
+    await openPlanner(page);
+    await expect(page.locator('[data-study-date]')).toHaveAttribute('data-study-date', '2026-10-15');
+  });
 });
 
 for (const [width, theme] of [[320, 'light'], [390, 'dark'], [1440, 'light'], [1440, 'dark']] as const) {
