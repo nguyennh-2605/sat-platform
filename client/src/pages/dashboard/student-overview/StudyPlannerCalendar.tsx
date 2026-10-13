@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { useRef, type KeyboardEvent } from 'react';
 import { addDays, addMonths, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { ChevronLeft, ChevronRight, Columns3, Grid3X3, List, Plus } from 'lucide-react';
@@ -55,7 +55,6 @@ function TimeGrid({ days, selectedDate, tasks, disabled, onTask, onCreate }: {
   days: Date[]; selectedDate: string; tasks: StudentTaskItem[]; disabled: boolean; onTask: (task: StudentTaskItem) => void; onCreate: (selection: StudyEventSelection) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 8 * 2 * ROW_HEIGHT; }, []);
   const columns = { gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))` };
   const navigateSlot = (event: KeyboardEvent<HTMLButtonElement>, index: number, minute: number) => {
     const nextIndex = index + (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0);
@@ -65,14 +64,14 @@ function TimeGrid({ days, selectedDate, tasks, disabled, onTask, onCreate }: {
     if (days[nextIndex] && nextMinute >= 0 && nextMinute < 1440) scrollRef.current?.querySelector<HTMLElement>(`[data-calendar-slot="${studyDay(days[nextIndex])}:${nextMinute}"]`)?.focus();
   };
   return <section aria-label={days.length === 1 ? 'Day plan' : 'Week plan'}>
-    <div ref={scrollRef} role="region" aria-label="Calendar time grid" tabIndex={0} className="max-h-[65vh] overflow-auto overscroll-contain" data-time-grid>
+    <div ref={scrollRef} role="region" aria-label="Calendar time grid" tabIndex={0} className="overflow-x-auto" data-time-grid>
       <div className={cn(days.length > 1 ? 'min-w-[840px]' : 'min-w-0')}>
         <div className="sticky top-0 z-20 bg-surface">
           <div className="grid border-b" style={columns}><div className="sticky left-0 z-10 border-r bg-surface" />{days.map(day => <div key={studyDay(day)} className="flex flex-col items-center gap-1 border-r py-3 last:border-r-0"><span data-calendar-weekday className="text-sm font-semibold text-foreground">{format(day, 'EEE')}</span><span className={cn('flex size-7 items-center justify-center rounded-full text-sm font-medium', studyDay(day) === studyToday() && 'bg-calendar-personal text-background')}>{format(day, 'd')}</span></div>)}</div>
           <div className="grid border-b" style={columns}><span className="sticky left-0 z-10 flex items-center justify-end whitespace-nowrap border-r bg-surface px-2 text-sm font-medium text-subtle">All day</span>{days.map(day => {
             const key = studyDay(day);
             const allDay = studyEventsForDay(tasks, key).filter(task => task.plannedStartMinutes == null);
-            return <div key={key} className="relative min-h-9 border-r last:border-r-0"><Button variant="calendar" className="absolute inset-0 h-full w-full p-0 hover:bg-muted/40" disabled={disabled} aria-label={`Add all-day event on ${format(day, 'MMMM d, yyyy')}`} onClick={() => onCreate({ date: key, startMinutes: null, endMinutes: null })} /><div className="relative max-h-36 space-y-px overflow-y-auto">{allDay.map(task => <CalendarEvent key={task.key} task={task} day={key} disabled={disabled} onTask={onTask} />)}</div></div>;
+            return <div key={key} className="relative min-h-9 border-r last:border-r-0"><Button variant="calendar" className="absolute inset-0 h-full w-full p-0 hover:bg-muted/40" disabled={disabled} aria-label={`Add all-day event on ${format(day, 'MMMM d, yyyy')}`} onClick={() => onCreate({ date: key, startMinutes: null, endMinutes: null })} /><div className="relative space-y-px">{allDay.map(task => <CalendarEvent key={task.key} task={task} day={key} disabled={disabled} onTask={onTask} />)}</div></div>;
           })}</div>
         </div>
         <div className="grid" style={columns}>

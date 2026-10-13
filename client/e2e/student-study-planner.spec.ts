@@ -449,6 +449,7 @@ test('legacy day-only events remain in All day and can be given a time', async (
 test('dragging an event moves its time and Undo restores the entire previous range', async ({ page }) => {
   const state = await setup(page, { planned: true });
   await openPlanner(page);
+  await timeSlot(page, dayKey(), 660).scrollIntoViewIfNeeded();
   const from = await eventButton(page, 'Review algebra').boundingBox();
   const to = await timeSlot(page, dayKey(), 660).boundingBox();
   await page.mouse.move(from!.x + from!.width / 2, from!.y + 15);
@@ -457,6 +458,7 @@ test('dragging an event moves its time and Undo restores the entire previous ran
   await page.mouse.move(to!.x + to!.width / 2, to!.y + 15, { steps: 12 });
   await page.mouse.up();
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeInViewport();
   expect(state.schedules.at(-1)).toMatchObject({ plannedStartMinutes: 660, plannedEndMinutes: 720 });
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0);
@@ -468,6 +470,32 @@ test('invalid deep-link dates fall back to today', async ({ page }) => {
   await page.goto('/dashboard/study-planner?date=2026-02-29&view=day');
   await expect(page.locator('[data-study-date]')).toHaveAttribute('data-study-date', dayKey());
 });
+
+for (const width of [320, 1440]) {
+  test(`calendar wheel scrolling moves the entire planner page at ${width}px`, async ({ page }) => {
+    await setup(page, { width, planned: true });
+    await page.setViewportSize({ width, height: 640 });
+    await openPlanner(page);
+    const planner = page.locator('[data-study-planner-page]');
+    for (const view of ['Day', 'Week', 'Month']) {
+      await page.getByRole('heading', { name: 'Study planner', exact: true }).scrollIntoViewIfNeeded();
+      await page.getByRole('tab', { name: view, exact: true }).click();
+      const calendar = view === 'Month' ? page.getByRole('region', { name: 'Month calendar' }) : page.locator('[data-time-grid]');
+      const before = await planner.evaluate(element => element.scrollTop);
+      const bounds = await calendar.boundingBox();
+      await page.mouse.move(bounds!.x + 100, bounds!.y + 160);
+      await page.mouse.wheel(0, 400);
+      await expect.poll(() => planner.evaluate(element => element.scrollTop)).toBeGreaterThan(before);
+      expect(await calendar.evaluate(element => element.scrollTop)).toBe(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await page.getByRole('heading', { name: 'Study planner', exact: true }).scrollIntoViewIfNeeded();
+    await page.getByRole('tab', { name: 'Day', exact: true }).click();
+    await timeSlot(page, dayKey(), 1410).click();
+    await expect(page.getByLabel('Start time')).toHaveValue('23:30');
+    await expect(page.getByRole('dialog')).toBeVisible();
+  });
+}
 
 for (const [width, theme] of [[320, 'light'], [390, 'dark'], [1440, 'light'], [1440, 'dark']] as const) {
   test(`time calendar, modal and toolbar fit ${width}px in ${theme}`, async ({ page }) => {
@@ -530,6 +558,7 @@ test('the event modal remains within a short mobile viewport', async ({ page }) 
 test('a failed move rolls the event back to its original day and time', async ({ page }) => {
   const state = await setup(page, { planned: true, failSchedule: true });
   await openPlanner(page);
+  await timeSlot(page, dayKey(), 660).scrollIntoViewIfNeeded();
   const from = await eventButton(page, 'Review algebra').boundingBox();
   const to = await timeSlot(page, dayKey(), 660).boundingBox();
   await page.mouse.move(from!.x + from!.width / 2, from!.y + 15);
