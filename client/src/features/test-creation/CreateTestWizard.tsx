@@ -36,6 +36,8 @@ import type { EditTestPayload, ExtractedDocument, ImportIssue, ImportPreview, Im
 import { hasInvalidStrictLatex, isValidSprAnswer } from './math-content-validation';
 import { TestDetailsStep } from './TestDetailsStep';
 import { QuestionBankPicker } from './QuestionBankPicker';
+import { insertTestImage } from './image-insertion';
+import type { ClipboardEvent } from 'react';
 
 const emptyPreview = (): ImportPreview => ({
   modules: [],
@@ -393,28 +395,13 @@ const CreateTestWizard = () => {
     }
   };
 
-  const insertAtCursor = (text: string) => {
-    const editor = editorRef.current;
-    const start = editor?.selectionStart;
-    const end = editor?.selectionEnd;
-    let cursor = 0;
-    setRawText(current => {
-      const from = start ?? current.length;
-      const to = end ?? current.length;
-      const separator = from > 0 && current[from - 1] !== '\n' ? '\n\n' : '';
-      const insertion = `${separator}[IMG]\n${text}\n`;
-      cursor = from + insertion.length;
-      return `${current.slice(0, from)}${insertion}${current.slice(to)}`;
-    });
-    setContentDirty(true);
-    requestAnimationFrame(() => {
-      editor?.focus();
-      editor?.setSelectionRange(cursor, cursor);
-    });
-  };
-
   const uploadImage = async (file: File) => {
+    if (editLocked || isParsing || imageUploadAbortRef.current) return;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size < 1 || file.size > 5 * 1024 * 1024) return toast.error('Choose a PNG, JPEG, or WebP image up to 5 MB');
+    const editor = editorRef.current;
+    const sourceText = rawText;
+    const start = editor?.selectionStart ?? sourceText.length;
+    const end = editor?.selectionEnd ?? sourceText.length;
     const abortController = new AbortController();
     imageUploadAbortRef.current = abortController;
     setIsUploadingImage(true);
@@ -427,7 +414,17 @@ const CreateTestWizard = () => {
       await uploadToSignedUrl(prepared.data.uploadUrl, file, prepared.data.headers, abortController.signal, setImageUploadProgress);
       await axiosClient.post(`/api/test-images/${prepared.data.asset.id}/complete`);
       if (abortController.signal.aborted) return;
-      insertAtCursor(`asset:${prepared.data.asset.id}`);
+      if (editorRef.current?.value !== sourceText) {
+        toast.error('The editor changed during upload. Return to the image position and try again.');
+        return;
+      }
+      const insertion = insertTestImage(sourceText, start, end, prepared.data.asset.id);
+      setRawText(insertion.text);
+      setContentDirty(true);
+      requestAnimationFrame(() => {
+        editorRef.current?.focus();
+        editorRef.current?.setSelectionRange(insertion.cursor, insertion.cursor);
+      });
       toast.success('Image added to the editor');
     } catch (error: unknown) {
       if ((error as Error)?.name !== 'AbortError') toast.error(requestErrorMessage(error, 'Unable to upload this image'));
@@ -437,6 +434,18 @@ const CreateTestWizard = () => {
       setImageUploadProgress(null);
       if (imageInputRef.current) imageInputRef.current.value = '';
     }
+  };
+
+  const pasteImage = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const images = Array.from(event.clipboardData.items).filter(item => item.kind === 'file' && item.type.startsWith('image/'));
+    if (!images.length) return;
+    event.preventDefault();
+    if (editLocked) return;
+    if (isParsing || imageUploadAbortRef.current) return toast.error('Wait for the current upload or preview to finish');
+    if (images.length > 1) return toast.error('Paste one image at a time');
+    const file = images[0].getAsFile();
+    if (!file) return toast.error('Unable to read this image. Copy it again or use Upload image.');
+    void uploadImage(file);
   };
 
   useEffect(() => () => imageUploadAbortRef.current?.abort(), []);
@@ -554,7 +563,7 @@ const CreateTestWizard = () => {
             </div>
             <div className="flex flex-wrap items-center gap-3">
               {stage === 'BUILD' ? (
-                <Button disabled={isLoadingEdit || isParsing} onClick={() => void continueToReview()}>Continue to review <ArrowRight data-icon="inline-end" /></Button>
+                <Button disabled={isLoadingEdit || isParsing || isUploadingImage} onClick={() => void continueToReview()}>Continue to review <ArrowRight data-icon="inline-end" /></Button>
               ) : (
                 <>
                   <Button variant="outline" onClick={() => { setStage('BUILD'); setBuildTab('IMPORT'); }}><ArrowLeft data-icon="inline-start" />Replace import</Button>
@@ -580,13 +589,14 @@ const CreateTestWizard = () => {
                       <TestDetailsStep form={detailsForm} isAdmin={isAdmin} />
                     </TabsContent>
                     <TabsContent value="BANK" className="min-h-0 flex-1 pt-2">
-                      <QuestionBankPicker subject={subject} moduleCount={moduleCount} disabled={editLocked} onUse={nextPreview => { applyPreview(nextPreview, ''); setRawText(''); }} />
+                      <QuestionBankPicker subject={subject} moduleCount={moduleCount} disabled={editLocked || isUploadingImage} onUse={nextPreview => { applyPreview(nextPreview, ''); setRawText(''); }} />
                     </TabsContent>
                     <TabsContent value="IMPORT" className="min-h-0 flex-1 pt-2">
                       <div className="flex h-full min-h-[520px] flex-col gap-4">
                         <div className="flex items-center justify-between border-b border-border pb-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">Structured text</span><span>{rawText.length.toLocaleString()} characters</span></div>
                         {/* The structured editor needs direct cursor-selection APIs so image blocks can be inserted at the caret. */}
-                        <textarea aria-label="Structured test content" ref={editorRef} value={rawText} onChange={event => { setRawText(event.target.value); setContentDirty(true); }} readOnly={editLocked} spellCheck={false} className="min-h-80 flex-1 resize-none rounded-lg border border-input bg-transparent p-3 font-mono text-xs leading-6 text-foreground outline-none placeholder:text-muted-foreground read-only:cursor-not-allowed read-only:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" placeholder={activeImportTemplate} />
+                        <textarea aria-label="Structured test content" aria-describedby="test-image-paste-hint" aria-busy={isUploadingImage} ref={editorRef} value={rawText} onChange={event => { setRawText(event.target.value); setContentDirty(true); }} onPaste={pasteImage} readOnly={editLocked || isUploadingImage || isParsing} spellCheck={false} className="min-h-80 flex-1 resize-none rounded-lg border border-input bg-transparent p-3 font-mono text-xs leading-6 text-foreground outline-none placeholder:text-muted-foreground read-only:cursor-not-allowed read-only:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" placeholder={activeImportTemplate} />
+                        <p id="test-image-paste-hint" className="text-xs text-muted-foreground">Paste a copied image here with Ctrl+V (⌘V on Mac). Place the cursor inside an [IMG] block to fill or replace it, or elsewhere to insert a new image. PNG, JPEG or WebP, up to 5 MB.</p>
                         {previewIsStale && <ImportNotice tone="warning" message="The structured text or setup changed after the last preview. Update the preview before continuing." />}
                         {importError && <ImportNotice tone="error" message={importError} />}
                         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
@@ -594,10 +604,10 @@ const CreateTestWizard = () => {
                           <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void parseFile(file); }} />
                           <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadImage(file); }} />
                           <Button type="button" variant="ghost" size="sm" onClick={() => setGuideOpen(true)}><CircleHelp data-icon="inline-start" />Formatting guide</Button>
-                          <Button type="button" variant="outline" size="sm" disabled={isParsing || editLocked} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoadingSpinner data-icon="inline-start" /> : <UploadCloud data-icon="inline-start" />}Upload file</Button>
-                          <Button type="button" variant="outline" size="sm" disabled={isUploadingImage || editLocked} onClick={() => imageInputRef.current?.click()}>{isUploadingImage ? <LoadingSpinner data-icon="inline-start" /> : <ImagePlus data-icon="inline-start" />}{isUploadingImage ? `Uploading ${imageUploadProgress ?? 0}%` : 'Upload image'}</Button>
+                          <Button type="button" variant="outline" size="sm" disabled={isParsing || isUploadingImage || editLocked} onClick={() => fileInputRef.current?.click()}>{isParsing ? <LoadingSpinner data-icon="inline-start" /> : <UploadCloud data-icon="inline-start" />}Upload file</Button>
+                          <Button type="button" variant="outline" size="sm" disabled={isUploadingImage || isParsing || editLocked} onClick={() => imageInputRef.current?.click()}>{isUploadingImage ? <LoadingSpinner data-icon="inline-start" /> : <ImagePlus data-icon="inline-start" />}{isUploadingImage ? `Uploading ${imageUploadProgress ?? 0}%` : 'Upload image'}</Button>
                           {isUploadingImage && <Button type="button" variant="ghost" size="sm" onClick={() => imageUploadAbortRef.current?.abort()}>Cancel upload</Button>}
-                          <Button type="button" size="sm" disabled={isParsing || !rawText.trim() || editLocked} onClick={() => void previewText()}>{isParsing ? <LoadingSpinner data-icon="inline-start" /> : <Eye data-icon="inline-start" />}Update preview</Button>
+                          <Button type="button" size="sm" disabled={isParsing || isUploadingImage || !rawText.trim() || editLocked} onClick={() => void previewText()}>{isParsing ? <LoadingSpinner data-icon="inline-start" /> : <Eye data-icon="inline-start" />}Update preview</Button>
                         </div>
                       </div>
                     </TabsContent>
@@ -665,7 +675,7 @@ function FormattingGuide({ subject, template }: { subject: Subject; template: st
         <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[TABLE]</code> Put each row on a new line, separate cells with the <strong className="font-semibold text-foreground">Tab key</strong>, and use the first row as the header.</p>
         <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[POEM]</code> Put each verse line on its own line.</p>
         <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[NOTE]</code> Put each supporting fact on a new line, optionally beginning with <code>-</code> or <code>•</code>.</p>
-        <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[IMG]</code> Use Upload image to store a private image and insert its <code>asset:</code> reference. Empty placeholders and external URLs may remain in a draft but block publishing.</p>
+        <p><code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">[IMG]</code> Place the cursor inside the block and paste a copied image with Ctrl+V (⌘V on Mac), or use Upload image. This fills or replaces the image while keeping its metadata. Pasting elsewhere inserts a new image block. Empty placeholders and external URLs may remain in a draft but block publishing.</p>
         <p>Generated edit text may include an <code className="rounded-sm bg-primary-soft px-1 py-0.5 font-semibold text-primary">@meta {'{'}...{'}'}</code> JSON line after a block tag. Keep it intact to preserve table titles, notes, poem authors, and image accessibility text.</p>
       </div>
       <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900"><strong className="font-semibold">Uploaded documents:</strong> use selectable text in PDF, DOCX, or TXT format. Scanned image-only PDFs cannot be read.{subject === 'MATH' && ' Equation extraction does not convert formulas to LaTeX, so prepare the Math source in the structured format above before importing.'}</div>
