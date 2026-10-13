@@ -157,11 +157,14 @@ Google-only auth uses verified stable `googleSubject`; new users are always stud
 | `GET` | `/api/classes/:id/score-report` | JWT + TEACHER/ADMIN | Score report assignments for a class |
 | `GET` | `/api/classes/:testId/report` | JWT + TEACHER/ADMIN | Test analytics (leaderboard, question stats) |
 | `POST` | `/api/classes` | JWT + TEACHER/ADMIN | Create a new class |
+| `POST` | `/api/classes/join` | JWT + STUDENT + current database STUDENT | Join using `{ code }`, the existing UUID class code; idempotently return `{ classroom: { id, name }, alreadyJoined }` |
 | `POST` | `/api/classes/:classId/students` | JWT + TEACHER/ADMIN | Add student by email |
 | `GET/POST` | `/api/classes/:classId/announcements` | JWT / JWT + TEACHER/ADMIN | List or publish class announcements with rich-text-compatible content and up to five persisted pinned items per class |
 | `PATCH/DELETE` | `/api/classes/:classId/announcements/:announcementId` | JWT + TEACHER/ADMIN | Edit, pin/unpin, or delete an announcement |
 | `POST` | `/api/classes/posts` | JWT + TEACHER/ADMIN | Legacy compatibility endpoint; announcements are routed to the dedicated source |
 | `POST` | `/api/classes/submissions` | JWT + STUDENT | Compatibility submission endpoint; delegates to the canonical Assignment submission flow |
+
+Students can join directly from Classroom's empty-state Join a class CTA or the class-list toolbar. The shared join dialog accepts the code copied by the teacher's existing Copy class code action (`Class.id`), preserves invalid/failed input and opens the joined class's Lessons tab on success. Joining invalidates class, student overview/task, progress and test caches. The API validates UUID format, uses the authenticated student identity, checks the account's current database role and limits attempts to 10 per minute per account. Membership, new assignees for published ALL_STUDENTS activities (plus their published test deliveries and legacy unlinked published deliveries) and an audit event are transactional. SELECTED, draft and closed canonical work is not assigned; existing assignee progress is preserved. Joining an existing membership returns success without duplicating membership or audit. No new code column or schema migration is required.
 
 ### 5.3 Assignments
 
@@ -334,12 +337,13 @@ Admin Overview uses complete platform days in the configured `APP_TIMEZONE`. It 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
 | `GET` | `/api/student/overview` | JWT + STUDENT | Student-focused next action, score/date preferences, 90-day accuracy progress, published System Test picks, and recent completed results |
-| `GET` | `/api/student/tasks` | JWT + STUDENT | Unified personal tasks, announcements, assignments, tests, and vocabulary activities with calendar and weekly summary data |
-| `POST/PATCH/DELETE` | `/api/student/tasks[/:id]` | JWT + STUDENT | Create, edit, and remove student-owned personal tasks |
+| `GET` | `/api/student/tasks` | JWT + STUDENT | Accessible personal/coursework sources for linking; calendar markers and summary count only learner-planned events |
+| `POST/PATCH/DELETE` | `/api/student/tasks[/:id]` | JWT + STUDENT | Create/edit a personal event and its study plan atomically; delete the owned task and plan together |
 | `PUT` | `/api/student/tasks/state` | JWT + STUDENT | Complete or reopen personal tasks and announcements; assessed coursework remains source-driven |
 | `PUT` | `/api/student/tasks/order` | JWT + STUDENT | Persist a student-specific order across unified task sources |
+| `PUT` | `/api/student/tasks/schedule` | JWT + STUDENT | Set/clear learner-owned `plannedDate`, `plannedStartMinutes`, `plannedEndMinutes` and optional `calendarColor`; never changes source deadlines, task type or completion |
 
-Student Overview uses only persisted product data. Coursework and personal planning are combined in a Productivity-style task surface. Assignment, test, and vocabulary completion comes from their authoritative submission/activity records; only personal tasks and announcements can be checked directly. Accuracy remains evidence-based, while current and target SAT scores are explicitly self-reported preferences.
+Student Overview uses only persisted product data and retains its Productivity layout, summary cards, Tasks card, calendar, Progress, Practice Picks and Recent Results. Tasks and calendar views show only events explicitly planned by the learner, with shared title/time content, completion styling and details/edit dialogs. Overview rows are neutral with a circular quick-completion control before the title and time aligned right; calendar events keep their saved colors. Titles capitalize the initial letter, and completed boxes have a full-width horizontal strike. The Tasks card's Open planner link opens the Student-only `/dashboard/study-planner` for Day/Week time grids and a Month calendar. Selecting a slot opens the shared event modal; completed events remain visible with a strike across the full box. Assignment, test, and vocabulary completion comes from authoritative submission/activity records; only personal tasks and announcements can be marked complete in event details. Study plans live in `UserTodoState` as a day and nullable start/end minutes in the platform study timezone, independently of source deadlines. Accuracy remains evidence-based, while current and target SAT scores are explicitly self-reported preferences. See `STUDENT_STUDY_PLANNER.md`.
 
 ### 5.14 Teacher Overview
 
@@ -573,8 +577,8 @@ Folder ──1:N── Test
 4. Subject recommendations require at least 20 recent answers, at least 10 answers in the subject, and at least 70% taxonomy coverage.
 5. Progress and Recent Results use completed submissions from the last 90 days and report accuracy rather than a synthetic SAT score.
 6. Practice Center subject and mode filters are URL-backed so Overview deep links restore the intended context.
-7. Unified Tasks combines coursework with student-created tasks, supports personal ordering, and keeps assessed completion source-driven.
-8. The calendar reads task dates, the Next SAT card uses the saved SAT date, and current/target scores are self-reported preferences rather than inferred analytics.
+7. The task API provides accessible coursework and student-created tasks for linking. Overview Tasks and all calendar views display only learner-planned events; teacher deadlines never insert events automatically. Overview shares event content, details/edit dialogs and mutations with the planner, without reorder handles or source badges. Counts and mini-calendar markers also use only planned events. The planner writes learner-owned dates and optional time ranges after verifying task access. Creating/editing personal events and plans is transactional; assessed completion stays source-driven.
+8. Day/Week render a 24-hour grid with 30-minute selection slots; Month renders day cells. A slot opens the event modal; existing day-only plans and deadline markers appear in All day. Mobile Week/Month scroll inside the calendar while the page retains all three view controls. Completed events stay visible by default. Dragging and Undo preserve the entire time range; date/view filters are URL-backed. Next SAT and current/target scores remain self-reported preferences.
 ```
 
 ### 8.7 Teacher Overview

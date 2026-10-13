@@ -1,5 +1,17 @@
 const ApiError = require('../utils/ApiError');
 const classService = require('../services/class.service');
+const classJoinService = require('../services/class-join.service');
+
+exports.joinClass = async (req, res) => {
+  try {
+    const result = await classJoinService.joinClass({ code: req.body?.code, userId: req.user?.userId || req.user?.id, userRole: req.user?.role });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof ApiError) return res.status(error.statusCode).json(error.body);
+    console.error('Join Class Error:', error);
+    res.status(500).json({ error: 'Unable to join the class. Please try again.' });
+  }
+};
 
 exports.createClass = async (req, res) => {
   try {

@@ -61,6 +61,7 @@ export interface StudentOverviewResponse {
 }
 
 export type StudentTaskSource = 'PERSONAL' | 'ANNOUNCEMENT' | 'ASSIGNMENT' | 'TEST' | 'QUIZ' | 'VOCABULARY';
+export type StudyEventColor = 'BLUE' | 'VIOLET' | 'TEAL' | 'AMBER';
 
 export interface StudentTaskItem {
   key: string;
@@ -78,6 +79,10 @@ export interface StudentTaskItem {
   durationMinutes: number | null;
   createdAt: string;
   dueAt: string | null;
+  plannedDate?: string | null;
+  plannedStartMinutes?: number | null;
+  plannedEndMinutes?: number | null;
+  calendarColor?: StudyEventColor | null;
   completedAt: string | null;
   completed: boolean;
   completionMode: 'USER' | 'SOURCE';

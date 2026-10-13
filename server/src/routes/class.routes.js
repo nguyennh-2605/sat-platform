@@ -5,9 +5,14 @@ const classTodoController = require('../controllers/class-todo.controller');
 const classAnnouncementController = require('../controllers/class-announcement.controller');
 const classPerformanceController = require('../controllers/class-performance.controller');
 const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware'); // Middleware check login
+const { createRateLimiter } = require('../middleware/rate-limit.middleware');
 
 // API lấy danh sách lớp (cho Sidebar)
 router.get('/', authenticateToken, classController.getMyClasses);
+router.post('/join', authenticateToken, authorizeRole(['STUDENT']), createRateLimiter({
+  windowMs: 60_000, max: 10, key: req => String(req.user.userId || req.user.id),
+  message: 'Too many join attempts. Please try again in a minute.',
+}), classController.joinClass);
 router.get('/todos', authenticateToken, classTodoController.list);
 router.post('/todos/acknowledge', authenticateToken, classTodoController.acknowledge);
 router.get('/list', authenticateToken, classController.getExamTests);

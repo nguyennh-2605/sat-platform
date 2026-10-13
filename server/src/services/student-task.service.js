@@ -19,7 +19,7 @@ const assertStudent = role => {
 };
 
 const normalizedTitle = value => {
-  const title = String(value || '').trim().replace(/\s+/g, ' ');
+  const title = String(value || '').trim().replace(/\s+/g, ' ').replace(/^\p{L}/u, letter => letter.toUpperCase());
   if (!title) throw new ApiError(400, { error: 'Task title is required.' });
   if (title.length > 160) throw new ApiError(400, { error: 'Task title must be 160 characters or fewer.' });
   return title;
@@ -37,6 +37,41 @@ const normalizedDueAt = value => {
   if (Number.isNaN(date.getTime())) throw new ApiError(400, { error: 'Choose a valid task date.' });
   return date;
 };
+
+const normalizedPlannedDate = value => {
+  if (value === null) return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new ApiError(400, { error: 'Choose a valid study day.' });
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value || value < '2000-01-01' || value > '2100-12-31') throw new ApiError(400, { error: 'Choose a valid study day.' });
+  return value;
+};
+
+const normalizedStudyPlan = (data, previous = {}) => {
+  const plannedDate = normalizedPlannedDate(data.plannedDate);
+  const hasTimes = data.plannedStartMinutes !== undefined || data.plannedEndMinutes !== undefined;
+  const plannedStartMinutes = hasTimes ? data.plannedStartMinutes : previous.plannedStartMinutes ?? null;
+  const plannedEndMinutes = hasTimes ? data.plannedEndMinutes : previous.plannedEndMinutes ?? null;
+  if (plannedDate === null) {
+    if (hasTimes && (plannedStartMinutes !== null || plannedEndMinutes !== null)) throw new ApiError(400, { error: 'A timed event needs a study day.' });
+    return { plannedDate: null, plannedStartMinutes: null, plannedEndMinutes: null };
+  }
+  if (plannedStartMinutes === null && plannedEndMinutes === null) return { plannedDate, plannedStartMinutes: null, plannedEndMinutes: null };
+  if (!Number.isInteger(plannedStartMinutes) || !Number.isInteger(plannedEndMinutes) || plannedStartMinutes < 0 || plannedEndMinutes > 1440 || plannedEndMinutes - plannedStartMinutes < 15) {
+    throw new ApiError(400, { error: 'Choose a valid start and end time, at least 15 minutes apart, within one study day.' });
+  }
+  return { plannedDate, plannedStartMinutes, plannedEndMinutes };
+};
+
+const hasStudyPlan = data => ['plannedDate', 'plannedStartMinutes', 'plannedEndMinutes'].some(field => data?.[field] !== undefined);
+const normalizedCalendarColor = value => {
+  if (value === null) return null;
+  if (!['BLUE', 'VIOLET', 'TEAL', 'AMBER'].includes(value)) throw new ApiError(400, { error: 'Choose a valid event color.' });
+  return value;
+};
+const colorFields = data => data?.calendarColor === undefined ? {} : { calendarColor: normalizedCalendarColor(data.calendarColor) };
+const writeStudyPlan = (db, userId, itemKey, plan) => db.userTodoState.upsert({
+  where: { userId_itemKey: { userId, itemKey } }, update: plan, create: { userId, itemKey, ...plan },
+});
 
 const priorityFor = dueAt => {
   if (!dueAt) return 'NORMAL';
@@ -67,18 +102,14 @@ const sortTasks = tasks => {
   });
 };
 
-const calendarDate = task => task.dueAt || (task.type === 'ANNOUNCEMENT' ? task.createdAt : null);
-
 const calendarMarkers = tasks => {
   const byDate = new Map();
   for (const task of tasks) {
-    const value = calendarDate(task);
-    if (!value) continue;
-    const date = dateKeyFormatter.format(new Date(value));
+    if (!task.plannedDate) continue;
+    const date = task.plannedDate;
     const current = byDate.get(date) || { date, total: 0, incomplete: 0, hasDeadline: false };
     current.total += 1;
     if (!task.completed) current.incomplete += 1;
-    if (task.dueAt) current.hasDeadline = true;
     byDate.set(date, current);
   }
   return [...byDate.values()].sort((first, second) => first.date.localeCompare(second.date));
@@ -86,17 +117,10 @@ const calendarMarkers = tasks => {
 
 const taskSummary = (tasks, now = new Date()) => {
   const today = platformDayStart(now);
-  const tomorrow = new Date(today.getTime() + DAY_MS);
   const weekEnd = new Date(today.getTime() + 7 * DAY_MS);
-  const isTodayTask = task => {
-    if (task.completed) return false;
-    if (!task.dueAt) return task.source === 'PERSONAL' || task.type === 'ANNOUNCEMENT';
-    return new Date(task.dueAt) < tomorrow;
-  };
-  const weekTasks = tasks.filter(task => {
-    const value = calendarDate(task);
-    return value && new Date(value) >= today && new Date(value) < weekEnd;
-  });
+  const todayKey = dateKeyFormatter.format(now);
+  const isTodayTask = task => !task.completed && task.plannedDate === todayKey;
+  const weekTasks = tasks.filter(task => task.plannedDate && task.plannedDate >= todayKey && task.plannedDate < dateKeyFormatter.format(weekEnd));
   const weekCompleted = weekTasks.filter(task => task.completed).length;
   return {
     todayRemaining: tasks.filter(isTodayTask).length,
@@ -109,7 +133,7 @@ const taskSummary = (tasks, now = new Date()) => {
 async function loadTaskSources({ db, userId }) {
   const [personal, states, announcements, posts, deliveries, vocabularyActivities] = await Promise.all([
     db.studentTask.findMany({ where: { userId }, orderBy: [{ position: 'asc' }, { createdAt: 'desc' }], take: MAX_TASKS }),
-    db.userTodoState.findMany({ where: { userId }, select: { itemKey: true, handledAt: true, completedAt: true, position: true } }),
+    db.userTodoState.findMany({ where: { userId }, select: { itemKey: true, handledAt: true, completedAt: true, position: true, plannedDate: true, plannedStartMinutes: true, plannedEndMinutes: true, calendarColor: true } }),
     db.classAnnouncement.findMany({
       where: { class: { students: { some: { id: userId } } } }, orderBy: { createdAt: 'desc' }, take: MAX_TASKS,
       select: { id: true, title: true, content: true, createdAt: true, classId: true, class: { select: { name: true } } },
@@ -238,43 +262,98 @@ async function getTasksWithDb({ db, userId, userRole, now = new Date() }) {
     });
   }
 
+  for (const task of tasks) {
+    const state = stateByKey.get(task.key);
+    task.plannedDate = state?.plannedDate || null;
+    task.plannedStartMinutes = state?.plannedStartMinutes ?? null;
+    task.plannedEndMinutes = state?.plannedEndMinutes ?? null;
+    task.calendarColor = state?.calendarColor ?? null;
+  }
   const ordered = sortTasks(tasks).slice(0, MAX_TASKS);
   return { items: ordered, summary: taskSummary(ordered, now), calendar: calendarMarkers(ordered), views: [...validViews] };
 }
 
 exports.getTasks = params => getTasksWithDb({ ...params, db: prisma });
 
-exports.createTask = async ({ userId, userRole, data }) => {
+async function scheduleTaskWithDb({ db, userId, userRole, itemKey, plannedDate, plannedStartMinutes, plannedEndMinutes, calendarColor }) {
   assertStudent(userRole);
   const currentUserId = parseUserId(userId);
-  const last = await prisma.studentTask.findFirst({ where: { userId: currentUserId }, orderBy: { position: 'desc' }, select: { position: true } });
-  return prisma.studentTask.create({
-    data: { userId: currentUserId, title: normalizedTitle(data?.title), details: normalizedDetails(data?.details), dueAt: normalizedDueAt(data?.dueAt), position: (last?.position || 0) + 1 },
-  });
-};
+  if (!currentUserId) throw new ApiError(401, { error: 'Sign in to plan your study.' });
+  normalizedPlannedDate(plannedDate);
+  const available = await getTasksWithDb({ db, userId: currentUserId, userRole });
+  const task = available.items.find(task => task.key === itemKey);
+  if (!task) throw new ApiError(404, { error: 'Task not found.' });
+  const plan = { ...normalizedStudyPlan({ plannedDate, plannedStartMinutes, plannedEndMinutes }, task), ...colorFields({ calendarColor }) };
+  await writeStudyPlan(db, currentUserId, itemKey, plan);
+  return { itemKey, ...plan };
+}
 
-exports.updateTask = async ({ taskId, userId, userRole, data }) => {
+exports.scheduleTask = params => scheduleTaskWithDb({ ...params, db: prisma });
+exports.scheduleTaskWithDb = scheduleTaskWithDb;
+exports.normalizedPlannedDate = normalizedPlannedDate;
+exports.normalizedStudyPlan = normalizedStudyPlan;
+exports.normalizedCalendarColor = normalizedCalendarColor;
+
+async function createTaskWithDb({ db, userId, userRole, data }) {
   assertStudent(userRole);
   const currentUserId = parseUserId(userId);
-  const existing = await prisma.studentTask.findFirst({ where: { id: String(taskId), userId: currentUserId } });
+  if (!currentUserId) throw new ApiError(401, { error: 'Sign in to create an event.' });
+  const fields = { title: normalizedTitle(data?.title), details: normalizedDetails(data?.details), dueAt: normalizedDueAt(data?.dueAt) };
+  const color = colorFields(data);
+  const plan = hasStudyPlan(data) || data?.calendarColor !== undefined ? { ...(hasStudyPlan(data) ? normalizedStudyPlan(data) : {}), ...color } : null;
+  const create = async transaction => {
+    const last = await transaction.studentTask.findFirst({ where: { userId: currentUserId }, orderBy: { position: 'desc' }, select: { position: true } });
+    const task = await transaction.studentTask.create({ data: { userId: currentUserId, ...fields, position: (last?.position || 0) + 1 } });
+    if (plan) await writeStudyPlan(transaction, currentUserId, `personal:${task.id}`, plan);
+    return { ...task, ...(plan || {}) };
+  };
+  return plan ? db.$transaction(create) : create(db);
+}
+exports.createTaskWithDb = createTaskWithDb;
+exports.createTask = params => createTaskWithDb({ ...params, db: prisma });
+
+async function updateTaskWithDb({ db, taskId, userId, userRole, data }) {
+  assertStudent(userRole);
+  const currentUserId = parseUserId(userId);
+  if (!currentUserId) throw new ApiError(401, { error: 'Sign in to edit an event.' });
+  const existing = await db.studentTask.findFirst({ where: { id: String(taskId), userId: currentUserId } });
   if (!existing) throw new ApiError(404, { error: 'Task not found.' });
-  return prisma.studentTask.update({
-    where: { id: existing.id },
-    data: {
+  const fields = {
       ...(data?.title !== undefined && { title: normalizedTitle(data.title) }),
       ...(data?.details !== undefined && { details: normalizedDetails(data.details) }),
       ...(data?.dueAt !== undefined && { dueAt: normalizedDueAt(data.dueAt) }),
       ...(data?.completed !== undefined && { completedAt: data.completed ? new Date() : null }),
-    },
-  });
-};
+  };
+  const color = colorFields(data);
+  const hasState = hasStudyPlan(data) || data?.calendarColor !== undefined;
+  const save = async transaction => {
+    let plan = data?.calendarColor !== undefined ? color : null;
+    if (hasStudyPlan(data)) {
+      const previous = await transaction.userTodoState.findUnique({ where: { userId_itemKey: { userId: currentUserId, itemKey: `personal:${existing.id}` } } });
+      plan = { ...normalizedStudyPlan({ ...data, plannedDate: data.plannedDate === undefined ? previous?.plannedDate ?? null : data.plannedDate }, previous || {}), ...color };
+    }
+    const task = await transaction.studentTask.update({ where: { id: existing.id }, data: fields });
+    if (plan) await writeStudyPlan(transaction, currentUserId, `personal:${task.id}`, plan);
+    return { ...task, ...(plan || {}) };
+  };
+  return hasState ? db.$transaction(save) : save(db);
+}
+exports.updateTaskWithDb = updateTaskWithDb;
+exports.updateTask = params => updateTaskWithDb({ ...params, db: prisma });
 
-exports.deleteTask = async ({ taskId, userId, userRole }) => {
+async function deleteTaskWithDb({ db, taskId, userId, userRole }) {
   assertStudent(userRole);
-  const result = await prisma.studentTask.deleteMany({ where: { id: String(taskId), userId: parseUserId(userId) } });
-  if (!result.count) throw new ApiError(404, { error: 'Task not found.' });
-  return { deleted: true };
-};
+  const currentUserId = parseUserId(userId);
+  if (!currentUserId) throw new ApiError(401, { error: 'Sign in to delete an event.' });
+  return db.$transaction(async transaction => {
+    const result = await transaction.studentTask.deleteMany({ where: { id: String(taskId), userId: currentUserId } });
+    if (!result.count) throw new ApiError(404, { error: 'Task not found.' });
+    await transaction.userTodoState.deleteMany({ where: { userId: currentUserId, itemKey: `personal:${taskId}` } });
+    return { deleted: true };
+  });
+}
+exports.deleteTaskWithDb = deleteTaskWithDb;
+exports.deleteTask = params => deleteTaskWithDb({ ...params, db: prisma });
 
 exports.updateTaskState = async ({ itemKey, completed, userId, userRole }) => {
   assertStudent(userRole);

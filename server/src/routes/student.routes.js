@@ -8,6 +8,7 @@ router.get('/overview', authenticateToken, authorizeRole(['STUDENT']), controlle
 router.get('/tasks', authenticateToken, authorizeRole(['STUDENT']), controller.getTasks);
 router.post('/tasks', authenticateToken, authorizeRole(['STUDENT']), controller.createTask);
 router.put('/tasks/order', authenticateToken, authorizeRole(['STUDENT']), controller.reorderTasks);
+router.put('/tasks/schedule', authenticateToken, authorizeRole(['STUDENT']), controller.scheduleTask);
 router.put('/tasks/state', authenticateToken, authorizeRole(['STUDENT']), controller.updateTaskState);
 router.patch('/tasks/:id', authenticateToken, authorizeRole(['STUDENT']), controller.updateTask);
 router.delete('/tasks/:id', authenticateToken, authorizeRole(['STUDENT']), controller.deleteTask);

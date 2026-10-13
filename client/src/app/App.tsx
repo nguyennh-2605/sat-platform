@@ -14,6 +14,7 @@ const HomePage = lazy(() => import('../pages/home/HomePage'));
 const AuthPage = lazy(() => import('../pages/auth/AuthPage'));
 const Dashboard = lazy(() => import('../pages/dashboard/Dashboard'));
 const DashboardHome = lazy(() => import('../pages/dashboard/DashboardHome'));
+const StudentStudyPlanner = lazy(() => import('../pages/dashboard/student-overview/StudentStudyPlanner'));
 const ExamRoom = lazy(() => import('../pages/exam-room/ExamRoom'));
 const PracticeTest = lazy(() => import('../pages/practice-test/PracticeTest'));
 const TestDetail = lazy(() => import('../pages/practice-test/TestDetail'));
@@ -62,6 +63,7 @@ function App() {
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>}>
                 <Route index element={<DashboardHome />} />
+                <Route path="study-planner" element={<RequireRole roles={['STUDENT']}><StudentStudyPlanner /></RequireRole>} />
                 <Route path="practice-test" element={<PracticeTest />} />
                 <Route path="practice-test/:testId" element={<TestDetail />} />
                 <Route path="classes" element={<ClassroomList />} />

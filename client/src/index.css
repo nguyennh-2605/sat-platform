@@ -46,6 +46,15 @@
   --color-info: var(--ui-info);
   --color-info-soft: var(--ui-info-soft);
 
+  --color-calendar-personal: var(--ui-calendar-personal);
+  --color-calendar-personal-soft: var(--ui-calendar-personal-soft);
+  --color-calendar-coursework: var(--ui-calendar-coursework);
+  --color-calendar-coursework-soft: var(--ui-calendar-coursework-soft);
+  --color-calendar-vocabulary: var(--ui-calendar-vocabulary);
+  --color-calendar-vocabulary-soft: var(--ui-calendar-vocabulary-soft);
+  --color-calendar-announcement: var(--ui-calendar-announcement);
+  --color-calendar-announcement-soft: var(--ui-calendar-announcement-soft);
+
   --color-sidebar: var(--ui-sidebar);
   --color-sidebar-hover: var(--ui-sidebar-hover);
   --color-sidebar-border: var(--ui-sidebar-border);
@@ -170,6 +179,15 @@
     --ui-subtle-foreground: color-mix(in oklch, var(--foreground) 72%, var(--background));
     --ui-info: #2563eb;
     --ui-info-soft: #eff6ff;
+    /* Calendar categories have their own palette; status colors retain their meaning. */
+    --ui-calendar-personal: #1d4ed8;
+    --ui-calendar-personal-soft: #dbeafe;
+    --ui-calendar-coursework: #6d28d9;
+    --ui-calendar-coursework-soft: #ede9fe;
+    --ui-calendar-vocabulary: #0f766e;
+    --ui-calendar-vocabulary-soft: #ccfbf1;
+    --ui-calendar-announcement: #92400e;
+    --ui-calendar-announcement-soft: #fef3c7;
     --ui-border: var(--border);
     --ui-border-strong: color-mix(in oklch, var(--border) 82%, var(--foreground));
     --ui-success: #047857;
@@ -231,7 +249,7 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  button:not([class*='rounded-full']),
+  button:not([class*='rounded-full']):not([data-variant='calendar']),
   input:not([class*='rounded-full']),
   select:not([class*='rounded-full']),
   textarea:not([class*='rounded-full']) {
@@ -551,6 +569,14 @@
   --ui-danger-soft: color-mix(in srgb, var(--ui-danger) 14%, var(--card));
   --ui-info: #93c5fd;
   --ui-info-soft: color-mix(in srgb, var(--ui-info) 14%, var(--card));
+  --ui-calendar-personal: #93c5fd;
+  --ui-calendar-personal-soft: color-mix(in srgb, #3b82f6 22%, var(--card));
+  --ui-calendar-coursework: #c4b5fd;
+  --ui-calendar-coursework-soft: color-mix(in srgb, #8b5cf6 22%, var(--card));
+  --ui-calendar-vocabulary: #5eead4;
+  --ui-calendar-vocabulary-soft: color-mix(in srgb, #14b8a6 20%, var(--card));
+  --ui-calendar-announcement: #fcd34d;
+  --ui-calendar-announcement-soft: color-mix(in srgb, #f59e0b 20%, var(--card));
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);

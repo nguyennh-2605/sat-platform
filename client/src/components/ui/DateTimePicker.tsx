@@ -17,6 +17,7 @@ interface DateTimePickerProps {
   clearable?: boolean;
   className?: string;
   ariaLabel?: string;
+  displayFormat?: string;
 }
 
 const localDateValue = (date: Date) => format(date, 'yyyy-MM-dd');
@@ -33,12 +34,12 @@ const parseMinimum = (value?: string | Date) => {
   return date;
 };
 
-export function DateTimePicker({ value = '', onChange, mode = 'datetime', minDate, placeholder = mode === 'date' ? 'Choose a date' : 'Choose date and time', disabled = false, clearable = true, className, ariaLabel }: DateTimePickerProps) {
+export function DateTimePicker({ value = '', onChange, mode = 'datetime', minDate, placeholder = mode === 'date' ? 'Choose a date' : 'Choose date and time', disabled = false, clearable = true, className, ariaLabel, displayFormat }: DateTimePickerProps) {
   const [open, setOpen] = useState(false);
   const timeInputId = useId();
   const selected = parseValue(value, mode);
   const minimum = parseMinimum(minDate);
-  const displayValue = selected ? format(selected, mode === 'date' ? 'PPP' : 'PPP · HH:mm') : placeholder;
+  const displayValue = selected ? format(selected, displayFormat || (mode === 'date' ? 'PPP' : 'PPP · HH:mm')) : placeholder;
 
   const selectDate = (date?: Date) => {
     if (!date) return;
@@ -67,7 +68,7 @@ export function DateTimePicker({ value = '', onChange, mode = 'datetime', minDat
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-0">
-        <Calendar mode="single" selected={selected} defaultMonth={selected || minimum} disabled={minimum ? { before: minimum } : undefined} onSelect={selectDate} />
+        <Calendar mode="single" required selected={selected} defaultMonth={selected || minimum} disabled={minimum ? { before: minimum } : undefined} onSelect={selectDate} />
         {mode === 'datetime' && <div className="flex items-center gap-2 border-t p-3">
           <Clock3 className="size-4 text-muted-foreground" />
           <label htmlFor={timeInputId} className="text-sm font-medium">Time</label>

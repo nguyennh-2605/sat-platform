@@ -14,6 +14,7 @@ interface SatDateDialogProps {
   saving: boolean;
   now: number;
   hasSavedDate?: boolean;
+  alignment?: 'content' | 'viewport';
   onOfficialDateChange: (value: string) => void;
   onCustomDateChange: (value: string) => void;
   onClose: () => void;
@@ -28,6 +29,7 @@ export function SatDateDialog({
   saving,
   now,
   hasSavedDate = true,
+  alignment = 'content',
   onOfficialDateChange,
   onCustomDateChange,
   onClose,
@@ -42,6 +44,7 @@ export function SatDateDialog({
     onClose={onClose}
     closeOnBackdrop={!saving}
     presentation="content-dialog"
+    alignment={alignment}
     title="Choose your SAT date"
     subtitle={hasSavedDate ? `Your countdown is currently set for ${format(effectiveDate, 'MMMM d, yyyy')}.` : `Choose a date to start your personal countdown. The next official option is ${format(effectiveDate, 'MMMM d, yyyy')}.`}
     className="!max-w-2xl"

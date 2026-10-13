@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Clock3, Copy, GraduationCap, MoreHorizontal, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Check, Clock3, Copy, GraduationCap, LogIn, MoreHorizontal, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -20,6 +20,7 @@ import { EmptyState, Modal, PageHeader } from '../../components/ui/AppUI';
 import axiosClient from '../../lib/axios';
 import { cachedGet, invalidateQueryCache } from '../../lib/queryCache';
 import { capitalizeFirstLetter } from '../../utils/text';
+import { JoinClassDialog } from '@/features/classroom/JoinClassDialog';
 
 type ClassSort = 'NEWEST' | 'NAME' | 'STUDENTS';
 
@@ -65,6 +66,7 @@ export default function ClassroomList() {
   const [sort, setSort] = useState<ClassSort>('NEWEST');
   const [editor, setEditor] = useState<{ mode: 'create' | 'edit'; classroom?: ClassSummary } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClassSummary | null>(null);
+  const [joining, setJoining] = useState(false);
 
   const fetchClasses = useCallback(async (force = false) => {
     setLoading(true);
@@ -113,6 +115,7 @@ export default function ClassroomList() {
                   <SelectContent align="end"><SelectItem value="NEWEST">Newest</SelectItem><SelectItem value="NAME">Name</SelectItem><SelectItem value="STUDENTS">Student count</SelectItem></SelectContent>
                 </Select>
                 {canCreate && <Button className="shrink-0" onClick={() => setEditor({ mode: 'create' })}><Plus aria-hidden="true" />Create class</Button>}
+                {!canCreate && <Button className="shrink-0" onClick={() => setJoining(true)}><LogIn aria-hidden="true" />Join a class</Button>}
               </div>
             </div>
           )}
@@ -122,8 +125,8 @@ export default function ClassroomList() {
               <EmptyState
                 icon={<GraduationCap className="size-5" />}
                 title="No classes yet"
-                description={canCreate ? 'Create your first class to organize students, assignments, and progress.' : 'Ask your teacher to add your account to a class. You can practice on your own while you wait.'}
-                action={canCreate ? <Button onClick={() => setEditor({ mode: 'create' })}><Plus aria-hidden="true" />Create class</Button> : <Button onClick={() => navigate('/dashboard/practice-test')}>Explore practice tests</Button>}
+                description={canCreate ? 'Create your first class to organize students, assignments, and progress.' : 'Enter the class code from your teacher to join your class.'}
+                action={canCreate ? <Button onClick={() => setEditor({ mode: 'create' })}><Plus aria-hidden="true" />Create class</Button> : <Button onClick={() => setJoining(true)}><LogIn aria-hidden="true" />Join a class</Button>}
               />
             ) : visibleClasses.length === 0 ? <EmptyState icon={<Search className="size-5" />} title="No matching classrooms" description="Try another class name or clear the search." action={<Button variant="outline" size="sm" onClick={() => setSearch('')}>Clear search</Button>} /> : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -135,6 +138,7 @@ export default function ClassroomList() {
         </section>
       </div>
 
+      {joining && <JoinClassDialog onClose={() => setJoining(false)} onJoined={classroom => { setJoining(false); navigate(`/dashboard/class/${classroom.id}?tab=lessons`); }} />}
       <ClassEditorModal state={editor} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); invalidateQueryCache('/api/classes', '/api/tests/classes'); await fetchClasses(true); }} />
       <DeleteClassModal target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={classId => {
         setClasses(current => current.filter(item => item.id !== classId));
