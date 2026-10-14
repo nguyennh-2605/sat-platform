@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, MinusCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, MinusCircle, XCircle } from 'lucide-react';
 
 import { Modal } from '@/components/ui/AppUI';
 import { Badge } from '@/components/ui/badge';
