@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectViewportModal } from './helpers/modal-layout';
 
 const token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.';
 const terms = [
@@ -176,6 +177,7 @@ for (const [mobile, theme] of [[false, 'light'], [true, 'dark']] as const) {
       return route.fulfill({ json: quiz });
     });
     await page.getByRole('button', { name: 'Take quiz', exact: true }).click();
+    await expectViewportModal(page.getByRole('dialog', { name: 'Set up your quiz', exact: true }));
     await page.getByRole('button', { name: 'Start quiz', exact: true }).click();
     await expect(page.getByText('Which meaning best matches this word?', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Check answer' })).toBeDisabled();

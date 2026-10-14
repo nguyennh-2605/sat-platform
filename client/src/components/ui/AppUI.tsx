@@ -5,9 +5,10 @@ import type {
   InputHTMLAttributes,
   KeyboardEvent,
   ReactNode,
+  RefObject,
   SelectHTMLAttributes,
 } from 'react';
-import { useEffect, useId, useLayoutEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Inbox, X } from 'lucide-react';
 import NotificationBell from '../../features/notifications/NotificationBell';
@@ -231,28 +232,27 @@ interface ModalProps {
   footer?: ReactNode;
   className?: string;
   presentation?: 'dialog' | 'content-dialog' | 'content-panel';
-  alignment?: 'content' | 'viewport';
   showBackdrop?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
-export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, children, footer, className, presentation = 'dialog', alignment = 'content', showBackdrop = true }: ModalProps) {
+export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, children, footer, className, presentation = 'dialog', showBackdrop = true, initialFocusRef }: ModalProps) {
   const titleId = useId();
   const subtitleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const returnFocusRef = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
 
-  useLayoutEffect(() => {
-    const overlay = overlayRef.current;
-    if (!open || presentation !== 'content-dialog' || alignment !== 'content' || !overlay) return;
-    const boundary = document.querySelector<HTMLElement>('[data-slot="sidebar-inset"]');
-    const updateBoundary = () => { overlay.style.left = `${Math.max(0, boundary?.getBoundingClientRect().left || 0)}px`; };
-    updateBoundary();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateBoundary);
-    if (boundary) observer?.observe(boundary);
-    window.addEventListener('resize', updateBoundary);
-    return () => { observer?.disconnect(); window.removeEventListener('resize', updateBoundary); overlay.style.left = ''; };
-  }, [open, presentation, alignment]);
+  // Keep the opener before React mounts autoFocus fields inside the popup.
+  useEffect(() => {
+    if (open) return;
+    const rememberFocus = (event: FocusEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('[role="dialog"]')?.getAttribute('aria-labelledby') !== titleId) returnFocusRef.current = target;
+    };
+    document.addEventListener('focusin', rememberFocus);
+    return () => document.removeEventListener('focusin', rememberFocus);
+  }, [open, titleId]);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -260,10 +260,10 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, 
 
   useEffect(() => {
     if (!open) return;
-    const previousActiveElement = document.activeElement as HTMLElement | null;
+    const previousActiveElement = returnFocusRef.current;
     const dialog = dialogRef.current;
     const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    const focusFirst = () => (dialog?.querySelector<HTMLElement>(focusableSelector) || dialog)?.focus();
+    const focusFirst = () => (initialFocusRef?.current || dialog?.querySelector<HTMLElement>(focusableSelector) || dialog)?.focus();
     const frame = window.requestAnimationFrame(focusFirst);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -301,7 +301,7 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, 
       document.body.style.overflow = previousOverflow;
       previousActiveElement?.focus();
     };
-  }, [open]);
+  }, [open, initialFocusRef]);
 
   if (!open) return null;
 
@@ -310,7 +310,6 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, 
 
   const modal = (
     <div
-      ref={overlayRef}
       className={isContentPanel
         ? 'absolute inset-0 z-200 flex min-h-0 min-w-0 bg-white'
         : isContentDialog
@@ -330,7 +329,7 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, 
           ? 'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-surface'
           : isContentDialog
             ? 'flex max-h-[calc(100dvh-2rem)] min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay'
-            : 'w-full max-w-lg overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay',
+            : 'flex max-h-[calc(100dvh-2rem)] min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay',
         className,
       )}>
         <div className={cx(
@@ -346,7 +345,7 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, 
             <X size={18} />
           </Button>
         </div>
-        <div className={isContentPanel ? 'min-h-0 flex-1 overflow-hidden p-6' : isContentDialog ? 'min-h-0 flex-1 overflow-y-auto p-4' : 'p-6'}>{children}</div>
+        <div className={isContentPanel ? 'min-h-0 flex-1 overflow-hidden p-6' : isContentDialog ? 'min-h-0 flex-1 overflow-y-auto p-4' : 'min-h-0 flex-1 overflow-y-auto p-6'}>{children}</div>
         {footer && <div className={cx(
           'flex shrink-0 justify-end',
           isContentDialog ? 'gap-2 border-t border-ui-border bg-muted/50 px-4 py-4 [&>button]:h-8' : 'gap-3 px-6 pb-5',
@@ -356,7 +355,8 @@ export function Modal({ open, title, subtitle, onClose, closeOnBackdrop = true, 
     </div>
   );
 
-  return isContentDialog ? createPortal(modal, document.body) : modal;
+  // Popup positioning must never inherit a route's transform, clipping or sidebar width.
+  return isContentPanel ? modal : createPortal(modal, document.body);
 }
 
 export function TableShell({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

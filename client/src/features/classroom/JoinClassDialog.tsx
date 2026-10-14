@@ -38,7 +38,7 @@ export function JoinClassDialog({ onClose, onJoined }: { onClose: () => void; on
       setError(response?.error || response?.message || 'Unable to join the class. Please try again.');
     } finally { inFlight.current = false; setJoining(false); }
   };
-  return <Modal open presentation="content-dialog" alignment="viewport" title="Join a class" subtitle="Enter the class code shared by your teacher." onClose={close} footer={<><Button variant="outline" disabled={joining} onClick={close}>Cancel</Button><Button type="submit" form={`${fieldId}-form`} disabled={joining || !code.trim()}>{joining && <LoadingSpinner />}{joining ? 'Joining…' : 'Join class'}</Button></>}>
+  return <Modal open presentation="content-dialog" title="Join a class" subtitle="Enter the class code shared by your teacher." onClose={close} footer={<><Button variant="outline" disabled={joining} onClick={close}>Cancel</Button><Button type="submit" form={`${fieldId}-form`} disabled={joining || !code.trim()}>{joining && <LoadingSpinner />}{joining ? 'Joining…' : 'Join class'}</Button></>}>
     <form id={`${fieldId}-form`} onSubmit={event => { event.preventDefault(); void join(); }} className="space-y-3">
       <label htmlFor={`${fieldId}-code`} className="block space-y-2 text-sm font-medium"><span>Class code</span><Input ref={inputRef} id={`${fieldId}-code`} value={code} onChange={event => { setCode(event.target.value); setError(''); }} maxLength={64} disabled={joining} autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="Paste your class code" aria-invalid={Boolean(error)} aria-describedby={`${fieldId}-${error ? 'error' : 'hint'}`} /></label>
       <p id={`${fieldId}-hint`} className="text-xs text-subtle">Ask your teacher for the code if you don’t have one.</p>

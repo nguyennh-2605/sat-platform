@@ -7,7 +7,9 @@ import ReadingText from '../../components/content/ReadingText';
 import { readingTextToHtml } from '../../components/content/readingTextFormat';
 import { DictionaryContext } from '../dictionary/dictionary-context';
 import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
+import { Modal } from '@/components/ui/AppUI';
+import { Textarea } from '@/components/ui/textarea';
+import { Search, Trash2 } from 'lucide-react';
 
 interface Props {
   content: string;
@@ -55,6 +57,7 @@ const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, read
   // UI States
   const [toolbar, setToolbar] = useState<{ x: number; y: number; show: boolean } | null>(null);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const noteInputRef = useRef<HTMLTextAreaElement>(null);
 
   const persistAnnotation = (nextHtml: string, nextNotes: Record<string, string>) => {
     sessionStorage.setItem(annotationStorageKey(content, annotationKey), JSON.stringify({ htmlContent: nextHtml, notes: nextNotes }));
@@ -363,74 +366,18 @@ const InteractiveTextContent: React.FC<Props> = ({ content, isMath = false, read
         </div>
       )}
 
-      {/* --- MODAL EDIT NOTE (Giữ nguyên) --- */}
       {activeNoteId && (
-        <div 
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/5" 
-          onClick={() => setActiveNoteId(null)}
-        >
-          <div 
-            className="bg-white p-5 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] w-[360px] border border-gray-200 animate-in zoom-in-95 duration-200 font-sans" 
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2 text-gray-800">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
-                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-                <h3 className="font-semibold text-[16px] tracking-tight">
-                  Note
-                </h3>
-              </div>
-              
-              {/* Nút Xóa (Dạng Icon tinh tế) */}
-              <button 
-                onClick={deleteActiveNote} 
-                className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-all duration-200"
-                title="Delete note"
-                aria-label="Delete note"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18"></path>
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                </svg>
-              </button>
-            </div>
-            
-            {/* Textarea */}
-            <textarea
-              className="w-full border border-gray-300 rounded-lg p-3.5 text-[15px] text-gray-800 leading-relaxed focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none bg-gray-50/50 hover:bg-white transition-all placeholder:text-gray-400"
-              rows={4}
-              placeholder="Write a note…"
-              value={notes[activeNoteId] || ''}
-              onChange={(e) => setNotes(prev => {
-                const next = { ...prev, [activeNoteId]: e.target.value };
-                persistAnnotation(htmlContent, next);
-                return next;
-              })}
-              autoFocus
-            />
-
-            {/* Footer Buttons */}
-            <div className="mt-5 flex justify-end gap-2.5">
-              <button 
-                onClick={() => setActiveNoteId(null)}
-                className="px-4 py-2 text-[14px] font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 hover:text-gray-800 rounded-full transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => setActiveNoteId(null)}
-                className="px-5 py-2 text-[14px] font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-xs transition-colors"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
+        <Modal open title="Note" presentation="content-dialog" className="max-w-sm!" initialFocusRef={noteInputRef} onClose={() => setActiveNoteId(null)} footer={<>
+          <Button variant="ghost" size="icon" className="mr-auto text-destructive" onClick={deleteActiveNote} aria-label="Delete note"><Trash2 /></Button>
+          <Button variant="outline" onClick={() => setActiveNoteId(null)}>Cancel</Button>
+          <Button onClick={() => setActiveNoteId(null)}>Save</Button>
+        </>}>
+          <Textarea ref={noteInputRef} aria-label="Note" rows={4} placeholder="Write a note…" value={notes[activeNoteId] || ''} onChange={event => setNotes(previous => {
+            const next = { ...previous, [activeNoteId]: event.target.value };
+            persistAnnotation(htmlContent, next);
+            return next;
+          })} />
+        </Modal>
       )}
     </div>
   );

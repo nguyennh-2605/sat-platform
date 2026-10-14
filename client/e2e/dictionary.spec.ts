@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectViewportModal } from './helpers/modal-layout';
 import type { QuestionData } from '../src/types/quiz';
 
 type ReviewQuestion = Pick<QuestionData, 'id' | 'type' | 'blocks' | 'questionText' | 'choices'> & { explanation: string };
@@ -106,7 +107,53 @@ test('Practice looks up passage and choice text without changing answers; highli
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
   await expect(lookup(page)).toContainText('Meaning 1 of ambivalent.');
   expect(lookups).toEqual(['ambivalent', 'ambiguous', 'ambivalent']);
+  await page.keyboard.press('Escape');
+  await selectWord(reading(page, 'ambivalent'), 'ambivalent', true);
+  await page.getByRole('button', { name: 'Add note', exact: true }).click();
+  const note = page.getByRole('dialog', { name: 'Note', exact: true });
+  await expectViewportModal(note);
+  await expect(note.getByRole('textbox', { name: 'Note', exact: true })).toBeFocused();
+  await note.getByRole('textbox', { name: 'Note', exact: true }).fill('Remember this context.');
+  await page.keyboard.press('Escape');
+  await expect(note).toHaveCount(0);
+  await page.locator('.sat-note').click();
+  await expect(note.getByRole('textbox', { name: 'Note', exact: true })).toHaveValue('Remember this context.');
+  await note.getByRole('button', { name: 'Delete note', exact: true }).click();
+  await expect(page.locator('.sat-note')).toHaveCount(0);
 });
+
+for (const width of [320, 1024, 1600]) {
+  test(`Score Report and search dialogs center on the viewport at ${width}px, after resizing and sidebar changes`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 640 });
+    await setup(page);
+    await page.goto('/dashboard/score-report/1');
+    const trigger = page.getByRole('button', { name: 'Review question 1', exact: true });
+    const dialog = page.getByRole('dialog', { name: 'Question 1', exact: true });
+    await trigger.click();
+    await expectViewportModal(dialog);
+    await page.screenshot({ path: `../tmp/score-result-modal-${width}.png`, animations: 'disabled' });
+    await page.setViewportSize({ width: width === 320 ? 390 : width - 100, height: 760 });
+    await expectViewportModal(dialog);
+    await page.mouse.click(4, 200);
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    if (width >= 1024) {
+      const inset = page.locator('[data-slot="sidebar-inset"]');
+      const before = await inset.evaluate(element => element.getBoundingClientRect().left);
+      expect(before).toBeGreaterThan(100);
+      await page.locator('[data-sidebar="trigger"]:visible').click();
+      await expect.poll(() => inset.evaluate(element => element.getBoundingClientRect().left)).toBeLessThan(before);
+    }
+    await trigger.click();
+    await expectViewportModal(dialog);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole('button', { name: 'Search workspace', exact: true }).click();
+    await expectViewportModal(page.getByRole('dialog', { name: 'Search workspace', exact: true }));
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'Search workspace', exact: true })).toBeFocused();
+  });
+}
 
 test('Practice saves a looked-up word without copying its passage or selecting an answer', async ({ page }) => {
   await setup(page);
@@ -278,6 +325,7 @@ for (const theme of ['light', 'dark'] as const) {
         if (view === 'Score Report') {
           await page.goto('/dashboard/score-report/1');
           await page.getByRole('button', { name: 'Review question 1', exact: true }).click();
+          await expectViewportModal(page.getByRole('dialog'));
         } else {
           await page.goto('/dashboard/error-log');
           await page.getByRole('button', { name: 'Dictionary test', exact: true }).click();

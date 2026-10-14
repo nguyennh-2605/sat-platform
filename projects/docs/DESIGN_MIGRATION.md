@@ -107,6 +107,8 @@ This is a presentation-layer migration, not a Next.js migration.
 
 ## Per-screen definition of done
 
+All popup dialogs center on the full viewport, including the sidebar, as requested by the user. Both shared Modal popup presentations portal into document.body without sidebar offsets. The modeless Error Log reflection workspace and inline content panels retain their workspace placement.
+
 - Uses a named pinned reference and records intentional deviations.
 - Keeps existing API calls, permissions, routes, and business behavior.
 - Uses shared primitives and semantic tokens; no local duplicate design system.

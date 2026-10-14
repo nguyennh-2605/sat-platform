@@ -1,11 +1,54 @@
-import { useState } from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useRef, useState } from 'react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Modal } from './AppUI';
 
 afterEach(cleanup);
 
 describe('Modal outside dismissal', () => {
+  it.each(['dialog', 'content-dialog'] as const)('restores the opener when a field autoFocuses in %s', presentation => {
+    function Example() {
+      const [open, setOpen] = useState(false);
+      return <><button onClick={() => setOpen(true)}>Open form</button><Modal open={open} title="Form" presentation={presentation} onClose={() => setOpen(false)}><input autoFocus aria-label="Name" /></Modal></>;
+    }
+    render(<Example />);
+    const trigger = screen.getByRole('button', { name: 'Open form' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus();
+    fireEvent.pointerDown(screen.getByRole('dialog').parentElement!);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('focuses a requested field and restores the trigger on Escape', async () => {
+    function Example() {
+      const [open, setOpen] = useState(false);
+      const inputRef = useRef<HTMLTextAreaElement>(null);
+      return <><button onClick={() => setOpen(true)}>Open note</button><Modal open={open} title="Note" onClose={() => setOpen(false)} initialFocusRef={inputRef}><textarea ref={inputRef} aria-label="Note" /></Modal></>;
+    }
+    render(<Example />);
+    const trigger = screen.getByRole('button', { name: 'Open note' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Note' })).toHaveFocus());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it.each(['dialog', 'content-dialog'] as const)('portals %s outside the sidebar and transformed page container', presentation => {
+    const { container } = render(<div data-slot="sidebar-inset" style={{ transform: 'translateX(0)', overflow: 'hidden', marginLeft: '256px' }}>
+      <Modal open title="Viewport centered" presentation={presentation} onClose={() => {}}>Content</Modal>
+    </div>);
+    const overlay = screen.getByRole('dialog').parentElement!;
+    expect(overlay.parentElement).toBe(document.body);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(overlay).toHaveClass('fixed', 'inset-0', 'items-center', 'justify-center');
+    expect(overlay.style.left).toBe('');
+    expect(screen.getByRole('dialog')).toHaveClass('max-h-[calc(100dvh-2rem)]');
+  });
+
   it.each(['dialog', 'content-dialog'] as const)('closes %s by default and restores focus and scrolling', presentation => {
     function Example() {
       const [open, setOpen] = useState(false);

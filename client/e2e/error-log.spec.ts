@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { ErrorEntry } from '../src/pages/error-log/types';
+import { expectViewportModal } from './helpers/modal-layout';
 
 const token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.';
 const entryId = (index: number) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
@@ -62,6 +63,21 @@ async function mockErrorLog(page: Page, options: { count?: number; questionFailu
 const reflection = (page: Page, source = 'Test source 001', field = 'Why I chose wrong') => page.getByRole('button', { name: `${field} for ${source}. Add reflection.`, exact: true });
 const editor = (page: Page) => page.locator('[data-reflection-editor] .ql-editor');
 const savedText = (html: string | null) => html?.replaceAll('&nbsp;', ' ') ?? '';
+
+for (const width of [320, 1440]) {
+  test(`entry dialogs center on the full viewport at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 640 });
+    await mockErrorLog(page);
+    await page.goto('/dashboard/error-log');
+    const trigger = page.getByRole('button', { name: 'Add entry', exact: true });
+    await trigger.click();
+    const dialog = page.getByRole('dialog', { name: 'Add an error entry', exact: true });
+    await expectViewportModal(dialog);
+    await page.mouse.click(4, 200);
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+}
 
 async function expectFullReflectionSurface(page: Page) {
   await expect(page.locator('[data-reflection-body] [data-slot="rich-text-editor"]')).toHaveCSS('border-width', '0px');

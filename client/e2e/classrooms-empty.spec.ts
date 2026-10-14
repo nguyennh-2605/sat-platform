@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectViewportModal } from './helpers/modal-layout';
 
 const token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.';
 const classCode = 'af820784-9a80-4b5e-bab9-b790e4e1e3c3';
@@ -112,9 +113,18 @@ test('join dialogs dismiss outside or with Escape and restore focus', async ({ p
 });
 
 test('teachers retain Create class and do not get the student join action', async ({ page }) => {
-  await setup(page, { role: 'TEACHER' });
-  await expect(page.getByRole('button', { name: 'Create class', exact: true })).toBeVisible();
+  await setup(page, { role: 'TEACHER', width: 1440 });
+  const trigger = page.getByRole('button', { name: 'Create class', exact: true });
+  await expect(trigger).toBeVisible();
   await expect(page.getByRole('button', { name: 'Join a class', exact: true })).toHaveCount(0);
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Create class', exact: true });
+  await expectViewportModal(dialog);
+  await page.setViewportSize({ width: 320, height: 640 });
+  await expectViewportModal(dialog);
+  await page.mouse.click(4, 200);
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
 });
 
 test('a class-load error remains a retry state instead of claiming the student has no classes', async ({ page }) => {

@@ -9,6 +9,7 @@ import axiosClient from '../../lib/axios';
 import { capitalizeFirstLetter } from '../../utils/text';
 import { Badge, Button, Card, Input } from '../../components/ui/AppUI';
 import { LoadingState } from '../../components/ui/loading';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 interface TestAssignmentManagerProps {
   onClose: () => void;
@@ -304,13 +305,13 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
 
       {/* TEST MODAL */}
       {isTestModalOpen && (
-        <div className="absolute inset-0 z-60 flex items-center justify-center bg-slate-900/50 p-4 md:p-8 animate-in fade-in duration-200">
-          <div role="dialog" aria-modal="true" aria-labelledby="select-tests-title" className="flex h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-card border border-ui-border bg-surface shadow-overlay animate-in zoom-in-95 duration-200">
+        <Dialog open onOpenChange={setIsTestModalOpen}>
+          <DialogContent showCloseButton={false} aria-describedby={undefined} className="flex h-[85dvh] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-5xl flex-col gap-0 overflow-hidden rounded-card border border-ui-border bg-surface p-0 shadow-overlay sm:max-w-5xl">
 
             {/* Modal Header & Breadcrumb */}
             <div className="z-10 flex flex-col gap-4 border-b border-ui-border bg-surface px-6 pb-3 pt-5">
               <div className="flex items-center justify-between">
-                <h3 id="select-tests-title" className="text-xl font-semibold text-foreground">Select tests</h3>
+                <DialogTitle className="text-xl font-semibold text-foreground">Select tests</DialogTitle>
                 <Button onClick={() => setIsTestModalOpen(false)} variant="ghost" size="icon" className="h-8 w-8" aria-label="Close test selector"><X size={18} /></Button>
               </div>
 
@@ -426,8 +427,8 @@ const TestAssignmentManager = ({ onClose, onSubmit, initialData }: TestAssignmen
               </div>
             </div>
 
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
