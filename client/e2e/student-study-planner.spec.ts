@@ -590,8 +590,8 @@ test('personal events retain selected colors, neutral text and distinct hour div
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(state.items().find(item => item.id === 'new')).toMatchObject({ calendarColor: 'VIOLET' });
   const event = eventButton(page, 'Colored revision');
-  const firstBackground = await event.evaluate(element => getComputedStyle(element).backgroundColor);
   await expect(event).toHaveClass(/bg-calendar-coursework-soft/);
+  const firstBackground = await event.evaluate(element => getComputedStyle(element).backgroundColor);
   const titleColor = await event.locator('[data-event-title]').evaluate(element => getComputedStyle(element).color);
   expect(titleColor).toBe(await page.getByRole('heading', { name: 'Study planner', exact: true }).evaluate(element => getComputedStyle(element).color));
   const timeColor = await event.locator('[data-event-time]').evaluate(element => getComputedStyle(element).color);
@@ -607,7 +607,11 @@ test('personal events retain selected colors, neutral text and distinct hour div
   await page.getByRole('option', { name: 'Teal', exact: true }).click();
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  expect(await event.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(firstBackground);
+  expect(state.items().find(item => item.id === 'new')).toMatchObject({ calendarColor: 'TEAL' });
+  await expect(event).toHaveClass(/bg-calendar-vocabulary-soft/);
+  // The button transitions its background after the modal closes; wait for the rendered color.
+  await expect(event).not.toHaveCSS('background-color', firstBackground);
   await page.reload();
   await expect(event).toHaveClass(/bg-calendar-vocabulary-soft/);
+  await expect(event).not.toHaveCSS('background-color', firstBackground);
 });
