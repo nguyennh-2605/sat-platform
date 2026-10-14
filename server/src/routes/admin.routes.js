@@ -5,6 +5,9 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth.middlew
 const router = express.Router();
 const adminOnly = authorizeRole(['ADMIN']);
 const teacherAccess = require('../controllers/teacher-access.controller');
+const feedback = require('../controllers/feedback.controller');
+router.get('/feedback', authenticateToken, adminOnly, feedback.list);
+router.patch('/feedback/:feedbackId', authenticateToken, adminOnly, feedback.review);
 router.get('/teacher-access', authenticateToken, adminOnly, teacherAccess.list);
 router.patch('/teacher-access/:requestId', authenticateToken, adminOnly, teacherAccess.review);
 

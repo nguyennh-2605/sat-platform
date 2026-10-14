@@ -52,5 +52,6 @@ router.use('/account', accountRoutes);
 router.use('/question-bank', questionBankRoutes);
 router.use('/roadmaps', roadmapRoutes);
 router.use('/dictionary', dictionaryRoutes);
+router.use('/feedback', require('./feedback.routes'));
 
 module.exports = router;

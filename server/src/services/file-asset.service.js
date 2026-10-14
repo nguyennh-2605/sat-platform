@@ -94,6 +94,7 @@ exports.completeUpload = async ({ fileAssetId, ownerId }, dependencies = {}) => 
   const studentId = currentUserId(ownerId);
   const asset = await db.fileAsset.findUnique({ where: { id: fileAssetId } });
   if (!asset) throw new ApiError(404, { error: 'Uploaded file was not found.' });
+  if (asset.purpose === 'FEEDBACK_IMAGE') throw new ApiError(404, { error: 'Use the feedback image endpoint.' });
   if (asset.purpose === 'TEST_IMAGE') throw new ApiError(404, { error: 'Use the test image upload endpoint.' });
   if (asset.ownerId !== studentId) throw new ApiError(403, { error: 'You cannot complete this upload.' });
   if (asset.status === 'READY') return serializeAsset(asset);
@@ -123,6 +124,7 @@ exports.getAccessUrl = async ({ fileAssetId, userId, userRole, download = false 
   const requesterId = currentUserId(userId);
   const asset = await db.fileAsset.findUnique({ where: { id: fileAssetId } });
   if (!asset || asset.status !== 'READY') throw new ApiError(404, { error: 'File not found.' });
+  if (asset.purpose === 'FEEDBACK_IMAGE') throw new ApiError(404, { error: 'Use the feedback image endpoint.' });
   if (asset.purpose === 'TEST_IMAGE') throw new ApiError(404, { error: 'Use the test image access endpoint.' });
   if (asset.ownerId !== requesterId && userRole !== 'ADMIN') {
     const accessibleLesson = db.lessonFile?.findFirst ? await db.lessonFile.findFirst({
@@ -159,7 +161,7 @@ exports.cleanupAssets = async ({
   const assets = await db.fileAsset.findMany({
     where: { OR: [
       { status: 'PENDING_UPLOAD', createdAt: { lt: olderThan } },
-      { status: 'READY', createdAt: { lt: olderThan }, items: { none: {} }, lessonFile: null, testImages: { none: {} }, bankQuestions: { none: {} } },
+      { status: 'READY', createdAt: { lt: olderThan }, items: { none: {} }, lessonFile: null, testImages: { none: {} }, bankQuestions: { none: {} }, feedbackAttachment: null },
       { status: 'PENDING_DELETE' },
     ] },
     take: batchSize,

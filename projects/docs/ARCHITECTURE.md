@@ -371,6 +371,20 @@ Question image blocks store a managed `assetId`; the shared renderer resolves sh
 
 Storage maintenance uses `npm run storage:cleanup`; real bucket verification uses the explicitly gated `npm run storage:smoke`. Environment separation, Render Cron setup, R2 lifecycle guidance, and operational response are documented in `projects/docs/STORAGE_OPERATIONS.md`.
 
+### User feedback
+
+The dashboard header's Feedback button is available to every authenticated role beside the theme control. Users choose Critical, Major issue, Minor annoyance, Improvement, or General feedback and send up to 5,000 characters with up to three PNG/JPEG/WebP images (5 MB each). Only the pathname is recorded; query strings and fragments are excluded. Closing the form preserves its draft while the dashboard remains mounted.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/feedback` | JWT + current account | Persist feedback and ready owned image references atomically; submission UUID makes retries idempotent |
+| `POST` | `/api/feedback/images` | JWT + current account | Upload one multipart `image`, validate signature and dimensions, and write server-owned private object storage |
+| `GET` | `/api/feedback/images/:fileAssetId` | JWT + sender/current ADMIN | Issue a five-minute read URL; admins can only read images linked to submitted feedback |
+| `GET` | `/api/admin/feedback` | JWT + current ADMIN | Filter by `status` and `level` (or `ALL`); newest-first composite cursor pagination with 25 rows per page |
+| `PATCH` | `/api/admin/feedback/:feedbackId` | JWT + current ADMIN | Set New, In progress, or Resolved with `expectedStatus` to reject stale concurrent reviews |
+
+The Admin-only Feedback inbox at `/dashboard/feedback` displays sender identity, severity, text, screenshots, submission time, and status. `Feedback` owns `FeedbackAttachment` links to `FEEDBACK_IMAGE` assets; generic file endpoints cannot access or complete these assets. The storage cleanup job excludes linked feedback screenshots and collects abandoned uploads. Submission and image upload limits are per authenticated account (10 reports and 30 images per hour). Text-only feedback works without object storage. Apply `20261014090000_add_feedback` and regenerate Prisma Client before starting the updated API.
+
 **Total: 55+ endpoints**
 
 ---

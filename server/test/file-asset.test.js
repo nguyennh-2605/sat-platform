@@ -179,13 +179,14 @@ test('cleanup deletes orphan assets and keeps failures pending for a retry', asy
   assert.deepEqual(pending, [{ id: 'asset-failed', status: 'PENDING_DELETE' }]);
 });
 
-test('cleanup excludes managed images referenced by a test', async () => {
+test('cleanup excludes images referenced by tests, bank questions, and feedback', async () => {
   let where;
   const db = createDb();
   db.fileAsset.findMany = async input => { where = input.where; return []; };
   await fileAssetService.cleanupAssets({ db, clock: () => 0 });
   assert.deepEqual(where.OR[1].testImages, { none: {} });
   assert.deepEqual(where.OR[1].bankQuestions, { none: {} });
+  assert.equal(where.OR[1].feedbackAttachment, null);
 });
 
 test('cleanup uses bounded concurrency instead of deleting the whole batch at once', async () => {

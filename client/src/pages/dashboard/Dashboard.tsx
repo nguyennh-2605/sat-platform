@@ -11,6 +11,7 @@ import {
   EllipsisVertical,
   LogOut,
   Moon,
+  MessageSquare,
   Search,
   Settings,
   Sun,
@@ -54,6 +55,7 @@ import { logoutAuthSession } from '../../lib/authSession';
 import { FocusClock } from '../../features/focus-timer/FocusClock';
 import { subscribeAuthSession } from '../../lib/authSession';
 import { useDashboardTheme } from '../../features/theme/dashboardTheme';
+import { FeedbackButton } from '@/features/feedback/FeedbackButton';
 
 const navigation = [
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -62,6 +64,7 @@ const navigation = [
   { to: '/dashboard/vocabulary', label: 'Vocabulary', icon: BookA },
   { to: '/dashboard/roadmap', label: 'Roadmap', icon: MapIcon, roles: ['ADMIN'] },
   { to: '/dashboard/teacher-access', label: 'Teacher access', icon: GraduationCap, roles: ['ADMIN'] },
+  { to: '/dashboard/feedback', label: 'Feedback inbox', icon: MessageSquare, roles: ['ADMIN'] },
   { to: '/dashboard/question-bank', label: 'Question Bank', icon: Database, roles: ['TEACHER', 'ADMIN'] },
   { to: '/dashboard/error-log', label: 'Error Log', icon: AlertCircle },
   { to: '/dashboard/results-analytics', label: 'Results & Analytics', icon: BarChart3 },
@@ -295,6 +298,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-1">
               {localStorage.getItem('userRole') === 'STUDENT' && <FocusClock />}
               <ThemeToggle />
+              <FeedbackButton />
             </div>
           </header>
 

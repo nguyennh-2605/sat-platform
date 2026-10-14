@@ -249,6 +249,7 @@ test('completed Score Report ignores legacy lock flags and supports keyboard loo
   await setup(page, { legacyLocked: true });
   await page.goto('/dashboard/score-report/1');
   await page.getByRole('button', { name: 'Review question 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Show explanation', exact: true }).click();
   await selectWord(reading(page, 'compelling'), 'compelling');
   await page.getByRole('button', { name: 'Look up', exact: true }).focus();
   await page.keyboard.press('Enter');
@@ -325,6 +326,7 @@ for (const theme of ['light', 'dark'] as const) {
         if (view === 'Score Report') {
           await page.goto('/dashboard/score-report/1');
           await page.getByRole('button', { name: 'Review question 1', exact: true }).click();
+          await page.getByRole('button', { name: 'Show explanation', exact: true }).click();
           await expectViewportModal(page.getByRole('dialog'));
         } else {
           await page.goto('/dashboard/error-log');

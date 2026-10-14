@@ -72,6 +72,51 @@ model User {
   roadmapProgress            StudentMilestoneProgress[]
   teacherAccessRequest       TeacherAccessRequest?         @relation("TeacherAccessApplicant")
   reviewedTeacherRequests    TeacherAccessRequest[]        @relation("TeacherAccessReviewer")
+  feedback                   Feedback[]                    @relation("FeedbackAuthor")
+  reviewedFeedback           Feedback[]                    @relation("FeedbackReviewer")
+}
+
+enum FeedbackLevel {
+  CRITICAL
+  MAJOR
+  MINOR
+  IMPROVEMENT
+  GENERAL
+}
+
+enum FeedbackStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+}
+
+model Feedback {
+  id           String         @id @default(uuid())
+  userId       Int
+  level        FeedbackLevel
+  message      String         @db.VarChar(5000)
+  pagePath     String?        @db.VarChar(500)
+  status       FeedbackStatus @default(NEW)
+  reviewedById Int?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  user         User           @relation("FeedbackAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy   User?          @relation("FeedbackReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  attachments  FeedbackAttachment[]
+
+  @@index([status, createdAt, id])
+  @@index([level, createdAt, id])
+  @@index([createdAt, id])
+  @@index([userId, createdAt])
+}
+
+model FeedbackAttachment {
+  feedbackId  String
+  fileAssetId String    @unique
+  feedback    Feedback  @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  asset       FileAsset @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
+
+  @@id([feedbackId, fileAssetId])
 }
 
 enum TeacherAccessStatus {
@@ -237,6 +282,7 @@ model FileAsset {
   lessonFile    LessonFile?
   testImages    TestImageUsage[]
   bankQuestions QuestionBankImageUsage[]
+  feedbackAttachment FeedbackAttachment?
 
   @@index([ownerId, status, createdAt])
   @@index([status, createdAt])
@@ -776,6 +822,7 @@ enum FileAssetStatus {
 enum FileAssetPurpose {
   GENERAL
   TEST_IMAGE
+  FEEDBACK_IMAGE
 }
 
 enum DeliveryStatus {
