@@ -53,7 +53,7 @@
     "googleapis": "^171.4.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
-    "katex": "^0.16.47",
+    "katex": "^0.19.0",
     "mammoth": "^1.11.0",
     "multer": "^2.1.1",
     "pdf-extraction": "^1.0.2",
