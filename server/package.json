@@ -11,6 +11,7 @@
     "test": "node --test test/*.test.js",
     "test:deploy": "node scripts/deploy-smoke-test.js",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:prepare:question-bank": "npm run db:import:question-bank -- --apply --require-render && npm run db:repair-question-bank-rw-graphs -- --apply --require-render && npm run db:repair-question-bank-math-graphs -- --apply --require-render && npm run db:publish-question-bank -- --apply --require-render && npm run db:audit-question-bank-images -- --require-render",
     "db:import:question-bank": "node scripts/import-question-bank-production.js",
     "db:repair-question-bank-rw-graphs": "node scripts/repair-question-bank-rw-graphs.js",
     "db:repair-question-bank-math-graphs": "node scripts/repair-question-bank-math-graphs.js",
@@ -30,6 +31,7 @@
     "admin:revoke-sessions": "node scripts/admin-cli.js revoke-sessions",
     "admin:demote": "node scripts/admin-cli.js demote",
     "start": "node index.js",
+    "start:render": "prisma migrate deploy && npm start",
     "postinstall": "prisma generate"
   },
   "keywords": [],

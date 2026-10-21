@@ -8,6 +8,7 @@ This runbook assumes the repository CI workflow is green before a deployment. Pr
 - Frontend root: `client`; install `npm ci`; build `npm run build`; publish `dist`.
 - Backend root: `server`; install `npm ci`; start `npm start`.
 - Database schema changes: run `npm run db:migrate:deploy` as the backend pre-deploy command.
+- Render without a separate pre-deploy phase: use `npm run start:render` as the Start Command. It applies migrations before starting the API.
 - Liveness probe: `GET /health` checks only the Node process.
 - Readiness probe: `GET /ready` checks PostgreSQL and returns `503` without leaking the database error when unavailable.
 
@@ -55,6 +56,34 @@ All `VITE_*` values are public browser configuration. Never put a private API se
 8. Check Sentry and structured logs using the deployment commit and request IDs.
 
 The deploy smoke variables are documented in `server/scripts/deploy-smoke-test.js`. Use only a dedicated test student and disposable test assignment. Do not paste its token into an issue or workflow log.
+
+## Switching databases and preparing the Question Bank
+
+Changing `DATABASE_URL` does not transfer records. Prisma migrations create the schema, but do not restore users, classes, attempts, or Question Bank content. To preserve an existing installation, restore its database backup into the replacement database and verify that the API points to it. Keep the corresponding object-storage bucket and credentials available for restored file metadata.
+
+Do not put `db:publish-question-bank` or `db:audit-question-bank-images` in the API Start Command. The publisher only updates existing records. The image audit intentionally fails when the bundled 3,767 questions or repaired graphs are absent, which prevents `npm start` from running in a chained command on a fresh database.
+
+Render configuration (service root: `server`):
+
+- Build Command: `npm ci` (the existing postinstall generates Prisma Client).
+- Start Command: `npm run start:render`.
+- Alternatively, use `npm run db:migrate:deploy` as Pre-Deploy Command and `npm start` as Start Command.
+- Health Check Path: `/ready`.
+
+For an intentionally fresh database:
+
+1. Deploy the API with the Start Command above so Google sign-in can create the owner's account.
+2. Sign in with the platform owner's real Google account and promote that account using the production CLI procedure in `GOOGLE_AUTH_SETUP.md`. The importer requires an existing Admin; it does not create one or grant roles automatically.
+3. Confirm the Render service's `DATABASE_URL` and production object-storage settings point to the intended environment.
+4. In Render Shell, from `server`, run:
+
+   ```bash
+   npm run db:prepare:question-bank
+   ```
+
+This explicit maintenance command imports the checked-in dataset, repairs Reading and Writing graphs, repairs Math graphs, publishes System questions, and audits the result, stopping at the first failure. It requires Render and a non-loopback database for writes. Matching imports and graph repairs can be rerun without duplicating questions or versions; conflicting content still fails for inspection. Publishing retains the existing publisher's behavior of publishing all System items, so run this command only when that is intended.
+
+Confirm the final audit reports `questionCount: 3767`, zero pending/conflicting graphs, and no failures. If the command fails because storage is unavailable or content conflicts, resolve the reported cause and rerun it. The API can remain available for account setup while the Question Bank is being prepared. This command only loads the bundled Question Bank; it does not recover other data from the old database.
 
 ## Rollback
 
